@@ -1,0 +1,4 @@
+[workspace]
+
+members = [ "hidive", "skydive" ]
+exclude = [ "pydive" ]
