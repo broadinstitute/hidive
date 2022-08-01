@@ -1,15 +1,12 @@
-use std::ffi::OsString;
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 mod prepare;
 mod assemble;
 mod join;
 
-use skydive;
-
-/// A fictional versioning CLI
+/// Analysis of high-diversity loci through genome co-assembly of long/short reads.
 #[derive(Debug, Parser)] // requires `derive` feature
 #[clap(name = "hidive")]
 #[clap(about = "Analysis of high-diversity loci through genome co-assembly of long/short reads.", long_about = None)]
