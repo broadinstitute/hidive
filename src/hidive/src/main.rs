@@ -1,84 +1,84 @@
+use std::ffi::OsString;
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand};
 
 mod prepare;
 mod assemble;
 mod join;
-mod impute;
 
 use skydive;
 
-#[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
-#[clap(propagate_version = true)]
-struct CLI {
+/// A fictional versioning CLI
+#[derive(Debug, Parser)] // requires `derive` feature
+#[clap(name = "hidive")]
+#[clap(about = "Analysis of high-diversity loci through genome co-assembly of long/short reads.", long_about = None)]
+#[clap(author = "Kiran V Garimella (kiran@broadinstitute.org)")]
+struct Cli {
     #[clap(subcommand)]
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 enum Commands {
-    /// Prepare a single long-read dataset for inclusion into a hidive graph.
-    Prepare(Prepare),
+    /// Extract target haplotypes from a FASTA file.
+    #[clap(arg_required_else_help = true)]
+    Prepare {
+        /// Loci to extract from FASTA files.
+        #[clap(short, long, value_parser)]
+        locus: Option<Vec<String>>,
 
-    /// Assemble a hidive graph for a single long-read or short-read dataset.
-    Assemble(Assemble),
+        /// Gene features in GFF2/GFF3/GTF format.
+        #[clap(short, long, value_parser)]
+        gff: Option<PathBuf>,
 
-    /// Join multiple hidive graphs.
-    Join(Join),
+        /// Output graph path.
+        #[clap(short, long, value_parser)]
+        output: PathBuf,
+        
+        /// FASTA files (optionally compressed) from which to extract haplotypes.
+        #[clap(required = true, value_parser)]
+        fasta: Vec<PathBuf>,
+    },
+    /// Join two or more hidive graphs into a single graph.
+    #[clap(arg_required_else_help = true)]
+    Join {
+        /// Output graph path.
+        #[clap(short, long, value_parser)]
+        output: PathBuf,
 
-    /// Impute the presence of missing k-mers in a joined hidive graph.
-    Impute(Impute),
-}
-
-#[derive(Args)]
-struct Prepare {
-    /// first number
-    number_one: i32,
-
-    /// second number
-    number_two: i32
-}
-
-#[derive(Args)]
-struct Assemble {
-    /// first number
-    number_one: i32,
-
-    /// second number
-    number_two: i32
-}
-
-#[derive(Args)]
-struct Join {
-    /// first number
-    number_one: i32,
-
-    /// second number
-    number_two: i32
-}
-
-#[derive(Args)]
-struct Impute {
-    /// first number
-    number_one: i32,
-
-    /// second number
-    number_two: i32
+        /// Hidive graphs to combine.
+        #[clap(required = true, value_parser)]
+        graph: Vec<PathBuf>,
+    },
+    /// Assemble target locus from long/short-read data in a BAM/CRAM file.
+    #[clap(arg_required_else_help = true)]
+    Assemble {
+        /// The remote to clone
+        #[clap(value_parser)]
+        remote: String,
+    },
+    #[clap(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 fn main() {
-    let num = 10;
-    println!("Hello, world! {} plus one is {}!",
-        num,
-        skydive::add_one(num)
-    );
+    let args = Cli::parse();
 
-    let cli = CLI::parse();
+    match args.command {
+        Commands::Prepare { locus, gff, output, fasta } => {
+            prepare::start(locus, gff, output, fasta);
+        }
+        Commands::Join { output, graph } => {
+            println!("Pushing to {} {:?}", output.display(), graph);
+        }
+        Commands::Assemble { remote } => {
+            println!("Adding {}", remote);
+        }
+        Commands::External(args) => {
+            println!("Calling out to {:?} with {:?}", &args[0], &args[1..]);
+        }
+    }
 
-    match cli.command {
-        Commands::Prepare(prepare) => prepare::start(&num, &2),
-        Commands::Assemble(assemble) => assemble::start(&num, &3),
-        Commands::Join(join) => join::start(&num, &4),
-        Commands::Impute(impute) => impute::start(&num, &5),
-    };
+    // Continued program logic goes here...
 }
