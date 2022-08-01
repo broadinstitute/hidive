@@ -1,3 +1,5 @@
-pub fn start(number_one: &i32, number_two: &i32) {
-    println!("The answer is {}!", number_one * number_two)
+use std::path::PathBuf;
+
+pub fn start(output: PathBuf, graph: Vec<PathBuf>) {
+    println!("The answer is {} {:?}!", output.display(), graph)
 }

@@ -54,12 +54,18 @@ enum Commands {
     /// Assemble target locus from long/short-read data in a BAM/CRAM file.
     #[clap(arg_required_else_help = true)]
     Assemble {
-        /// The remote to clone
-        #[clap(value_parser)]
-        remote: String,
+        /// Loci to extract from BAM/CRAM files.
+        #[clap(short, long, value_parser)]
+        locus: Option<Vec<String>>,
+
+        /// Output graph path.
+        #[clap(short, long, value_parser)]
+        output: PathBuf,
+        
+        /// Aligned reads in BAM/CRAM format.
+        #[clap(required = true, value_parser)]
+        reads: PathBuf,
     },
-    #[clap(external_subcommand)]
-    External(Vec<OsString>),
 }
 
 fn main() {
@@ -70,15 +76,10 @@ fn main() {
             prepare::start(locus, gff, output, fasta);
         }
         Commands::Join { output, graph } => {
-            println!("Pushing to {} {:?}", output.display(), graph);
+            join::start(output, graph);
         }
-        Commands::Assemble { remote } => {
-            println!("Adding {}", remote);
-        }
-        Commands::External(args) => {
-            println!("Calling out to {:?} with {:?}", &args[0], &args[1..]);
+        Commands::Assemble { locus, output, reads } => {
+            assemble::start(locus, output, reads);
         }
     }
-
-    // Continued program logic goes here...
 }
