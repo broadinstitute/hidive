@@ -6,7 +6,6 @@ mod prepare;
 mod assemble;
 mod join;
 
-/// Analysis of high-diversity loci through genome co-assembly of long/short reads.
 #[derive(Debug, Parser)] // requires `derive` feature
 #[clap(name = "hidive")]
 #[clap(about = "Analysis of high-diversity loci through genome co-assembly of long/short reads.", long_about = None)]
@@ -21,6 +20,10 @@ enum Commands {
     /// Extract target haplotypes from a FASTA file.
     #[clap(arg_required_else_help = true)]
     Prepare {
+        /// Output graph path.
+        #[clap(short, long, value_parser)]
+        output: PathBuf,
+        
         /// Loci to extract from FASTA files.
         #[clap(short, long, value_parser)]
         locus: Option<Vec<String>>,
@@ -29,10 +32,6 @@ enum Commands {
         #[clap(short, long, value_parser)]
         gff: Option<PathBuf>,
 
-        /// Output graph path.
-        #[clap(short, long, value_parser)]
-        output: PathBuf,
-        
         /// FASTA files (optionally compressed) from which to extract haplotypes.
         #[clap(required = true, value_parser)]
         fasta: Vec<PathBuf>,
@@ -51,14 +50,14 @@ enum Commands {
     /// Assemble target locus from long/short-read data in a BAM/CRAM file.
     #[clap(arg_required_else_help = true)]
     Assemble {
-        /// Loci to extract from BAM/CRAM files.
-        #[clap(short, long, value_parser)]
-        locus: Option<Vec<String>>,
-
         /// Output graph path.
         #[clap(short, long, value_parser)]
         output: PathBuf,
         
+        /// Loci to extract from BAM/CRAM files.
+        #[clap(short, long, value_parser)]
+        locus: Option<Vec<String>>,
+
         /// Aligned reads in BAM/CRAM format.
         #[clap(required = true, value_parser)]
         reads: PathBuf,
@@ -69,14 +68,14 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Prepare { locus, gff, output, fasta } => {
-            prepare::start(locus, gff, output, fasta);
+        Commands::Prepare { output, locus, gff, fasta } => {
+            prepare::start(output, locus, gff, fasta);
         }
         Commands::Join { output, graph } => {
             join::start(output, graph);
         }
-        Commands::Assemble { locus, output, reads } => {
-            assemble::start(locus, output, reads);
+        Commands::Assemble { output, locus, reads } => {
+            assemble::start(output, locus, reads);
         }
     }
 }
