@@ -6,7 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+arrow2 = "0.13.0"
 bio = "*"
 clap = { version = "*", features = ["derive"] }
+parquet2 = "0.14.2"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }
 skydive = { path = "../skydive" }
