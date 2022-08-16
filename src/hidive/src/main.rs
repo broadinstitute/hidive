@@ -17,7 +17,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Extract target haplotypes from a FASTA file.
+    /// Extract target haplotypes from FASTA file(s).
     #[clap(arg_required_else_help = true)]
     Prepare {
         /// Output graph path.
@@ -32,9 +32,9 @@ enum Commands {
         #[clap(short, long, value_parser)]
         gff: Option<PathBuf>,
 
-        /// FASTA files (optionally compressed) from which to extract haplotypes.
+        /// Indexed FASTA files from which to extract haplotypes.
         #[clap(required = true, value_parser)]
-        fasta: Vec<PathBuf>,
+        fasta: PathBuf,
     },
     /// Join two or more hidive graphs into a single graph.
     #[clap(arg_required_else_help = true)]
@@ -69,7 +69,7 @@ fn main() {
 
     match args.command {
         Commands::Prepare { output, locus, gff, fasta } => {
-            prepare::start(output, locus, gff, fasta);
+            prepare::start(output, &locus, gff, fasta);
         }
         Commands::Join { output, graph } => {
             join::start(output, graph);

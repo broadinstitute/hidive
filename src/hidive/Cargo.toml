@@ -9,6 +9,9 @@ edition = "2021"
 arrow2 = "0.13.0"
 bio = "*"
 clap = { version = "*", features = ["derive"] }
+debruijn = "0.3.4"
+noodles = "*"
 parquet2 = "0.14.2"
+regex = "*"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }
 skydive = { path = "../skydive" }
