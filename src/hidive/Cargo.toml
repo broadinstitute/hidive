@@ -6,12 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow2 = "0.13.0"
+arrow2 = "*"
 bio = "*"
 clap = { version = "*", features = ["derive"] }
-debruijn = "0.3.4"
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
 noodles = "*"
-parquet2 = "0.14.2"
+parquet2 = "*"
+petgraph = "*"
+rayon = "*"
 regex = "*"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }
 skydive = { path = "../skydive" }
+
+[profile.release]
+debug = true
