@@ -1,20 +1,17 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::str;
-use debruijn::compression::{compress_kmers_with_hash, ScmapCompress, compress_graph};
-use debruijn::graph::DebruijnGraph;
+use debruijn::compression::{compress_kmers_with_hash, ScmapCompress};
 use regex::Regex;
 
 use bio::io::fasta::IndexedReader;
-use bio::io::gff;
+// use bio::io::gff;
 use bio::utils::Interval;
 
-use debruijn::{Dir, Exts};
-use debruijn::{self, Kmer};
-use debruijn::kmer::{self, Kmer15};
-use debruijn::filter::{self, KmerSummarizer, CountFilter};
+use debruijn::Exts;
+use debruijn::*;
+use debruijn::kmer::{Kmer15};
 use debruijn::dna_string::DnaString;
-use debruijn::clean_graph::CleanGraph;
 
 // use graph::BaseGraph;
 
@@ -27,11 +24,6 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
 
     let (chrs, intervals) = get_intervals(locus, &faidx);
 
-    let total_interval_length = sum_interval_lengths(&intervals);
-    if total_interval_length > TOTAL_INTERVAL_LENGTH_LIMIT {
-        panic!("Total interval length is too large ({} bp); must be less than {} bp.", total_interval_length, TOTAL_INTERVAL_LENGTH_LIMIT);
-    }
-
     let fwd_seqs = get_sequences(&chrs, &intervals, faidx);
 
     let mut seqs = Vec::new();
@@ -42,14 +34,25 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
         seqs.push((dna_string, Exts::empty(), 0));
     }
 
-    let (valid_kmers, _) =
-        filter::filter_kmers::<Kmer15, _, _, _, _>(
-            &seqs,
-            &Box::new(filter::CountFilter::new(1)),
-            true,
-            true,
-            4
-        );
+    let (valid_kmers, _) = filter::filter_kmers::<Kmer15, _, _, _, _>(
+        &seqs,
+        &Box::new(filter::CountFilter::new(0)),
+        true,
+        true,
+        4
+    );
+
+    let mut num_kmers = 0;
+    for v in valid_kmers.iter() {
+        if *v.2 > 1 {
+            println!("{:?} {:?} {:?}", v.0, v.1, v.2);
+            println!("{:?}", valid_kmers.get(v.0));
+        }
+
+        num_kmers += 1;
+    }
+
+    println!("{}", num_kmers);
 
     let dbg = compress_kmers_with_hash(
         true,
@@ -57,17 +60,19 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
         &valid_kmers)
         .finish();
 
+    // println!("{:?} {:?} {:?}", seqs.len(), valid_kmers.len(), dbg.len());
+
     let mut buffer = File::create(output).unwrap();
     dbg.write_gfa(&mut buffer).unwrap();
 
     /*
     [x] vec loci (chrs and intervals (equal length))
-    [x] - If locus vector is empty:
-    [x]  - Add all loci to loci vec
-    [x] - Else
-    [x]  - Add all contig coordinates to loci vec
+    [x] - if locus vector is empty:
+    [x]  - add all loci to loci vec
+    [x] - else
+    [x]  - add all contig coordinates to loci vec
 
-    [x] Abort if we try to add more than 100 megabases of data to the vector
+    [x] abort if we try to add more than 100 megabases of data to the vector
 
     [x] vec sequences
     [x] for locus in loci:
@@ -133,7 +138,16 @@ fn get_intervals(locus: &Option<Vec<String>>, faidx: &IndexedReader<std::fs::Fil
         };
     }
 
+    check_interval_length_limit(&intervals);
+
     (chrs, intervals)
+}
+
+fn check_interval_length_limit(intervals: &[Interval<u64>]) {
+    let total_interval_length = sum_interval_lengths(intervals);
+    if total_interval_length > TOTAL_INTERVAL_LENGTH_LIMIT {
+        panic!("Total interval length is too large ({} bp); must be less than {} bp.", total_interval_length, TOTAL_INTERVAL_LENGTH_LIMIT);
+    }
 }
 
 fn sum_interval_lengths(intervals: &[Interval<u64>]) -> u64 {
@@ -144,23 +158,4 @@ fn sum_interval_lengths(intervals: &[Interval<u64>]) -> u64 {
     }
 
     sum
-}
-
-pub struct KmerCountSummarize {
-    min_kmer_obs: usize,
-}
-
-impl KmerSummarizer<u8, u8> for KmerCountSummarize {
-    fn summarize<K, F: Iterator<Item = (K, Exts, u8)>>(&self, items: F) -> (bool, Exts, u8) {
-        let mut all_exts = Exts::empty();
-
-        let mut nreads = 0;
-
-        for (_, exts, _) in items {
-            nreads += 1;
-            all_exts = all_exts.add(exts);
-        }
-
-        (nreads >= self.min_kmer_obs, all_exts, 0)
-    }
 }
