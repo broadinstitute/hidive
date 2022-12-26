@@ -1,21 +1,18 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::str;
-use debruijn::compression::{compress_kmers_with_hash, ScmapCompress};
 use regex::Regex;
 
 use bio::io::fasta::IndexedReader;
-// use bio::io::gff;
 use bio::utils::Interval;
+// use bio::io::gff;
 
-use debruijn::Exts;
-use debruijn::*;
-use debruijn::kmer::{Kmer15};
 use debruijn::dna_string::DnaString;
-
-// use graph::BaseGraph;
+use debruijn::*;
+use debruijn::kmer::*;
 
 use skydive;
+use skydive::dbg::DeBruijnGraph;
 
 const TOTAL_INTERVAL_LENGTH_LIMIT: u64 = 100_000_000;
 
@@ -26,44 +23,18 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
 
     let fwd_seqs = get_sequences(&chrs, &intervals, faidx);
 
-    let mut seqs = Vec::new();
-    for fwd_seq in fwd_seqs {
-        let seq: Vec<u8> = fwd_seq.into_iter().map(debruijn::base_to_bits).collect();
-        let dna_string = DnaString::from_bytes(&seq);
+    println!("{:?} {:?} {:?}", chrs.len(), intervals.len(), fwd_seqs.len());
 
-        seqs.push((dna_string, Exts::empty(), 0));
-    }
+    let mut g = DeBruijnGraph::new();
 
-    let (valid_kmers, _) = filter::filter_kmers::<Kmer15, _, _, _, _>(
-        &seqs,
-        &Box::new(filter::CountFilter::new(0)),
-        true,
-        true,
-        4
-    );
+    fwd_seqs.iter().for_each(|s| {
+        g.add(s);
+    });
 
-    let mut num_kmers = 0;
-    for v in valid_kmers.iter() {
-        if *v.2 > 1 {
-            println!("{:?} {:?} {:?}", v.0, v.1, v.2);
-            println!("{:?}", valid_kmers.get(v.0));
-        }
+    println!("{:?}", g);
 
-        num_kmers += 1;
-    }
-
-    println!("{}", num_kmers);
-
-    let dbg = compress_kmers_with_hash(
-        true,
-        &ScmapCompress::new(),
-        &valid_kmers)
-        .finish();
-
-    // println!("{:?} {:?} {:?}", seqs.len(), valid_kmers.len(), dbg.len());
-
-    let mut buffer = File::create(output).unwrap();
-    dbg.write_gfa(&mut buffer).unwrap();
+    // let mut buffer = File::create(output).unwrap();
+    // dbg.write_gfa(&mut buffer).unwrap();
 
     /*
     [x] vec loci (chrs and intervals (equal length))
@@ -79,7 +50,7 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
     [ ] - if gff provided:
     [ ]   - get gff records
     [x] - get sequence
-    [x] - construct graph
+    [ ] - construct graph
     [ ] - add links to graph
     */
 }
@@ -94,8 +65,12 @@ pub fn start(output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>
 //     }
 // }
 
-fn get_sequences(chrs: &[String], intervals: &[Interval<u64>], mut faidx: IndexedReader<std::fs::File>) -> Vec<Vec<u8>> {
-    let mut seqs: Vec<Vec<u8>> = Vec::new();
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
+
+fn get_sequences(chrs: &[String], intervals: &[Interval<u64>], mut faidx: IndexedReader<std::fs::File>) -> Vec<DnaString> {
+    let mut seqs: Vec<DnaString> = Vec::new();
 
     for (_, (chr, interval)) in chrs.iter().zip(intervals.iter()).enumerate() {
         let mut seq: Vec<u8> = Vec::new();
@@ -108,7 +83,12 @@ fn get_sequences(chrs: &[String], intervals: &[Interval<u64>], mut faidx: Indexe
             .read(&mut seq)
             .expect("Couldn't read the interval");
 
-        seqs.push(seq);
+        for split_seq in seq.split(|ch| *ch == b'N') {
+            if split_seq.len() > 0 {
+                let split_seq_two_bit: Vec<u8> = split_seq.to_vec().into_iter().map(debruijn::base_to_bits).collect();
+                seqs.push(DnaString::from_bytes(&split_seq_two_bit));
+            }
+        }
     }
 
     seqs

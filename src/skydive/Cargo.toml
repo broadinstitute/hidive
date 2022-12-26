@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+petgraph = "*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+unzip-n = "*"

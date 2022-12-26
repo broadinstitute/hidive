@@ -16,6 +16,7 @@ petgraph = "*"
 rayon = "*"
 regex = "*"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }
+serde_json = "*"
 skydive = { path = "../skydive" }
 
 [profile.release]

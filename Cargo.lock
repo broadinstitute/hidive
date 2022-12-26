@@ -635,6 +635,7 @@ dependencies = [
  "rayon",
  "regex",
  "rust-htslib",
+ "serde_json",
  "skydive",
 ]
 
@@ -1317,6 +1318,14 @@ checksum = "f27f6278552951f1f2b8cf9da965d10969b2efdea95a6ec47987ab46edfe263a"
 [[package]]
 name = "skydive"
 version = "0.1.0"
+dependencies = [
+ "debruijn",
+ "petgraph",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "unzip-n",
+]
 
 [[package]]
 name = "smallvec"
@@ -1489,6 +1498,17 @@ name = "unicode-segmentation"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e8820f5d777f6224dc4be3632222971ac30164d4a258d595640799554ebfd99"
+
+[[package]]
+name = "unzip-n"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2e7e85a0596447f0f2ac090e16bc4c516c6fe91771fb0c0ccf7fa3dae896b9c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "url"
