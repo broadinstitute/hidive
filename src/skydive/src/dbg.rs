@@ -5,6 +5,7 @@ use debruijn::{kmer::*, Vmer};
 
 use std::collections::HashMap;
 
+/// Represents a DeBruijn graph with a built-in and fixed k-mer size of 15.
 #[derive(Debug)]
 pub struct DeBruijnGraph {
     g: Graph<Kmer15, u32>,
@@ -12,6 +13,7 @@ pub struct DeBruijnGraph {
 }
 
 impl DeBruijnGraph {
+    /// Create an empty de Bruijn graph.
     pub fn new() -> Self {
         DeBruijnGraph {
             g: Graph::<Kmer15, u32>::new(),
@@ -19,12 +21,14 @@ impl DeBruijnGraph {
         }
     }
 
+    /// Add a vector of DnaString sequences to the graph as k-mers and edges.
     pub fn add_all(&mut self, seqs: &Vec<DnaString>) {
         seqs.iter().for_each(|s| {
             self.add(s);
         });
     }
 
+    /// Add a single DnaString sequence to the graph as k-mers and edges.
     pub fn add(&mut self, s: &DnaString) {
         let first_kmer = s.first_kmer::<Kmer15>();
         let mut n1 = self.add_vertex(first_kmer);
@@ -38,10 +42,12 @@ impl DeBruijnGraph {
         }
     }
 
+    /// Check if a given k-mer exists in the graph.
     pub fn has_vertex(&mut self, v: &Kmer15) -> bool {
         self.idx.contains_key(v)
     }
 
+    /// Get the internal index associated with a particular k-mer.
     pub fn get_index(&mut self, v: &Kmer15) -> Result<&NodeIndex, String> {
         if !self.has_vertex(v) {
             return Err("Vertex not found".to_string());
@@ -50,6 +56,7 @@ impl DeBruijnGraph {
         return Ok(self.idx.get(v).unwrap())
     }
 
+    /// Add a single k-mer to the graph.
     pub fn add_vertex(&mut self, v: Kmer15) -> NodeIndex {
         if self.has_vertex(&v) {
             return *self.get_index(&v).unwrap();
@@ -62,6 +69,7 @@ impl DeBruijnGraph {
         ni
     }
 
+    /// Add a single edge between two nodes to the graph.
     pub fn add_edge(&mut self, n1: NodeIndex, n2: NodeIndex, e: u32) -> EdgeIndex {
         self.g.add_edge(n1, n2, e)
     }
