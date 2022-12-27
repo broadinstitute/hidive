@@ -17,15 +17,18 @@ use skydive::dbg::DeBruijnGraph;
 const TOTAL_INTERVAL_LENGTH_LIMIT: u64 = 100_000_000;
 
 pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf>, fasta: PathBuf) {
-    // Load sequences and intervals (if any)
+    // Load sequences and intervals (if any).
     let faidx = IndexedReader::from_file(&fasta).unwrap();
     let (chrs, intervals) = get_intervals(locus, &faidx);
 
     // Convert sequences to a form that we can use, and break sequences at 'N's.
     let fwd_seqs = get_sequences(&chrs, &intervals, faidx);
 
+    // Add sequences to graph.
     let mut g = DeBruijnGraph::new();
     g.add_all(&fwd_seqs);
+
+    // Assemble contiguous sequences.
 
     println!("{:?}", g);
 
@@ -46,7 +49,7 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     [ ] - if gff provided:
     [ ]   - get gff records
     [x] - get sequence
-    [ ] - construct graph
+    [x] - construct graph
     [ ] - add links to graph
     */
 }

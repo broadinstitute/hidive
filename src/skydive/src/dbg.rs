@@ -8,7 +8,8 @@ use std::collections::HashMap;
 /// Represents a DeBruijn graph with a built-in and fixed k-mer size of 15.
 #[derive(Debug)]
 pub struct DeBruijnGraph {
-    g: Graph<Kmer15, u32>,
+    graph: Graph<Kmer15, u32>,
+    cov: HashMap<Kmer15, u32>,
     idx: HashMap<Kmer15, NodeIndex>
 }
 
@@ -16,7 +17,8 @@ impl DeBruijnGraph {
     /// Create an empty de Bruijn graph.
     pub fn new() -> Self {
         DeBruijnGraph {
-            g: Graph::<Kmer15, u32>::new(),
+            graph: Graph::<Kmer15, u32>::new(),
+            cov: HashMap::<Kmer15, u32>::new(),
             idx: HashMap::<Kmer15, NodeIndex>::new()
         }
     }
@@ -56,14 +58,25 @@ impl DeBruijnGraph {
         return Ok(self.idx.get(v).unwrap())
     }
 
+    /// Get coverage of k-mer in graph
+    pub fn get_coverage(&mut self, v: &Kmer15) -> u32 {
+        if self.has_vertex(v) {
+            return *self.cov.get(v).unwrap();
+        }
+
+        0
+    }
+
     /// Add a single k-mer to the graph.
     pub fn add_vertex(&mut self, v: Kmer15) -> NodeIndex {
         if self.has_vertex(&v) {
+            self.cov.insert(v, self.cov.get(&v).unwrap() + 1);
             return *self.get_index(&v).unwrap();
         }
 
-        let ni = self.g.add_node(v);
+        let ni = self.graph.add_node(v);
 
+        self.cov.insert(v, 1);
         self.idx.insert(v, ni);
 
         ni
@@ -71,7 +84,7 @@ impl DeBruijnGraph {
 
     /// Add a single edge between two nodes to the graph.
     pub fn add_edge(&mut self, n1: NodeIndex, n2: NodeIndex, e: u32) -> EdgeIndex {
-        self.g.add_edge(n1, n2, e)
+        self.graph.add_edge(n1, n2, e)
     }
 }
 
@@ -91,50 +104,69 @@ mod tests {
             DnaString::from_dna_string("CACCAACTGATCAGA"),
         ];
 
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
-        assert_eq!(0, graph.g.node_count());
+        assert_eq!(0, dbg.graph.node_count());
 
-        graph.add_all(&seqs);
+        dbg.add_all(&seqs);
 
-        assert_eq!(3, graph.g.node_count());
+        assert_eq!(3, dbg.graph.node_count());
     }
 
     #[test]
     fn test_add() {
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
-        assert_eq!(0, graph.g.node_count());
-        assert_eq!(0, graph.idx.len());
+        assert_eq!(0, dbg.graph.node_count());
+        assert_eq!(0, dbg.idx.len());
 
         for (i, fw_kmer) in get_dna_string().iter_kmers::<Kmer15>().enumerate() {
-            graph.add_vertex(fw_kmer);
+            dbg.add_vertex(fw_kmer);
 
-            assert_eq!(i+1, graph.g.node_count());
-            assert_eq!(i+1, graph.idx.len());
+            assert_eq!(i+1, dbg.graph.node_count());
+            assert_eq!(i+1, dbg.idx.len());
         }
     }
 
     #[test]
+    fn test_count_added_kmers() {
+        let kmer_count_1 = DnaString::from_dna_string("CACCAACTGATCAGA").first_kmer();
+        let kmer_count_2 = DnaString::from_dna_string("ATCGTAGCTCCCACT").first_kmer();
+
+        let mut dbg = DeBruijnGraph::new();
+
+        assert_eq!(0, dbg.graph.node_count());
+
+        dbg.add_vertex(kmer_count_1);
+        dbg.add_vertex(kmer_count_2);
+        dbg.add_vertex(kmer_count_2);
+
+        assert_eq!(2, dbg.graph.node_count());
+
+        assert_eq!(1, dbg.get_coverage(&kmer_count_1));
+        assert_eq!(2, dbg.get_coverage(&kmer_count_2));
+    }
+
+    #[test]
     fn test_has_vertex() {
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
         let good_vertex = get_dna_string().first_kmer::<Kmer15>();
         let bad_vertex = get_dna_string().last_kmer::<Kmer15>();
 
-        graph.add_vertex(good_vertex);
+        dbg.add_vertex(good_vertex);
 
-        assert_eq!(graph.has_vertex(&good_vertex), true);
-        assert_eq!(graph.has_vertex(&bad_vertex), false);
+        assert_eq!(dbg.has_vertex(&good_vertex), true);
+        assert_eq!(dbg.has_vertex(&bad_vertex), false);
     }
 
     #[test]
     fn test_get_index() {
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
         for fw_kmer in get_dna_string().iter_kmers::<Kmer15>() {
-            let index_in = graph.add_vertex(fw_kmer);
-            let index_out = graph.g.node_indices().find(|i| graph.g[*i] == fw_kmer).unwrap();
+            let index_in = dbg.add_vertex(fw_kmer);
+            let index_out = dbg.graph.node_indices().find(|i| dbg.graph[*i] == fw_kmer).unwrap();
 
             assert_eq!(index_in, index_out);
         }
@@ -142,25 +174,25 @@ mod tests {
 
     #[test]
     fn test_add_vertex() {
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
         let first_vertex = get_dna_string().first_kmer::<Kmer15>();
         let last_vertex = get_dna_string().last_kmer::<Kmer15>();
 
-        assert_eq!(0, graph.g.node_count());
+        assert_eq!(0, dbg.graph.node_count());
 
-        graph.add_vertex(first_vertex);
+        dbg.add_vertex(first_vertex);
 
-        assert_eq!(1, graph.g.node_count());
+        assert_eq!(1, dbg.graph.node_count());
 
-        graph.add_vertex(last_vertex);
+        dbg.add_vertex(last_vertex);
 
-        assert_eq!(2, graph.g.node_count());
+        assert_eq!(2, dbg.graph.node_count());
     }
 
     #[test]
     fn test_add_edge() {
-        let mut graph = DeBruijnGraph::new();
+        let mut dbg = DeBruijnGraph::new();
 
         let s = get_dna_string();
         let mut iter = s.iter_kmers::<Kmer15>();
@@ -168,13 +200,13 @@ mod tests {
         let first_kmer = iter.next().unwrap();
         let second_kmer = iter.next().unwrap();
 
-        let n1 = graph.add_vertex(first_kmer);
-        let n2 = graph.add_vertex(second_kmer);
+        let n1 = dbg.add_vertex(first_kmer);
+        let n2 = dbg.add_vertex(second_kmer);
 
-        assert_eq!(0, graph.g.edge_count());
+        assert_eq!(0, dbg.graph.edge_count());
 
-        graph.add_edge(n1, n2, 0);
+        dbg.add_edge(n1, n2, 0);
 
-        assert_eq!(1, graph.g.edge_count());
+        assert_eq!(1, dbg.graph.edge_count());
     }
 }
