@@ -60,3 +60,90 @@ impl DeBruijnGraph {
         self.g.add_edge(n1, n2, e)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_dna_string() -> DnaString {
+        DnaString::from_dna_string("GCTATAGCATATGCTGTCATGCAA")
+    }
+
+    #[test]
+    fn test_add() {
+        let mut graph = DeBruijnGraph::new();
+
+        assert_eq!(0, graph.g.node_count());
+        assert_eq!(0, graph.idx.len());
+
+        for (i, fw_kmer) in get_dna_string().iter_kmers::<Kmer15>().enumerate() {
+            graph.add_vertex(fw_kmer);
+
+            assert_eq!(i+1, graph.g.node_count());
+            assert_eq!(i+1, graph.idx.len());
+        }
+    }
+
+    #[test]
+    fn test_has_vertex() {
+        let mut graph = DeBruijnGraph::new();
+
+        let good_vertex = get_dna_string().first_kmer::<Kmer15>();
+        let bad_vertex = get_dna_string().last_kmer::<Kmer15>();
+
+        graph.add_vertex(good_vertex);
+
+        assert_eq!(graph.has_vertex(&good_vertex), true);
+        assert_eq!(graph.has_vertex(&bad_vertex), false);
+    }
+
+    #[test]
+    fn test_get_index() {
+        let mut graph = DeBruijnGraph::new();
+
+        for fw_kmer in get_dna_string().iter_kmers::<Kmer15>() {
+            let index_in = graph.add_vertex(fw_kmer);
+            let index_out = graph.g.node_indices().find(|i| graph.g[*i] == fw_kmer).unwrap();
+
+            assert_eq!(index_in, index_out);
+        }
+    }
+
+    #[test]
+    fn test_add_vertex() {
+        let mut graph = DeBruijnGraph::new();
+
+        let first_vertex = get_dna_string().first_kmer::<Kmer15>();
+        let last_vertex = get_dna_string().last_kmer::<Kmer15>();
+
+        assert_eq!(0, graph.g.node_count());
+
+        graph.add_vertex(first_vertex);
+
+        assert_eq!(1, graph.g.node_count());
+
+        graph.add_vertex(last_vertex);
+
+        assert_eq!(2, graph.g.node_count());
+    }
+
+    #[test]
+    fn test_add_edge() {
+        let mut graph = DeBruijnGraph::new();
+
+        let s = get_dna_string();
+        let mut iter = s.iter_kmers::<Kmer15>();
+
+        let first_kmer = iter.next().unwrap();
+        let second_kmer = iter.next().unwrap();
+
+        let n1 = graph.add_vertex(first_kmer);
+        let n2 = graph.add_vertex(second_kmer);
+
+        assert_eq!(0, graph.g.edge_count());
+
+        graph.add_edge(n1, n2, 0);
+
+        assert_eq!(1, graph.g.edge_count());
+    }
+}
