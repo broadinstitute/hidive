@@ -19,16 +19,22 @@ impl DeBruijnGraph {
         }
     }
 
+    pub fn add_all(&mut self, seqs: &Vec<DnaString>) {
+        seqs.iter().for_each(|s| {
+            self.add(s);
+        });
+    }
+
     pub fn add(&mut self, s: &DnaString) {
-        let mut last_kmer = s.first_kmer::<Kmer15>();
+        let first_kmer = s.first_kmer::<Kmer15>();
+        let mut n1 = self.add_vertex(first_kmer);
 
         for cur_kmer in s.iter_kmers::<Kmer15>().skip(1) {
-            let n1 = self.add_vertex(last_kmer);
             let n2 = self.add_vertex(cur_kmer);
             
             self.add_edge(n1, n2, 0);
 
-            last_kmer = cur_kmer;
+            n1 = n2;
         }
     }
 
@@ -67,6 +73,23 @@ mod tests {
 
     fn get_dna_string() -> DnaString {
         DnaString::from_dna_string("GCTATAGCATATGCTGTCATGCAA")
+    }
+
+    #[test]
+    fn test_add_all() {
+        let seqs = vec![
+            DnaString::from_dna_string("ATCGTAGCTCCCACT"),
+            DnaString::from_dna_string("GGCATAGCTCTAGCA"),
+            DnaString::from_dna_string("CACCAACTGATCAGA"),
+        ];
+
+        let mut graph = DeBruijnGraph::new();
+
+        assert_eq!(0, graph.g.node_count());
+
+        graph.add_all(&seqs);
+
+        assert_eq!(3, graph.g.node_count());
     }
 
     #[test]
