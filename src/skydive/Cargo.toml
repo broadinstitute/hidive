@@ -7,7 +7,12 @@ edition = "2021"
 
 [dependencies]
 debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+parquet = "*"
 petgraph = "*"
+polars = { version = "*", features = ["parquet", "lazy", "csv-file", "strings", "temporal", "dtype-duration", "dtype-categorical", "concat_str", "list", "list_eval", "rank", "lazy_regex"]}
+color-eyre = {version = "*"}
+rand = {version = "*"}
+reqwest = { version = "*", features = ["blocking"]}
 serde = "*"
 serde_derive = "*"
 serde_json = "*"

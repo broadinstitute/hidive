@@ -10,9 +10,11 @@ arrow2 = "*"
 bio = "*"
 clap = { version = "*", features = ["derive"] }
 debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+eyre = "0.6.8"
 noodles = "*"
-parquet2 = "*"
+parquet = "*"
 petgraph = "*"
+polars = "*"
 rayon = "*"
 regex = "*"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }

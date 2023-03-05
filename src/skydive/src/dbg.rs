@@ -1,9 +1,12 @@
+use petgraph::visit::{EdgeIndexable, NodeIndexable};
 use petgraph::{graph::Graph, stable_graph::NodeIndex, stable_graph::EdgeIndex};
+use petgraph::visit::Dfs;
 
 use debruijn::dna_string::DnaString;
 use debruijn::{kmer::*, Vmer};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::{fs::File, path::Path};
 
 /// Represents a DeBruijn graph with a built-in and fixed k-mer size of 15.
 #[derive(Debug)]
@@ -58,7 +61,7 @@ impl DeBruijnGraph {
         return Ok(self.idx.get(v).unwrap())
     }
 
-    /// Get coverage of k-mer in graph
+    /// Get coverage of k-mer in graph.
     pub fn get_coverage(&mut self, v: &Kmer15) -> u32 {
         if self.has_vertex(v) {
             return *self.cov.get(v).unwrap();
@@ -86,10 +89,41 @@ impl DeBruijnGraph {
     pub fn add_edge(&mut self, n1: NodeIndex, n2: NodeIndex, e: u32) -> EdgeIndex {
         self.graph.add_edge(n1, n2, e)
     }
+
+    /// Assemble all contigs.
+    pub fn assemble_contigs(&mut self) {
+        let mut visited = HashSet::<&Kmer15>::new();
+
+        for v in self.cov.keys() {
+            if !visited.contains(v) {
+
+            }
+        }
+    }
+
+    /// Assemble a single contig starting from a single k-mer.
+    pub fn assemble_contig(&mut self, v: &Kmer15) {
+        for start in self.graph.node_indices() {
+            if *self.get_index(v).unwrap() == start {
+                let mut dfs = Dfs::new(&self.graph, start);
+
+                println!("{:?}", self.graph.node_weight(start));
+        
+                print!("[{}] ", start.index());
+                while let Some(visited) = dfs.next(&self.graph) {
+                    print!(" {} {:?}", visited.index(), self.graph.node_weight(visited));
+                }
+        
+                println!();
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use parquet::file::writer::SerializedColumnWriter;
+
     use super::*;
 
     fn get_dna_string() -> DnaString {
@@ -114,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add() {
+    fn test_add_many_vertices() {
         let mut dbg = DeBruijnGraph::new();
 
         assert_eq!(0, dbg.graph.node_count());
@@ -126,6 +160,17 @@ mod tests {
             assert_eq!(i+1, dbg.graph.node_count());
             assert_eq!(i+1, dbg.idx.len());
         }
+    }
+
+    #[test]
+    fn test_add() {
+        let mut dbg = DeBruijnGraph::new();
+
+        let s = get_dna_string();
+        dbg.add(&s);
+
+        assert_eq!(s.len() - 15 + 1, dbg.graph.node_count());
+        assert_eq!(s.len() - 15 + 1, dbg.idx.len());
     }
 
     #[test]
@@ -208,5 +253,34 @@ mod tests {
         dbg.add_edge(n1, n2, 0);
 
         assert_eq!(1, dbg.graph.edge_count());
+    }
+
+    #[test]
+    fn test_assemble_contig() {
+        let mut dbg = DeBruijnGraph::new();
+
+        let s = get_dna_string();
+        dbg.add(&s);
+
+        dbg.assemble_contig(&s.first_kmer::<Kmer15>());
+    }
+
+    // Trying some stuff
+
+    #[test]
+    fn sample_test() {
+        use color_eyre::{Result};
+        use polars::prelude::*;
+
+        let mut df = df!(
+            "foo" => [1, 2, 3],
+            "bar" => [None, Some("bak"), Some("baz")],
+        )
+        .unwrap();
+        
+        let mut file = std::fs::File::create("path.parquet").unwrap();
+        ParquetWriter::new(&mut file).finish(&mut df).unwrap();
+
+        println!("{:?}", df);
     }
 }

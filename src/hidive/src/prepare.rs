@@ -29,7 +29,6 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     g.add_all(&fwd_seqs);
 
     // Assemble contiguous sequences.
-
     println!("{:?}", g);
 
     // let mut buffer = File::create(output).unwrap();
@@ -63,10 +62,6 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
 //         }
 //     }
 // }
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
 
 fn get_sequences(chrs: &[String], intervals: &[Interval<u64>], mut faidx: IndexedReader<std::fs::File>) -> Vec<DnaString> {
     let mut seqs: Vec<DnaString> = Vec::new();
