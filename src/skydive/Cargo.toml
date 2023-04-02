@@ -20,3 +20,6 @@ serde = "*"
 serde_derive = "*"
 serde_json = "*"
 unzip-n = "*"
+
+[profile.release]
+debug = true

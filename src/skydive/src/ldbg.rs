@@ -19,13 +19,23 @@ impl<const K: usize> LdBG<K> {
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
             // Iterate over k-mers
-            for fwd_kmer in fwd_seq.kmers(K as u8) {
+            for (i, fwd_kmer) in fwd_seq.windows(K).enumerate() {
+                // If it's not already there, insert k-mer and empty record into k-mer map.
                 if !kmers.contains_key(fwd_kmer) {
-                    // Insert k-mer and empty record into k-mer map.
-                    kmers.insert(fwd_kmer.to_vec(), Record::new(1));
-                } else {
-                    // We've seen this k-mer before, so increment its coverage.
-                    kmers.get_mut(fwd_kmer).unwrap().increment_coverage();
+                    kmers.insert(fwd_kmer.to_vec(), Record::new(0));
+                }
+
+                // Increment the k-mer's coverage.
+                kmers.get_mut(fwd_kmer).unwrap().increment_coverage();
+
+                // Set incoming edge.
+                if i > 0 {
+                    kmers.get_mut(fwd_kmer).unwrap().set_incoming_edge(fwd_seq[i - 1]);
+                }
+
+                // Set outgoing edge.
+                if i + K < fwd_seq.len() {
+                    kmers.get_mut(fwd_kmer).unwrap().set_outgoing_edge(fwd_seq[i + K]);
                 }
             }
         }

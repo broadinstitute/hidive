@@ -25,7 +25,7 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
 
     for (kmer, record) in g.kmers {
         if record.coverage() > 1 {
-            println!("{:?} {:?}", String::from_utf8(kmer), record.coverage());
+            println!("{} {}", String::from_utf8(kmer).unwrap(), record);
         }
     }
 
