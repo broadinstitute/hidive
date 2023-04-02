@@ -54,6 +54,28 @@ impl Record {
             _ => println!("Invalid nucleotide: {}", nucleotide as char)
         }
     }
+
+    /// The in-degree of a particular k-mer.
+    pub fn in_degree(&self) -> u8 {
+        let mut degree: u8 = 0;
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_C) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_G) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_T) { 1 } else { 0 };
+
+        degree
+    }
+
+    /// The out-degree of a particular k-mer.
+    pub fn out_degree(&self) -> u8 {
+        let mut degree: u8 = 0;
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { 1 } else { 0 };
+
+        degree
+    }
 }
 
 impl fmt::Display for Record {
