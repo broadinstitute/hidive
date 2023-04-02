@@ -6,11 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+bitflags = "*"
+color-eyre = {version = "*"}
+# debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+# kmers = { git = "https://github.com/COMBINE-lab/kmers", branch = "main" }
+needletail = "*"
 parquet = "*"
 petgraph = "*"
 polars = { version = "*", features = ["parquet", "lazy", "csv-file", "strings", "temporal", "dtype-duration", "dtype-categorical", "concat_str", "list", "list_eval", "rank", "lazy_regex"]}
-color-eyre = {version = "*"}
 rand = {version = "*"}
 reqwest = { version = "*", features = ["blocking"]}
 serde = "*"

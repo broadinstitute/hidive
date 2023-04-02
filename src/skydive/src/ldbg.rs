@@ -1,31 +1,41 @@
-use petgraph::visit::{EdgeIndexable, NodeIndexable};
-use petgraph::{graph::Graph, stable_graph::NodeIndex, stable_graph::EdgeIndex};
-use petgraph::visit::Dfs;
+use std::{fs, path::Path, sync::Arc};
+use std::collections::BTreeMap;
 
-use debruijn::dna_string::DnaString;
-use debruijn::{kmer::*, Vmer};
+use needletail::Sequence;
 
-use std::collections::{HashMap, HashSet};
-use std::{fs::File, path::Path};
+use crate::record::Record;
 
-/// Represents a DeBruijn graph with a built-in and fixed k-mer size of 15.
+/// Represents a linked de Bruijn graph with a variable k-mer size specified at construction time.
 #[derive(Debug)]
-pub struct DeBruijnGraph {
-    graph: Graph<Kmer15, u32>,
-    cov: HashMap<Kmer15, u32>,
-    idx: HashMap<Kmer15, NodeIndex>
+pub struct LdBG<const K: usize> {
+    pub kmers: BTreeMap<Vec<u8>, Record>
 }
 
-impl DeBruijnGraph {
-    /// Create an empty de Bruijn graph.
-    pub fn new() -> Self {
-        DeBruijnGraph {
-            graph: Graph::<Kmer15, u32>::new(),
-            cov: HashMap::<Kmer15, u32>::new(),
-            idx: HashMap::<Kmer15, NodeIndex>::new()
+impl<const K: usize> LdBG<K> {
+    /// Create a de Bruijn graph from a list of sequences.
+    pub fn from_sequences(fwd_seqs: Vec<Vec<u8>>) -> Self {
+        let mut kmers = BTreeMap::new();
+
+        // Iterate over sequences
+        for fwd_seq in fwd_seqs {
+            // Iterate over k-mers
+            for fwd_kmer in fwd_seq.kmers(K as u8) {
+                if !kmers.contains_key(fwd_kmer) {
+                    // Insert k-mer and empty record into k-mer map.
+                    kmers.insert(fwd_kmer.to_vec(), Record::new(1));
+                } else {
+                    // We've seen this k-mer before, so increment its coverage.
+                    kmers.get_mut(fwd_kmer).unwrap().increment_coverage();
+                }
+            }
+        }
+
+        LdBG {
+            kmers
         }
     }
 
+    /*
     /// Add a vector of DnaString sequences to the graph as k-mers and edges.
     pub fn add_all(&mut self, seqs: &Vec<DnaString>) {
         seqs.iter().for_each(|s| {
@@ -118,10 +128,12 @@ impl DeBruijnGraph {
             }
         }
     }
+    */
 }
 
 #[cfg(test)]
 mod tests {
+    /*
     use parquet::file::writer::SerializedColumnWriter;
 
     use super::*;
@@ -283,4 +295,5 @@ mod tests {
 
         println!("{:?}", df);
     }
+    */
 }
