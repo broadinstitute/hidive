@@ -76,6 +76,11 @@ impl Record {
 
         degree
     }
+
+    /// Identifies junctions in the graph
+    pub fn is_junction(&self) -> bool {
+        self.in_degree() > 1 || self.out_degree() > 1
+    }
 }
 
 impl fmt::Display for Record {
