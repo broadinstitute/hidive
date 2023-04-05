@@ -1,7 +1,6 @@
-use std::{fs, path::Path, sync::Arc};
 use std::collections::BTreeMap;
 
-use needletail::Sequence;
+use indextree::{Arena, NodeId};
 
 use crate::record::Record;
 
@@ -17,7 +16,7 @@ impl<const K: usize> LdBG<K> {
         let mut kmers = BTreeMap::new();
 
         // Iterate over sequences
-        for fwd_seq in fwd_seqs {
+        for fwd_seq in &fwd_seqs {
             // Iterate over k-mers
             for (i, fwd_kmer) in fwd_seq.windows(K).enumerate() {
                 // If it's not already there, insert k-mer and empty record into k-mer map.
@@ -38,6 +37,26 @@ impl<const K: usize> LdBG<K> {
                     kmers.get_mut(fwd_kmer).unwrap().set_outgoing_edge(fwd_seq[i + K]);
                 }
             }
+        }
+
+        // Iterate over sequences again to add in the link information.
+        for fwd_seq in &fwd_seqs {
+            let arena = &mut Arena::new();
+            let root = arena.new_node('-' as u8); // root note
+            let mut last_junction = root;
+
+            // Iterate over k-mers
+            for (i, fwd_kmer) in fwd_seq.windows(K).enumerate() {
+                // If this k-mer is a junction, record the next edge.
+                if kmers.get(fwd_kmer).unwrap().is_junction() {
+                    let this_junction = arena.new_node(fwd_seq[i + K]);
+
+                    last_junction.append(this_junction, arena);
+                    last_junction = this_junction;
+                }
+            }
+
+            // println!("{:?}", arena);
         }
 
         LdBG {

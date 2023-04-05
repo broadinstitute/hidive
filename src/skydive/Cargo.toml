@@ -8,8 +8,7 @@ edition = "2021"
 [dependencies]
 bitflags = "*"
 color-eyre = {version = "*"}
-# debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
-# kmers = { git = "https://github.com/COMBINE-lab/kmers", branch = "main" }
+indextree = "*"
 needletail = "*"
 parquet = "*"
 petgraph = "*"

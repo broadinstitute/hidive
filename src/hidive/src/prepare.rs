@@ -23,11 +23,11 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     // Construct a linked de Bruijn graph from the sequences.
     let g: LdBG<15> = LdBG::from_sequences(fwd_seqs);
 
-    for (kmer, record) in g.kmers {
-        if record.coverage() > 1 && record.is_junction() {
-            println!("{} {}", String::from_utf8(kmer).unwrap(), record);
-        }
-    }
+    // for (kmer, record) in g.kmers {
+    //     if record.coverage() > 1 && record.is_junction() {
+    //         println!("{} {}", String::from_utf8(kmer).unwrap(), record);
+    //     }
+    // }
 
     // println!("{:?}", g.kmers.len());
 
