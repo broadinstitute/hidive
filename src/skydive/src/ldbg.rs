@@ -7,11 +7,8 @@ use crate::record::Record;
 fn print_junction_tree(root: NodeId, arena: &Arena<u8>, depth: usize) {
     for child in root.children(arena) {
         let node = arena.get(child).unwrap();
-        // let node_id = arena.get_node_id(node).unwrap();
 
         println!("{} {}", depth, *node.get() as char);
-
-        // child.debug_pretty_print(arena);
 
         print_junction_tree(child, arena, depth + 1);
     }
@@ -59,34 +56,44 @@ impl<const K: usize> LdBG<K> {
 
         // Iterate over sequences again to add in the link information.
         for fwd_seq in &fwd_seqs {
-            let mut last_non_junction_kmer: Option<&[u8]> = None;
+            println!("{:?}", fwd_seq.len());
+
+            let mut anchor_kmer: Option<&[u8]> = None;
 
             // Iterate over k-mers.
             for (i, fwd_kmer) in fwd_seq.windows(K).enumerate() {
-                // If this k-mer is a junction, record the next edge.
-                if kmers.get(fwd_kmer).unwrap().is_junction() && last_non_junction_kmer.is_some() {
-                    let mut last_junction: Option<NodeId> = None;
-                    if !junction_tree.contains_key(last_non_junction_kmer.unwrap()) {
+                // If this k-mer has out-degree > 1, and we have a place to anchor the links, start the link annotation process.
+                if kmers.get(fwd_kmer).unwrap().out_degree() > 1 && anchor_kmer.is_some() {
+                    // Create the junction tree.
+                    if !junction_tree.contains_key(anchor_kmer.unwrap()) {
                         let arena = &mut Arena::new();
-                        junction_tree.insert(last_non_junction_kmer.unwrap().to_owned(), arena.to_owned());
+                        junction_tree.insert(anchor_kmer.unwrap().to_owned(), arena.to_owned());
                     }
 
-                    let arena = junction_tree.get_mut(last_non_junction_kmer.unwrap()).unwrap();
-                    let this_junction = arena.new_node(fwd_seq[i + K]);
+                    let arena = junction_tree.get_mut(anchor_kmer.unwrap()).unwrap();
+                    let root = arena.new_node('-' as u8);
+                    let mut last_junction = root;
 
-                    if last_junction.is_some() {
-                        last_junction.unwrap().append(this_junction, arena);
+                    for (j, _) in fwd_seq
+                        .windows(K)
+                        .enumerate()
+                        .skip(i)
+                        .filter(|x| {
+                            kmers.get((*x).1).unwrap().out_degree() > 1
+                        }) {
+
+                        // println!("{:?} {:?} {:?} {:?} {} {}", i, String::from_utf8(fwd_kmer.to_vec()), j, String::from_utf8(junction_kmer.to_vec()), fwd_seq[j + K] as char, kmers.get(junction_kmer).unwrap());
+
+                        let this_junction = arena.new_node(fwd_seq[j + K]);
+                        last_junction.append(this_junction, arena);
+                        last_junction = this_junction;
                     }
 
-                    last_junction = Some(this_junction);
-
-                    match last_non_junction_kmer {
-                        Some(last_non_junction_kmer) => println!("{:?} {:?}", String::from_utf8(last_non_junction_kmer.to_vec()), String::from_utf8(fwd_kmer.to_vec())),
-                        None => println!("{:?} {:?}", last_non_junction_kmer, String::from_utf8(fwd_kmer.to_vec())),
-                    }
+                    // println!("{:?}", arena);
+                    // print_junction_tree(root, arena, 0);
                 }
 
-                last_non_junction_kmer = Some(fwd_kmer);
+                anchor_kmer = Some(fwd_kmer);
             }
 
             // print_junction_tree(root, arena, 0);
