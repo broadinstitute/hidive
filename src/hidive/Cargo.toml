@@ -15,6 +15,7 @@ needletail = "*"
 noodles = "*"
 parquet = "*"
 petgraph = "*"
+poasta = { path = "/Users/kiran/repositories/poasta" }
 polars = "*"
 rayon = "*"
 regex = "*"

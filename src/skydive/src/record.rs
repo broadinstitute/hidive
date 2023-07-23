@@ -40,7 +40,7 @@ impl Record {
             b'C' => self.edges.insert(Edges::FLAG_EDGE_IN_C),
             b'G' => self.edges.insert(Edges::FLAG_EDGE_IN_G),
             b'T' => self.edges.insert(Edges::FLAG_EDGE_IN_T),
-            _ => println!("Invalid nucleotide: {}", nucleotide as char)
+            _ => ()
         }
     }
 
@@ -51,7 +51,7 @@ impl Record {
             b'C' => self.edges.insert(Edges::FLAG_EDGE_OUT_C),
             b'G' => self.edges.insert(Edges::FLAG_EDGE_OUT_G),
             b'T' => self.edges.insert(Edges::FLAG_EDGE_OUT_T),
-            _ => println!("Invalid nucleotide: {}", nucleotide as char)
+            _ => ()
         }
     }
 
