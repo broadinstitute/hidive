@@ -24,32 +24,11 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     // Construct a linked de Bruijn graph from the sequences.
     let g = LdBG::from_sequences(11, &fwd_seqs);
 
-    let kmer = g.kmers.first_key_value().unwrap().0;
-
-    for fwd_seq in fwd_seqs {
-        let s = String::from_utf8(fwd_seq.clone()).unwrap();
-        let r = String::from_utf8(fwd_seq.clone().reverse_complement()).unwrap();
-        println!("orig: {}", s);
-        println!("orig: {}", r);
-    }
-
-    g.assemble(kmer);
-
-    // for (kmer, record) in g.kmers {
-    //     if record.coverage() > 1 && record.is_junction() {
-    //         println!("{} {}", String::from_utf8(kmer).unwrap(), record);
-    //     }
-    // }
-
-    // println!("{:?}", g.kmers.len());
-
-    // for fwd_seq in fwd_seqs {
-    //     let s = String::from_utf8(fwd_seq).unwrap();
-    //     println!("{}", s);
-    // }
-
     // Assemble contiguous sequences.
-    // println!("{:?}", g);
+    let kmer = g.kmers.first_key_value().unwrap().0;
+    let contig = g.assemble(kmer);
+
+    println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
 
     // let mut buffer = File::create(output).unwrap();
     // dbg.write_gfa(&mut buffer).unwrap();

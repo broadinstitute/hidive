@@ -53,9 +53,9 @@ impl LdBG {
         graph.get_mut(can_kmer).unwrap().set_outgoing_edge(can_next_base);
 
         // Print some information.
-        Self::print_kmer(fw_kmer, fw_prev_base, fw_next_base, None);
-        Self::print_kmer(can_kmer, can_prev_base, can_next_base, graph.get(can_kmer));
-        println!("");
+        // Self::print_kmer(fw_kmer, fw_prev_base, fw_next_base, None);
+        // Self::print_kmer(can_kmer, can_prev_base, can_next_base, graph.get(can_kmer));
+        // println!("");
     }
 
     fn build_graph(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> KmerGraph {
@@ -68,10 +68,10 @@ impl LdBG {
                 let fw_kmer = &fwd_seq[i..i+k];
         
                 let prev = fwd_seq.get(i.wrapping_sub(1));
-                let fw_prev_base = *prev.unwrap_or(&b'N');
+                let fw_prev_base = *prev.unwrap_or(&b'.');
 
                 let next = fwd_seq.get(i+k);
-                let fw_next_base = *next.unwrap_or(&b'N');
+                let fw_next_base = *next.unwrap_or(&b'.');
 
                 Self::add_to_graph(&mut graph, fw_kmer, fw_prev_base, fw_next_base);
             }
@@ -151,7 +151,7 @@ impl LdBG {
         return Some(prev_kmer);
     }
 
-    pub fn assemble(&self, kmer: &[u8]) {
+    pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
         let mut last_kmer = kmer.to_vec();
@@ -184,7 +184,7 @@ impl LdBG {
             }
         }
 
-        println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
+        contig
     }
 
     pub fn add_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> BTreeMap<Vec<u8>, Arena<u8>> {
@@ -238,9 +238,9 @@ impl LdBG {
 
     fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
         println!("{} {} {} {}",
-            std::char::from_u32(prev_base as u32).unwrap_or('N'),
+            std::char::from_u32(prev_base as u32).unwrap_or('.'),
             std::str::from_utf8(kmer).unwrap(),
-            std::char::from_u32(next_base as u32).unwrap_or('N'),
+            std::char::from_u32(next_base as u32).unwrap_or('.'),
             record.map_or(String::from(""), |r| format!("{}", r))
         );
     }
