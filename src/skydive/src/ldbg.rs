@@ -18,22 +18,13 @@ pub struct LdBG {
 
 impl LdBG {
     /// Create a de Bruijn graph from a list of sequences.
-    pub fn from_sequences(k: usize, fwd_seqs: Vec<Vec<u8>>) -> Self {
-        let graph = Self::build_graph(k, &fwd_seqs);
-        // let links = build_links(kmer_size, &fwd_seqs, &graph);
+    pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> Self {
+        let graph = Self::build_graph(k, fwd_seqs);
+        // let links = Self::add_links(k, &fwd_seqs, &graph);
 
         LdBG {
             kmers: graph
         }
-    }
-
-    fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
-        println!("{} {} {} {}",
-            std::char::from_u32(prev_base as u32).unwrap_or('N'),
-            std::str::from_utf8(kmer).unwrap(),
-            std::char::from_u32(next_base as u32).unwrap_or('N'),
-            record.map_or(String::from(""), |r| format!("{}", r))
-        );
     }
 
     fn add_to_graph(graph: &mut KmerGraph, fw_kmer: &[u8], fw_prev_base: u8, fw_next_base: u8) {
@@ -89,67 +80,181 @@ impl LdBG {
         graph
     }
 
-}
+    fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+        let rc_kmer_vec = kmer.reverse_complement();
+        let rc_kmer = rc_kmer_vec.as_bytes();
 
-pub fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> BTreeMap<Vec<u8>, Arena<u8>> {
-    let mut junction_tree: BTreeMap<Vec<u8>, Arena<u8>> = BTreeMap::new();
+        if kmer < rc_kmer {
+            kmer.to_vec()
+        } else {
+            rc_kmer.to_vec()
+        }
+    }
 
-    // Iterate over sequences again to add in the link information.
-    for fwd_seq in fwd_seqs {
-        println!("{:?}", fwd_seq.len());
+    pub fn next_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+        let can_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        let can_kmer = can_kmer_vec.as_bytes();
 
-        let mut anchor_kmer: Option<&[u8]> = None;
-
-        // Iterate over k-mers.
-        for (i, fwd_kmer) in fwd_seq.windows(k).enumerate() {
-            // If this k-mer has out-degree > 1, and we have a place to anchor the links, start the link annotation process.
-            if graph.get(fwd_kmer).unwrap().out_degree() > 1 && anchor_kmer.is_some() {
-                // Create the junction tree.
-                if !junction_tree.contains_key(anchor_kmer.unwrap()) {
-                    let arena = &mut Arena::new();
-                    junction_tree.insert(anchor_kmer.unwrap().to_owned(), arena.to_owned());
-                }
-
-                let arena = junction_tree.get_mut(anchor_kmer.unwrap()).unwrap();
-                let root = arena.new_node('-' as u8);
-                let mut last_junction = root;
-
-                for (j, _) in fwd_seq
-                    .windows(k)
-                    .enumerate()
-                    .skip(i)
-                    .filter(|x| {
-                        graph.get((*x).1).unwrap().out_degree() > 1
-                    }) {
-
-                    let this_junction = arena.new_node(fwd_seq[j + k]);
-                    last_junction.append(this_junction, arena);
-                    last_junction = this_junction;
-                }
-
-                // println!("{:?}", arena);
-                // print_junction_tree(root, arena, 0);
-            }
-
-            anchor_kmer = Some(fwd_kmer);
+        if !self.kmers.contains_key(can_kmer) {
+            return None;
         }
 
-        // print_junction_tree(root, arena, 0);
+        let r = self.kmers.get(can_kmer).unwrap();
+
+        let next_base;
+        if can_kmer == kmer {
+            if r.out_degree() != 1 {
+                return None;
+            }
+
+            next_base = r.outgoing_edges()[0];
+        } else {
+            if r.in_degree() != 1 {
+                return None;
+            }
+
+            next_base = complement(r.incoming_edges()[0]);
+        }
+
+        let next_kmer = [&kmer[1..kmer.len()], &[next_base]].concat();
+
+        return Some(next_kmer);
     }
 
-    junction_tree
-}
+    pub fn prev_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+        let can_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        let can_kmer = can_kmer_vec.as_bytes();
 
-fn print_junction_tree(root: NodeId, arena: &Arena<u8>, depth: usize) {
-    for child in root.children(arena) {
-        let node = arena.get(child).unwrap();
+        if !self.kmers.contains_key(can_kmer) {
+            return None;
+        }
 
-        println!("{} {}", depth, *node.get() as char);
+        let r = self.kmers.get(can_kmer).unwrap();
 
-        print_junction_tree(child, arena, depth + 1);
+        let prev_base;
+        if can_kmer == kmer {
+            if r.in_degree() != 1 {
+                return None;
+            }
+
+            prev_base = r.incoming_edges()[0];
+        } else {
+            if r.out_degree() != 1 {
+                return None;
+            }
+
+            prev_base = complement(r.outgoing_edges()[0]);
+        }
+
+        let prev_kmer = [&[prev_base], &kmer[0..kmer.len()-1]].concat();
+
+        return Some(prev_kmer);
+    }
+
+    pub fn assemble(&self, kmer: &[u8]) {
+        let mut contig: Vec<u8> = kmer.to_vec();
+
+        let mut last_kmer = kmer.to_vec();
+        loop {
+            let res = self.next_kmer(&last_kmer);
+
+            match res {
+                Some(this_kmer) => {
+                    contig.push(this_kmer[this_kmer.len() - 1]);
+                    last_kmer = this_kmer;
+                },
+                None => {
+                    break;
+                }
+            }
+        }
+
+        last_kmer = kmer.to_vec();
+        loop {
+            let res = self.prev_kmer(&last_kmer);
+
+            match res {
+                Some(this_kmer) => {
+                    contig.insert(0, this_kmer[0]);
+                    last_kmer = this_kmer;
+                },
+                None => {
+                    break;
+                }
+            }
+        }
+
+        println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
+    }
+
+    pub fn add_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> BTreeMap<Vec<u8>, Arena<u8>> {
+        let mut junction_tree: BTreeMap<Vec<u8>, Arena<u8>> = BTreeMap::new();
+
+        // Iterate over sequences again to add in the link information.
+        for fwd_seq in fwd_seqs {
+            println!("{:?}", fwd_seq.len());
+
+            let mut anchor_kmer: Option<&[u8]> = None;
+
+            // Iterate over k-mers.
+            for (i, fwd_kmer) in fwd_seq.windows(k).enumerate() {
+                // If this k-mer has out-degree > 1, and we have a place to anchor the links, start the link annotation process.
+                if graph.get(fwd_kmer).unwrap().out_degree() > 1 && anchor_kmer.is_some() {
+                    // Create the junction tree.
+                    if !junction_tree.contains_key(anchor_kmer.unwrap()) {
+                        let arena = &mut Arena::new();
+                        junction_tree.insert(anchor_kmer.unwrap().to_owned(), arena.to_owned());
+                    }
+
+                    let arena = junction_tree.get_mut(anchor_kmer.unwrap()).unwrap();
+                    let root = arena.new_node('-' as u8);
+                    let mut last_junction = root;
+
+                    for (j, _) in fwd_seq
+                        .windows(k)
+                        .enumerate()
+                        .skip(i)
+                        .filter(|x| {
+                            graph.get((*x).1).unwrap().out_degree() > 1
+                        }) {
+
+                        let this_junction = arena.new_node(fwd_seq[j + k]);
+                        last_junction.append(this_junction, arena);
+                        last_junction = this_junction;
+                    }
+
+                    // println!("{:?}", arena);
+                    // print_junction_tree(root, arena, 0);
+                }
+
+                anchor_kmer = Some(fwd_kmer);
+            }
+
+            // print_junction_tree(root, arena, 0);
+        }
+
+        junction_tree
+    }
+
+    fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
+        println!("{} {} {} {}",
+            std::char::from_u32(prev_base as u32).unwrap_or('N'),
+            std::str::from_utf8(kmer).unwrap(),
+            std::char::from_u32(next_base as u32).unwrap_or('N'),
+            record.map_or(String::from(""), |r| format!("{}", r))
+        );
+    }
+
+    fn print_junction_tree(root: NodeId, arena: &Arena<u8>, depth: usize) {
+        for child in root.children(arena) {
+            let node = arena.get(child).unwrap();
+
+            println!("{} {}", depth, *node.get() as char);
+
+            Self::print_junction_tree(child, arena, depth + 1);
+        }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use std::io::Read;

@@ -23,6 +23,30 @@ impl Record {
         self.coverage
     }
 
+    /// Return incoming edges
+    pub fn incoming_edges(&self) -> Vec<u8> {
+        let mut edges = Vec::new();
+
+        if self.edges.contains(Edges::FLAG_EDGE_IN_A) { edges.push(b'A'); }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_C) { edges.push(b'C'); }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_G) { edges.push(b'G'); }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_T) { edges.push(b'T'); }
+
+        edges
+    }
+
+    /// Return outgoing edges
+    pub fn outgoing_edges(&self) -> Vec<u8> {
+        let mut edges = Vec::new();
+
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_A) { edges.push(b'A'); }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { edges.push(b'C'); }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { edges.push(b'G'); }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { edges.push(b'T'); }
+
+        edges
+    }
+
     /// Increment the coverage value by 1.
     pub fn increment_coverage(&mut self) {
         self.coverage = self.coverage.saturating_add(1);
@@ -99,4 +123,199 @@ impl fmt::Display for Record {
             self.coverage,
         )
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // use proptest::prelude::*;
+
+    #[test]
+    fn test_get_coverage() {
+        let r1 = Record::new(1);
+        let r10 = Record::new(10);
+
+        assert!(r1.coverage() == 1);
+        assert!(r10.coverage() == 10);
+    }
+
+    #[test]
+    fn test_set_coverage() {
+        let mut r100 = Record::new(0);
+        r100.set_coverage(100);
+
+        let mut r1000 = Record::new(0);
+        r1000.set_coverage(1000);
+
+        assert!(r100.coverage() == 100);
+        assert!(r1000.coverage() == 1000);
+    }
+
+    #[test]
+    fn test_increment_coverage() {
+        let mut r100 = Record::new(99);
+        r100.increment_coverage();
+
+        let mut r1000 = Record::new(999);
+        r1000.increment_coverage();
+
+        assert!(r100.coverage() == 100);
+        assert!(r1000.coverage() == 1000);
+    }
+
+    #[test]
+    fn test_increment_coverage_saturates() {
+        let mut rmax = Record::new(u16::MAX);
+        rmax.increment_coverage();
+
+        assert!(rmax.coverage() == u16::MAX);
+    }
+
+    #[test]
+    fn test_set_incoming_edge() {
+        let mut r = Record::new(1);
+
+        assert!(r.edges.is_empty());
+
+        r.set_incoming_edge('A' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_A));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_T));
+
+        r.set_incoming_edge('C' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_T));
+
+        r.set_incoming_edge('G' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_C));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_T));
+
+        r.set_incoming_edge('T' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_C));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_G));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_IN_T));
+
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_T));
+    }
+
+    #[test]
+    fn test_set_outgoing_edge() {
+        let mut r = Record::new(1);
+
+        assert!(r.edges.is_empty());
+
+        r.set_outgoing_edge('A' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_T));
+
+        r.set_outgoing_edge('C' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_T));
+
+        r.set_outgoing_edge('G' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_OUT_T));
+
+        r.set_outgoing_edge('T' as u8);
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        assert!(r.edges.contains(Edges::FLAG_EDGE_OUT_T));
+
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_A));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_C));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_G));
+        assert!(!r.edges.contains(Edges::FLAG_EDGE_IN_T));
+    }
+
+    #[test]
+    fn test_in_degree() {
+        let mut r = Record::new(1);
+
+        assert!(r.in_degree() == 0);
+
+        r.set_incoming_edge('A' as u8);
+        assert!(r.in_degree() == 1);
+
+        r.set_incoming_edge('C' as u8);
+        assert!(r.in_degree() == 2);
+
+        r.set_incoming_edge('G' as u8);
+        assert!(r.in_degree() == 3);
+
+        r.set_incoming_edge('T' as u8);
+        assert!(r.in_degree() == 4);
+
+        r.set_outgoing_edge('A' as u8);
+        assert!(r.in_degree() == 4);
+    }
+
+    #[test]
+    fn test_out_degree() {
+        let mut r = Record::new(1);
+
+        assert!(r.out_degree() == 0);
+
+        r.set_outgoing_edge('A' as u8);
+        assert!(r.out_degree() == 1);
+
+        r.set_outgoing_edge('C' as u8);
+        assert!(r.out_degree() == 2);
+
+        r.set_outgoing_edge('G' as u8);
+        assert!(r.out_degree() == 3);
+
+        r.set_outgoing_edge('T' as u8);
+        assert!(r.out_degree() == 4);
+
+        r.set_outgoing_edge('A' as u8);
+        assert!(r.out_degree() == 4);
+    }
+
+    #[test]
+    fn test_incoming_junction() {
+        let mut r = Record::new(1);
+
+        assert!(r.is_junction() == false);
+
+        r.set_incoming_edge('A' as u8);
+        assert!(r.is_junction() == false);
+
+        r.set_incoming_edge('C' as u8);
+        assert!(r.is_junction() == true);
+    }
+
+    #[test]
+    fn test_outgoing_junction() {
+        let mut r = Record::new(1);
+
+        assert!(r.is_junction() == false);
+
+        r.set_outgoing_edge('A' as u8);
+        assert!(r.is_junction() == false);
+
+        r.set_outgoing_edge('C' as u8);
+        assert!(r.is_junction() == true);
+    }
+
+    // proptest! {
+    //     #[test]
+    //     fn test_set_coverage() {
+    //     }
+    // }
 }

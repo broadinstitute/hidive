@@ -20,5 +20,9 @@ serde_derive = "*"
 serde_json = "*"
 unzip-n = "*"
 
+[dev-dependencies]
+pretty_assertions = "1"
+proptest = "*"
+
 [profile.release]
 debug = true
