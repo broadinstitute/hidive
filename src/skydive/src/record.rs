@@ -11,10 +11,10 @@ pub struct Record {
 
 impl Record {
     /// Create an empty de Bruijn graph record.
-    pub fn new(coverage: u16) -> Self {
+    pub fn new(coverage: u16, edges: Option<Edges>) -> Self {
         Record {
             coverage: coverage,
-            edges: Edges::empty()
+            edges: edges.unwrap_or(Edges::empty()),
         }
     }
 
@@ -132,8 +132,8 @@ mod tests {
 
     #[test]
     fn test_get_coverage() {
-        let r1 = Record::new(1);
-        let r10 = Record::new(10);
+        let r1 = Record::new(1, None);
+        let r10 = Record::new(10, None);
 
         assert!(r1.coverage() == 1);
         assert!(r10.coverage() == 10);
@@ -141,10 +141,10 @@ mod tests {
 
     #[test]
     fn test_set_coverage() {
-        let mut r100 = Record::new(0);
+        let mut r100 = Record::new(0, None);
         r100.set_coverage(100);
 
-        let mut r1000 = Record::new(0);
+        let mut r1000 = Record::new(0, None);
         r1000.set_coverage(1000);
 
         assert!(r100.coverage() == 100);
@@ -153,10 +153,10 @@ mod tests {
 
     #[test]
     fn test_increment_coverage() {
-        let mut r100 = Record::new(99);
+        let mut r100 = Record::new(99, None);
         r100.increment_coverage();
 
-        let mut r1000 = Record::new(999);
+        let mut r1000 = Record::new(999, None);
         r1000.increment_coverage();
 
         assert!(r100.coverage() == 100);
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_increment_coverage_saturates() {
-        let mut rmax = Record::new(u16::MAX);
+        let mut rmax = Record::new(u16::MAX, None);
         rmax.increment_coverage();
 
         assert!(rmax.coverage() == u16::MAX);
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_set_incoming_edge() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.edges.is_empty());
 
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_set_outgoing_edge() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.edges.is_empty());
 
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_in_degree() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.in_degree() == 0);
 
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_out_degree() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.out_degree() == 0);
 
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_incoming_junction() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.is_junction() == false);
 
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_outgoing_junction() {
-        let mut r = Record::new(1);
+        let mut r = Record::new(1, None);
 
         assert!(r.is_junction() == false);
 

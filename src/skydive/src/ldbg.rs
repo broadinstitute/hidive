@@ -7,6 +7,7 @@ use needletail::Sequence;
 use needletail::sequence::complement;
 
 use crate::record::Record;
+use crate::edges::Edges;
 
 type KmerGraph = BTreeMap<Vec<u8>, Record>;
 
@@ -27,6 +28,7 @@ impl LdBG {
         }
     }
 
+    /// Add a k-mer, the preceeding base, and following base to the graph
     fn add_to_graph(graph: &mut KmerGraph, fw_kmer: &[u8], fw_prev_base: u8, fw_next_base: u8) {
         let rc_kmer_vec = fw_kmer.reverse_complement();
         let rc_kmer = rc_kmer_vec.as_bytes();
@@ -40,7 +42,7 @@ impl LdBG {
 
         // If it's not already there, insert k-mer and empty record into k-mer map.
         if !graph.contains_key(can_kmer) {
-            graph.insert(can_kmer.to_owned(), Record::new(0));
+            graph.insert(can_kmer.to_owned(), Record::new(0, None));
         }
 
         // Increment the canonical k-mer's coverage.
@@ -58,6 +60,7 @@ impl LdBG {
         // println!("");
     }
 
+    /// Build a de Bruijn graph from a vector of sequences.
     fn build_graph(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> KmerGraph {
         let mut graph: KmerGraph = BTreeMap::new();
 
@@ -80,6 +83,7 @@ impl LdBG {
         graph
     }
 
+    /// Get the canonical (lexicographically-lowest) version of a k-mer.
     fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
         let rc_kmer_vec = kmer.reverse_complement();
         let rc_kmer = rc_kmer_vec.as_bytes();
@@ -91,7 +95,8 @@ impl LdBG {
         }
     }
 
-    pub fn next_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+    /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
+    fn next_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
         let can_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let can_kmer = can_kmer_vec.as_bytes();
 
@@ -121,7 +126,8 @@ impl LdBG {
         return Some(next_kmer);
     }
 
-    pub fn prev_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+    /// Starting at a given k-mer, get the previous k-mer (or return None if there isn't a single incoming edge).
+    fn prev_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
         let can_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let can_kmer = can_kmer_vec.as_bytes();
 
@@ -151,6 +157,7 @@ impl LdBG {
         return Some(prev_kmer);
     }
 
+    /// Starting at a given k-mer, assemble a contig.
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
@@ -257,58 +264,54 @@ impl LdBG {
 }
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-
     use super::*;
 
     fn get_test_genome() -> Vec<u8> {
         "ACTGATTTCGATGCGATGCGATGCCACGGTGG".as_bytes().to_vec()
-        /*
-         CCACCGTGGCATCGCATCGCATCGAAATCAGT
-         */
     }
 
-    fn get_test_read() -> Vec<u8> {
-        "TTTCGATGCGATGCGATGCCACG".as_bytes().to_vec()
-    }
+    // fn get_test_read() -> Vec<u8> {
+    //     "TTTCGATGCGATGCGATGCCACG".as_bytes().to_vec()
+    // }
 
     #[test]
-    fn test_add_all() {
+    fn test_add_sequences() {
         let genome = get_test_genome();
-        let rc = genome.reverse_complement();
+        let fwd_seqs = vec!(genome);
 
-        println!("{}", String::from_utf8(genome.to_owned()).unwrap());
-        println!("{}", String::from_utf8(rc).unwrap());
-        // let read = get_test_read();
+        let g = LdBG::from_sequences(5, &fwd_seqs);
 
-        let g = LdBG::from_sequences(5, vec!(genome));
+        let mut exp_graph = KmerGraph::new();
+        exp_graph.insert(b"AAATC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
+        exp_graph.insert(b"AATCA".to_vec(), Record::new(1, Some(Edges::from_string("a.....G.".to_string()))));
+        exp_graph.insert(b"ACCGT".to_vec(), Record::new(1, Some(Edges::from_string(".c....G.".to_string()))));
+        exp_graph.insert(b"ACTGA".to_vec(), Record::new(1, Some(Edges::from_string(".......T".to_string()))));
+        exp_graph.insert(b"ATCAG".to_vec(), Record::new(1, Some(Edges::from_string("a......T".to_string()))));
+        exp_graph.insert(b"ATCGA".to_vec(), Record::new(1, Some(Edges::from_string(".c..A...".to_string()))));
+        exp_graph.insert(b"ATCGC".to_vec(), Record::new(2, Some(Edges::from_string(".c..A...".to_string()))));
+        exp_graph.insert(b"ATGCC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
+        exp_graph.insert(b"ATGCG".to_vec(), Record::new(2, Some(Edges::from_string("..g.A...".to_string()))));
+        exp_graph.insert(b"ATTTC".to_vec(), Record::new(1, Some(Edges::from_string("..g...G.".to_string()))));
+        exp_graph.insert(b"CACCG".to_vec(), Record::new(1, Some(Edges::from_string(".c.....T".to_string()))));
+        exp_graph.insert(b"CACGG".to_vec(), Record::new(1, Some(Edges::from_string(".c.....T".to_string()))));
+        exp_graph.insert(b"CATCG".to_vec(), Record::new(3, Some(Edges::from_string("..g.AC..".to_string()))));
+        exp_graph.insert(b"CCACC".to_vec(), Record::new(1, Some(Edges::from_string("......G.".to_string()))));
+        exp_graph.insert(b"CCACG".to_vec(), Record::new(1, Some(Edges::from_string("..g...G.".to_string()))));
+        exp_graph.insert(b"CGAAA".to_vec(), Record::new(1, Some(Edges::from_string("...t...T".to_string()))));
+        exp_graph.insert(b"GATGC".to_vec(), Record::new(3, Some(Edges::from_string(".c...CG.".to_string()))));
+        exp_graph.insert(b"GCCAC".to_vec(), Record::new(1, Some(Edges::from_string("...t..G.".to_string()))));
+        exp_graph.insert(b"TCGAA".to_vec(), Record::new(1, Some(Edges::from_string("a...A...".to_string()))));
+        exp_graph.insert(b"TCGCA".to_vec(), Record::new(2, Some(Edges::from_string("a......T".to_string()))));
+        exp_graph.insert(b"TGCCA".to_vec(), Record::new(1, Some(Edges::from_string("a....C..".to_string()))));
+
 
         for (kmer, record) in g.kmers {
-            println!("{:?} {}", String::from_utf8(kmer), record);
+            assert!(exp_graph.contains_key(kmer.as_bytes()));
+
+            let exp_record = exp_graph.get(kmer.as_bytes()).unwrap();
+            assert!(record.coverage() == exp_record.coverage());
+            assert!(record.incoming_edges() == exp_record.incoming_edges());
+            assert!(record.outgoing_edges() == exp_record.outgoing_edges());
         }
     }
-
-    /*
-AAATC 1 ..g.A...
-AATCA 1 a.....G.
-ACCGT 1 .c....G.
-ACTGA 1 .......T
-ATCAG 1 a......T
-ATCGA 1 .c..A...
-ATCGC 2 .c..A...
-ATGCC 1 ..g.A...
-ATGCG 2 ..g.A...
-ATTTC 1 ..g...G.
-CACCG 1 .c.....T
-CACGG 1 .c.....T
-CATCG 3 ..g.AC..
-CCACC 1 ......G.
-CCACG 1 ..g...G.
-CGAAA 1 ...t...T
-GATGC 3 .c...CG.
-GCCAC 1 ...t..G.
-TCGAA 1 a...A...
-TCGCA 2 a......T
-TGCCA 1 a....C..
-     */
 }
