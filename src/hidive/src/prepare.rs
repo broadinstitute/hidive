@@ -22,13 +22,14 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     let fwd_seqs = get_sequences(&chrs, &intervals, faidx);
 
     // Construct a linked de Bruijn graph from the sequences.
-    let g = LdBG::from_sequences(11, &fwd_seqs);
+    let g = LdBG::from_sequences(5, &fwd_seqs);
 
     // Assemble contiguous sequences.
     let kmer = g.kmers.first_key_value().unwrap().0;
     let contig = g.assemble(kmer);
 
     println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
+    println!("{:?}", std::str::from_utf8(contig.reverse_complement().as_bytes()).unwrap());
 
     // let mut buffer = File::create(output).unwrap();
     // dbg.write_gfa(&mut buffer).unwrap();
