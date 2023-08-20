@@ -31,6 +31,17 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
     println!("{:?}", std::str::from_utf8(contig.reverse_complement().as_bytes()).unwrap());
 
+    for fw_kmer in g.links.keys() {
+        let vs = g.links.get(fw_kmer).unwrap();
+
+        for v in vs {
+            println!("{:?} {:?}",
+                std::str::from_utf8(fw_kmer).unwrap(),
+                std::str::from_utf8(v).unwrap(),
+            )
+        }
+    }
+
     // let mut buffer = File::create(output).unwrap();
     // dbg.write_gfa(&mut buffer).unwrap();
 
