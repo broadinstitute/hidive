@@ -79,6 +79,7 @@ impl LdBG {
         graph
     }
 
+    /// Add all junction choices from a given sequence.
     fn add_record_to_links(links: &mut Links, fwd_seq: &Vec<u8>, k: usize, graph: &KmerGraph) {
         // Iterate over k-mers to find junctions
         let mut anchor_kmer = &fwd_seq[0..k];
