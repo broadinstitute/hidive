@@ -253,7 +253,6 @@ impl LdBG {
 
                         for i in 0..links_in_scope.len() {
                             links_in_scope[i].remove(0);
-
                         }
 
                         for i in (0..links_in_scope.len()).rev() {
@@ -309,7 +308,41 @@ impl LdBG {
             } else if r.out_degree() == 1 {
                 prev_base = complement(r.outgoing_edges()[0]);
             } else {
-                return None;
+                if links_in_scope.len() > 0 {
+                    println!("{:?}", std::str::from_utf8(kmer));
+                    for l in links_in_scope.clone() {
+                        println!("{:?}", std::str::from_utf8(&l));
+                    }
+
+                    let consensus_junction_choice = links_in_scope[0][0];
+
+                    println!(" -- {:?}", std::char::from_u32(consensus_junction_choice as u32));
+
+                    let mut has_match = false;
+                    for junction_base in r.outgoing_edges() {
+                        if junction_base == consensus_junction_choice {
+                            has_match = true;
+                        }
+                    }
+
+                    if has_match {
+                        prev_base = complement(consensus_junction_choice);
+
+                        for i in 0..links_in_scope.len() {
+                            links_in_scope[i].remove(0);
+                        }
+
+                        for i in (0..links_in_scope.len()).rev() {
+                            if links_in_scope[i].len() == 0 {
+                                links_in_scope.remove(i);
+                            }
+                        }
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
             }
         }
 
@@ -352,9 +385,11 @@ impl LdBG {
         last_kmer = kmer.to_vec();
         loop {
             // update available links
-            if self.has_links_at(last_kmer.as_bytes()) {
-                let mut new_links_in_scope = self.links_at(last_kmer.as_bytes());
+            let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
+            let cn_kmer = cn_kmer_vec.as_bytes();
 
+            if self.rc_links.contains_key(cn_kmer.as_bytes()) {
+                let mut new_links_in_scope = self.rc_links.get(cn_kmer.as_bytes()).unwrap().clone();
                 links_in_scope.append(&mut new_links_in_scope);
             }
 

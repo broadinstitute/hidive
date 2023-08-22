@@ -25,8 +25,10 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     let g = LdBG::from_sequences(5, &fwd_seqs);
 
     // Assemble contiguous sequences.
-    // let kmer = g.kmers.first_key_value().unwrap().0;
-    let kmer = b"GATTT".to_vec();
+    // let kmer = b"GATTT".to_vec();
+    // let kmer = b"AAATC".to_vec();
+    let kmer = b"CACGG".to_vec();
+    // let kmer = b"CCGTG".to_vec();
     let contig = g.assemble(&kmer);
 
     println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
