@@ -25,20 +25,6 @@ impl LdBG {
         let fw_links = Self::build_fw_links(k, fwd_seqs, &kmers);
         let rc_links = Self::build_rc_links(k, fwd_seqs, &kmers);
 
-        // for kv in &fw_links {
-        //     println!("fw_links {:?} {:?}",
-        //         std::str::from_utf8(kv.0),
-        //         kv.1.len()
-        //     );
-        // }
-
-        // for kv in &rc_links {
-        //     println!("rc_links {:?} {:?}",
-        //         std::str::from_utf8(kv.0),
-        //         kv.1.len()
-        //     );
-        // }
-
         LdBG {
             kmers,
             fw_links,
@@ -315,22 +301,16 @@ impl LdBG {
             } else if r.in_degree() == 1 {
                 prev_base = r.incoming_edges()[0];
             } else {
-                for link in links_in_scope {
-                    println!("a link {:?}", std::str::from_utf8(link));
-                }
-
-                for base in r.incoming_edges() {
-                    println!("a base {:?}", std::char::from_u32(base as u32));
-                }
-
                 return None;
             }
         } else {
-            if r.out_degree() != 1 {
+            if r.out_degree() == 0 {
+                return None;
+            } else if r.out_degree() == 1 {
+                prev_base = complement(r.outgoing_edges()[0]);
+            } else {
                 return None;
             }
-
-            prev_base = complement(r.outgoing_edges()[0]);
         }
 
         let prev_kmer = [&[prev_base], &kmer[0..kmer.len()-1]].concat();
@@ -343,27 +323,15 @@ impl LdBG {
         let mut contig: Vec<u8> = kmer.to_vec();
         let mut links_in_scope: Vec<Vec<u8>> = Vec::new();
 
-        println!("start {:?}", std::str::from_utf8(kmer));
-
         let mut last_kmer = kmer.to_vec();
         loop {
             // update available links
             let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
             let cn_kmer = cn_kmer_vec.as_bytes();
 
-            // if self.has_links_at(last_kmer.as_bytes()) {
             if self.fw_links.contains_key(cn_kmer.as_bytes()) {
-                println!("fw link {:?} {}", self.fw_links.get(cn_kmer.as_bytes()), cn_kmer == last_kmer);
-                println!("rc link {:?} {}", self.rc_links.get(cn_kmer.as_bytes()), cn_kmer == last_kmer);
-
                 let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
-
                 links_in_scope.append(&mut new_links_in_scope);
-
-                println!("fwd {:?} {}",
-                    std::str::from_utf8(last_kmer.as_bytes()),
-                    links_in_scope.len()
-                );
             }
 
             let res = self.next_kmer(&last_kmer, &mut links_in_scope);
@@ -388,11 +356,6 @@ impl LdBG {
                 let mut new_links_in_scope = self.links_at(last_kmer.as_bytes());
 
                 links_in_scope.append(&mut new_links_in_scope);
-
-                println!("rev {:?} {}",
-                    std::str::from_utf8(last_kmer.as_bytes()),
-                    links_in_scope.len()
-                );
             }
 
             let res = self.prev_kmer(&last_kmer, &mut links_in_scope);
