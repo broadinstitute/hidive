@@ -14,18 +14,35 @@ type Links = BTreeMap<Vec<u8>, Vec<Vec<u8>>>;
 #[derive(Debug)]
 pub struct LdBG {
     pub kmers: KmerGraph,
-    pub links: Links
+    pub fw_links: Links,
+    pub rc_links: Links
 }
 
 impl LdBG {
     /// Create a de Bruijn graph from a list of sequences.
     pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
-        let links = Self::build_links(k, fwd_seqs, &kmers);
+        let fw_links = Self::build_fw_links(k, fwd_seqs, &kmers);
+        let rc_links = Self::build_rc_links(k, fwd_seqs, &kmers);
+
+        // for kv in &fw_links {
+        //     println!("fw_links {:?} {:?}",
+        //         std::str::from_utf8(kv.0),
+        //         kv.1.len()
+        //     );
+        // }
+
+        // for kv in &rc_links {
+        //     println!("rc_links {:?} {:?}",
+        //         std::str::from_utf8(kv.0),
+        //         kv.1.len()
+        //     );
+        // }
 
         LdBG {
             kmers,
-            links
+            fw_links,
+            rc_links
         }
     }
 
@@ -116,19 +133,29 @@ impl LdBG {
         }
     }
 
-    /// Build the links for a de Bruijn graph from a vector of sequences.
-    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
-        let mut links = Links::new();
+    /// Build the forward links for a de Bruijn graph from a vector of sequences.
+    fn build_fw_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
+        let mut fw_links = Links::new();
 
         // Iterate over sequences again to add links
         for fwd_seq in fwd_seqs {
-            LdBG::add_record_to_links(&mut links, fwd_seq, k, graph);
-
-            let rev_seq = &fwd_seq.reverse_complement();
-            LdBG::add_record_to_links(&mut links, rev_seq, k, graph);
+            LdBG::add_record_to_links(&mut fw_links, fwd_seq, k, graph);
         }
 
-        links
+        fw_links
+    }
+
+    /// Build the forward links for a de Bruijn graph from a vector of sequences.
+    fn build_rc_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
+        let mut rc_links = Links::new();
+
+        // Iterate over sequences again to add links
+        for fwd_seq in fwd_seqs {
+            let rev_seq = &fwd_seq.reverse_complement();
+            LdBG::add_record_to_links(&mut rc_links, rev_seq, k, graph);
+        }
+
+        rc_links
     }
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
@@ -187,8 +214,28 @@ impl LdBG {
         false
     }
 
+    /// Determine if there are links at a particular anchor k-mer.
+    fn has_links_at(&self, kmer: &[u8]) -> bool {
+        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer = cn_kmer_vec.as_bytes();
+
+        self.fw_links.contains_key(cn_kmer) || self.rc_links.contains_key(cn_kmer)
+    }
+
+    /// Retrieve links at a particular anchor k-mer.
+    fn links_at(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
+        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer = cn_kmer_vec.as_bytes();
+
+        if kmer == cn_kmer {
+            return self.fw_links.get(cn_kmer).unwrap().clone();
+        }
+
+        self.rc_links.get(cn_kmer).unwrap().clone()
+    }
+
     /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
-    fn next_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+    fn next_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Vec<u8>>) -> Option<Vec<u8>> {
         let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
@@ -200,17 +247,49 @@ impl LdBG {
 
         let next_base;
         if cn_kmer == kmer {
-            if r.out_degree() != 1 {
+            if r.out_degree() == 0 {
                 return None;
-            }
+            } else if r.out_degree() == 1 {
+                next_base = r.outgoing_edges()[0];
+            } else {
+                if links_in_scope.len() > 0 {
+                    let consensus_junction_choice = links_in_scope[0][0];
 
-            next_base = r.outgoing_edges()[0];
+                    let mut has_match = false;
+                    for junction_base in r.outgoing_edges() {
+                        if junction_base == consensus_junction_choice {
+                            has_match = true;
+                        }
+                    }
+
+                    if has_match {
+                        next_base = consensus_junction_choice;
+
+                        for i in 0..links_in_scope.len() {
+                            links_in_scope[i].remove(0);
+
+                        }
+
+                        for i in (0..links_in_scope.len()).rev() {
+                            if links_in_scope[i].len() == 0 {
+                                links_in_scope.remove(i);
+                            }
+                        }
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
         } else {
-            if r.in_degree() != 1 {
+            if r.in_degree() == 0 {
+                return None;
+            } else if r.in_degree() == 1 {
+                next_base = complement(r.incoming_edges()[0]);
+            } else {
                 return None;
             }
-
-            next_base = complement(r.incoming_edges()[0]);
         }
 
         let next_kmer = [&kmer[1..kmer.len()], &[next_base]].concat();
@@ -219,7 +298,7 @@ impl LdBG {
     }
 
     /// Starting at a given k-mer, get the previous k-mer (or return None if there isn't a single incoming edge).
-    fn prev_kmer(&self, kmer: &[u8]) -> Option<Vec<u8>> {
+    fn prev_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Vec<u8>>) -> Option<Vec<u8>> {
         let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
@@ -231,11 +310,21 @@ impl LdBG {
 
         let prev_base;
         if cn_kmer == kmer {
-            if r.in_degree() != 1 {
+            if r.in_degree() == 0 {
+                return None;
+            } else if r.in_degree() == 1 {
+                prev_base = r.incoming_edges()[0];
+            } else {
+                for link in links_in_scope {
+                    println!("a link {:?}", std::str::from_utf8(link));
+                }
+
+                for base in r.incoming_edges() {
+                    println!("a base {:?}", std::char::from_u32(base as u32));
+                }
+
                 return None;
             }
-
-            prev_base = r.incoming_edges()[0];
         } else {
             if r.out_degree() != 1 {
                 return None;
@@ -252,10 +341,32 @@ impl LdBG {
     /// Starting at a given k-mer, assemble a contig.
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
+        let mut links_in_scope: Vec<Vec<u8>> = Vec::new();
+
+        println!("start {:?}", std::str::from_utf8(kmer));
 
         let mut last_kmer = kmer.to_vec();
         loop {
-            let res = self.next_kmer(&last_kmer);
+            // update available links
+            let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
+            let cn_kmer = cn_kmer_vec.as_bytes();
+
+            // if self.has_links_at(last_kmer.as_bytes()) {
+            if self.fw_links.contains_key(cn_kmer.as_bytes()) {
+                println!("fw link {:?} {}", self.fw_links.get(cn_kmer.as_bytes()), cn_kmer == last_kmer);
+                println!("rc link {:?} {}", self.rc_links.get(cn_kmer.as_bytes()), cn_kmer == last_kmer);
+
+                let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
+
+                links_in_scope.append(&mut new_links_in_scope);
+
+                println!("fwd {:?} {}",
+                    std::str::from_utf8(last_kmer.as_bytes()),
+                    links_in_scope.len()
+                );
+            }
+
+            let res = self.next_kmer(&last_kmer, &mut links_in_scope);
 
             match res {
                 Some(this_kmer) => {
@@ -268,9 +379,23 @@ impl LdBG {
             }
         }
 
+        links_in_scope = Vec::new();
+
         last_kmer = kmer.to_vec();
         loop {
-            let res = self.prev_kmer(&last_kmer);
+            // update available links
+            if self.has_links_at(last_kmer.as_bytes()) {
+                let mut new_links_in_scope = self.links_at(last_kmer.as_bytes());
+
+                links_in_scope.append(&mut new_links_in_scope);
+
+                println!("rev {:?} {}",
+                    std::str::from_utf8(last_kmer.as_bytes()),
+                    links_in_scope.len()
+                );
+            }
+
+            let res = self.prev_kmer(&last_kmer, &mut links_in_scope);
 
             match res {
                 Some(this_kmer) => {

@@ -25,22 +25,12 @@ pub fn start(_output: PathBuf, locus: &Option<Vec<String>>, _gff: Option<PathBuf
     let g = LdBG::from_sequences(5, &fwd_seqs);
 
     // Assemble contiguous sequences.
-    let kmer = g.kmers.first_key_value().unwrap().0;
-    let contig = g.assemble(kmer);
+    // let kmer = g.kmers.first_key_value().unwrap().0;
+    let kmer = b"GATTT".to_vec();
+    let contig = g.assemble(&kmer);
 
     println!("{:?}", std::str::from_utf8(contig.as_bytes()).unwrap());
     println!("{:?}", std::str::from_utf8(contig.reverse_complement().as_bytes()).unwrap());
-
-    for fw_kmer in g.links.keys() {
-        let vs = g.links.get(fw_kmer).unwrap();
-
-        for v in vs {
-            println!("{:?} {:?}",
-                std::str::from_utf8(fw_kmer).unwrap(),
-                std::str::from_utf8(v).unwrap(),
-            )
-        }
-    }
 
     // let mut buffer = File::create(output).unwrap();
     // dbg.write_gfa(&mut buffer).unwrap();
