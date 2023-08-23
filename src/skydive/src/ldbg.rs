@@ -436,7 +436,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_add_sequences() {
+    fn test_from_sequences() {
         let genome = get_test_genome();
         let fwd_seqs = vec!(genome);
 
@@ -474,5 +474,33 @@ mod tests {
             assert!(record.incoming_edges() == exp_record.incoming_edges());
             assert!(record.outgoing_edges() == exp_record.outgoing_edges());
         }
+    }
+
+    #[test]
+    fn test_assemble() {
+        let fw_genome = get_test_genome();
+        let fwd_seqs = vec!(fw_genome.clone());
+
+        let rc_genome = fw_genome.reverse_complement();
+
+        let g = LdBG::from_sequences(5, &fwd_seqs);
+
+        // assembly outside cycle should recapitulate entire genome
+        assert!(fw_genome == g.assemble(b"ACTGA"));
+        assert!(fw_genome == g.assemble(b"TTCGA"));
+        assert!(fw_genome == g.assemble(b"TGCCA"));
+        assert!(fw_genome == g.assemble(b"GGTGG"));
+
+        // assembly outside cycle should recapitulate entire genome
+        assert!(rc_genome == g.assemble(b"ACTGA".to_vec().reverse_complement().as_bytes()));
+        assert!(rc_genome == g.assemble(b"TTCGA".to_vec().reverse_complement().as_bytes()));
+        assert!(rc_genome == g.assemble(b"TGCCA".to_vec().reverse_complement().as_bytes()));
+        assert!(rc_genome == g.assemble(b"GGTGG".to_vec().reverse_complement().as_bytes()));
+
+        // assembly inside cycle should not recapitulate entire genome
+        assert!(fw_genome != g.assemble(b"TGCGA"));
+        assert!(rc_genome != g.assemble(b"TGCGA".to_vec().reverse_complement().as_bytes()));
+        assert!(fw_genome != g.assemble(b"CGATG"));
+        assert!(rc_genome != g.assemble(b"CGATG".to_vec().reverse_complement().as_bytes()));
     }
 }
