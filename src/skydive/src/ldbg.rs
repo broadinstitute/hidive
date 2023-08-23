@@ -134,58 +134,33 @@ impl LdBG {
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
     fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
-        let rc_kmer_vec = kmer.reverse_complement();
-        let rc_kmer = rc_kmer_vec.as_bytes();
+        std::cmp::min(kmer, &kmer.reverse_complement()).to_vec()
+    }
 
-        if kmer < rc_kmer {
-            kmer.to_vec()
-        } else {
-            rc_kmer.to_vec()
+    /// Check if the given k-mer represents a junction (in the orientation of the given k-mer).
+    fn has_junction(graph: &KmerGraph, kmer: &[u8], outgoing: bool) -> bool {
+        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer = cn_kmer_vec.as_bytes();
+
+        if let Some(r) = graph.get(cn_kmer) {
+            if kmer == cn_kmer {
+                return r.out_degree() > 1 && outgoing || r.in_degree() > 1 && !outgoing;
+            } else {
+                return r.in_degree() > 1 && outgoing || r.out_degree() > 1 && !outgoing;
+            }
         }
+
+        false
     }
 
     /// Check if the given k-mer represents an outgoing junction (in the orientation of the given k-mer).
     fn has_outgoing_junction(graph: &KmerGraph, kmer: &[u8]) -> bool {
-        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
-        let cn_kmer = cn_kmer_vec.as_bytes();
-
-        if graph.contains_key(cn_kmer) {
-            let r = graph.get(cn_kmer).unwrap();
-
-            if kmer == cn_kmer {
-                if r.out_degree() > 1 {
-                    return true;
-                }
-            } else {
-                if r.in_degree() > 1 {
-                    return true;
-                }
-            }
-        }
-
-        false
+        Self::has_junction(graph, kmer, true)
     }
 
     /// Check if the given k-mer represents an incoming junction (in the orientation of the given k-mer).
     fn has_incoming_junction(graph: &KmerGraph, kmer: &[u8]) -> bool {
-        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
-        let cn_kmer = cn_kmer_vec.as_bytes();
-
-        if graph.contains_key(cn_kmer) {
-            let r = graph.get(cn_kmer).unwrap();
-
-            if kmer == cn_kmer {
-                if r.in_degree() > 1 {
-                    return true;
-                }
-            } else {
-                if r.out_degree() > 1 {
-                    return true;
-                }
-            }
-        }
-
-        false
+        Self::has_junction(graph, kmer, false)
     }
 
     /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
