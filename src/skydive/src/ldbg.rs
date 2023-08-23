@@ -90,18 +90,18 @@ impl LdBG {
         for i in 0..fwd_seq.len()-k+1 {
             let fw_kmer = &fwd_seq[i..i+k];
 
-            if !LdBG::has_incoming_junction(&graph, fw_kmer) && !LdBG::has_outgoing_junction(&graph, fw_kmer) {
+            if !LdBG::has_junction(&graph, fw_kmer, false) && !LdBG::has_junction(&graph, fw_kmer, true) {
                 anchor_kmer = &fwd_seq[i..i+k];
             }
 
-            if LdBG::has_outgoing_junction(&graph, fw_kmer) {
+            if LdBG::has_junction(&graph, fw_kmer, true) {
                 let mut junctions = Vec::new();
 
                 // Iterate over k-mers after the current junction and record further junction choices
                 for j in i..fwd_seq.len()-k+1 {
                     let next_kmer = &fwd_seq[j..j+k];
 
-                    let has_junction = LdBG::has_outgoing_junction(&graph, next_kmer);
+                    let has_junction = LdBG::has_junction(&graph, next_kmer, true);
                     if has_junction {
                         junctions.push(fwd_seq[j+k]);
                     }
@@ -151,16 +151,6 @@ impl LdBG {
         }
 
         false
-    }
-
-    /// Check if the given k-mer represents an outgoing junction (in the orientation of the given k-mer).
-    fn has_outgoing_junction(graph: &KmerGraph, kmer: &[u8]) -> bool {
-        Self::has_junction(graph, kmer, true)
-    }
-
-    /// Check if the given k-mer represents an incoming junction (in the orientation of the given k-mer).
-    fn has_incoming_junction(graph: &KmerGraph, kmer: &[u8]) -> bool {
-        Self::has_junction(graph, kmer, false)
     }
 
     /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
