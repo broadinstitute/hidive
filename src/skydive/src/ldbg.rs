@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 
 use parquet::data_type::AsBytes;
 
@@ -223,6 +224,26 @@ impl LdBG {
         Some(prev_kmer)
     }
 
+    /// Assemble all contigs from the linked de Bruijn graph.
+    pub fn assemble_all(&self) -> Vec<Vec<u8>> {
+        let mut contigs = Vec::new();
+
+        let mut used_kmers = HashSet::new();
+        let k = self.kmers.keys().next().unwrap().len();
+
+        for cn_kmer in self.kmers.keys() {
+            if !used_kmers.contains(cn_kmer) {
+                let contig = self.assemble(cn_kmer);
+                for kmer_in_contig in contig.windows(k) {
+                    used_kmers.insert(Self::canonicalize_kmer(kmer_in_contig));
+                }
+                contigs.push(contig);
+            }
+        }
+
+        contigs
+    }
+
     /// Starting at a given k-mer, assemble a contig.
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
@@ -302,10 +323,12 @@ mod tests {
     use super::*;
     use crate::edges::Edges;
 
+    /// Example genome from https://academic.oup.com/bioinformatics/article/34/15/2556/4938484
     fn get_test_genome() -> Vec<u8> {
         "ACTGATTTCGATGCGATGCGATGCCACGGTGG".as_bytes().to_vec()
     }
 
+    // Example read from https://academic.oup.com/bioinformatics/article/34/15/2556/4938484
     // fn get_test_read() -> Vec<u8> {
     //     "TTTCGATGCGATGCGATGCCACG".as_bytes().to_vec()
     // }
