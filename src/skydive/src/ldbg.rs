@@ -465,7 +465,6 @@ mod tests {
         exp_graph.insert(b"TCGCA".to_vec(), Record::new(2, Some(Edges::from_string("a......T".to_string()))));
         exp_graph.insert(b"TGCCA".to_vec(), Record::new(1, Some(Edges::from_string("a....C..".to_string()))));
 
-
         for (kmer, record) in g.kmers {
             assert!(exp_graph.contains_key(kmer.as_bytes()));
 
