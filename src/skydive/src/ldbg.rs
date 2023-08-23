@@ -22,8 +22,8 @@ impl LdBG {
     /// Create a de Bruijn graph from a list of sequences.
     pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
-        let fw_links = Self::build_fw_links(k, fwd_seqs, &kmers);
-        let rc_links = Self::build_rc_links(k, fwd_seqs, &kmers);
+        let fw_links = Self::build_links(k, fwd_seqs, &kmers, false);
+        let rc_links = Self::build_links(k, fwd_seqs, &kmers, true);
 
         LdBG {
             kmers,
@@ -119,29 +119,17 @@ impl LdBG {
         }
     }
 
-    /// Build the forward links for a de Bruijn graph from a vector of sequences.
-    fn build_fw_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
-        let mut fw_links = Links::new();
+    /// Build the links for a de Bruijn graph from a vector of sequences.
+    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph, is_reverse: bool) -> Links {
+        let mut links = Links::new();
 
         // Iterate over sequences again to add links
         for fwd_seq in fwd_seqs {
-            LdBG::add_record_to_links(&mut fw_links, fwd_seq, k, graph);
+            let seq = if is_reverse { fwd_seq.clone().reverse_complement() } else { fwd_seq.clone() };
+            LdBG::add_record_to_links(&mut links, &seq, k, graph);
         }
 
-        fw_links
-    }
-
-    /// Build the forward links for a de Bruijn graph from a vector of sequences.
-    fn build_rc_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
-        let mut rc_links = Links::new();
-
-        // Iterate over sequences again to add links
-        for fwd_seq in fwd_seqs {
-            let rev_seq = &fwd_seq.reverse_complement();
-            LdBG::add_record_to_links(&mut rc_links, rev_seq, k, graph);
-        }
-
-        rc_links
+        links
     }
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
@@ -200,86 +188,39 @@ impl LdBG {
         false
     }
 
-    /// Determine if there are links at a particular anchor k-mer.
-    fn has_links_at(&self, kmer: &[u8]) -> bool {
-        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
-        let cn_kmer = cn_kmer_vec.as_bytes();
-
-        self.fw_links.contains_key(cn_kmer) || self.rc_links.contains_key(cn_kmer)
-    }
-
-    /// Retrieve links at a particular anchor k-mer.
-    fn links_at(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
-        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
-        let cn_kmer = cn_kmer_vec.as_bytes();
-
-        if kmer == cn_kmer {
-            return self.fw_links.get(cn_kmer).unwrap().clone();
-        }
-
-        self.rc_links.get(cn_kmer).unwrap().clone()
-    }
-
     /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
     fn next_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Vec<u8>>) -> Option<Vec<u8>> {
         let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
-        if !self.kmers.contains_key(cn_kmer) {
-            return None;
-        }
+        let r = self.kmers.get(cn_kmer)?;
 
-        let r = self.kmers.get(cn_kmer).unwrap();
-
-        let next_base;
-        if cn_kmer == kmer {
-            if r.out_degree() == 0 {
-                return None;
-            } else if r.out_degree() == 1 {
-                next_base = r.outgoing_edges()[0];
-            } else {
-                if links_in_scope.len() > 0 {
-                    let consensus_junction_choice = links_in_scope[0][0];
-
-                    let mut has_match = false;
-                    for junction_base in r.outgoing_edges() {
-                        if junction_base == consensus_junction_choice {
-                            has_match = true;
-                        }
-                    }
-
-                    if has_match {
-                        next_base = consensus_junction_choice;
-
-                        for i in 0..links_in_scope.len() {
-                            links_in_scope[i].remove(0);
-                        }
-
-                        for i in (0..links_in_scope.len()).rev() {
-                            if links_in_scope[i].len() == 0 {
-                                links_in_scope.remove(i);
-                            }
-                        }
+        let next_base = if cn_kmer == kmer {
+            match r.out_degree() {
+                0 => return None,
+                1 => r.outgoing_edges()[0],
+                _ => {
+                    let consensus_junction_choice = links_in_scope.get(0)?[0];
+                    if r.outgoing_edges().contains(&consensus_junction_choice) {
+                        links_in_scope.iter_mut().for_each(|link| { link.remove(0); });
+                        links_in_scope.retain(|link| !link.is_empty());
+                        consensus_junction_choice
                     } else {
                         return None;
                     }
-                } else {
-                    return None;
                 }
             }
         } else {
-            if r.in_degree() == 0 {
-                return None;
-            } else if r.in_degree() == 1 {
-                next_base = complement(r.incoming_edges()[0]);
-            } else {
-                return None;
+            match r.in_degree() {
+                0 => return None,
+                1 => complement(r.incoming_edges()[0]),
+                _ => return None,
             }
-        }
+        };
 
         let next_kmer = [&kmer[1..kmer.len()], &[next_base]].concat();
 
-        return Some(next_kmer);
+        Some(next_kmer)
     }
 
     /// Starting at a given k-mer, get the previous k-mer (or return None if there isn't a single incoming edge).
@@ -287,61 +228,34 @@ impl LdBG {
         let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
-        if !self.kmers.contains_key(cn_kmer) {
-            return None;
-        }
+        let r = self.kmers.get(cn_kmer)?;
 
-        let r = self.kmers.get(cn_kmer).unwrap();
-
-        let prev_base;
-        if cn_kmer == kmer {
-            if r.in_degree() == 0 {
-                return None;
-            } else if r.in_degree() == 1 {
-                prev_base = r.incoming_edges()[0];
-            } else {
-                return None;
+        let prev_base = if cn_kmer == kmer {
+            match r.in_degree() {
+                0 => return None,
+                1 => r.incoming_edges()[0],
+                _ => return None,
             }
         } else {
-            if r.out_degree() == 0 {
-                return None;
-            } else if r.out_degree() == 1 {
-                prev_base = complement(r.outgoing_edges()[0]);
-            } else {
-                if links_in_scope.len() > 0 {
-                    let consensus_junction_choice = links_in_scope[0][0];
-
-                    let mut has_match = false;
-                    for junction_base in r.outgoing_edges() {
-                        if junction_base == consensus_junction_choice {
-                            has_match = true;
-                        }
-                    }
-
-                    if has_match {
-                        prev_base = complement(consensus_junction_choice);
-
-                        for i in 0..links_in_scope.len() {
-                            links_in_scope[i].remove(0);
-                        }
-
-                        for i in (0..links_in_scope.len()).rev() {
-                            if links_in_scope[i].len() == 0 {
-                                links_in_scope.remove(i);
-                            }
-                        }
+            match r.out_degree() {
+                0 => return None,
+                1 => complement(r.outgoing_edges()[0]),
+                _ => {
+                    let consensus_junction_choice = links_in_scope.get(0)?[0];
+                    if r.outgoing_edges().contains(&consensus_junction_choice) {
+                        links_in_scope.iter_mut().for_each(|link| { link.remove(0); });
+                        links_in_scope.retain(|link| !link.is_empty());
+                        complement(consensus_junction_choice)
                     } else {
                         return None;
                     }
-                } else {
-                    return None;
                 }
             }
-        }
+        };
 
         let prev_kmer = [&[prev_base], &kmer[0..kmer.len()-1]].concat();
 
-        return Some(prev_kmer);
+        Some(prev_kmer)
     }
 
     /// Starting at a given k-mer, assemble a contig.
