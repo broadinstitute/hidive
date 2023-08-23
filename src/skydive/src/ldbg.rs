@@ -236,27 +236,21 @@ impl LdBG {
     /// Starting at a given k-mer, assemble a contig.
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
+
+        self.assemble_forward(&mut contig, kmer.to_vec());
+        self.assemble_backward(&mut contig, kmer.to_vec());
+
+        contig
+    }
+
+    /// Assemble a contig in the forward direction.
+    fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
         let mut links_in_scope: Vec<Vec<u8>> = Vec::new();
-
-        let mut last_kmer = kmer.to_vec();
+        let mut last_kmer = start_kmer.clone();
         loop {
-            // update available links
-            let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
-            let cn_kmer = cn_kmer_vec.as_bytes();
+            self.update_links(&mut links_in_scope, &last_kmer);
 
-            if self.fw_links.contains_key(cn_kmer.as_bytes()) {
-                let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
-                links_in_scope.append(&mut new_links_in_scope);
-            }
-
-            if self.rc_links.contains_key(cn_kmer.as_bytes()) {
-                let mut new_links_in_scope = self.rc_links.get(cn_kmer.as_bytes()).unwrap().clone();
-                links_in_scope.append(&mut new_links_in_scope);
-            }
-
-            let res = self.next_kmer(&last_kmer, &mut links_in_scope);
-
-            match res {
+            match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
                     contig.push(this_kmer[this_kmer.len() - 1]);
                     last_kmer = this_kmer;
@@ -266,28 +260,16 @@ impl LdBG {
                 }
             }
         }
+    }
 
-        links_in_scope = Vec::new();
-
-        last_kmer = kmer.to_vec();
+    /// Assemble a contig in the backward direction.
+    fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
+        let mut links_in_scope: Vec<Vec<u8>> = Vec::new();
+        let mut last_kmer = start_kmer.clone();
         loop {
-            // update available links
-            let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
-            let cn_kmer = cn_kmer_vec.as_bytes();
+            self.update_links(&mut links_in_scope, &last_kmer);
 
-            if self.fw_links.contains_key(cn_kmer.as_bytes()) {
-                let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
-                links_in_scope.append(&mut new_links_in_scope);
-            }
-
-            if self.rc_links.contains_key(cn_kmer.as_bytes()) {
-                let mut new_links_in_scope = self.rc_links.get(cn_kmer.as_bytes()).unwrap().clone();
-                links_in_scope.append(&mut new_links_in_scope);
-            }
-
-            let res = self.prev_kmer(&last_kmer, &mut links_in_scope);
-
-            match res {
+            match self.prev_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
                     contig.insert(0, this_kmer[0]);
                     last_kmer = this_kmer;
@@ -297,8 +279,22 @@ impl LdBG {
                 }
             }
         }
+    }
 
-        contig
+    /// Update available links.
+    fn update_links(&self, links_in_scope: &mut Vec<Vec<u8>>, last_kmer: &Vec<u8>) {
+        let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
+        let cn_kmer = cn_kmer_vec.as_bytes();
+
+        if self.fw_links.contains_key(cn_kmer.as_bytes()) {
+            let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
+            links_in_scope.append(&mut new_links_in_scope);
+        }
+
+        if self.rc_links.contains_key(cn_kmer.as_bytes()) {
+            let mut new_links_in_scope = self.rc_links.get(cn_kmer.as_bytes()).unwrap().clone();
+            links_in_scope.append(&mut new_links_in_scope);
+        }
     }
 
     fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
