@@ -479,10 +479,9 @@ mod tests {
     #[test]
     fn test_assemble() {
         let fw_genome = get_test_genome();
-        let fwd_seqs = vec!(fw_genome.clone());
-
         let rc_genome = fw_genome.reverse_complement();
 
+        let fwd_seqs = vec!(fw_genome.clone());
         let g = LdBG::from_sequences(5, &fwd_seqs);
 
         // assembly outside cycle should recapitulate entire genome
