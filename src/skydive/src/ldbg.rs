@@ -7,29 +7,36 @@ use needletail::Sequence;
 use needletail::sequence::complement;
 
 use crate::record::Record;
+use crate::link::LinkData;
 
 type KmerGraph = BTreeMap<Vec<u8>, Record>;
-type Links = BTreeMap<Vec<u8>, Vec<Vec<u8>>>;
+type Links = BTreeMap<Vec<u8>, BTreeMap<Vec<u8>, LinkData>>;
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug)]
 pub struct LdBG {
     pub kmers: KmerGraph,
-    pub fw_links: Links,
-    pub rc_links: Links
+    pub links: Links,
 }
 
 impl LdBG {
     /// Create a de Bruijn graph from a list of sequences.
     pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
-        let fw_links = Self::build_links(k, fwd_seqs, &kmers, false);
-        let rc_links = Self::build_links(k, fwd_seqs, &kmers, true);
+        let links = Self::build_links(k, fwd_seqs, &kmers);
+
+        // for kmer in vec![b"TCAGA", b"ACTCT", b"CCGCG", b"GACGC", b"CCAGA", b"CGCGA", b"AGAGC", b"GCGTA"] {
+        //     let kmer_vec = kmer.to_vec();
+        //     let kv = links.get_key_value(&kmer_vec).unwrap();
+
+        //     for jv in kv.1 {
+        //         println!("{:?} {:?} {}", std::str::from_utf8(kv.0), std::str::from_utf8(jv.0), jv.1);
+        //     }
+        // }
 
         LdBG {
             kmers,
-            fw_links,
-            rc_links
+            links,
         }
     }
 
@@ -84,12 +91,26 @@ impl LdBG {
     }
 
     /// Add all junction choices from a given sequence.
-    fn add_record_to_links(links: &mut Links, fwd_seq: &Vec<u8>, k: usize, graph: &KmerGraph) {
+    fn add_record_to_links(links: &mut Links, fwd_seq: &Vec<u8>, k: usize, graph: &KmerGraph, is_forward: bool) {
         // Iterate over k-mers to find junctions
         let mut anchor_kmer = &fwd_seq[0..k];
 
         for i in 0..fwd_seq.len()-k+1 {
             let fw_kmer = &fwd_seq[i..i+k];
+            let rc_kmer_vec = fw_kmer.reverse_complement();
+            let rc_kmer= rc_kmer_vec.as_bytes();
+
+            let cn_kmer_vec = LdBG::canonicalize_kmer(fw_kmer).to_owned();
+            let cn_kmer = cn_kmer_vec.as_bytes();
+
+            // if let Some(r) = graph.get(cn_kmer) {
+            //     println!("{:?} {:?} {:?} {}",
+            //         std::str::from_utf8(fw_kmer),
+            //         std::str::from_utf8(rc_kmer),
+            //         std::str::from_utf8(cn_kmer),
+            //         r
+            //     )
+            // }
 
             if !LdBG::has_junction(&graph, fw_kmer, false) && !LdBG::has_junction(&graph, fw_kmer, true) {
                 anchor_kmer = &fwd_seq[i..i+k];
@@ -98,7 +119,12 @@ impl LdBG {
             if LdBG::has_junction(&graph, fw_kmer, true) {
                 let mut junctions = Vec::new();
 
-                // Iterate over k-mers after the current junction and record further junction choices
+                // println!(" -- {:?} {:?} {} anchor",
+                //     std::str::from_utf8(LdBG::canonicalize_kmer(anchor_kmer).as_bytes()),
+                //     std::str::from_utf8(fwd_seq[i..fwd_seq.len()].as_bytes()),
+                //     is_forward
+                // );
+
                 for j in i..fwd_seq.len()-k+1 {
                     let next_kmer = &fwd_seq[j..j+k];
 
@@ -108,26 +134,40 @@ impl LdBG {
                     }
                 }
 
-                let cn_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
-                let cn_kmer = cn_kmer_vec.as_bytes();
+                let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
+                let cn_anchor_kmer = cn_anchor_kmer_vec.as_bytes();
 
-                if !links.contains_key(cn_kmer) {
-                    links.insert(cn_kmer.to_owned(), Vec::new());
+                if !links.contains_key(cn_anchor_kmer) {
+                    links.insert(cn_anchor_kmer.to_owned(), BTreeMap::new());
                 }
 
-                links.get_mut(cn_kmer).unwrap().push(junctions);
+                if !links.get(cn_anchor_kmer).unwrap().contains_key(&junctions) {
+                    let linkdata = LinkData::new(0, anchor_kmer == cn_anchor_kmer);
+                    links.get_mut(cn_anchor_kmer)
+                            .unwrap()
+                            .insert(junctions.clone(), linkdata);
+                }
+
+                links.get_mut(cn_anchor_kmer)
+                        .unwrap()
+                        .get_mut(&junctions)
+                        .unwrap()
+                        .increment_coverage();
             }
         }
     }
 
     /// Build the links for a de Bruijn graph from a vector of sequences.
-    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph, is_reverse: bool) -> Links {
+    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
         let mut links = Links::new();
 
         // Iterate over sequences again to add links
         for fwd_seq in fwd_seqs {
-            let seq = if is_reverse { fwd_seq.clone().reverse_complement() } else { fwd_seq.clone() };
-            LdBG::add_record_to_links(&mut links, &seq, k, graph);
+            let fw_seq = fwd_seq.clone();
+            let rc_seq = fw_seq.reverse_complement();
+
+            LdBG::add_record_to_links(&mut links, &fw_seq, k, graph, true);
+            LdBG::add_record_to_links(&mut links, &rc_seq, k, graph, false);
         }
 
         links
@@ -145,9 +185,9 @@ impl LdBG {
 
         if let Some(r) = graph.get(cn_kmer) {
             if kmer == cn_kmer {
-                return r.out_degree() > 1 && outgoing || r.in_degree() > 1 && !outgoing;
+                return (r.out_degree() > 1 && outgoing) || (r.in_degree() > 1 && !outgoing);
             } else {
-                return r.in_degree() > 1 && outgoing || r.out_degree() > 1 && !outgoing;
+                return (r.in_degree() > 1 && outgoing) || (r.out_degree() > 1 && !outgoing);
             }
         }
 
@@ -200,7 +240,24 @@ impl LdBG {
             match r.in_degree() {
                 0 => return None,
                 1 => r.incoming_edges()[0],
-                _ => return None,
+                _ =>  {
+                    let consensus_junction_choice = links_in_scope.get(0)?[0];
+
+                    // println!("{:?} {:?} {:?} {:?}",
+                    //     std::str::from_utf8(kmer.as_bytes()),
+                    //     std::str::from_utf8(cn_kmer.as_bytes()),
+                    //     std::char::from_u32(consensus_junction_choice as u32),
+                    //     std::str::from_utf8(r.incoming_edges().as_bytes())
+                    // );
+
+                    if r.incoming_edges().contains(&consensus_junction_choice) {
+                        links_in_scope.iter_mut().for_each(|link| { link.remove(0); });
+                        links_in_scope.retain(|link| !link.is_empty());
+                        consensus_junction_choice
+                    } else {
+                        return None;
+                    }
+                }
             }
         } else {
             match r.out_degree() {
@@ -233,11 +290,17 @@ impl LdBG {
 
         for cn_kmer in self.kmers.keys() {
             if !used_kmers.contains(cn_kmer) {
-                let contig = self.assemble(cn_kmer);
-                for kmer_in_contig in contig.windows(k) {
-                    used_kmers.insert(Self::canonicalize_kmer(kmer_in_contig));
+                let r = self.kmers.get(cn_kmer).unwrap();
+
+                if r.in_degree() == 1 && r.out_degree() == 1 {
+                    let contig = self.assemble(cn_kmer);
+                    for kmer_in_contig in contig.windows(k) {
+                        used_kmers.insert(Self::canonicalize_kmer(kmer_in_contig));
+                    }
+                    contigs.push(contig);
                 }
-                contigs.push(contig);
+
+                used_kmers.insert(cn_kmer.clone());
             }
         }
 
@@ -297,14 +360,12 @@ impl LdBG {
         let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
-        if self.fw_links.contains_key(cn_kmer.as_bytes()) {
-            let mut new_links_in_scope = self.fw_links.get(cn_kmer.as_bytes()).unwrap().clone();
-            links_in_scope.append(&mut new_links_in_scope);
-        }
+        if self.links.contains_key(cn_kmer.as_bytes()) {
+            let mut new_links_in_scope = self.links.get(cn_kmer.as_bytes()).unwrap().clone();
 
-        if self.rc_links.contains_key(cn_kmer.as_bytes()) {
-            let mut new_links_in_scope = self.rc_links.get(cn_kmer.as_bytes()).unwrap().clone();
-            links_in_scope.append(&mut new_links_in_scope);
+            for jv in new_links_in_scope {
+                links_in_scope.push(jv.0.clone());
+            }
         }
     }
 
@@ -323,6 +384,8 @@ mod tests {
     use super::*;
     use crate::edges::Edges;
 
+    use rand::{Rng, SeedableRng};
+
     /// Example genome from https://academic.oup.com/bioinformatics/article/34/15/2556/4938484
     fn get_test_genome() -> Vec<u8> {
         "ACTGATTTCGATGCGATGCGATGCCACGGTGG".as_bytes().to_vec()
@@ -332,6 +395,20 @@ mod tests {
     // fn get_test_read() -> Vec<u8> {
     //     "TTTCGATGCGATGCGATGCCACG".as_bytes().to_vec()
     // }
+
+    fn generate_random_genome(length: usize, seed: u64) -> Vec<u8> {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+
+        let alphabet = b"ACGT";
+        let mut genome = Vec::with_capacity(length);
+
+        for _ in 0..length {
+            let idx = rng.gen_range(0..4);
+            genome.push(alphabet[idx]);
+        }
+
+        genome
+    }
 
     #[test]
     fn test_from_sequences() {
@@ -398,5 +475,25 @@ mod tests {
         assert!(rc_genome != g.assemble(b"TGCGA".to_vec().reverse_complement().as_bytes()));
         assert!(fw_genome != g.assemble(b"CGATG"));
         assert!(rc_genome != g.assemble(b"CGATG".to_vec().reverse_complement().as_bytes()));
+    }
+
+    #[test]
+    fn test_assemble_random_genome() {
+        for length in (50..100).step_by(5) {
+            let random_genome = generate_random_genome(length, 0);
+            let fwd_seqs = vec!(random_genome.clone());
+
+            if length == 60 {
+                println!("FW {:?} {:?}", length, std::str::from_utf8(random_genome.as_bytes()));
+                println!("RV {:?} {:?}", length, std::str::from_utf8(random_genome.reverse_complement().as_bytes()));
+
+                let g = LdBG::from_sequences(5, &fwd_seqs);
+                let contigs = g.assemble_all();
+
+                for contig in contigs {
+                    println!(" -- {} {:?}", contig.len(), std::str::from_utf8(contig.as_bytes()));
+                }
+            }
+        }
     }
 }

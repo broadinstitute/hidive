@@ -3216,6 +3216,7 @@ dependencies = [
  "pretty_assertions",
  "proptest",
  "rand",
+ "rand_chacha",
  "reqwest",
  "serde",
  "serde_derive",

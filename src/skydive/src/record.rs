@@ -109,7 +109,9 @@ impl Record {
 
 impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}{}{}{} {}{}{}{}] {}",
+        write!(f, "{} {}{}{}{}{}{}{}{}",
+            self.coverage,
+
             if self.edges.contains(Edges::FLAG_EDGE_IN_A)  { 'a' } else { '.' },
             if self.edges.contains(Edges::FLAG_EDGE_IN_C)  { 'c' } else { '.' },
             if self.edges.contains(Edges::FLAG_EDGE_IN_G)  { 'g' } else { '.' },
@@ -119,8 +121,6 @@ impl fmt::Display for Record {
             if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { 'C' } else { '.' },
             if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { 'G' } else { '.' },
             if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { 'T' } else { '.' },
-
-            self.coverage,
         )
     }
 }
