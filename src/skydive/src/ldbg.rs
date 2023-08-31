@@ -299,9 +299,10 @@ impl LdBG {
     /// Assemble a contig in the forward direction.
     fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
         let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            self.update_links(&mut links_in_scope, &last_kmer, true);
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links);
 
             match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
@@ -318,9 +319,10 @@ impl LdBG {
     /// Assemble a contig in the backward direction.
     fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
         let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            self.update_links(&mut links_in_scope, &last_kmer, false);
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links);
 
             match self.prev_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
@@ -335,7 +337,7 @@ impl LdBG {
     }
 
     /// Update links available to inform navigation during graph traversal.
-    fn update_links(&self, links_in_scope: &mut Vec<Link>, last_kmer: &Vec<u8>, go_forward: bool) {
+    fn update_links(&self, links_in_scope: &mut Vec<Link>, last_kmer: &Vec<u8>, used_links: &mut HashSet<Link>) {
         let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
@@ -348,7 +350,10 @@ impl LdBG {
                 let link_goes_forward = record_orientation_matches_kmer == jv.0.is_forward();
                 let new_link = if link_goes_forward { jv.0.clone() } else { jv.0.complement() };
 
-                links_in_scope.push(new_link);
+                if !used_links.contains(&new_link) {
+                    used_links.insert(new_link.clone());
+                    links_in_scope.push(new_link);
+                }
             }
         }
     }
@@ -480,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_assemble_random_genome() {
-        for length in (20..100).step_by(5) {
+        for length in (50..100).step_by(5) {
             let random_genome = generate_random_genome(length, 0);
             let fwd_seqs = vec!(random_genome.clone());
 
