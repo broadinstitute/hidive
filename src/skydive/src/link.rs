@@ -1,18 +1,23 @@
 use std::fmt;
+use std::collections::VecDeque;
+
+use needletail::sequence::complement;
+
+use parquet::data_type::AsBytes;
 
 /// Represents metadata on a link (a series of junction choices in de Bruijn graph).
-#[derive(Debug)]
-pub struct LinkData {
-    coverage: u16,
-    is_forward: bool
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Link {
+    is_forward: bool,
+    junctions: VecDeque<u8>
 }
 
-impl LinkData {
-    /// Create an empty de Bruijn graph record.
-    pub fn new(coverage: u16, is_forward: bool) -> Self {
-        LinkData {
-            coverage,
-            is_forward
+impl Link {
+    /// Create an empty link record.
+    pub fn new(is_forward: bool) -> Self {
+        Link {
+            is_forward: is_forward,
+            junctions: VecDeque::new()
         }
     }
 
@@ -21,73 +26,53 @@ impl LinkData {
         self.is_forward
     }
 
-    /// Return the LinkData's coverage.
-    pub fn coverage(&self) -> u16 {
-        self.coverage
+    /// Return the number of junction choices in the link.
+    pub fn length(&self) -> usize {
+        self.junctions.len()
     }
 
-    /// Increment the coverage value by 1.
-    pub fn increment_coverage(&mut self) {
-        self.coverage = self.coverage.saturating_add(1);
+    /// Indicate whether the list of junctions is empty.
+    pub fn is_empty(&self) -> bool {
+        self.junctions.is_empty()
     }
 
-    /// Set the coverage value.
-    pub fn set_coverage(&mut self, coverage: u16) {
-        self.coverage = coverage;
+    /// Add a junction to the queue.
+    pub fn push_back(&mut self, junction: u8) {
+        self.junctions.push_back(junction);
+    }
+
+    /// Peek at a junction from the front of the queue.
+    pub fn front(&self) -> Option<&u8> {
+        self.junctions.front()
+    }
+
+    /// Take a junction from the front of the queue.
+    pub fn pop_front(&mut self) -> Option<u8> {
+        self.junctions.pop_front()
+    }
+
+    /// Return a new link with the junction choices complemented.
+    pub fn complement(&self) -> Link {
+        let mut new_link = Link::new(self.is_forward);
+
+        for junction in &self.junctions {
+            new_link.push_back(complement(*junction));
+        }
+
+        new_link
     }
 }
 
-impl fmt::Display for LinkData {
+impl fmt::Display for Link {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}",
+        let mut jvec = Vec::new();
+        for junction in &self.junctions {
+            jvec.push(*junction);
+        }
+        
+        write!(f, "{} {:?}",
             if self.is_forward { "F" } else { "R" },
-            self.coverage,
+            std::str::from_utf8(jvec.as_bytes())
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_coverage() {
-        let r1 = LinkData::new(1, true);
-        let r10 = LinkData::new(10, true);
-
-        assert!(r1.coverage() == 1);
-        assert!(r10.coverage() == 10);
-    }
-
-    #[test]
-    fn test_set_coverage() {
-        let mut r100 = LinkData::new(0, true);
-        r100.set_coverage(100);
-
-        let mut r1000 = LinkData::new(0, true);
-        r1000.set_coverage(1000);
-
-        assert!(r100.coverage() == 100);
-        assert!(r1000.coverage() == 1000);
-    }
-
-    #[test]
-    fn test_increment_coverage() {
-        let mut r100 = LinkData::new(99, true);
-        r100.increment_coverage();
-
-        let mut r1000 = LinkData::new(999, true);
-        r1000.increment_coverage();
-
-        assert!(r100.coverage() == 100);
-        assert!(r1000.coverage() == 1000);
-    }
-
-    #[test]
-    fn test_increment_coverage_saturates() {
-        let mut rmax = LinkData::new(u16::MAX, true);
-        rmax.increment_coverage();
-
-        assert!(rmax.coverage() == u16::MAX);
     }
 }
