@@ -20,19 +20,23 @@ Quick start
 The following commands will compile the Rust and Python codebase.
 
 .. code-block:: bash
-   
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  # Install Rust.
 
-   git clone https://github.com/broadinstitute/hidive.git          # Clone repository.
-   cd hidive                                                       # Change into the Hidive directory.
-   cargo build --release                                           # Build Hidive's Rust codebase (with release optimizations).
+   # Install Rust.
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-   python -mvenv venv                                              # Create a Python virtual environment.
-   . venv/bin/activate                                             # Activate environment.
-   pip install -f dev-requirements.txt                             # Install Python dependencies.
+   # Download and build Hidive
+   git clone https://github.com/broadinstitute/hidive.git
+   cd hidive
+   cargo build --release
 
-   cd src/pydive/                                                  # Change into the Pydive directory.
-   maturin develop --release                                       # Build Hidive's Python codebase (with release optimizations).
+   # Configure Python environment
+   python -mvenv venv
+   . venv/bin/activate
+   pip install -f dev-requirements.txt
+
+   # Build Hidive's Python codebase, Pydive.
+   cd src/pydive/
+   maturin develop --release
 
 Prerequisites
 -------------
