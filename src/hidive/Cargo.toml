@@ -8,14 +8,13 @@ edition = "2021"
 [dependencies]
 arrow2 = "*"
 bio = "*"
-clap = { version = "*", features = ["derive"] }
-# debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+clap = { version = "4.5.1", features = ["derive"] }
 eyre = "0.6.8"
 needletail = "*"
 noodles = "*"
 parquet = "*"
 petgraph = "*"
-poasta = { path = "/Users/kiran/repositories/poasta" }
+#poasta = { path = "/Users/kiran/repositories/poasta" }
 polars = "*"
 rayon = "*"
 regex = "*"
