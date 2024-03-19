@@ -14,6 +14,26 @@ Hidive is a targeted genome co-assembler for biobank-scale long-read and short-r
 Documentation for the API can be found on the `documentation page <https://broadinstitute.github.io/hidive/>`_.
 
 
+Quick start
+-----------
+
+The following commands will compile the Rust and Python codebase.
+
+.. code-block:: bash
+   
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  # Install Rust.
+
+   git clone https://github.com/broadinstitute/hidive.git          # Clone repository.
+   cd hidive                                                       # Change into the Hidive directory.
+   cargo build --release                                           # Build Hidive's Rust codebase (with release optimizations).
+
+   python -mvenv venv                                              # Create a Python virtual environment.
+   . venv/bin/activate                                             # Activate environment.
+   pip install -f dev-requirements.txt                             # Install Python dependencies.
+
+   cd src/pydive/                                                  # Change into the Pydive directory.
+   maturin develop --release                                       # Build Hidive's Python codebase (with release optimizations).
+
 Prerequisites
 -------------
 
@@ -50,7 +70,7 @@ To optionally build the Python bindings to the Rust codebase, follow the procedu
    # For more information on Maturin, visit https://github.com/PyO3/maturin .
    python -mvenv venv
    . venv/bin/activate
-   pip install maturin
+   pip install -f dev-requirements.txt
 
    # Build the library (with release optimizations) and install it in
    # the currently active virtual environment.
