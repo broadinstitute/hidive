@@ -1,27 +1,11 @@
 from collections import defaultdict
 import sys
-sys.path.append("../AnchorbasedGraphicalGenome/")
-import CCGG_extension as CCGG
 import numpy
 import json
 import argparse
 import AGG
 from Levenshtein import distance
-
-################input#################
-# ref = 'MHC-CHM13'
-# source_seq = graph.nodes[sanchor]['seq'] ### input
-# sink_seq = graph.nodes[eanchor]['seq']  ### input
-# source_pos = int(graph.nodes[sanchor][ref])-1
-# sink_pos = int(graph.nodes[eanchor][ref])-1
-# print(source_pos,sink_pos )
-# ref_HLAC = contig[source_pos:sink_pos] ### input
-
-
-# filename = './HLA-A/HLA-A_anchorgraph.aln.fa'
-
-
-
+import gzip
 
 
 #################Functions#####################
