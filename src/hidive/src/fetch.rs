@@ -56,5 +56,10 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>
     let output_path = output.absolutize().unwrap().into_owned();
 
     // Call the stage_data function from the skydive module to process and stage the data
-    skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path);
+    let r = skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path);
+
+    match r {
+        Ok(_) => { eprintln!("Done!") },
+        Err(_) => { panic!("Failed to write multi-sample locus BAM.") },
+    }
 }
