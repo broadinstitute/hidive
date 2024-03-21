@@ -1825,6 +1825,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 name = "hidive"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow2 0.15.0",
  "bio",
  "clap",
@@ -1832,6 +1833,7 @@ dependencies = [
  "needletail",
  "noodles",
  "parquet",
+ "path-absolutize",
  "petgraph",
  "polars 0.26.1",
  "rayon",
@@ -1839,6 +1841,7 @@ dependencies = [
  "rust-htslib",
  "serde_json",
  "skydive",
+ "url",
 ]
 
 [[package]]
@@ -2867,6 +2870,24 @@ name = "paste"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
+
+[[package]]
+name = "path-absolutize"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
+dependencies = [
+ "path-dedot",
+]
+
+[[package]]
+name = "path-dedot"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "pem"

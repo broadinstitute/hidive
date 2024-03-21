@@ -26,9 +26,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Loci to extract from WGS BAM files.
+        /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
         #[clap(short, long, value_parser)]
-        locus: Vec<String>,
+        loci: Vec<String>,
 
         /// Indexed WGS BAM files from which to extract reads.
         #[clap(required = true, value_parser)]
@@ -92,8 +92,8 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Fetch { output, locus, bam_paths } => {
-            fetch::start(&output, &locus, &bam_paths);
+        Commands::Fetch { output, loci, bam_paths } => {
+            fetch::start(&output, &loci, &bam_paths);
         }
         Commands::Build { output, bam_path } => {
             build::start(&output, &bam_path);
