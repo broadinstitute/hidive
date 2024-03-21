@@ -1,31 +1,48 @@
+// Import the Result type from the anyhow crate for error handling.
 use anyhow::Result;
-use std::collections::{ HashSet, HashMap };
+
+// Import various standard library collections.
+use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
+
+// Import the Url type to work with URLs.
 use url::Url;
 
+// Import ExponentialBackoff for retrying operations.
 use backoff::ExponentialBackoff;
+
+// Import Gag to suppress output to stderr.
 use gag::Gag;
+
+// Import rayon's parallel iterator traits.
 use rayon::prelude::*;
 
-use rust_htslib::bam::record::{ Aux, Cigar };
-use rust_htslib::bam::{ self, Read, IndexedReader, ext::BamRecordExtensions };
+// Import types from rust_htslib for working with BAM files.
+use rust_htslib::bam::{ self, Read, IndexedReader };
 
+// Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
 
+// Function to open a BAM file from a URL and cache its contents locally.
 fn open_bam(reads_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     env::set_current_dir(cache_path).unwrap();
 
+    // Try to open the BAM file from the URL, with retries for authorization.
     let bam = match IndexedReader::from_url(reads_url) {
         Ok(bam) => bam,
         Err(_) => {
+            // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
 
+            // Try opening the BAM file again.
             match IndexedReader::from_url(reads_url) {
                 Ok(bam) => bam,
                 Err(_) => {
+                    // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
 
+                    // Try one last time to open the BAM file.
                     IndexedReader::from_url(reads_url)?
                 }
             }
@@ -35,8 +52,11 @@ fn open_bam(reads_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     Ok(bam)
 }
 
+// Function to extract reads from a BAM file within a specified genomic region.
 fn extract_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<bam::Record>> {
     let mut records = Vec::new();
+
+    // Fetch the genomic region from the BAM file.
     let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
     for (_, r) in bam.records().enumerate() {
         let record = r?;
@@ -47,6 +67,7 @@ fn extract_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64)
     Ok(records)
 }
 
+// Function to stage data from a single BAM file.
 fn stage_data_from_one_file(
     reads_url: &Url,
     loci: &HashSet<(String, u64, u64)>,
@@ -56,48 +77,60 @@ fn stage_data_from_one_file(
 
     let mut all_reads = Vec::new();
     for (chr, start, stop) in loci.iter() {
+        // Extract reads for the current locus.
         let reads = extract_reads(&mut bam, chr, start, stop).unwrap();
 
+        // Extend the all_reads vector with the reads from the current locus.
         all_reads.extend(reads);
     }
 
     Ok(all_reads)
 }
 
+// Function to stage data from multiple BAM files.
 fn stage_data_from_all_files(
     reads_urls: &HashSet<Url>,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
 ) -> Result<Vec<Vec<bam::Record>>> {
+    // Use a parallel iterator to process multiple BAM files concurrently.
     let all_reads: Vec<_> = reads_urls
         .par_iter()
         .map(|reads_url| {
+            // Define an operation to stage data from one file.
             let op = || {
                 let reads = stage_data_from_one_file(reads_url, loci, cache_path)?;
                 Ok(reads)
             };
 
+            // Retry the operation with exponential backoff in case of failure.
             match backoff::retry(ExponentialBackoff::default(), op) {
                 Ok(reads) => { reads }
                 Err(e) => {
+                    // If all retries fail, panic with an error message.
                     panic!("Error: {}", e);
                 }
             }
         })
         .collect();
 
+    // Return a vector of vectors, each containing reads from one BAM file.
     Ok(all_reads)
 }
 
+// Function to retrieve the header of a BAM file.
 fn get_bam_header(
     reads_url: &Url,
     cache_path: &PathBuf,
 ) -> Result<bam::HeaderView> {
+    // Open the BAM file.
     let bam = open_bam(reads_url, cache_path)?;
 
+    // Return the header of the BAM file.
     Ok(bam.header().to_owned())
 }
 
+// Public function to stage data from multiple BAM files and write to an output file.
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64)>,
@@ -110,12 +143,16 @@ pub fn stage_data(
     // automatically when it goes out of scope at the end of the function.
     let _stderr_gag = Gag::stderr().unwrap();
 
+    // Get the header from the first BAM file.
     let first_url = reads_urls.iter().next().unwrap();
     let first_header = get_bam_header(first_url, cache_path)?;
+    // Create a new header based on the first header.
     let header = bam::Header::from_template(&first_header);
 
+    // Stage data from all BAM files.
     let all_reads = stage_data_from_all_files(reads_urls, loci, cache_path)?;
 
+    // Create a BAM writer to write the reads to the output file.
     let mut bam_writer = bam::Writer::from_path(output_path, &header, bam::Format::Bam)?;
     all_reads
         .iter()
