@@ -4015,6 +4015,7 @@ dependencies = [
  "indextree",
  "indicatif",
  "iset",
+ "linear-map",
  "memoffset 0.9.0",
  "ndarray",
  "needletail",

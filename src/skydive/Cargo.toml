@@ -21,6 +21,7 @@ humansize = "*"
 indextree = "*"
 indicatif = { version = "*", features = ["rayon"] }
 iset = "0.2.2"
+linear-map = "1.2.0"
 memoffset = "0.9.0"
 ndarray = { version = "0.15.6", features = ["rayon"] }
 needletail = "*"

@@ -2,9 +2,10 @@
 use anyhow::Result;
 
 // Import various standard library collections.
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
+use linear_map::LinearMap;
 
 // Import the Url type to work with URLs.
 use url::Url;
@@ -19,7 +20,8 @@ use gag::Gag;
 use rayon::prelude::*;
 
 // Import types from rust_htslib for working with BAM files.
-use rust_htslib::bam::{ self, Read, IndexedReader };
+use rust_htslib::bam::{ self, Header, IndexedReader, Read };
+use rust_htslib::bam::header::HeaderRecord;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
@@ -72,8 +74,13 @@ fn stage_data_from_one_file(
     reads_url: &Url,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
-) -> Result<Vec<bam::Record>> {
+) -> Result<(Vec<LinearMap<String, String>>, Vec<bam::Record>)> {
     let mut bam = open_bam(reads_url, cache_path)?;
+    let header_view = bam.header().to_owned();
+
+    let header = Header::from_template(&header_view);
+    let header_map = header.to_hashmap();
+    let read_groups = header_map.get("RG").unwrap().clone();
 
     let mut all_reads = Vec::new();
     for (chr, start, stop) in loci.iter() {
@@ -84,7 +91,7 @@ fn stage_data_from_one_file(
         all_reads.extend(reads);
     }
 
-    Ok(all_reads)
+    Ok((read_groups, all_reads))
 }
 
 // Function to stage data from multiple BAM files.
@@ -92,20 +99,21 @@ fn stage_data_from_all_files(
     reads_urls: &HashSet<Url>,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
-) -> Result<Vec<Vec<bam::Record>>> {
+// ) -> Result<Vec<Vec<bam::Record>>> {
+) -> Result<Vec<(Vec<LinearMap<std::string::String, std::string::String>>, Vec<rust_htslib::bam::Record>)>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
-    let all_reads: Vec<_> = reads_urls
+    let all_data: Vec<_> = reads_urls
         .par_iter()
         .map(|reads_url| {
             // Define an operation to stage data from one file.
             let op = || {
-                let reads = stage_data_from_one_file(reads_url, loci, cache_path)?;
-                Ok(reads)
+                let (read_groups, reads) = stage_data_from_one_file(reads_url, loci, cache_path)?;
+                Ok((read_groups, reads))
             };
 
             // Retry the operation with exponential backoff in case of failure.
             match backoff::retry(ExponentialBackoff::default(), op) {
-                Ok(reads) => { reads }
+                Ok((read_groups, reads)) => { (read_groups, reads) }
                 Err(e) => {
                     // If all retries fail, panic with an error message.
                     panic!("Error: {}", e);
@@ -114,8 +122,8 @@ fn stage_data_from_all_files(
         })
         .collect();
 
-    // Return a vector of vectors, each containing reads from one BAM file.
-    Ok(all_reads)
+    // Return a vector of vectors, each containing read groups and reads from one BAM file.
+    Ok(all_data)
 }
 
 // Function to retrieve the header of a BAM file.
@@ -146,18 +154,56 @@ pub fn stage_data(
     // Get the header from the first BAM file.
     let first_url = reads_urls.iter().next().unwrap();
     let first_header = get_bam_header(first_url, cache_path)?;
+
     // Create a new header based on the first header.
-    let header = bam::Header::from_template(&first_header);
+    let mut header = bam::Header::from_template(&first_header);
+    let header_map = header.to_hashmap();
+    let rgs = header_map.get("RG").unwrap();
+    let mut rg_ids: HashSet<String> = rgs
+        .iter()
+        .filter_map(|a| a.get("ID").cloned())
+        .collect();
 
     // Stage data from all BAM files.
-    let all_reads = stage_data_from_all_files(reads_urls, loci, cache_path)?;
+    let all_data= stage_data_from_all_files(reads_urls, loci, cache_path)?;
+    all_data
+        .iter()
+        .for_each(|(h, _)| {
+            let mut hr = HeaderRecord::new("RG".as_bytes());
+
+            // Populate the header with read group information, avoiding the read group that's already in the header.
+            h
+                .iter()
+                .filter(|a| {
+                    let status = !rg_ids.contains(a.get("ID").unwrap());
+                    rg_ids.insert(a.get("ID").unwrap().clone());
+
+                    status
+                })
+                .flatten()
+                .for_each(|(k, v)| {
+                    hr.push_tag(k.as_bytes(), v);
+                });
+
+            header.push_record(&hr);
+        });
 
     // Create a BAM writer to write the reads to the output file.
     let mut bam_writer = bam::Writer::from_path(output_path, &header, bam::Format::Bam)?;
-    all_reads
+    let mut seen_read_ids = HashSet::new();
+    all_data
         .iter()
-        .flatten()
-        .try_for_each(|read| bam_writer.write(read))?;
+        .for_each(|(_, reads)| {
+            reads
+                .iter()
+                .for_each(|read| {
+                    if !seen_read_ids.contains(read.qname()) {
+                        let _ = bam_writer.write(read);
+                    }
+
+                    seen_read_ids.insert(read.qname());
+                });
+        });
 
     Ok(())
 }

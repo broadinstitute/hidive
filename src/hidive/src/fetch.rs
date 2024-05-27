@@ -52,6 +52,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
+
     // Convert the output path to an absolute path and own it
     let output_path = output.absolutize().unwrap().into_owned();
 
