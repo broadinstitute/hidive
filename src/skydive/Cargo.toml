@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 backoff = "0.4.0"
+bio-types = "1.0.1"
 bitflags = "*"
 chrono = "*"
 cloud-storage = { version = "*", features = ["sync"] }

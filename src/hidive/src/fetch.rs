@@ -18,11 +18,12 @@ use skydive;
 /// * `output` - A reference to a PathBuf that specifies the output file path.
 /// * `loci_list` - A reference to a vector of strings, each representing a genomic locus.
 /// * `bam_paths` - A reference to a vector of PathBufs, each representing a path to a BAM file.
+/// * `require_spanning_reads` - Flag indicating that reads should fully span the requested locus.
 ///
 /// # Panics
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
-pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>) {
+pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>, require_spanning_reads: bool) {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();
 
@@ -57,7 +58,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>
     let output_path = output.absolutize().unwrap().into_owned();
 
     // Call the stage_data function from the skydive module to process and stage the data
-    let r = skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path);
+    let r = skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path, require_spanning_reads);
 
     match r {
         Ok(_) => { eprintln!("Done!") },

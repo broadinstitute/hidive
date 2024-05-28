@@ -1,5 +1,6 @@
 // Import the Result type from the anyhow crate for error handling.
 use anyhow::Result;
+use rust_htslib::bam::ext::BamRecordExtensions;
 
 // Import various standard library collections.
 use std::collections::{HashMap, HashSet};
@@ -22,6 +23,7 @@ use rayon::prelude::*;
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{ self, Header, IndexedReader, Read };
 use rust_htslib::bam::header::HeaderRecord;
+use bio_types::genome::Interval;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
@@ -99,7 +101,6 @@ fn stage_data_from_all_files(
     reads_urls: &HashSet<Url>,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
-// ) -> Result<Vec<Vec<bam::Record>>> {
 ) -> Result<Vec<(Vec<LinearMap<std::string::String, std::string::String>>, Vec<rust_htslib::bam::Record>)>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
     let all_data: Vec<_> = reads_urls
@@ -138,12 +139,21 @@ fn get_bam_header(
     Ok(bam.header().to_owned())
 }
 
+pub fn read_spans_locus(
+    start: i64,
+    end: i64,
+    loci: &HashSet<(String, u64, u64)>,
+) -> bool {
+    loci.iter().any(|e| start <= e.1 as i64 && end >= e.2 as i64)
+}
+
 // Public function to stage data from multiple BAM files and write to an output file.
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64)>,
     reads_urls: &HashSet<Url>,
     cache_path: &PathBuf,
+    require_spanning_reads: bool
 ) -> Result<()> {
     // Disable stderr from trying to open an IndexedReader a few times, so
     // that the Jupyter notebook user doesn't get confused by intermediate
@@ -197,7 +207,7 @@ pub fn stage_data(
             reads
                 .iter()
                 .for_each(|read| {
-                    if !seen_read_ids.contains(read.qname()) {
+                    if !seen_read_ids.contains(read.qname()) && read_spans_locus(read.reference_start(), read.reference_end(), loci) {
                         let _ = bam_writer.write(read);
                     }
 
@@ -253,7 +263,7 @@ mod tests {
         ).unwrap();
         let reads_urls = HashSet::from([reads_url]);
 
-        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path);
+        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path, false);
 
         assert!(result.is_ok(), "Failed to stage data from file");
 
@@ -274,7 +284,7 @@ mod tests {
         let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
         let reads_urls = HashSet::from([ reads_url_1, reads_url_2 ]);
 
-        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path);
+        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path, false);
 
         println!("{:?}", result);
 
