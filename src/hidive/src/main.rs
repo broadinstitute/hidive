@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod fetch;
+mod trim;
 mod build;
 mod impute;
 mod assemble;
@@ -26,6 +27,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Require reads to span the specified locus.
+        #[clap(short, long, value_parser)]
+        require_spanning_reads: bool,
+
         /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
         #[clap(short, long, value_parser)]
         loci: Vec<String>,
@@ -33,6 +38,22 @@ enum Commands {
         /// Indexed WGS BAM files from which to extract reads.
         #[clap(required = true, value_parser)]
         bam_paths: Vec<PathBuf>,
+    },
+
+    /// Trim reads to a specific window around locus.
+    #[clap(arg_required_else_help = true)]
+    Trim {
+        /// Output path for trimmed BAM.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
+        #[clap(short, long, value_parser)]
+        loci: Vec<String>,
+
+        /// Multi-sample BAM file with reads spanning locus of interest.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
     },
 
     /// Build series-parallel graph from long-read data in multi-sample BAM file.
@@ -92,8 +113,11 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Fetch { output, loci, bam_paths } => {
-            fetch::start(&output, &loci, &bam_paths);
+        Commands::Fetch { output, loci, bam_paths, require_spanning_reads}  => {
+            fetch::start(&output, &loci, &bam_paths, require_spanning_reads);
+        }
+        Commands::Trim { output, loci, bam_path } => {
+            trim::start(&output, &loci, &bam_path);
         }
         Commands::Build { output, bam_path } => {
             build::start(&output, &bam_path);
