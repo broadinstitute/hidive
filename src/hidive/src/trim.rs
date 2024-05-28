@@ -1,6 +1,7 @@
 // Import necessary standard library modules
 use std::{collections::HashMap, path::PathBuf};
 use std::collections::HashSet;
+use std::io::Write;
 
 // Import the Absolutize trait to convert relative paths to absolute paths
 use path_absolutize::Absolutize;
@@ -33,8 +34,11 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
         }
     }
 
-    let mut bam = IndexedReader::from_path(bam_path).unwrap();
+    // Open output file for writing.
+    let mut output_file = std::fs::File::create(output)
+        .expect("Unable to create output file");
 
+    let mut bam = IndexedReader::from_path(bam_path).unwrap();
     let rg_sm_map = get_rg_to_sm_mapping(&bam);
 
     loci
@@ -119,7 +123,8 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
                 if let Ok(Aux::String(rg)) = record.aux(b"RG") {
                     let sample_name = rg_sm_map.get(rg).unwrap().to_owned();
                     let sequence_str = sequence.join("");
-                    println!(">{}.{}\n{}", sample_name, String::from_utf8_lossy(record.qname()), sequence_str);
+                    let output_str = format!(">{}.{}\n{}", sample_name, String::from_utf8_lossy(record.qname()), sequence_str);
+                    writeln!(output_file, "{}", output_str).expect("Unable to write to file");
                 }
             }
         });
