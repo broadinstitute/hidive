@@ -2,6 +2,8 @@ FROM python:3.9.19-slim-bullseye
 
 MAINTAINER Kiran V Garimella
 
+ARG branch
+
 # install gsutil
 RUN apt-get update --allow-releaseinfo-change
 RUN apt-get update -m
@@ -46,8 +48,9 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # install hidive
-RUN git clone https://github.com/broadinstitute/hidive.git \
-    && cd hidive \
+RUN git clone https://github.com/broadinstitute/hidive.git
+RUN cd hidive \
+    && git checkout $branch \
     && cargo build --release --verbose \
     && cp target/release/hidive /usr/local/bin/
 
