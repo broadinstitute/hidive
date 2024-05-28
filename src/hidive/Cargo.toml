@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-arrow2 = "*"
+#arrow2 = "*"
 bio = "*"
 clap = { version = "4.5.1", features = ["derive"] }
 eyre = "0.6.8"
@@ -17,7 +17,7 @@ parquet = "*"
 path-absolutize = "3.1.1"
 petgraph = "*"
 #poasta = { path = "/Users/kiran/repositories/poasta" }
-polars = "*"
+#polars = "*"
 rayon = "*"
 regex = "*"
 rust-htslib = { version = "*", features = ["gcs", "serde_feature"] }

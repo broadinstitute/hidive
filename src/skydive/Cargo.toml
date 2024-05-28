@@ -29,7 +29,7 @@ needletail = "*"
 openssl = { version = "0.10", features = ["vendored"] }
 parquet = "*"
 petgraph = "*"
-polars = { version = "*", features = ["parquet", "lazy", "csv-file", "strings", "temporal", "dtype-duration", "dtype-categorical", "concat_str", "list", "list_eval", "rank", "lazy_regex"]}
+#polars = { version = "*", features = ["parquet", "lazy", "csv-file", "strings", "temporal", "dtype-duration", "dtype-categorical", "concat_str", "list", "list_eval", "rank", "lazy_regex"]}
 pyo3 = { version = "*", features = ["abi3-py37", "extension-module"] }
 pyo3-asyncio = { version = "*", features = ["attributes", "async-std-runtime", "tokio-runtime"] }
 rand = {version = "*"}
