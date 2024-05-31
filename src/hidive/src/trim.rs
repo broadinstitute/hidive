@@ -45,6 +45,47 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
         .iter()
         .for_each(|(chr, start, stop)| {
             let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
+
+            let mut bmap = HashMap::new();
+
+            for p in bam.pileup() {
+                let pileup = p.unwrap();
+
+                if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+                    for alignment in pileup.alignments() {
+                        let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
+                        if !bmap.contains_key(&qname) {
+                            bmap.insert(qname.to_owned(), String::new());
+                        }
+
+                        if !alignment.is_del() && !alignment.is_refskip() {
+                            let a = alignment.record().seq()[alignment.qpos().unwrap()];
+
+                            bmap.get_mut(&qname).unwrap().push(a as char);
+                        }
+
+                        match alignment.indel() {
+                            bam::pileup::Indel::Ins(len) =>  {
+                                let pos1 = alignment.qpos().unwrap() as usize;
+                                let pos2 = pos1 + (len as usize);
+                                for pos in pos1..pos2 {
+                                    let a = alignment.record().seq()[pos];
+
+                                    bmap.get_mut(&qname).unwrap().push(a as char);
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            for kv in bmap {
+                let output_str = format!(">{}\n{}", kv.0, kv.1);
+                writeln!(output_file, "{}", output_str).expect("Unable to write to file");
+            }
+
+            /*
             for (_, r) in bam.records().enumerate() {
                 let record = r.unwrap();
 
@@ -127,6 +168,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
                     writeln!(output_file, "{}", output_str).expect("Unable to write to file");
                 }
             }
+            */
         });
 }
 

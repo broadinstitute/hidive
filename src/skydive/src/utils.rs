@@ -1,4 +1,28 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
+
+pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
+    // Initialize a HashSet to store unique loci after parsing
+    let mut loci = HashSet::new();
+    
+    // Iterate over each locus in the provided list
+    for locus in loci_list {
+        // Attempt to parse the locus using a function from the skydive module
+        match parse_locus(locus.to_owned()) {
+            Ok(l_fmt) => {
+                // If parsing is successful, insert the formatted locus into the HashSet
+                loci.insert(l_fmt);
+            }
+            Err(_) => {
+                // If parsing fails, panic and terminate the program, providing an error message
+                panic!("Could not parse locus '{}'.", locus);
+            }
+        }
+    }
+
+    loci
+}
 
 pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
     let l_fmt = locus.replace(",", "");

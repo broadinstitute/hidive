@@ -159,11 +159,18 @@ pub fn stage_data(
     // that the Jupyter notebook user doesn't get confused by intermediate
     // error messages that are nothing to worry about. The gag will end
     // automatically when it goes out of scope at the end of the function.
-    let _stderr_gag = Gag::stderr().unwrap();
+    let mut _stderr_gag = Gag::stderr().unwrap();
 
     // Get the header from the first BAM file.
     let first_url = reads_urls.iter().next().unwrap();
-    let first_header = get_bam_header(first_url, cache_path)?;
+    let first_header = match get_bam_header(first_url, cache_path) {
+        Ok(first_header) => first_header,
+        Err(e) => {
+            drop(_stderr_gag);
+
+            panic!("Error: {}", e);
+        }
+    };
 
     // Create a new header based on the first header.
     let mut header = bam::Header::from_template(&first_header);
@@ -175,13 +182,21 @@ pub fn stage_data(
         .collect();
 
     // Stage data from all BAM files.
-    let all_data= stage_data_from_all_files(reads_urls, loci, cache_path)?;
+    let all_data = match stage_data_from_all_files(reads_urls, loci, cache_path) {
+        Ok(all_data) => all_data,
+        Err(e) => {
+            drop(_stderr_gag);
+
+            panic!("Error: {}", e);
+        }
+    };
+
+    // Populate the output header with read group information, avoiding the read group that's already in the header.
     all_data
         .iter()
         .for_each(|(h, _)| {
             let mut hr = HeaderRecord::new("RG".as_bytes());
 
-            // Populate the header with read group information, avoiding the read group that's already in the header.
             h
                 .iter()
                 .filter(|a| {

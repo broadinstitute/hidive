@@ -24,31 +24,20 @@ use skydive;
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
 pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>, require_spanning_reads: bool) {
-    // Initialize a HashSet to store unique loci after parsing
-    let mut loci = HashSet::new();
-
-    // Iterate over each locus in the provided list
-    for locus in loci_list {
-        // Attempt to parse the locus using a function from the skydive module
-        match skydive::utils::parse_locus(locus.to_owned()) {
-            Ok(l_fmt) => {
-                // If parsing is successful, insert the formatted locus into the HashSet
-                loci.insert(l_fmt);
-            }
-            Err(_) => {
-                // If parsing fails, panic and terminate the program, providing an error message
-                panic!("Could not parse locus '{}'.", locus);
-            }
-        }
-    }
+    let loci = skydive::utils::parse_loci(loci_list);
 
     // Convert the list of BAM file paths into a HashSet of URLs
     let reads_urls: HashSet<Url> = bam_paths
         .iter()
         // Use filter_map to attempt to parse each path as a URL, and collect the successful ones
-        .filter_map(
-            |path| Url::parse(&path.to_string_lossy()).ok()
-        )
+        .filter_map(|path| {
+            let path_str = path.to_string_lossy();
+            if path_str.starts_with("gs://") {
+                Url::parse(&path_str).ok()
+            } else {
+                Url::from_file_path(path.absolutize().unwrap()).ok()
+            }
+        })
         .collect();
 
     // Get the system's temporary directory path
@@ -61,7 +50,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>
     let r = skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path, require_spanning_reads);
 
     match r {
-        Ok(_) => { eprintln!("Done!") },
+        Ok(_) => {},
         Err(_) => { panic!("Failed to write multi-sample locus BAM.") },
     }
 }
