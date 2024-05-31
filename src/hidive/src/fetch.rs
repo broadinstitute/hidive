@@ -1,12 +1,8 @@
 // Import necessary standard library modules
 use std::path::PathBuf;
-use std::collections::HashSet;
 
 // Import the Absolutize trait to convert relative paths to absolute paths
 use path_absolutize::Absolutize;
-
-// Import the Url type to work with URLs
-use url::Url;
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -25,20 +21,7 @@ use skydive;
 /// Panics if any locus in `loci_list` cannot be parsed.
 pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>, require_spanning_reads: bool) {
     let loci = skydive::utils::parse_loci(loci_list);
-
-    // Convert the list of BAM file paths into a HashSet of URLs
-    let reads_urls: HashSet<Url> = bam_paths
-        .iter()
-        // Use filter_map to attempt to parse each path as a URL, and collect the successful ones
-        .filter_map(|path| {
-            let path_str = path.to_string_lossy();
-            if path_str.starts_with("gs://") {
-                Url::parse(&path_str).ok()
-            } else {
-                Url::from_file_path(path.absolutize().unwrap()).ok()
-            }
-        })
-        .collect();
+    let reads_urls = skydive::utils::parse_file_names(bam_paths);
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();

@@ -6,6 +6,7 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
+use std::io::{self, Write};
 use linear_map::LinearMap;
 
 // Import the Url type to work with URLs.
@@ -19,6 +20,7 @@ use gag::Gag;
 
 // Import rayon's parallel iterator traits.
 use rayon::prelude::*;
+use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{ self, Header, IndexedReader, Read };
@@ -102,6 +104,7 @@ fn stage_data_from_all_files(
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
 ) -> Result<Vec<(Vec<LinearMap<std::string::String, std::string::String>>, Vec<rust_htslib::bam::Record>)>> {
+
     // Use a parallel iterator to process multiple BAM files concurrently.
     let all_data: Vec<_> = reads_urls
         .par_iter()
@@ -153,7 +156,7 @@ pub fn stage_data(
     loci: &HashSet<(String, u64, u64)>,
     reads_urls: &HashSet<Url>,
     cache_path: &PathBuf,
-    require_spanning_reads: bool
+    require_spanning_reads: bool,
 ) -> Result<()> {
     // Disable stderr from trying to open an IndexedReader a few times, so
     // that the Jupyter notebook user doesn't get confused by intermediate
