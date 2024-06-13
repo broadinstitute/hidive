@@ -225,7 +225,7 @@ pub fn stage_data(
             reads
                 .iter()
                 .for_each(|read| {
-                    if !seen_read_ids.contains(read.qname()) && read_spans_locus(read.reference_start(), read.reference_end(), loci) {
+                    if !seen_read_ids.contains(read.qname()) && (!require_spanning_reads || read_spans_locus(read.reference_start(), read.reference_end(), loci)) {
                         let _ = bam_writer.write(read);
                     }
 
