@@ -1602,12 +1602,13 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hidive"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "bio",
  "clap",
  "eyre",
+ "flate2",
  "needletail",
  "noodles",
  "parquet",
@@ -1616,6 +1617,7 @@ dependencies = [
  "rayon",
  "regex",
  "rust-htslib",
+ "serde",
  "serde_json",
  "skydive",
  "url",
@@ -3369,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "skydive"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "backoff",

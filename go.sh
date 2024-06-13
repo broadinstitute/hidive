@@ -27,3 +27,5 @@ samtools fasta HG00438.HLA-A.bam | sed '/^>/s/$/\|HG00438/' > HG00438.HLA-A.fast
 samtools fasta HG02559.HLA-A.bam | sed '/^>/s/$/\|HG02559/' > HG02559.HLA-A.fasta
 
 cat HG002.HLA-A.fasta HG00438.HLA-A.fasta HG02559.HLA-A.fasta > HLA-A.fasta
+
+./target/release/hidive build HLA-A.fasta GCA_000001405.15_GRCh38_no_alt_analysis_set.fa
