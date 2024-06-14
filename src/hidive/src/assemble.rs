@@ -1,6 +1,6 @@
 // Import necessary standard library modules
-use std::path::PathBuf;
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 // Import the Absolutize trait to convert relative paths to absolute paths
 use path_absolutize::Absolutize;

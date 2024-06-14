@@ -19,7 +19,12 @@ use skydive;
 /// # Panics
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
-pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>, require_spanning_reads: bool) {
+pub fn start(
+    output: &PathBuf,
+    loci_list: &Vec<String>,
+    bam_paths: &Vec<PathBuf>,
+    require_spanning_reads: bool,
+) {
     let loci = skydive::utils::parse_loci(loci_list);
     let reads_urls = skydive::utils::parse_file_names(bam_paths);
 
@@ -30,10 +35,18 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_paths: &Vec<PathBuf>
     let output_path = output.absolutize().unwrap().into_owned();
 
     // Call the stage_data function from the skydive module to process and stage the data
-    let r = skydive::stage::stage_data(&output_path, &loci, &reads_urls, &cache_path, require_spanning_reads);
+    let r = skydive::stage::stage_data(
+        &output_path,
+        &loci,
+        &reads_urls,
+        &cache_path,
+        require_spanning_reads,
+    );
 
     match r {
-        Ok(_) => {},
-        Err(_) => { panic!("Failed to write multi-sample locus BAM.") },
+        Ok(_) => {}
+        Err(_) => {
+            panic!("Failed to write multi-sample locus BAM.")
+        }
     }
 }

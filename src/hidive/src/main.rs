@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod fetch;
-mod trim;
-mod build;
-mod impute;
 mod assemble;
+mod build;
 mod coassemble;
+mod fetch;
+mod impute;
+mod trim;
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[clap(name = "hidive")]
@@ -125,13 +125,28 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Fetch { output, loci, bam_paths, require_spanning_reads}  => {
+        Commands::Fetch {
+            output,
+            loci,
+            bam_paths,
+            require_spanning_reads,
+        } => {
             fetch::start(&output, &loci, &bam_paths, require_spanning_reads);
         }
-        Commands::Trim { output, loci, bam_path } => {
+        Commands::Trim {
+            output,
+            loci,
+            bam_path,
+        } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, loci, kmer_size, fasta_path, reference_path } => {
+        Commands::Build {
+            output,
+            loci,
+            kmer_size,
+            fasta_path,
+            reference_path,
+        } => {
             build::start(&output, &loci, kmer_size, &fasta_path, &reference_path);
         }
         Commands::Impute { output, graph } => {
@@ -140,7 +155,11 @@ fn main() {
         Commands::Assemble { output, graph } => {
             assemble::start(&output, &graph);
         }
-        Commands::Coassemble { output, graph, bam_or_cram_paths } => {
+        Commands::Coassemble {
+            output,
+            graph,
+            bam_or_cram_paths,
+        } => {
             coassemble::start(&output, &graph, &bam_or_cram_paths);
         }
     }
