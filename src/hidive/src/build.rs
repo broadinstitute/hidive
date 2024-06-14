@@ -58,7 +58,7 @@ pub fn reverse_complement(kmer: &str) -> String {
         .collect()
 }
 
-pub fn find_sequences_between_sanchor_eanchor(reads: Vec<Record>, ref_hla: String) -> (HashSet<String>, HashMap<String, String>){
+pub fn find_sequences_between_sanchor_eanchor(reads: Vec<Record>, ref_hla: String, stem: &String) -> (HashSet<String>, HashMap<String, String>){
     let mut hla_samples = HashSet::new();
     let mut hla_seq = HashMap::new();
 
@@ -71,8 +71,11 @@ pub fn find_sequences_between_sanchor_eanchor(reads: Vec<Record>, ref_hla: Strin
         hla_seq.insert(h.clone(), seq_upper);
     }
 
-    hla_samples.insert("MHC-CHM13".to_string());
-    hla_seq.insert("MHC-CHM13".to_string(), ref_hla);
+    // hla_samples.insert("MHC-CHM13".to_string());
+    // hla_seq.insert("MHC-CHM13".to_string(), ref_hla);
+
+    hla_samples.insert(stem.to_owned());
+    hla_seq.insert(stem.to_owned(), ref_hla);
 
     (hla_samples, hla_seq)
 }
@@ -146,13 +149,14 @@ pub fn get_anchor_information(
     sample_dict:&HashMap<String, HashSet<String>>, 
     hla_samples:&HashSet<String>, 
     position_dict:&HashMap<String, HashMap<String, Vec<usize>>>, 
-    k: usize) 
+    k: usize,
+    stem: &String) 
     -> Vec<String> {
     let mut anchorlist = Vec::new();
     for (kmer, samplelist) in sample_dict.iter(){
         if samplelist.len() == hla_samples.len(){
             if let Some(positions) = position_dict.get(kmer){
-                if positions.len()>1 && positions.get("MHC-CHM13").map_or(false, |v| v.len() == 1){
+                if positions.len()>1 && positions.get(stem).map_or(false, |v| v.len() == 1){
                     anchorlist.push(kmer.clone());
                 }
             }
@@ -163,11 +167,11 @@ pub fn get_anchor_information(
 }
 
 
-pub fn get_anchors(anchorlist:&Vec<String>, position_dict: &HashMap<String, HashMap<String, Vec<usize>>>, k: usize) -> HashMap<String, AnchorInfo>{
+pub fn get_anchors(anchorlist:&Vec<String>, position_dict: &HashMap<String, HashMap<String, Vec<usize>>>, k: usize, stem: &String) -> HashMap<String, AnchorInfo>{
     let mut anchor_info = HashMap::new();
     for kmer in anchorlist.iter(){
         if let Some(positions) = position_dict.get(kmer){
-            if let Some(pos) = positions.get("MHC-CHM13").and_then(|v| v.first()){
+            if let Some(pos) = positions.get(stem).and_then(|v| v.first()){
                 let anchor_name = format!("A{:06}", pos / k + 1);
                 anchor_info.insert(anchor_name, AnchorInfo {
                     seq: kmer.clone(),
@@ -439,7 +443,7 @@ pub fn write_gfa(final_anchor: &HashMap<String, AnchorInfo>, edge_info: &HashMap
     Ok(())
 }
 
-pub fn filter_undersupported_edges(edge_info: &HashMap<String, EdgeInfo>, reference: &str, threshold: i32) -> HashMap<String, EdgeInfo> {
+pub fn filter_undersupported_edges(edge_info: &HashMap<String, EdgeInfo>, reference: &String, threshold: i32) -> HashMap<String, EdgeInfo> {
     let mut filtered_edges = edge_info.clone(); // Clone the input HashMap to create an owned version
 
     for (edge, data) in edge_info.iter() {
@@ -479,11 +483,11 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, k: usize, fasta_path: &P
             .collect();
 
         let unique_kmer_list = get_reference_kmer_profile(&reference_hla, k);
-        let (hla_samples, hla_seq) = find_sequences_between_sanchor_eanchor(reads, reference_hla);
+        let (hla_samples, hla_seq) = find_sequences_between_sanchor_eanchor(reads, reference_hla, &stem);
         let (sample_dict, position_dict) = map_reference_unique_kmers_to_seq(unique_kmer_list,  &hla_seq, k);
 
-        let anchorlist = get_anchor_information(&sample_dict.lock().unwrap(), &hla_samples, &position_dict.lock().unwrap(), k);
-        let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k);
+        let anchorlist = get_anchor_information(&sample_dict.lock().unwrap(), &hla_samples, &position_dict.lock().unwrap(), k, &stem);
+        let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k, &stem);
 
         let final_anchor = get_final_anchor(&anchors, k);
         let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
@@ -493,8 +497,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, k: usize, fasta_path: &P
             .map(|(k, v)| (k.clone(), (*v).clone()))
             .collect();
 
-        let reference = "MHC-CHM13";
-        let filtered_edges = filter_undersupported_edges(&edge_info,reference, 4);
+        let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
 
         write_gfa(&dereferenced_final_anchor, &filtered_edges, output);
 
