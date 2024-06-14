@@ -63,6 +63,14 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
+        #[clap(short, long, value_parser)]
+        loci: Vec<String>,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value = "11")]
+        kmer_size: usize,
+
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
         fasta_path: PathBuf,
@@ -123,8 +131,8 @@ fn main() {
         Commands::Trim { output, loci, bam_path } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, fasta_path, reference_path } => {
-            build::start(&output, &fasta_path, &reference_path);
+        Commands::Build { output, loci, kmer_size, fasta_path, reference_path } => {
+            build::start(&output, &loci, kmer_size, &fasta_path, &reference_path);
         }
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);

@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 use std::collections::HashSet;
 
+use bio::io::fasta::{self, Record, Reader, IndexedReader};
 // Import the Absolutize trait to convert relative paths to absolute paths
 use path_absolutize::Absolutize;
 
@@ -29,58 +30,6 @@ use std::error::Error;
 
 // use std::fs::File;
 
-pub fn load_fasta(filename: &str) -> io::Result<(Vec<String>, Vec<String>)> {
-    let file = File::open(filename)?;
-    let reader: Box<dyn BufRead> = if filename.ends_with(".gz") {
-        Box::new(BufReader::new(GzDecoder::new(file)))
-    } else {
-        Box::new(BufReader::new(file))
-    };
-
-    let mut headers = Vec::new();
-    let mut sequences = Vec::new();
-    let mut current_sequence = String::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.starts_with('>') {
-            if !current_sequence.is_empty() {
-                // Save the current sequence before starting a new one
-                sequences.push(current_sequence.clone());
-                current_sequence.clear();
-            }
-            // Save the header, trimming the leading '>'
-            headers.push(line[1..].to_string());
-        } else {
-            // Append the line to the current sequence
-            current_sequence.push_str(&line);
-        }
-    }
-
-    // Don't forget to add the last sequence if the file doesn't end with a header
-    if !current_sequence.is_empty() {
-        sequences.push(current_sequence);
-    }
-
-    Ok((headers, sequences))
-}
-
-pub fn find_reference_and_source_sink_anchors(
-    reference: &str,
-    genestart: i32,
-    geneend: i32,
-    chromosome: i32,
-) -> String {
-    let (_headers, _sequences) = load_fasta(&reference).expect("fail to load reference file");
-    println!("{}", "test 1");
-    let chromo = (chromosome - 1) as usize;
-    let contig = &_sequences[chromo];
-    let end = geneend.min(contig.chars().count() as i32) as usize;
-    let start = genestart as usize;
-    let refseq: String = contig.chars().skip(start).take(end - start).collect();
-    println!("{}", "test 2");
-    return refseq.to_uppercase();
-}
 pub fn get_reference_kmer_profile(ref_hla: &str, k: usize) -> Vec<String> {
     let mut ref_kmer_profile: HashMap<String, i32> = HashMap::new();
     let r = ref_hla.len() as isize - k as isize + 1;
@@ -109,18 +58,22 @@ pub fn reverse_complement(kmer: &str) -> String {
         .collect()
 }
 
-pub fn find_sequences_between_sanchor_eanchor(headers: Vec<String>, sequences: Vec<String>, ref_hla: String) -> (HashSet<String>, HashMap<String, String>){
+pub fn find_sequences_between_sanchor_eanchor(reads: Vec<Record>, ref_hla: String) -> (HashSet<String>, HashMap<String, String>){
     let mut hla_samples = HashSet::new();
     let mut hla_seq = HashMap::new();
-    for (i, seq) in sequences.iter().enumerate() {
-        let h = &headers[i];
-        let seq_upper = seq.to_uppercase();
+
+    for read in reads.iter() {
+        let h = String::from_utf8_lossy(read.id().as_bytes()).to_string();
+        let seq_upper = String::from_utf8(read.seq().to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
+
         let sample_identifier = h.split("|").last().unwrap_or_default().to_string();
         hla_samples.insert(sample_identifier.clone());
         hla_seq.insert(h.clone(), seq_upper);
     }
+
     hla_samples.insert("MHC-CHM13".to_string());
     hla_seq.insert("MHC-CHM13".to_string(), ref_hla);
+
     (hla_samples, hla_seq)
 }
 
@@ -421,9 +374,9 @@ pub fn create_edge_file(hla_seq: &HashMap<String, String>,
 
         }
     (edge_info, outgoing)
-    }
+}
 
-pub fn write_gfa(final_anchor: &HashMap<String, AnchorInfo>, edge_info: &HashMap<String, EdgeInfo>, output_filename: &str) -> Result<(), Box<dyn Error>> {
+pub fn write_gfa(final_anchor: &HashMap<String, AnchorInfo>, edge_info: &HashMap<String, EdgeInfo>, output_filename: &PathBuf) -> Result<(), Box<dyn Error>> {
     let mut file = File::create(output_filename)?;
 
     writeln!(file, "H\tVN:Z:1.0")?;
@@ -474,12 +427,15 @@ pub fn write_gfa(final_anchor: &HashMap<String, AnchorInfo>, edge_info: &HashMap
     for s in anchor_output {
         writeln!(file, "{}", s)?;
     }
+
     for s in edge_output {
         writeln!(file, "{}", s)?;
     }
+
     for l in link_output {
         writeln!(file, "{}", l)?;
     }
+
     Ok(())
 }
 
@@ -496,59 +452,57 @@ pub fn filter_undersupported_edges(edge_info: &HashMap<String, EdgeInfo>, refere
     filtered_edges // Return the owned HashMap
 }
 
-pub fn start(output: &PathBuf, fasta_path: &PathBuf, reference_path: &PathBuf) {
-    println!("Hello, Cargo!");
-    // let filename = "/Users/suhang/Google Drive/My Drive/Analysis/HLAC/HLAE/HLA-E.aln.fa";
-    let filename = fasta_path.to_str().unwrap();
-    let (headers, sequences) = load_fasta(filename).expect("fail to load reads");
-    println!("Hello, Cargo! 1");
-    // let reference = "/Users/suhang/Analysis/chm13v2.0.ebv.fa.gz";
-    let reference = reference_path.to_str().unwrap();
-    // let genestart: i32 = 32408981;
-    // let geneend: i32 = 32422402;
-    let genestart = 29940532;
-    let geneend = 29947870;
+pub fn start(output: &PathBuf, loci_list: &Vec<String>, k: usize, fasta_path: &PathBuf, reference_path: &PathBuf) {
+    let loci = skydive::utils::parse_loci(loci_list);
 
-    // chr6:29,940,532-29,947,870
+    let stem = fasta_path.file_stem().unwrap().to_str().unwrap().to_string();
 
-    let chromosome: i32 = 6;
-    let reference_hla =
-        find_reference_and_source_sink_anchors(reference, genestart, geneend, chromosome);
-    println!("Hello, Cargo! 2");
-    let k: usize = 11;
-    let unique_kmer_list = get_reference_kmer_profile(&reference_hla, k);
-    println!("Hello, Cargo! 3");
-    let (hla_samples, hla_seq) = find_sequences_between_sanchor_eanchor(headers, sequences, reference_hla);
-    println!("Hello, Cargo! 4");
-    let (sample_dict, position_dict) = map_reference_unique_kmers_to_seq(unique_kmer_list,  &hla_seq, k);
-    // println!("{:?}, {:?}", sample_dict, position_dict);
-    println!("Hello, Cargo! 5");
-    let anchorlist = get_anchor_information(&sample_dict.lock().unwrap(), &hla_samples, &position_dict.lock().unwrap(), k);
-    println!("{}", anchorlist.len());
-    println!("Hello, Cargo! 6");
-    let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k);
-    println!("{}", anchors.len());
-    let final_anchor = get_final_anchor(&anchors, k);
-    println!("Hello, Cargo! 7");
-    let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
-    println!("Hello, Cargo! 8");
+    let mut faidx = IndexedReader::from_file(&reference_path).unwrap();
 
+    for (chr, start, stop) in loci.iter() {
+        // move the pointer in the index to the desired sequence and interval
+        faidx
+            .fetch(chr, *start, *stop)
+            .expect("Couldn't fetch interval");
 
-    let outputfilename = "test";
-    let dereferenced_final_anchor: HashMap<_, AnchorInfo> = final_anchor.iter()
-    .map(|(k, v)| (k.clone(), (*v).clone()))
-    .collect();
+        // read the subsequence defined by the interval into a vector
+        let mut seq = Vec::new();
+        faidx.read(&mut seq).expect("Couldn't read the interval");
 
-    let reference = "MHC-CHM13";
-    let filtered_edges = filter_undersupported_edges(&edge_info,reference, 4);
+        let reference_hla = String::from_utf8(seq.to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
 
-    write_gfa(&dereferenced_final_anchor, &filtered_edges, &format!("{}.trimmed.gfa", outputfilename));
-      println!("Hello, Cargo! 9");
+        let reader = Reader::from_file(fasta_path).unwrap();
 
-    // let anchor_list: Vec<String> = final_anchor.keys().cloned().collect();
-    // let seqlist: Vec<String> = anchor_list.iter()
-    //     .filter_map(|anchor| final_anchor.get(anchor).map(|info| info.get_seq().clone()))
-    //     .collect();
+        let reads: Vec<Record> = reader
+            .records()
+            .map(|r| r.unwrap())
+            .collect();
 
-    // println!("{:?}", seqlist);
+        let unique_kmer_list = get_reference_kmer_profile(&reference_hla, k);
+        let (hla_samples, hla_seq) = find_sequences_between_sanchor_eanchor(reads, reference_hla);
+        let (sample_dict, position_dict) = map_reference_unique_kmers_to_seq(unique_kmer_list,  &hla_seq, k);
+
+        let anchorlist = get_anchor_information(&sample_dict.lock().unwrap(), &hla_samples, &position_dict.lock().unwrap(), k);
+        let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k);
+
+        let final_anchor = get_final_anchor(&anchors, k);
+        let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
+
+        let dereferenced_final_anchor = final_anchor
+            .iter()
+            .map(|(k, v)| (k.clone(), (*v).clone()))
+            .collect();
+
+        let reference = "MHC-CHM13";
+        let filtered_edges = filter_undersupported_edges(&edge_info,reference, 4);
+
+        write_gfa(&dereferenced_final_anchor, &filtered_edges, output);
+
+        // let anchor_list: Vec<String> = final_anchor.keys().cloned().collect();
+        // let seqlist: Vec<String> = anchor_list.iter()
+        //     .filter_map(|anchor| final_anchor.get(anchor).map(|info| info.get_seq().clone()))
+        //     .collect();
+
+        // println!("{:?}", seqlist);
+    }
 }
