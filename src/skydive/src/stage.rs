@@ -1,6 +1,5 @@
 // Import the Result type from the anyhow crate for error handling.
 use anyhow::Result;
-use parquet::data_type::AsBytes;
 use rust_htslib::bam::record::Aux;
 
 // Import various standard library collections.
@@ -8,8 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::File;
 use std::path::PathBuf;
-use std::io::{self, BufWriter, Write};
-use linear_map::LinearMap;
+use std::io::BufWriter;
 
 // Import the Url type to work with URLs.
 use url::Url;
@@ -17,19 +15,13 @@ use url::Url;
 // Import ExponentialBackoff for retrying operations.
 use backoff::ExponentialBackoff;
 
-// Import Gag to suppress output to stderr.
-use gag::Gag;
-
 // Import rayon's parallel iterator traits.
 use rayon::prelude::*;
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 // Import types from rust_htslib for working with BAM files.
-use rust_htslib::bam::{ self, Header, IndexedReader, Read };
-use rust_htslib::bam::header::HeaderRecord;
-use rust_htslib::bam::ext::BamRecordExtensions;
+use rust_htslib::bam::{ self, IndexedReader, Read };
 use bio::io::fasta;
-use bio_types::genome::Interval;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
@@ -39,9 +31,12 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     env::set_current_dir(cache_path).unwrap();
 
     // Try to open the BAM file from the URL, with retries for authorization.
+    eprintln!("Read '{}', attempt 1...", seqs_url);
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
+            eprintln!("Read '{}', attempt 2 (reauthorizing to GCS)...", seqs_url);
+
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
 
@@ -49,6 +44,8 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
             match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
+                    eprintln!("Read '{}', attempt 3 (overriding cURL CA bundle)...", seqs_url);
+
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
 
@@ -224,18 +221,10 @@ pub fn stage_data(
     seq_urls: &HashSet<Url>,
     cache_path: &PathBuf
 ) -> Result<()> {
-    // Disable stderr from trying to open an IndexedReader a few times, so
-    // that the Jupyter notebook user doesn't get confused by intermediate
-    // error messages that are nothing to worry about. The gag will end
-    // automatically when it goes out of scope at the end of the function.
-    // let mut _stderr_gag = Gag::stderr().unwrap();
-
     // Stage data from all BAM files.
     let all_data = match stage_data_from_all_files(seq_urls, loci, cache_path) {
         Ok(all_data) => all_data,
         Err(e) => {
-            // drop(_stderr_gag);
-
             panic!("Error: {}", e);
         }
     };
