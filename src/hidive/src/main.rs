@@ -118,30 +118,17 @@ enum Commands {
 }
 
 fn main() {
-    let args = Cli::parse();
+    eprintln!("[{}] hidive version {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), env!("CARGO_PKG_VERSION"));
 
+    let args = Cli::parse();
     match args.command {
-        Commands::Fetch {
-            output,
-            loci,
-            seq_paths,
-        } => {
+        Commands::Fetch { output, loci, seq_paths, } => {
             fetch::start(&output, &loci, &seq_paths);
         }
-        Commands::Trim {
-            output,
-            loci,
-            bam_path,
-        } => {
+        Commands::Trim { output, loci, bam_path, } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build {
-            output,
-            loci,
-            kmer_size,
-            fasta_path,
-            reference_path,
-        } => {
+        Commands::Build { output, loci, kmer_size, fasta_path, reference_path, } => {
             build::start(&output, &loci, kmer_size, &fasta_path, &reference_path);
         }
         Commands::Impute { output, graph } => {
@@ -150,12 +137,10 @@ fn main() {
         Commands::Assemble { output, graph } => {
             assemble::start(&output, &graph);
         }
-        Commands::Coassemble {
-            output,
-            graph,
-            bam_or_cram_paths,
-        } => {
+        Commands::Coassemble { output, graph, bam_or_cram_paths, } => {
             coassemble::start(&output, &graph, &bam_or_cram_paths);
         }
     }
+
+    eprintln!("[{}] Complete.", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
 }

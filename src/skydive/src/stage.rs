@@ -31,11 +31,11 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     env::set_current_dir(cache_path).unwrap();
 
     // Try to open the BAM file from the URL, with retries for authorization.
-    eprintln!("Read '{}', attempt 1...", seqs_url);
+    eprintln!("[{}] Read '{}', attempt 1", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
-            eprintln!("Read '{}', attempt 2 (reauthorizing to GCS)...", seqs_url);
+            eprintln!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -44,7 +44,7 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
             match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-                    eprintln!("Read '{}', attempt 3 (overriding cURL CA bundle)...", seqs_url);
+                    eprintln!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();

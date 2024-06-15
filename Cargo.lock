@@ -455,7 +455,7 @@ checksum = "4a69423e30444738eccc5e54eccee75779dd3f15ecc0469b95d8529d4b6b7586"
 dependencies = [
  "anyhow",
  "approx 0.5.1",
- "bio-types 0.13.0",
+ "bio-types",
  "bit-set",
  "bv",
  "bytecount",
@@ -488,20 +488,6 @@ dependencies = [
 
 [[package]]
 name = "bio-types"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfa990f40a28735fa598dc3dd58d73e62e6b41458959d623903b927ba7b04c80"
-dependencies = [
- "derive-new",
- "lazy_static",
- "regex",
- "serde",
- "strum_macros 0.24.2",
- "thiserror",
-]
-
-[[package]]
-name = "bio-types"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d45749b87f21808051025e9bf714d14ff4627f9d8ca967eade6946ea769aa4a"
@@ -509,6 +495,7 @@ dependencies = [
  "derive-new",
  "lazy_static",
  "regex",
+ "serde",
  "strum_macros 0.24.2",
  "thiserror",
 ]
@@ -1137,6 +1124,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_logger"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1602,13 +1602,16 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hidive"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "bio",
+ "chrono",
  "clap",
+ "env_logger",
  "eyre",
  "flate2",
+ "log",
  "needletail",
  "noodles",
  "parquet",
@@ -1687,6 +1690,12 @@ name = "humansize"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02296996cb8796d7c6e3bc2d9211b7802812d36999a51bb754123ead7d37d026"
+
+[[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
@@ -1838,6 +1847,17 @@ name = "ipnet"
 version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11b0d96e660696543b251e58030cf9787df56da39dab19ad60eae7353040917e"
+
+[[package]]
+name = "is-terminal"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
+dependencies = [
+ "hermit-abi 0.3.9",
+ "libc",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "iset"
@@ -3110,7 +3130,7 @@ version = "0.39.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "239ef7334dbf59acd56b7a6fa62a525ed7e36d6239a686ed4ff61bc794108e53"
 dependencies = [
- "bio-types 0.13.0",
+ "bio-types",
  "byteorder",
  "custom_derive",
  "derive-new",
@@ -3371,12 +3391,12 @@ dependencies = [
 
 [[package]]
 name = "skydive"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "backoff",
  "bio",
- "bio-types 1.0.1",
+ "bio-types",
  "bitflags",
  "chrono",
  "cloud-storage",
