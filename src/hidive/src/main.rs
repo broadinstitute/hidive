@@ -118,7 +118,7 @@ enum Commands {
 }
 
 fn main() {
-    eprintln!("[{}] hidive version {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), env!("CARGO_PKG_VERSION"));
+    eprintln!("[{}] Hidive version {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), env!("CARGO_PKG_VERSION"));
 
     let args = Cli::parse();
     match args.command {

@@ -30,8 +30,11 @@ use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
 fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     env::set_current_dir(cache_path).unwrap();
 
+    if env::var("GCS_OAUTH_TOKEN").is_err() {
+        gcs_authorize_data_access();
+    }
+
     // Try to open the BAM file from the URL, with retries for authorization.
-    eprintln!("[{}] Read '{}', attempt 1", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
@@ -146,15 +149,35 @@ fn stage_data_from_one_file(
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
 ) -> Result<Vec<fasta::Record>> {
-    let mut bam = open_bam(seqs_url, cache_path)?;
-
     let mut all_seqs = Vec::new();
-    for (chr, start, stop) in loci.iter() {
-        // Extract seqs for the current locus.
-        let seqs = extract_bam_reads(&mut bam, chr, start, stop).unwrap();
 
-        // Extend the all_seqs vector with the seqs from the current locus.
-        all_seqs.extend(seqs);
+    let extension = seqs_url.path().split('.').last().unwrap_or_default();
+    match extension {
+        "bam" => {
+            // Handle BAM file processing
+            let mut bam = open_bam(seqs_url, cache_path)?;
+
+            for (chr, start, stop) in loci.iter() {
+                // Extract seqs for the current locus.
+                let seqs = extract_bam_reads(&mut bam, chr, start, stop).unwrap();
+
+                // Extend the all_seqs vector with the seqs from the current locus.
+                all_seqs.extend(seqs);
+            }
+        },
+        "cram" => {
+            // Handle CRAM file processing
+        },
+        "fa" | "fasta" => {
+            // Handle FASTA file processing
+        },
+        "fa.gz" | "fasta.gz" => {
+            // Handle compressed FASTA file processing
+        },
+        _ => {
+            // Handle unknown file extension
+            return Err(anyhow::anyhow!("Unsupported file extension: {}", extension));
+        },
     }
 
     Ok(all_seqs)

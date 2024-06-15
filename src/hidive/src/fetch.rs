@@ -36,7 +36,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>
     match r {
         Ok(_) => {}
         Err(_) => {
-            panic!("Failed to write multi-sample locus BAM.")
+            panic!("Failed to write output FASTA.")
         }
     }
 }
