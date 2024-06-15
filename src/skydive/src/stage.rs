@@ -62,52 +62,83 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     Ok(bam)
 }
 
-// Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_bam_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
-    let header_view = bam.header().to_owned();
-    let header = Header::from_template(&header_view);
-    let header_map = header.to_hashmap();
-    let read_groups = header_map.get("RG").unwrap().clone();
+// Function to get a mapping between read group and sample name from a BAM header.
+fn get_rg_to_sm_mapping(bam: &IndexedReader) -> HashMap<String, String> {
+    let header = bam::Header::from_template(bam.header());
 
-    let sample_map: LinearMap<String, String> = read_groups
-        .iter()
-        .map(|read_group| (read_group.get("ID").unwrap().clone(), read_group.get("SM").unwrap().clone()))
+    let rg_sm_map: HashMap<String, String> = header
+        .to_hashmap()
+        .into_iter()
+        .flat_map(|(_, records)| records)
+        .filter(|record| record.contains_key("ID") && record.contains_key("SM"))
+        .map(|record| (record["ID"].to_owned(), record["SM"].to_owned()))
         .collect();
 
-    let mut records = Vec::new();
+    rg_sm_map
+}
 
-    // Fetch the genomic region from the BAM file.
+fn get_sm_name_from_rg(alignment: &bam::pileup::Alignment, rg_sm_map: &HashMap<String, String>) -> Result<String> {
+    let r = alignment.record();
+    let rg = r.aux(b"RG")?;
+
+    if let Aux::String(v) = rg {
+        if let Some(sm) = rg_sm_map.get(v) {
+            Ok(sm.to_owned())
+        } else {
+            Err(anyhow::Error::msg(format!("Sample name not found for read group: {}", v)))
+        }
+    } else {
+        Err(anyhow::Error::msg("Read group is not a string"))
+    }
+}
+
+// Function to extract seqs from a BAM file within a specified genomic region.
+fn extract_bam_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+    let rg_sm_map = get_rg_to_sm_mapping(&bam);
+
+    let mut bmap = HashMap::new();
+
     let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
-    for (_, r) in bam.records().enumerate() {
-        let read = r?;
+    for p in bam.pileup() {
+        let pileup = p.unwrap();
 
-        let sm = match read.aux(b"RG") {
-            Ok(value) => {
-                if let Aux::String(v) = value {
-                    let q = v.to_string();
-                    sample_map.get(&q).unwrap().to_string()
-                } else {
-                    panic!("Error reading RG field from read {}", String::from_utf8_lossy(read.qname()));
+        if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+            for alignment in pileup.alignments() {
+                let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
+                let sm = get_sm_name_from_rg(&alignment, &rg_sm_map)?;
+
+                let seq_name = format!("{}|{}", qname, sm);
+
+                if !bmap.contains_key(&seq_name) {
+                    bmap.insert(seq_name.to_owned(), String::new());
+                }
+
+                if !alignment.is_del() && !alignment.is_refskip() {
+                    let a = alignment.record().seq()[alignment.qpos().unwrap()];
+
+                    bmap.get_mut(&seq_name).unwrap().push(a as char);
+                }
+
+                match alignment.indel() {
+                    bam::pileup::Indel::Ins(len) => {
+                        let pos1 = alignment.qpos().unwrap() as usize;
+                        let pos2 = pos1 + (len as usize);
+                        for pos in pos1..pos2 {
+                            let a = alignment.record().seq()[pos];
+
+                            bmap.get_mut(&seq_name).unwrap().push(a as char);
+                        }
+                    }
+                    _ => {}
                 }
             }
-            Err(e) => {
-                panic!("No read group data from which to obtain sample name. {}", e);
-            }
-        };
-
-        let qname = String::from_utf8_lossy(read.qname()).to_string();
-        let id = format!("{}|{}", &qname, &sm);
-        let vseq = read.seq().as_bytes();
-        let bseq = vseq.as_bytes();
-
-        let seq = fasta::Record::with_attrs(
-            id.as_str(),
-            Some(""),
-            bseq
-        );
-
-        records.push(seq);
+        }
     }
+
+    let records = bmap
+        .iter()
+        .map(|kv| fasta::Record::with_attrs(kv.0.as_str(), None, kv.1.as_bytes()))
+        .collect();
 
     Ok(records)
 }
@@ -197,13 +228,13 @@ pub fn stage_data(
     // that the Jupyter notebook user doesn't get confused by intermediate
     // error messages that are nothing to worry about. The gag will end
     // automatically when it goes out of scope at the end of the function.
-    let mut _stderr_gag = Gag::stderr().unwrap();
+    // let mut _stderr_gag = Gag::stderr().unwrap();
 
     // Stage data from all BAM files.
     let all_data = match stage_data_from_all_files(seq_urls, loci, cache_path) {
         Ok(all_data) => all_data,
         Err(e) => {
-            drop(_stderr_gag);
+            // drop(_stderr_gag);
 
             panic!("Error: {}", e);
         }
