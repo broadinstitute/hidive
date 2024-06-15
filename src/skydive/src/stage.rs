@@ -1,12 +1,14 @@
 // Import the Result type from the anyhow crate for error handling.
 use anyhow::Result;
-use rust_htslib::bam::ext::BamRecordExtensions;
+use parquet::data_type::AsBytes;
+use rust_htslib::bam::record::Aux;
 
 // Import various standard library collections.
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::fs::File;
 use std::path::PathBuf;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use linear_map::LinearMap;
 
 // Import the Url type to work with URLs.
@@ -25,31 +27,33 @@ use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{ self, Header, IndexedReader, Read };
 use rust_htslib::bam::header::HeaderRecord;
+use rust_htslib::bam::ext::BamRecordExtensions;
+use bio::io::fasta;
 use bio_types::genome::Interval;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
 
 // Function to open a BAM file from a URL and cache its contents locally.
-fn open_bam(reads_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
+fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     env::set_current_dir(cache_path).unwrap();
 
     // Try to open the BAM file from the URL, with retries for authorization.
-    let bam = match IndexedReader::from_url(reads_url) {
+    let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
 
             // Try opening the BAM file again.
-            match IndexedReader::from_url(reads_url) {
+            match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
 
                     // Try one last time to open the BAM file.
-                    IndexedReader::from_url(reads_url)?
+                    IndexedReader::from_url(seqs_url)?
                 }
             }
         }
@@ -58,16 +62,51 @@ fn open_bam(reads_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     Ok(bam)
 }
 
-// Function to extract reads from a BAM file within a specified genomic region.
-fn extract_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<bam::Record>> {
+// Function to extract seqs from a BAM file within a specified genomic region.
+fn extract_bam_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+    let header_view = bam.header().to_owned();
+    let header = Header::from_template(&header_view);
+    let header_map = header.to_hashmap();
+    let read_groups = header_map.get("RG").unwrap().clone();
+
+    let sample_map: LinearMap<String, String> = read_groups
+        .iter()
+        .map(|read_group| (read_group.get("ID").unwrap().clone(), read_group.get("SM").unwrap().clone()))
+        .collect();
+
     let mut records = Vec::new();
 
     // Fetch the genomic region from the BAM file.
     let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
     for (_, r) in bam.records().enumerate() {
-        let record = r?;
+        let read = r?;
 
-        records.push(record);
+        let sm = match read.aux(b"RG") {
+            Ok(value) => {
+                if let Aux::String(v) = value {
+                    let q = v.to_string();
+                    sample_map.get(&q).unwrap().to_string()
+                } else {
+                    panic!("Error reading RG field from read {}", String::from_utf8_lossy(read.qname()));
+                }
+            }
+            Err(e) => {
+                panic!("No read group data from which to obtain sample name. {}", e);
+            }
+        };
+
+        let qname = String::from_utf8_lossy(read.qname()).to_string();
+        let id = format!("{}|{}", &qname, &sm);
+        let vseq = read.seq().as_bytes();
+        let bseq = vseq.as_bytes();
+
+        let seq = fasta::Record::with_attrs(
+            id.as_str(),
+            Some(""),
+            bseq
+        );
+
+        records.push(seq);
     }
 
     Ok(records)
@@ -75,49 +114,44 @@ fn extract_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64)
 
 // Function to stage data from a single BAM file.
 fn stage_data_from_one_file(
-    reads_url: &Url,
+    seqs_url: &Url,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
-) -> Result<(Vec<LinearMap<String, String>>, Vec<bam::Record>)> {
-    let mut bam = open_bam(reads_url, cache_path)?;
-    let header_view = bam.header().to_owned();
+) -> Result<Vec<fasta::Record>> {
+    let mut bam = open_bam(seqs_url, cache_path)?;
 
-    let header = Header::from_template(&header_view);
-    let header_map = header.to_hashmap();
-    let read_groups = header_map.get("RG").unwrap().clone();
-
-    let mut all_reads = Vec::new();
+    let mut all_seqs = Vec::new();
     for (chr, start, stop) in loci.iter() {
-        // Extract reads for the current locus.
-        let reads = extract_reads(&mut bam, chr, start, stop).unwrap();
+        // Extract seqs for the current locus.
+        let seqs = extract_bam_reads(&mut bam, chr, start, stop).unwrap();
 
-        // Extend the all_reads vector with the reads from the current locus.
-        all_reads.extend(reads);
+        // Extend the all_seqs vector with the seqs from the current locus.
+        all_seqs.extend(seqs);
     }
 
-    Ok((read_groups, all_reads))
+    Ok(all_seqs)
 }
 
 // Function to stage data from multiple BAM files.
 fn stage_data_from_all_files(
-    reads_urls: &HashSet<Url>,
+    seq_urls: &HashSet<Url>,
     loci: &HashSet<(String, u64, u64)>,
     cache_path: &PathBuf,
-) -> Result<Vec<(Vec<LinearMap<std::string::String, std::string::String>>, Vec<rust_htslib::bam::Record>)>> {
+) -> Result<Vec<fasta::Record>> {
 
     // Use a parallel iterator to process multiple BAM files concurrently.
-    let all_data: Vec<_> = reads_urls
+    let all_data: Vec<_> = seq_urls
         .par_iter()
-        .map(|reads_url| {
+        .map(|seqs_url| {
             // Define an operation to stage data from one file.
             let op = || {
-                let (read_groups, reads) = stage_data_from_one_file(reads_url, loci, cache_path)?;
-                Ok((read_groups, reads))
+                let seqs = stage_data_from_one_file(seqs_url, loci, cache_path)?;
+                Ok(seqs)
             };
 
             // Retry the operation with exponential backoff in case of failure.
             match backoff::retry(ExponentialBackoff::default(), op) {
-                Ok((read_groups, reads)) => { (read_groups, reads) }
+                Ok(seqs) => { seqs }
                 Err(e) => {
                     // If all retries fail, panic with an error message.
                     panic!("Error: {}", e);
@@ -126,17 +160,19 @@ fn stage_data_from_all_files(
         })
         .collect();
 
-    // Return a vector of vectors, each containing read groups and reads from one BAM file.
-    Ok(all_data)
+    let flattened_data = all_data.into_iter().flatten().collect::<Vec<_>>();
+
+    // Return a flattened vector of sequences
+    Ok(flattened_data)
 }
 
 // Function to retrieve the header of a BAM file.
 fn get_bam_header(
-    reads_url: &Url,
+    seqs_url: &Url,
     cache_path: &PathBuf,
 ) -> Result<bam::HeaderView> {
     // Open the BAM file.
-    let bam = open_bam(reads_url, cache_path)?;
+    let bam = open_bam(seqs_url, cache_path)?;
 
     // Return the header of the BAM file.
     Ok(bam.header().to_owned())
@@ -154,9 +190,8 @@ pub fn read_spans_locus(
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64)>,
-    reads_urls: &HashSet<Url>,
-    cache_path: &PathBuf,
-    require_spanning_reads: bool,
+    seq_urls: &HashSet<Url>,
+    cache_path: &PathBuf
 ) -> Result<()> {
     // Disable stderr from trying to open an IndexedReader a few times, so
     // that the Jupyter notebook user doesn't get confused by intermediate
@@ -164,28 +199,8 @@ pub fn stage_data(
     // automatically when it goes out of scope at the end of the function.
     let mut _stderr_gag = Gag::stderr().unwrap();
 
-    // Get the header from the first BAM file.
-    let first_url = reads_urls.iter().next().unwrap();
-    let first_header = match get_bam_header(first_url, cache_path) {
-        Ok(first_header) => first_header,
-        Err(e) => {
-            drop(_stderr_gag);
-
-            panic!("Error: {}", e);
-        }
-    };
-
-    // Create a new header based on the first header.
-    let mut header = bam::Header::from_template(&first_header);
-    let header_map = header.to_hashmap();
-    let rgs = header_map.get("RG").unwrap();
-    let mut rg_ids: HashSet<String> = rgs
-        .iter()
-        .filter_map(|a| a.get("ID").cloned())
-        .collect();
-
     // Stage data from all BAM files.
-    let all_data = match stage_data_from_all_files(reads_urls, loci, cache_path) {
+    let all_data = match stage_data_from_all_files(seq_urls, loci, cache_path) {
         Ok(all_data) => all_data,
         Err(e) => {
             drop(_stderr_gag);
@@ -194,44 +209,13 @@ pub fn stage_data(
         }
     };
 
-    // Populate the output header with read group information, avoiding the read group that's already in the header.
-    all_data
-        .iter()
-        .for_each(|(h, _)| {
-            let mut hr = HeaderRecord::new("RG".as_bytes());
+    // Write to a FASTA file.
+    let mut buf_writer = BufWriter::new(File::create(output_path)?);
+    let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
 
-            h
-                .iter()
-                .filter(|a| {
-                    let status = !rg_ids.contains(a.get("ID").unwrap());
-                    rg_ids.insert(a.get("ID").unwrap().clone());
-
-                    status
-                })
-                .flatten()
-                .for_each(|(k, v)| {
-                    hr.push_tag(k.as_bytes(), v);
-                });
-
-            header.push_record(&hr);
-        });
-
-    // Create a BAM writer to write the reads to the output file.
-    let mut bam_writer = bam::Writer::from_path(output_path, &header, bam::Format::Bam)?;
-    let mut seen_read_ids = HashSet::new();
-    all_data
-        .iter()
-        .for_each(|(_, reads)| {
-            reads
-                .iter()
-                .for_each(|read| {
-                    if !seen_read_ids.contains(read.qname()) && (!require_spanning_reads || read_spans_locus(read.reference_start(), read.reference_end(), loci)) {
-                        let _ = bam_writer.write(read);
-                    }
-
-                    seen_read_ids.insert(read.qname());
-                });
-        });
+    for record in all_data.iter() {
+        fasta_writer.write_record(record)?;
+    }
 
     Ok(())
 }
@@ -247,25 +231,25 @@ mod tests {
     // message to stderr. Elsewhere in the code, we suppress such messages (i.e. in stage_data()), but here we don't.
     #[test]
     fn test_open_bam() {
-        let reads_url = Url::parse(
-            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
+        let seqs_url = Url::parse(
+            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
         let cache_path = std::env::temp_dir();
 
-        let bam = open_bam(&reads_url, &cache_path);
+        let bam = open_bam(&seqs_url, &cache_path);
 
         assert!(bam.is_ok(), "Failed to open bam file");
     }
 
     #[test]
     fn test_stage_data_from_one_file() {
-        let reads_url = Url::parse(
-            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
+        let seqs_url = Url::parse(
+            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
         let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
         let cache_path = std::env::temp_dir();
 
-        let result = stage_data_from_one_file(&reads_url, &loci, &cache_path);
+        let result = stage_data_from_one_file(&seqs_url, &loci, &cache_path);
 
         assert!(result.is_ok(), "Failed to stage data from one file");
     }
@@ -276,12 +260,12 @@ mod tests {
         let output_path = cache_path.join("test.bam");
 
         let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
-        let reads_url = Url::parse(
-            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
+        let seqs_url = Url::parse(
+            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
-        let reads_urls = HashSet::from([reads_url]);
+        let seq_urls = HashSet::from([seqs_url]);
 
-        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path, false);
+        let result = stage_data(&output_path, &loci, &seq_urls, &cache_path);
 
         assert!(result.is_ok(), "Failed to stage data from file");
 
@@ -293,16 +277,16 @@ mod tests {
         let cache_path = std::env::temp_dir();
         let output_path = cache_path.join("test.bam");
 
-        let reads_url_1 = Url::parse(
-            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
+        let seqs_url_1 = Url::parse(
+            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
-        let reads_url_2 = Url::parse(
-            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.bam"
+        let seqs_url_2 = Url::parse(
+            "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/seqs/ccs/aligned/m84043_230901_211947_s1.bam"
         ).unwrap();
         let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
-        let reads_urls = HashSet::from([ reads_url_1, reads_url_2 ]);
+        let seq_urls = HashSet::from([ seqs_url_1, seqs_url_2 ]);
 
-        let result = stage_data(&output_path, &loci, &reads_urls, &cache_path, false);
+        let result = stage_data(&output_path, &loci, &seq_urls, &cache_path);
 
         println!("{:?}", result);
 

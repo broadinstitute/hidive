@@ -670,7 +670,7 @@ pub fn start(
 
         // println!("{:?}", seqlist);
 
-        // let graph_filename = 
+        // let graph_filename =
         let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
         println!("{:?}", graph.anchor)
     }

@@ -27,17 +27,13 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Require reads to span the specified locus.
-        #[clap(short, long, value_parser)]
-        require_spanning_reads: bool,
-
         /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
         #[clap(short, long, value_parser)]
         loci: Vec<String>,
 
-        /// Indexed WGS BAM files from which to extract reads.
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
-        bam_paths: Vec<PathBuf>,
+        seq_paths: Vec<PathBuf>,
     },
 
     /// Trim reads to a specific window around locus.
@@ -128,10 +124,9 @@ fn main() {
         Commands::Fetch {
             output,
             loci,
-            bam_paths,
-            require_spanning_reads,
+            seq_paths,
         } => {
-            fetch::start(&output, &loci, &bam_paths, require_spanning_reads);
+            fetch::start(&output, &loci, &seq_paths);
         }
         Commands::Trim {
             output,
