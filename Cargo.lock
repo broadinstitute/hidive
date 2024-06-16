@@ -1602,7 +1602,11 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hidive"
+<<<<<<< HEAD
 version = "0.1.18"
+=======
+version = "0.1.17"
+>>>>>>> 1bdc0f6 (Debugging)
 dependencies = [
  "anyhow",
  "bio",
@@ -3391,7 +3395,11 @@ dependencies = [
 
 [[package]]
 name = "skydive"
+<<<<<<< HEAD
 version = "0.1.18"
+=======
+version = "0.1.17"
+>>>>>>> 1bdc0f6 (Debugging)
 dependencies = [
  "anyhow",
  "backoff",
