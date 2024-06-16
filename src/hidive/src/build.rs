@@ -623,13 +623,13 @@ pub fn start(
     let mut reads: Vec<Record> = Vec::new();
     for record in all_reads {
         if record.id().ends_with(&reference_name) {
+            skydive::elog!("Using '{}' as reference for anchor discovery.", record.id());
+
             reference = String::from_utf8_lossy(record.seq()).to_string();
         } else {
             reads.push(record);
         }
     }
-
-    println!("{}", reference);
 
     // Create the k-mer profile.
     let unique_kmer_list = get_reference_kmer_profile(&reference, k);

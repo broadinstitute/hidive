@@ -114,9 +114,11 @@ enum Commands {
 }
 
 fn main() {
-    skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
-
     let args = Cli::parse();
+
+    skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
+    skydive::elog!("{:?}", args);
+    
     match args.command {
         Commands::Fetch { output, loci, seq_paths, } => {
             fetch::start(&output, &loci, &seq_paths);
