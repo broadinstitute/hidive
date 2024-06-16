@@ -24,13 +24,15 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
-    eprintln!("[{}] Data will be cached to {:?}.", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), cache_path);
+    // eprintln!("[{}] Intermediate data will be stored at {:?}.", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), cache_path);
+    skydive::elog!("Intermediate data will be stored at {:?}.", cache_path);
 
     // Convert the output path to an absolute path and own it
     let output_path = output.absolutize().unwrap().into_owned();
 
     // Call the stage_data function from the skydive module to process and stage the data
-    eprintln!("[{}] Fetching data...", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+    // eprintln!("[{}] Fetching data...", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+    skydive::elog!("Fetching data...");
     let r = skydive::stage::stage_data(&output_path, &loci, &seq_urls, &cache_path);
 
     match r {

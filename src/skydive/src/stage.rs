@@ -21,11 +21,12 @@ use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{ self, IndexedReader, Read };
-use rust_htslib::faidx::{ self, Reader };
+use rust_htslib::faidx::Reader;
 use bio::io::fasta;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
+use crate::elog;
 
 // Function to open a BAM file from a URL and cache its contents locally.
 fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
@@ -39,7 +40,11 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
-            eprintln!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+<<<<<<< HEAD
+            elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
+=======
+            elog!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+>>>>>>> bfdb82b (Simplifying build command)
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -48,7 +53,11 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
             match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-                    eprintln!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+<<<<<<< HEAD
+                    elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
+=======
+                    elog!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+>>>>>>> bfdb82b (Simplifying build command)
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -75,7 +84,11 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
     let fasta = match Reader::from_url(seqs_url) {
         Ok(fasta) => fasta,
         Err(_) => {
-            eprintln!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+<<<<<<< HEAD
+            elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
+=======
+            elog!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+>>>>>>> bfdb82b (Simplifying build command)
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -84,7 +97,11 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
             match Reader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-                    eprintln!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+<<<<<<< HEAD
+                    elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
+=======
+                    elog!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
+>>>>>>> bfdb82b (Simplifying build command)
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -130,7 +147,7 @@ fn get_sm_name_from_rg(alignment: &bam::pileup::Alignment, rg_sm_map: &HashMap<S
 }
 
 // Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_bam_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+fn extract_bam_reads(basename: &String, bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(&bam);
 
     let mut bmap = HashMap::new();
@@ -181,15 +198,18 @@ fn extract_bam_reads(bam: &mut IndexedReader, chr: &String, start: &u64, stop: &
 }
 
 // Function to extract seqs from a FASTA file within a specified genomic region.
-fn extract_fasta_seqs(fasta: &mut Reader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
-    let id = format!("{}:{}-{}", chr, start, stop);
+fn extract_fasta_seqs(basename: &String, fasta: &mut Reader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+    let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
+<<<<<<< HEAD
+    let seq = fasta.fetch_seq_string(chr, *start as usize, (*stop - 1) as usize).unwrap();
+=======
     let seq = fasta.fetch_seq_string(chr, *start as usize, *stop as usize).unwrap();
+>>>>>>> bfdb82b (Simplifying build command)
 
     let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
     Ok(records)
 }
-
 
 // Function to stage data from a single BAM file.
 fn stage_data_from_one_file(
@@ -199,26 +219,36 @@ fn stage_data_from_one_file(
 ) -> Result<Vec<fasta::Record>> {
     let mut all_seqs = Vec::new();
 
+    let basename = seqs_url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap().last().unwrap().to_string();
+
     let seqs_str = seqs_url.as_str();
     if seqs_str.ends_with(".bam") {
         // Handle BAM file processing
+        let basename = basename
+            .trim_end_matches(".bam")
+            .to_string();
         let mut bam = open_bam(seqs_url, cache_path)?;
 
         for (chr, start, stop) in loci.iter() {
             // Extract seqs for the current locus.
-            let seqs = extract_bam_reads(&mut bam, chr, start, stop).unwrap();
+            let seqs = extract_bam_reads(&basename, &mut bam, chr, start, stop).unwrap();
 
             // Extend the all_seqs vector with the seqs from the current locus.
             all_seqs.extend(seqs);
         }
     } else if seqs_str.ends_with(".fa") || seqs_str.ends_with(".fasta") || seqs_str.ends_with(".fa.gz") || seqs_str.ends_with(".fasta.gz") {
         // Handle FASTA file processing
-
+        let basename = basename
+            .trim_end_matches(".fa")
+            .trim_end_matches(".fasta")
+            .trim_end_matches(".fa.gz")
+            .trim_end_matches(".fasta.gz")
+            .to_string();
         let mut fasta = open_fasta(seqs_url, cache_path)?;
 
         for (chr, start, stop) in loci.iter() {
             // Extract seqs for the current locus.
-            let seqs = extract_fasta_seqs(&mut fasta, chr, start, stop).unwrap();
+            let seqs = extract_fasta_seqs(&basename, &mut fasta, chr, start, stop).unwrap();
 
             // Extend the all_seqs vector with the seqs from the current locus.
             all_seqs.extend(seqs);

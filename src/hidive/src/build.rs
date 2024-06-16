@@ -602,10 +602,9 @@ impl GraphicalGenome {
 
 pub fn start(
     output: &PathBuf,
-    loci_list: &Vec<String>,
     k: usize,
     fasta_path: &PathBuf,
-    reference_path: &PathBuf,
+    reference_name: String
 ) {
     // Use the basename of the reads fasta to be the reference sequence name in the graph.
     let stem = fasta_path
@@ -615,65 +614,60 @@ pub fn start(
         .unwrap()
         .to_string();
 
-    let mut faidx = IndexedReader::from_file(&reference_path).unwrap();
-    for (chr, start, stop) in skydive::utils::parse_loci(loci_list).iter() {
-        // Fetch the requested sequence from the reference.
-        faidx
-            .fetch(chr, *start, *stop)
-            .expect("Couldn't fetch interval");
+    // Read the reads records (name and sequence) into a vector.
+    let reader = Reader::from_file(fasta_path).unwrap();
+    let all_reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
 
-        // Read the reference bases
-        let mut seq = Vec::new();
-        faidx.read(&mut seq).expect("Couldn't read the interval");
+    // Find the reference sequence in the read sequences and create a new vector excluding the reference.
+    let mut reference = String::new();
+    let mut reads: Vec<Record> = Vec::new();
+    for record in all_reads {
+        if record.id().ends_with(&reference_name) {
+            skydive::elog!("Using '{}' as reference for anchor discovery.", record.id());
 
-        let reference =
-            String::from_utf8(seq.to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
-
-        println!("{}", reference);
-
-        // Read the reads records (name and sequence) into a vector.
-        let reader = Reader::from_file(fasta_path).unwrap();
-        let reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
-
-        // Create the k-mer profile.
-        let unique_kmer_list = get_reference_kmer_profile(&reference, k);
-        let (hla_samples, hla_seq) =
-            find_sequences_between_sanchor_eanchor(reads, reference, &stem);
-        let (sample_dict, position_dict) =
-            map_reference_unique_kmers_to_seq(unique_kmer_list, &hla_seq, k);
-
-        // Compute anchors.
-        let anchorlist = get_anchor_information(
-            &sample_dict.lock().unwrap(),
-            &hla_samples,
-            &position_dict.lock().unwrap(),
-            &stem,
-        );
-        let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k, &stem);
-
-        let final_anchor = get_final_anchor(&anchors, k);
-        let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
-
-        let dereferenced_final_anchor = final_anchor
-            .iter()
-            .map(|(k, v)| (k.clone(), (*v).clone()))
-            .collect();
-
-        // Filter edges with little read support.
-        let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
-
-        // Write final graph to disk.
-        write_gfa(&dereferenced_final_anchor, &filtered_edges, output);
-
-        // let anchor_list: Vec<String> = final_anchor.keys().cloned().collect();
-        // let seqlist: Vec<String> = anchor_list.iter()
-        //     .filter_map(|anchor| final_anchor.get(anchor).map(|info| info.get_seq().clone()))
-        //     .collect();
-
-        // println!("{:?}", seqlist);
-
-        // let graph_filename =
-        let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
-        // println!("{:?}", graph.anchor)
+            reference = String::from_utf8_lossy(record.seq()).to_string();
+        } else {
+            reads.push(record);
+        }
     }
+
+    // Create the k-mer profile.
+    let unique_kmer_list = get_reference_kmer_profile(&reference, k);
+    let (hla_samples, hla_seq) =
+        find_sequences_between_sanchor_eanchor(reads, reference, &stem);
+    let (sample_dict, position_dict) =
+        map_reference_unique_kmers_to_seq(unique_kmer_list, &hla_seq, k);
+
+    // Compute anchors.
+    let anchorlist = get_anchor_information(
+        &sample_dict.lock().unwrap(),
+        &hla_samples,
+        &position_dict.lock().unwrap(),
+        &stem,
+    );
+    let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k, &stem);
+
+    let final_anchor = get_final_anchor(&anchors, k);
+    let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
+
+    let dereferenced_final_anchor = final_anchor
+        .iter()
+        .map(|(k, v)| (k.clone(), (*v).clone()))
+        .collect();
+
+    // Filter edges with little read support.
+    let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
+
+    // Write final graph to disk.
+    write_gfa(&dereferenced_final_anchor, &filtered_edges, output);
+
+    // let anchor_list: Vec<String> = final_anchor.keys().cloned().collect();
+    // let seqlist: Vec<String> = anchor_list.iter()
+    //     .filter_map(|anchor| final_anchor.get(anchor).map(|info| info.get_seq().clone()))
+    //     .collect();
+
+    // println!("{:?}", seqlist);
+
+    let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
+    // println!("{:?}", graph.anchor)
 }
