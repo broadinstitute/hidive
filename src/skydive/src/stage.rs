@@ -40,11 +40,7 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
-<<<<<<< HEAD
             elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
-=======
-            elog!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
->>>>>>> bfdb82b (Simplifying build command)
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -53,11 +49,7 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
             match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-<<<<<<< HEAD
                     elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
-=======
-                    elog!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
->>>>>>> bfdb82b (Simplifying build command)
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -84,11 +76,7 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
     let fasta = match Reader::from_url(seqs_url) {
         Ok(fasta) => fasta,
         Err(_) => {
-<<<<<<< HEAD
             elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
-=======
-            elog!("[{}] Read '{}', attempt 2 (reauthorizing to GCS)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
->>>>>>> bfdb82b (Simplifying build command)
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -97,11 +85,7 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
             match Reader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-<<<<<<< HEAD
                     elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
-=======
-                    elog!("[{}] Read '{}', attempt 3 (overriding cURL CA bundle)", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), seqs_url);
->>>>>>> bfdb82b (Simplifying build command)
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -200,11 +184,7 @@ fn extract_bam_reads(basename: &String, bam: &mut IndexedReader, chr: &String, s
 // Function to extract seqs from a FASTA file within a specified genomic region.
 fn extract_fasta_seqs(basename: &String, fasta: &mut Reader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
     let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
-<<<<<<< HEAD
     let seq = fasta.fetch_seq_string(chr, *start as usize, (*stop - 1) as usize).unwrap();
-=======
-    let seq = fasta.fetch_seq_string(chr, *start as usize, *stop as usize).unwrap();
->>>>>>> bfdb82b (Simplifying build command)
 
     let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
