@@ -52,28 +52,24 @@ enum Commands {
         bam_path: PathBuf,
     },
 
-    /// Build series-parallel graph from long-read data in multi-sample BAM file.
+    /// Build series-parallel graph from long-read data in multi-sample FASTA file.
     #[clap(arg_required_else_help = true)]
     Build {
         /// Output path for series-parallel graph.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        #[clap(short, long, value_parser)]
-        loci: Vec<String>,
-
         /// Kmer-size
         #[clap(short, long, value_parser, default_value = "11")]
         kmer_size: usize,
 
+        /// Name of sequence to use as reference.
+        #[clap(short, long, value_parser, required = true)]
+        reference_name: String,
+
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
-        fasta_path: PathBuf,
-
-        /// Reference sequence.
-        #[clap(required = true, value_parser)]
-        reference_path: PathBuf,
+        fasta_path: PathBuf
     },
 
     /// Cluster edge matrix and impute missing edges.
@@ -118,7 +114,7 @@ enum Commands {
 }
 
 fn main() {
-    eprintln!("[{}] Hidive version {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), env!("CARGO_PKG_VERSION"));
+    skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
 
     let args = Cli::parse();
     match args.command {
@@ -128,8 +124,8 @@ fn main() {
         Commands::Trim { output, loci, bam_path, } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, loci, kmer_size, fasta_path, reference_path, } => {
-            build::start(&output, &loci, kmer_size, &fasta_path, &reference_path);
+        Commands::Build { output, kmer_size, fasta_path , reference_name } => {
+            build::start(&output, kmer_size, &fasta_path, reference_name);
         }
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
@@ -142,5 +138,5 @@ fn main() {
         }
     }
 
-    eprintln!("[{}] Complete.", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+    skydive::elog!("Complete.");
 }
