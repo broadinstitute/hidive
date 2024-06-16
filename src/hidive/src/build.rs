@@ -629,6 +629,8 @@ pub fn start(
         let reference =
             String::from_utf8(seq.to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
 
+        println!("{}", reference);
+
         // Read the reads records (name and sequence) into a vector.
         let reader = Reader::from_file(fasta_path).unwrap();
         let reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
@@ -672,6 +674,6 @@ pub fn start(
 
         // let graph_filename =
         let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
-        println!("{:?}", graph.anchor)
+        // println!("{:?}", graph.anchor)
     }
 }
