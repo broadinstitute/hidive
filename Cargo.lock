@@ -3391,15 +3391,7 @@ dependencies = [
 
 [[package]]
 name = "skydive"
-<<<<<<< HEAD
-<<<<<<< HEAD
-version = "0.1.18"
-=======
-version = "0.1.17"
->>>>>>> 1bdc0f6 (Debugging)
-=======
-version = "0.1.18"
->>>>>>> abf0409 (Debugging)
+version = "0.1.19"
 dependencies = [
  "anyhow",
  "backoff",
