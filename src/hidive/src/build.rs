@@ -629,6 +629,8 @@ pub fn start(
         }
     }
 
+    println!("{}", reference);
+
     // Create the k-mer profile.
     let unique_kmer_list = get_reference_kmer_profile(&reference, k);
     let (hla_samples, hla_seq) =
