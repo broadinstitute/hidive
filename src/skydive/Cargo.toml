@@ -1,6 +1,10 @@
 [package]
 name = "skydive"
+<<<<<<< HEAD
 version = "0.1.49"
+=======
+version = "0.1.45"
+>>>>>>> 1c8de8f (revise output name)
 edition = "2021"
 resolver = "2"
 
