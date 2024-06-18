@@ -2,10 +2,11 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod assemble;
-mod build;
-mod coassemble;
 mod fetch;
+mod cluster;
+mod build;
+mod assemble;
+mod coassemble;
 mod impute;
 mod trim;
 
@@ -20,7 +21,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Stream selected loci from long-read WGS BAM files stored locally or in Google Cloud Storage.
+    /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
         /// Output path for multi-sample BAM file with reads spanning locus of interest.
@@ -34,6 +35,22 @@ enum Commands {
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
+    },
+
+    /// Cluster sequences based on k-mer presence/absence.
+    #[clap(arg_required_else_help = true)]
+    Cluster {
+        /// Output path for clustered sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value = "11")]
+        kmer_size: usize,
+
+        /// Multi-sample FASTA file with reads spanning locus of interest.
+        #[clap(required = true, value_parser)]
+        fasta_path: PathBuf
     },
 
     /// Trim reads to a specific window around locus.
@@ -120,13 +137,16 @@ fn main() {
     skydive::elog!("{:?}", args);
     
     match args.command {
-        Commands::Fetch { output, loci, seq_paths, } => {
+        Commands::Fetch { output, loci, seq_paths } => {
             fetch::start(&output, &loci, &seq_paths);
         }
-        Commands::Trim { output, loci, bam_path, } => {
+        Commands::Cluster { output, kmer_size, fasta_path } => {
+            cluster::start(&output, kmer_size, &fasta_path);
+        }
+        Commands::Trim { output, loci, bam_path } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, kmer_size, fasta_path , reference_name } => {
+        Commands::Build { output, kmer_size, fasta_path, reference_name } => {
             build::start(&output, kmer_size, &fasta_path, reference_name);
         }
         Commands::Impute { output, graph } => {
@@ -135,7 +155,7 @@ fn main() {
         Commands::Assemble { output, graph } => {
             assemble::start(&output, &graph);
         }
-        Commands::Coassemble { output, graph, bam_or_cram_paths, } => {
+        Commands::Coassemble { output, graph, bam_or_cram_paths } => {
             coassemble::start(&output, &graph, &bam_or_cram_paths);
         }
     }

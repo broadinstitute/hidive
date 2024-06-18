@@ -1,22 +1,22 @@
 // Import necessary standard library modules
 use std::collections::HashSet;
 use std::path::PathBuf;
-
-use bio::io::fasta::{IndexedReader, Reader, Record};
-
-use flate2::read::GzDecoder;
-use serde_json::Value;
-
-// Import the skydive module, which contains the necessary functions for building graphs
-use skydive;
-
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::sync::Mutex;
+
+use bio::io::fasta::{Reader, Record};
+
+use flate2::read::GzDecoder;
+use serde_json::Value;
+use serde::{Deserialize, Serialize};
+
+use rayon::prelude::*;
+
+// Import the skydive module, which contains the necessary functions for building graphs
+use skydive;
 
 pub fn get_reference_kmer_profile(ref_hla: &str, k: usize) -> Vec<String> {
     let mut ref_kmer_profile: HashMap<String, i32> = HashMap::new();
@@ -50,11 +50,11 @@ pub fn reverse_complement(kmer: &str) -> String {
 
 pub fn find_sequences_between_sanchor_eanchor(
     reads: Vec<Record>,
-    ref_hla: String,
+    ref_roi: String,
     stem: &String,
 ) -> (HashSet<String>, HashMap<String, String>) {
-    let mut hla_samples = HashSet::new();
-    let mut hla_seq = HashMap::new();
+    let mut roi_samples = HashSet::new();
+    let mut roi_seq = HashMap::new();
 
     for read in reads.iter() {
         let h = String::from_utf8_lossy(read.id().as_bytes()).to_string();
@@ -62,19 +62,19 @@ pub fn find_sequences_between_sanchor_eanchor(
             String::from_utf8(read.seq().to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
 
         let sample_identifier = h.split("|").last().unwrap_or_default().to_string();
-        hla_samples.insert(sample_identifier.clone());
-        hla_seq.insert(h.clone(), seq_upper);
+        roi_samples.insert(sample_identifier.clone());
+        roi_seq.insert(h.clone(), seq_upper);
     }
 
-    hla_samples.insert(stem.to_owned());
-    hla_seq.insert(stem.to_owned(), ref_hla);
+    roi_samples.insert(stem.to_owned());
+    roi_seq.insert(stem.to_owned(), ref_roi);
 
-    (hla_samples, hla_seq)
+    (roi_samples, roi_seq)
 }
 
 pub fn map_reference_unique_kmers_to_seq(
     unique_kmerlist: Vec<String>,
-    hla_seq: &HashMap<String, String>,
+    roi_seq: &HashMap<String, String>,
     k: usize,
 ) -> (
     Mutex<HashMap<String, HashSet<String>>>,
@@ -99,7 +99,7 @@ pub fn map_reference_unique_kmers_to_seq(
         }
     });
 
-    hla_seq.par_iter().for_each(|(readname, seq)| {
+    roi_seq.par_iter().for_each(|(readname, seq)| {
         let seq_len = seq.len();
 
         if seq_len >= k {
@@ -151,13 +151,13 @@ impl AnchorInfo {
 
 pub fn get_anchor_information(
     sample_dict: &HashMap<String, HashSet<String>>,
-    hla_samples: &HashSet<String>,
+    roi_samples: &HashSet<String>,
     position_dict: &HashMap<String, HashMap<String, Vec<usize>>>,
     stem: &String,
 ) -> Vec<String> {
     let mut anchorlist = Vec::new();
     for (kmer, samplelist) in sample_dict.iter() {
-        if samplelist.len() == hla_samples.len() {
+        if samplelist.len() == roi_samples.len() {
             if let Some(positions) = position_dict.get(kmer) {
                 if positions.len() > 1 && positions.get(stem).map_or(false, |v| v.len() == 1) {
                     anchorlist.push(kmer.clone());
@@ -361,7 +361,7 @@ pub fn construct_edges(
 }
 
 pub fn create_edge_file(
-    hla_seq: &HashMap<String, String>,
+    roi_seq: &HashMap<String, String>,
     final_anchor: &HashMap<String, &AnchorInfo>,
     k: usize,
 ) -> (HashMap<String, EdgeInfo>, HashMap<String, Vec<String>>) {
@@ -375,7 +375,7 @@ pub fn create_edge_file(
         .collect();
     let mut contig_index = 0;
 
-    for (contig_name, contig) in hla_seq.iter() {
+    for (contig_name, contig) in roi_seq.iter() {
         contig_index += 1;
         let sample_name = contig_name
             .split('|')
@@ -633,22 +633,22 @@ pub fn start(
 
     // Create the k-mer profile.
     let unique_kmer_list = get_reference_kmer_profile(&reference, k);
-    let (hla_samples, hla_seq) =
+    let (roi_samples, roi_seq) =
         find_sequences_between_sanchor_eanchor(reads, reference, &stem);
     let (sample_dict, position_dict) =
-        map_reference_unique_kmers_to_seq(unique_kmer_list, &hla_seq, k);
+        map_reference_unique_kmers_to_seq(unique_kmer_list, &roi_seq, k);
 
     // Compute anchors.
     let anchorlist = get_anchor_information(
         &sample_dict.lock().unwrap(),
-        &hla_samples,
+        &roi_samples,
         &position_dict.lock().unwrap(),
         &stem,
     );
     let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k, &stem);
 
     let final_anchor = get_final_anchor(&anchors, k);
-    let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
+    let (edge_info, outgoing) = create_edge_file(&roi_seq, &final_anchor, k);
 
     let dereferenced_final_anchor = final_anchor
         .iter()

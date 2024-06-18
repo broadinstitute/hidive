@@ -26,7 +26,6 @@ use bio::io::fasta;
 
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
-use crate::elog;
 
 // Function to open a BAM file from a URL and cache its contents locally.
 fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
@@ -40,7 +39,7 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
     let bam = match IndexedReader::from_url(seqs_url) {
         Ok(bam) => bam,
         Err(_) => {
-            elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
+            crate::elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -49,7 +48,7 @@ fn open_bam(seqs_url: &Url, cache_path: &PathBuf) -> Result<IndexedReader> {
             match IndexedReader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-                    elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
+                    crate::elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -76,7 +75,7 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
     let fasta = match Reader::from_url(seqs_url) {
         Ok(fasta) => fasta,
         Err(_) => {
-            elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
+            crate::elog!("Read '{}', attempt 2 (reauthorizing to GCS)", seqs_url);
 
             // If opening fails, try authorizing access to Google Cloud Storage.
             gcs_authorize_data_access();
@@ -85,7 +84,7 @@ fn open_fasta(seqs_url: &Url, cache_path: &PathBuf) -> Result<Reader> {
             match Reader::from_url(seqs_url) {
                 Ok(bam) => bam,
                 Err(_) => {
-                    elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
+                    crate::elog!("Read '{}', attempt 3 (overriding cURL CA bundle)", seqs_url);
 
                     // If it still fails, guess the cURL CA bundle path.
                     local_guess_curl_ca_bundle();
@@ -219,10 +218,10 @@ fn stage_data_from_one_file(
     } else if seqs_str.ends_with(".fa") || seqs_str.ends_with(".fasta") || seqs_str.ends_with(".fa.gz") || seqs_str.ends_with(".fasta.gz") {
         // Handle FASTA file processing
         let basename = basename
-            .trim_end_matches(".fa")
+            .trim_end_matches(".fasta.gz")
             .trim_end_matches(".fasta")
             .trim_end_matches(".fa.gz")
-            .trim_end_matches(".fasta.gz")
+            .trim_end_matches(".fa")
             .to_string();
         let mut fasta = open_fasta(seqs_url, cache_path)?;
 
