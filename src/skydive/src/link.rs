@@ -8,8 +8,8 @@ use parquet::data_type::AsBytes;
 /// Represents metadata on a link (a series of junction choices in de Bruijn graph).
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Link {
-    is_forward: bool,
-    junctions: VecDeque<u8>
+    pub is_forward: bool,
+    pub junctions: VecDeque<u8>
 }
 
 impl Link {
@@ -21,13 +21,21 @@ impl Link {
         }
     }
 
+    /// Create a link from a sequence of junction choices.
+    pub fn from_junctions(is_forward: bool, seq: &[u8]) -> Self {
+        Link {
+            is_forward: is_forward,
+            junctions: VecDeque::from(seq.to_vec())
+        }
+    }
+
     /// Return orientation of the link.
     pub fn is_forward(&self) -> bool {
         self.is_forward
     }
 
     /// Return the number of junction choices in the link.
-    pub fn length(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.junctions.len()
     }
 
