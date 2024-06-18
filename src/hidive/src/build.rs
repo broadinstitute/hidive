@@ -699,7 +699,7 @@ pub struct GetSeriesParallelGraph {
 impl GetSeriesParallelGraph {
     pub fn new(graph: &GraphicalGenome) -> GraphicalGenome {
         let nodelist = Self::series_parallel_graph_nodelist(graph);
-        println!("{:?}", nodelist);
+        // println!("{:?}", nodelist);
         // let (anchor, edges, outgoing, incoming) = Self::series_parallel_graph(&nodelist, graph);
         let (anchor, edges, outgoing, incoming) = Self::series_parallel_graph(&nodelist, graph);
         GraphicalGenome {
@@ -836,6 +836,8 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
         let json_string = serde_json::to_string(&data_clone).unwrap_or_else(|_| "{}".to_string());
         writeln!(file, "S\t{}\t{}\tPG:J:{}", anchor, seq, json_string)?;
     }
+    let mut edge_output = Vec::new();
+    let mut link_output = Vec::new();
 
     for (edge, edge_data) in &graph.edges {
         let seq = edge_data["seq"].as_str().unwrap_or_default();
@@ -844,16 +846,22 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
         let mut edge_data_clone = edge_data.clone();
         edge_data_clone.as_object_mut().unwrap().remove("seq");
         let json_string = serde_json::to_string(&edge_data_clone).unwrap_or_else(|_| "{}".to_string());
-        if edge_data_clone.get("reads").is_some() {
-            let read_count = edge_data_clone["reads"].as_array().unwrap().len();
-            writeln!(file, "S\t{}\t{}\tPG:J:{}\tRC:i:{}", edge, seq, json_string, read_count)?;
+        let formatted_string = if edge_data.get("reads").and_then(|r| r.as_array()).map_or(false, |arr| !arr.is_empty()) {
+            format!("S\t{}\t{}\tPG:J:{}\tRC:i:{}", edge, seq, json_string, edge_data.get("reads").and_then(|r| r.as_array()).map_or(0, |arr| arr.len()))
         } else {
-            writeln!(file, "S\t{}\t{}", edge, seq)?;
-        }
-        writeln!(file, "L\t{}\t+\t{}\t+\t0M", src, edge)?;
-        writeln!(file, "L\t{}\t+\t{}\t+\t0M", edge, dst)?;
-    }
+            format!("S\t{}\t{}", edge, seq)
+        };
+        edge_output.push(formatted_string);
 
+        link_output.push(format!("L\t{}\t+\t{}\t+\t0M", src, edge));
+        link_output.push(format!("L\t{}\t+\t{}\t+\t0M", edge, dst));
+    }
+    for s in edge_output {
+        writeln!(file, "{}", s)?;
+    }
+    for l in link_output {
+        writeln!(file, "{}", l)?;
+    }
     Ok(())
 }
 
@@ -923,8 +931,9 @@ pub fn start(
     // println!("{:?}", graph.anchor)
 
     let mut sp_graph = GetSeriesParallelGraph::new(&graph);
-    let outputfilename = output.join(".sp.gfa");
-    let outputfilename_str = outputfilename.to_str().expect("Failed to convert path to string");
-    write_graph_from_graph(outputfilename_str, &mut sp_graph);
+    let outputfilename_str = output.with_extension("sp.gfa");
+    println!("{:?}", outputfilename_str);
+    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);    println!("{:?}", outputfilename_str);
+    // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
 
 }
