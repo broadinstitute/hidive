@@ -31,7 +31,9 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>
     let r = skydive::stage::stage_data(&output, &loci, &seq_urls, &cache_path);
 
     match r {
-        Ok(_) => {}
+        Ok(n) => {
+            skydive::elog!("Fetched {} records.", n)
+        }
         Err(_) => {
             panic!("Failed to write output FASTA.")
         }

@@ -43,6 +43,14 @@ Prerequisites
 
 Hidive is designed to access local files or data in Google Cloud Storage (GCS). Within certain cloud-computing environments (i.e. Terra, All of Us Researcher Workbench), access to GCS is already configured. For accessing files in GCS on your local machine, you will also need to install the `Google Cloud CLI <https://cloud.google.com/sdk/docs/install-sdk>`_. Then, configure your `Application Default Credentials (ADC) <https://cloud.google.com/docs/authentication/provide-credentials-adc#local-dev>`_.
 
+If accessing `requester pays buckets <https://cloud.google.com/storage/docs/requester-pays>`_ buckets, set the following environment variable before running hidive commands:
+
+
+.. code-block:: bash
+
+   export GCS_REQUESTER_PAYS_PROJECT=<Google Project ID>
+
+
 
 Installation
 ------------
