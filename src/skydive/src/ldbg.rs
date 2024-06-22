@@ -20,10 +20,13 @@ pub struct LdBG {
 }
 
 impl LdBG {
-    /// Create a de Bruijn graph from a list of sequences.
-    pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>) -> Self {
+    /// Create a de Bruijn graph (and optional links) from a list of sequences.
+    pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
-        let links = Self::build_links(k, fwd_seqs, &kmers);
+        let links = match build_links {
+            true => Self::build_links(k, fwd_seqs, &kmers),
+            false => Links::new()
+        };
 
         LdBG {
             kmers,
@@ -404,7 +407,7 @@ mod tests {
         let genome = get_test_genome();
         let fwd_seqs = vec!(genome);
 
-        let g = LdBG::from_sequences(5, &fwd_seqs);
+        let g = LdBG::from_sequences(5, &fwd_seqs, true);
 
         let mut exp_graph = KmerGraph::new();
         exp_graph.insert(b"AAATC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
@@ -445,7 +448,7 @@ mod tests {
         let rc_genome = fw_genome.reverse_complement();
 
         let fwd_seqs = vec!(fw_genome.clone());
-        let g = LdBG::from_sequences(5, &fwd_seqs);
+        let g = LdBG::from_sequences(5, &fwd_seqs, true);
 
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
@@ -467,37 +470,47 @@ mod tests {
     }
 
     #[test]
-    fn test_link_annotations_correct() {
-        for length in (50..100).step_by(5) {
+    fn test_assemble_random_genomes() {
+        for length in (50..5000).step_by(50) {
             let random_genome = generate_random_genome(length, 0);
-            let fwd_seqs = vec!(random_genome.clone());
+            for k in (11..21).step_by(2) {
+                let fwd_seqs = vec!(random_genome.clone());
 
-            println!("{:?}", std::str::from_utf8(random_genome.as_bytes()));
+                let g = LdBG::from_sequences(k, &fwd_seqs, true);
+                let contigs = g.assemble_all();
 
-            let g = LdBG::from_sequences(5, &fwd_seqs);
-            let contigs = g.assemble_all();
+                // println!("genome -- {:?}", std::str::from_utf8(random_genome.as_bytes()));
 
-            for contig in contigs {
-                println!("{:?}", std::str::from_utf8(contig.as_bytes()));
+                for fw_contig in contigs {
+                    assert!(!fw_contig.is_empty(), "Contig should not be empty (length={} kmer={})", length, k);
+                    assert!(fw_contig.len() >= k, "Contig should be at least k-mer size (length={} kmer={})", length, k);
+
+                    let rc_contig = fw_contig.reverse_complement();
+
+                    // println!("contig -- {:?}", std::str::from_utf8(fw_contig.as_bytes()));
+                    // println!("contig -- {:?}", std::str::from_utf8(rc_contig.as_bytes()));
+
+                    assert!(random_genome == fw_contig || random_genome == rc_contig, "Contig should match the genome or its reverse complement (length={} kmer={})", length, k);
+                }
             }
         }
     }
 
     #[test]
-    fn test_assemble_random_genome() {
-        for length in (50..100).step_by(5) {
-            let random_genome = generate_random_genome(length, 0);
-            let fwd_seqs = vec!(random_genome.clone());
+    fn test_assemble_with_and_without_links() {
+        let length = 2700;
+        let k = 11;
 
-            println!("FW {:?} {:?}", length, std::str::from_utf8(random_genome.as_bytes()));
-            println!("RV {:?} {:?}", length, std::str::from_utf8(random_genome.reverse_complement().as_bytes()));
+        let random_genome = generate_random_genome(length, 0);
+        let fwd_seqs = vec!(random_genome.clone());
 
-            let g = LdBG::from_sequences(5, &fwd_seqs);
-            let contigs = g.assemble_all();
+        let g1 = LdBG::from_sequences(k, &fwd_seqs, false);
+        let g2 = LdBG::from_sequences(k, &fwd_seqs, true);
 
-            for contig in contigs {
-                println!(" - {} {:?}", contig.len(), std::str::from_utf8(contig.as_bytes()));
-            }
-        }
+        let contigs1 = g1.assemble_all();
+        let contigs2 = g2.assemble_all();
+
+        assert!(contigs1.len() == 3);
+        assert!(contigs2.len() == 1);
     }
 }
