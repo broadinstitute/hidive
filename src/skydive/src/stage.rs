@@ -26,7 +26,7 @@ use rust_htslib::faidx::Reader;
 use bio::io::fasta;
 
 // Import functions for authorizing access to Google Cloud Storage.
-use crate::utils::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
+use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
 
 // Function to open a BAM/CRAM file from a URL and cache its contents locally.
 fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {

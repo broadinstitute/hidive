@@ -19,8 +19,8 @@ use skydive;
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
 pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>) {
-    let loci = skydive::utils::parse::parse_loci(loci_list);
-    let seq_urls = skydive::utils::parse::parse_file_names(seq_paths);
+    let loci = skydive::parse::parse_loci(loci_list);
+    let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
@@ -28,7 +28,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>
 
     // Call the stage_data function from the skydive module to process and stage the data
     skydive::elog!("Fetching data...");
-    let r = skydive::utils::stage::stage_data(&output, &loci, &seq_urls, &cache_path);
+    let r = skydive::stage::stage_data(&output, &loci, &seq_urls, &cache_path);
 
     match r {
         Ok(n) => {

@@ -15,13 +15,14 @@ type Links = BTreeMap<Vec<u8>, BTreeMap<Link, u16>>;
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug)]
 pub struct LdBG {
+    pub name: String,
     pub kmers: KmerGraph,
     pub links: Links,
 }
 
 impl LdBG {
     /// Create a de Bruijn graph (and optional links) from a list of sequences.
-    pub fn from_sequences(k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
+    pub fn from_sequences(name: String, k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
         let links = match build_links {
             true => Self::build_links(k, fwd_seqs, &kmers),
@@ -29,12 +30,18 @@ impl LdBG {
         };
 
         LdBG {
+            name,
             kmers,
             links,
         }
     }
 
-    /// Add a k-mer, the preceeding base, and following base to the graph
+    /// Get name of graph.
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    /// Add a k-mer, the preceeding base, and following base to the graph.
     fn add_record_to_graph(graph: &mut KmerGraph, fw_kmer: &[u8], fw_prev_base: u8, fw_next_base: u8) {
         let rc_kmer_vec = fw_kmer.reverse_complement();
         let rc_kmer = rc_kmer_vec.as_bytes();
@@ -219,10 +226,10 @@ impl LdBG {
     fn prev_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Link>) -> Option<Vec<u8>> {
         let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
-        let dbg_cn_kmer_str = String::from_utf8(cn_kmer_vec.clone()).unwrap();
+        // let dbg_cn_kmer_str = String::from_utf8(cn_kmer_vec.clone()).unwrap();
 
         let r = self.kmers.get(cn_kmer)?;
-        let dbg_r_str = r.to_string();
+        // let dbg_r_str = r.to_string();
 
         let prev_base = if cn_kmer == kmer {
             match r.in_degree() {
@@ -361,6 +368,7 @@ impl LdBG {
         }
     }
 
+    /// Pretty-print k-mer, edge, and record information.
     fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
         println!("{} {} {} {}",
             std::char::from_u32(prev_base as u32).unwrap_or('.'),
@@ -407,7 +415,7 @@ mod tests {
         let genome = get_test_genome();
         let fwd_seqs = vec!(genome);
 
-        let g = LdBG::from_sequences(5, &fwd_seqs, true);
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
 
         let mut exp_graph = KmerGraph::new();
         exp_graph.insert(b"AAATC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
@@ -448,7 +456,7 @@ mod tests {
         let rc_genome = fw_genome.reverse_complement();
 
         let fwd_seqs = vec!(fw_genome.clone());
-        let g = LdBG::from_sequences(5, &fwd_seqs, true);
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
 
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
@@ -476,7 +484,7 @@ mod tests {
             for k in (11..21).step_by(2) {
                 let fwd_seqs = vec!(random_genome.clone());
 
-                let g = LdBG::from_sequences(k, &fwd_seqs, true);
+                let g = LdBG::from_sequences(String::from("test"), k, &fwd_seqs, true);
                 let contigs = g.assemble_all();
 
                 // println!("genome -- {:?}", std::str::from_utf8(random_genome.as_bytes()));
@@ -504,8 +512,8 @@ mod tests {
         let random_genome = generate_random_genome(length, 0);
         let fwd_seqs = vec!(random_genome.clone());
 
-        let g1 = LdBG::from_sequences(k, &fwd_seqs, false);
-        let g2 = LdBG::from_sequences(k, &fwd_seqs, true);
+        let g1 = LdBG::from_sequences(String::from("without_links"), k, &fwd_seqs, false);
+        let g2 = LdBG::from_sequences(String::from("with_links"), k, &fwd_seqs, true);
 
         let contigs1 = g1.assemble_all();
         let contigs2 = g2.assemble_all();

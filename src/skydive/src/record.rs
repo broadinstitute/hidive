@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ldbg::edges::Edges;
+use crate::edges::Edges;
 
 /// Represents a de Bruijn graph record.
 #[derive(Debug)]
