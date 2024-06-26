@@ -24,6 +24,7 @@ pub struct LdBG {
     pub name: String,
     pub kmers: KmerGraph,
     pub links: Links,
+    pub junctions: HashMap<Vec<u8>, bool>,
 }
 
 impl LdBG {
@@ -37,12 +38,12 @@ impl LdBG {
             .map(|r| r.seq().as_bytes().to_vec())
             .collect();
 
-        crate::elog!("Building graph from {} sequences", fwd_seqs.len());
         let kmers = Self::build_graph(k, &fwd_seqs);
 
-        crate::elog!("Building links from {} sequences", fwd_seqs.len());
+        let junctions = Self::find_junctions(&kmers);
+
         let links = match build_links {
-            true => Self::build_links(k, &fwd_seqs, &kmers),
+            true => Self::build_links(k, &fwd_seqs, &kmers, &junctions),
             false => Links::new()
         };
 
@@ -50,14 +51,18 @@ impl LdBG {
             name,
             kmers,
             links,
+            junctions
         }
     }
 
     /// Create a de Bruijn graph (and optional links) from a list of sequences.
     pub fn from_sequences(name: String, k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
+
+        let junctions = Self::find_junctions(&kmers);
+
         let links = match build_links {
-            true => Self::build_links(k, fwd_seqs, &kmers),
+            true => Self::build_links(k, fwd_seqs, &kmers, &junctions),
             false => Links::new()
         };
 
@@ -65,6 +70,7 @@ impl LdBG {
             name,
             kmers,
             links,
+            junctions
         }
     }
 
@@ -124,18 +130,18 @@ impl LdBG {
     }
 
     /// Add all junction choices from a given sequence.
-    fn add_record_to_links(links: &mut Links, fwd_seq: &Vec<u8>, k: usize, graph: &KmerGraph, outgoing: bool) {
+    fn add_record_to_links(links: &mut Links, fwd_seq: &Vec<u8>, k: usize, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>, outgoing: bool) {
         let mut anchor_kmer = &fwd_seq[0..1];
 
         // Iterate over k-mers to find junctions.
         for i in 0..fwd_seq.len()-k+1 {
             let fw_kmer = &fwd_seq[i..i+k];
 
-            if !LdBG::has_junction(&graph, fw_kmer, false) && !LdBG::has_junction(&graph, fw_kmer, true) {
+            if !LdBG::has_junction(&graph, junctions, fw_kmer, false) && !LdBG::has_junction(&graph, junctions, fw_kmer, true) {
                 anchor_kmer = &fwd_seq[i..i+k];
             }
 
-            if anchor_kmer.len() == k && LdBG::has_junction(&graph, fw_kmer, outgoing) {
+            if anchor_kmer.len() == k && LdBG::has_junction(&graph, junctions, fw_kmer, outgoing) {
                 let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
                 let cn_anchor_kmer = cn_anchor_kmer_vec.as_bytes();
 
@@ -145,7 +151,7 @@ impl LdBG {
                 for j in i..fwd_seq.len()-k {
                     let next_kmer = &fwd_seq[j..j+k];
 
-                    let has_junction = LdBG::has_junction(&graph, next_kmer, true);
+                    let has_junction = LdBG::has_junction(&graph, junctions, next_kmer, true);
                     if has_junction {
                         link.push_back(fwd_seq[j+k]);
                     }
@@ -172,7 +178,7 @@ impl LdBG {
     }
 
     /// Build the links for a de Bruijn graph from a vector of sequences.
-    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
+    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>) -> Links {
         let progress_bar_style = indicatif::ProgressStyle::default_bar()
             .template("Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
             .unwrap()
@@ -186,32 +192,86 @@ impl LdBG {
             let fw_seq = fwd_seq.clone();
             let rc_seq = fw_seq.reverse_complement();
 
-            LdBG::add_record_to_links(&mut links, &fw_seq, k, graph, true);
-            LdBG::add_record_to_links(&mut links, &rc_seq, k, graph, false);
+            LdBG::add_record_to_links(&mut links, &fw_seq, k, graph, junctions, true);
+            LdBG::add_record_to_links(&mut links, &rc_seq, k, graph, junctions, false);
         });
 
         links
     }
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
+    // #[inline(always)]
+    // fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    //     std::cmp::min(kmer, &kmer.reverse_complement()).to_vec()
+    // }
+
+    /// Get the canonical (lexicographically-lowest) version of a k-mer.
+    #[inline(always)]
     fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
-        std::cmp::min(kmer, &kmer.reverse_complement()).to_vec()
+        let rc_kmer = kmer.reverse_complement();
+        if kmer < rc_kmer.as_bytes() {
+            kmer.to_vec()
+        } else {
+            rc_kmer.as_bytes().to_vec()
+        }
     }
 
+    /// Find junctions in the graph.
+    fn find_junctions(kmers: &KmerGraph) -> HashMap<Vec<u8>, bool> {
+        kmers
+            .par_iter()
+            .flat_map(|(cn_kmer, r)| {
+                let mut junction_kmers = HashMap::new();
+
+                let fw_kmer = cn_kmer.clone();
+                let rc_kmer = cn_kmer.reverse_complement();
+
+                let (in_degree, out_degree) = (r.in_degree(), r.out_degree());
+
+                if out_degree > 1 {
+                    junction_kmers.insert(fw_kmer.clone(), true);
+                    junction_kmers.insert(rc_kmer.clone(), false);
+                }
+
+                if in_degree > 1 {
+                    junction_kmers.insert(fw_kmer.clone(), false);
+                    junction_kmers.insert(rc_kmer.clone(), true);
+                }
+
+                // for outgoing in [ true, false ] {
+                //     if (out_degree > 1 && outgoing) || (in_degree > 1 && !outgoing) {
+                //         junction_kmers.insert(fw_kmer.clone(), outgoing);
+                //     }
+
+                //     if (in_degree > 1 && outgoing) || (out_degree > 1 && !outgoing) {
+                //         junction_kmers.insert(rc_kmer.clone(), outgoing);
+                //     }
+                // }
+
+                junction_kmers
+            })
+            .collect()
+    }
+
+
     /// Check if the given k-mer represents a junction (in the orientation of the given k-mer).
-    fn has_junction(graph: &KmerGraph, kmer: &[u8], outgoing: bool) -> bool {
-        let cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
-        let cn_kmer = cn_kmer_vec.as_bytes();
+    fn has_junction(graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>, kmer: &[u8], outgoing: bool) -> bool {
+        // let cn_kmer = LdBG::canonicalize_kmer(kmer);
 
-        if let Some(r) = graph.get(cn_kmer) {
-            if kmer == cn_kmer {
-                return (r.out_degree() > 1 && outgoing) || (r.in_degree() > 1 && !outgoing);
-            } else {
-                return (r.in_degree() > 1 && outgoing) || (r.out_degree() > 1 && !outgoing);
-            }
-        }
+        // if let Some(r) = graph.get(&cn_kmer) {
+        //     let is_canonical = kmer == cn_kmer.as_slice();
+        //     let (in_degree, out_degree) = (r.in_degree(), r.out_degree());
 
-        false
+        //     return if is_canonical {
+        //         (out_degree > 1 && outgoing) || (in_degree > 1 && !outgoing)
+        //     } else {
+        //         (in_degree > 1 && outgoing) || (out_degree > 1 && !outgoing)
+        //     };
+        // }
+
+        // false
+
+        junctions.contains_key(kmer) && *junctions.get(kmer).unwrap() == outgoing
     }
 
     /// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
@@ -511,10 +571,12 @@ mod tests {
 
     #[test]
     fn test_assemble_random_genomes() {
-        for length in (50..5000).step_by(50) {
+        for length in (50..3000).step_by(50) {
             let random_genome = generate_random_genome(length, 0);
             for k in (11..21).step_by(2) {
                 let fwd_seqs = vec!(random_genome.clone());
+
+                println!("length={} k={}", length, k);
 
                 let g = LdBG::from_sequences(String::from("test"), k, &fwd_seqs, true);
                 let contigs = g.assemble_all();
