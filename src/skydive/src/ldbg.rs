@@ -184,16 +184,20 @@ impl LdBG {
             .unwrap()
             .progress_chars("#>-");
 
-        let mut links = Links::new();
-
-        // Iterate over sequences again to add links
-        // for fwd_seq in fwd_seqs {
-        fwd_seqs.iter().progress_with_style(progress_bar_style).for_each(|fwd_seq| {
+        let links: Links = fwd_seqs.par_iter().progress_with_style(progress_bar_style).map(|fwd_seq| {
+            let mut local_links = Links::new();
             let fw_seq = fwd_seq.clone();
             let rc_seq = fw_seq.reverse_complement();
 
-            LdBG::add_record_to_links(&mut links, &fw_seq, k, graph, junctions, true);
-            LdBG::add_record_to_links(&mut links, &rc_seq, k, graph, junctions, false);
+            LdBG::add_record_to_links(&mut local_links, &fw_seq, k, graph, junctions, true);
+            LdBG::add_record_to_links(&mut local_links, &rc_seq, k, graph, junctions, false);
+
+            local_links
+        }).reduce(Links::new, |mut acc, local_links| {
+            for (k, v) in local_links {
+                acc.entry(k).or_insert_with(HashMap::new).extend(v);
+            }
+            acc
         });
 
         links
@@ -334,7 +338,11 @@ impl LdBG {
                 0 => return None,
                 1 => r.incoming_edges()[0],
                 _ => {
-                    let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
+                    // let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
+                    let consensus_junction_choice = match links_in_scope.get(0)?.front() {
+                        Some(choice) => *choice,
+                        None => return None,
+                    };
 
                     if r.incoming_edges().contains(&consensus_junction_choice) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
@@ -350,7 +358,10 @@ impl LdBG {
                 0 => return None,
                 1 => complement(r.outgoing_edges()[0]),
                 _ => {
-                    let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
+                    let consensus_junction_choice = match links_in_scope.get(0)?.front() {
+                        Some(choice) => *choice,
+                        None => return None,
+                    };
 
                     if r.outgoing_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
