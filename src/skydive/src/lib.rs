@@ -7,6 +7,7 @@ pub mod mldbg;
 
 pub mod env;
 pub mod parse;
+pub mod utils;
 
 pub mod stage;
 pub mod storage_gcs;

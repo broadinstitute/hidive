@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod fetch;
-mod cluster;
-mod build;
 mod assemble;
+mod build;
+mod cluster;
 mod coassemble;
+mod fetch;
 mod impute;
 mod trim;
 
@@ -50,7 +50,7 @@ enum Commands {
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
-        fasta_path: PathBuf
+        fasta_path: PathBuf,
     },
 
     /// Trim reads to a specific window around locus.
@@ -86,7 +86,7 @@ enum Commands {
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
-        fasta_path: PathBuf
+        fasta_path: PathBuf,
     },
 
     /// Cluster edge matrix and impute missing edges.
@@ -135,18 +135,35 @@ fn main() {
 
     skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
     skydive::elog!("{:?}", args);
-    
+
     match args.command {
-        Commands::Fetch { output, loci, seq_paths } => {
+        Commands::Fetch {
+            output,
+            loci,
+            seq_paths,
+        } => {
             fetch::start(&output, &loci, &seq_paths);
         }
-        Commands::Cluster { output, kmer_size, fasta_path } => {
+        Commands::Cluster {
+            output,
+            kmer_size,
+            fasta_path,
+        } => {
             cluster::start(&output, kmer_size, &fasta_path);
         }
-        Commands::Trim { output, loci, bam_path } => {
+        Commands::Trim {
+            output,
+            loci,
+            bam_path,
+        } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, kmer_size, fasta_path, reference_name } => {
+        Commands::Build {
+            output,
+            kmer_size,
+            fasta_path,
+            reference_name,
+        } => {
             build::start(&output, kmer_size, &fasta_path, reference_name);
         }
         Commands::Impute { output, graph } => {
@@ -155,7 +172,11 @@ fn main() {
         Commands::Assemble { output, graph } => {
             assemble::start(&output, &graph);
         }
-        Commands::Coassemble { output, long_read_fasta_paths, short_read_fasta_paths } => {
+        Commands::Coassemble {
+            output,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
             coassemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
     }

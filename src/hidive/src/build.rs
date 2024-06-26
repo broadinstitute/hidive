@@ -1,17 +1,17 @@
 // Import necessary standard library modules
-use std::collections::HashSet;
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use bio::io::fasta::{Reader, Record};
 
 use flate2::read::GzDecoder;
-use serde_json::Value;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use rayon::prelude::*;
 
@@ -600,12 +600,7 @@ impl GraphicalGenome {
     }
 }
 
-pub fn start(
-    output: &PathBuf,
-    k: usize,
-    fasta_path: &PathBuf,
-    reference_name: String
-) {
+pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: String) {
     // Use the basename of the reads fasta to be the reference sequence name in the graph.
     let stem = fasta_path
         .file_stem()
@@ -633,8 +628,7 @@ pub fn start(
 
     // Create the k-mer profile.
     let unique_kmer_list = get_reference_kmer_profile(&reference, k);
-    let (roi_samples, roi_seq) =
-        find_sequences_between_sanchor_eanchor(reads, reference, &stem);
+    let (roi_samples, roi_seq) = find_sequences_between_sanchor_eanchor(reads, reference, &stem);
     let (sample_dict, position_dict) =
         map_reference_unique_kmers_to_seq(unique_kmer_list, &roi_seq, k);
 

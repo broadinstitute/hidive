@@ -32,7 +32,11 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, seq_paths: &Vec<PathBuf>
 
     match r {
         Ok(n) => {
-            skydive::elog!("Wrote {} sequences to '{}'.", n, output.absolutize().unwrap().to_str().unwrap())
+            skydive::elog!(
+                "Wrote {} sequences to '{}'.",
+                n,
+                output.absolutize().unwrap().to_str().unwrap()
+            )
         }
         Err(_) => {
             panic!("Failed to write output FASTA.")
