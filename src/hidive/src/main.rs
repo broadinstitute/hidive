@@ -113,20 +113,20 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Co-assemble target locus from short-read data using the series-parallel graph to assist.
+    /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
         /// Output path for assembled short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Series-parallel graph.
-        #[clap(required = true, value_parser)]
-        graph: PathBuf,
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, required = false, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
 
-        /// Single-sample WGS CRAM.
+        /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        bam_or_cram_paths: Vec<PathBuf>,
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 }
 
@@ -155,8 +155,8 @@ fn main() {
         Commands::Assemble { output, graph } => {
             assemble::start(&output, &graph);
         }
-        Commands::Coassemble { output, graph, bam_or_cram_paths } => {
-            coassemble::start(&output, &graph, &bam_or_cram_paths);
+        Commands::Coassemble { output, long_read_fasta_paths, short_read_fasta_paths } => {
+            coassemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
     }
 

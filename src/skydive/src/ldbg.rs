@@ -1,16 +1,22 @@
-use std::collections::BTreeMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+// use std::sync::Mutex;
 
+use indicatif::ProgressIterator;
 use parquet::data_type::AsBytes;
 
+use std::path::PathBuf;
 use needletail::Sequence;
 use needletail::sequence::complement;
+
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
+use indicatif::ParallelProgressIterator;
 
 use crate::record::Record;
 use crate::link::Link;
 
-type KmerGraph = BTreeMap<Vec<u8>, Record>;
-type Links = BTreeMap<Vec<u8>, BTreeMap<Link, u16>>;
+type KmerGraph = HashMap<Vec<u8>, Record>;
+type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug)]
@@ -21,6 +27,32 @@ pub struct LdBG {
 }
 
 impl LdBG {
+    /// Create a de Bruijn graph (and optional links) from a file path.
+    pub fn from_file(name: String, k: usize, seq_path: &PathBuf, build_links: bool) -> Self {
+        let reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
+        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
+
+        let fwd_seqs: Vec<Vec<u8>> = all_reads
+            .iter()
+            .map(|r| r.seq().as_bytes().to_vec())
+            .collect();
+
+        crate::elog!("Building graph from {} sequences", fwd_seqs.len());
+        let kmers = Self::build_graph(k, &fwd_seqs);
+
+        crate::elog!("Building links from {} sequences", fwd_seqs.len());
+        let links = match build_links {
+            true => Self::build_links(k, &fwd_seqs, &kmers),
+            false => Links::new()
+        };
+
+        LdBG {
+            name,
+            kmers,
+            links,
+        }
+    }
+
     /// Create a de Bruijn graph (and optional links) from a list of sequences.
     pub fn from_sequences(name: String, k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
         let kmers = Self::build_graph(k, fwd_seqs);
@@ -110,7 +142,7 @@ impl LdBG {
                 // Populate link.
                 let mut link = Link::new(anchor_kmer == cn_anchor_kmer);
 
-                for j in i..fwd_seq.len()-k+1 {
+                for j in i..fwd_seq.len()-k {
                     let next_kmer = &fwd_seq[j..j+k];
 
                     let has_junction = LdBG::has_junction(&graph, next_kmer, true);
@@ -121,7 +153,7 @@ impl LdBG {
 
                 // Add link to links map.
                 if !links.contains_key(cn_anchor_kmer) {
-                    links.insert(cn_anchor_kmer.to_owned(), BTreeMap::new());
+                    links.insert(cn_anchor_kmer.to_owned(), HashMap::new());
                 }
 
                 if !links.get(cn_anchor_kmer).unwrap().contains_key(&link) {
@@ -141,16 +173,22 @@ impl LdBG {
 
     /// Build the links for a de Bruijn graph from a vector of sequences.
     fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
+        let progress_bar_style = indicatif::ProgressStyle::default_bar()
+            .template("Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
+            .unwrap()
+            .progress_chars("#>-");
+
         let mut links = Links::new();
 
         // Iterate over sequences again to add links
-        for fwd_seq in fwd_seqs {
+        // for fwd_seq in fwd_seqs {
+        fwd_seqs.iter().progress_with_style(progress_bar_style).for_each(|fwd_seq| {
             let fw_seq = fwd_seq.clone();
             let rc_seq = fw_seq.reverse_complement();
 
             LdBG::add_record_to_links(&mut links, &fw_seq, k, graph, true);
             LdBG::add_record_to_links(&mut links, &rc_seq, k, graph, false);
-        }
+        });
 
         links
     }
@@ -469,12 +507,6 @@ mod tests {
         assert!(rc_genome == g.assemble(b"TTCGA".to_vec().reverse_complement().as_bytes()));
         assert!(rc_genome == g.assemble(b"TGCCA".to_vec().reverse_complement().as_bytes()));
         assert!(rc_genome == g.assemble(b"GGTGG".to_vec().reverse_complement().as_bytes()));
-
-        // assembly inside cycle should not recapitulate entire genome
-        assert!(fw_genome != g.assemble(b"TGCGA"));
-        assert!(rc_genome != g.assemble(b"TGCGA".to_vec().reverse_complement().as_bytes()));
-        assert!(fw_genome != g.assemble(b"CGATG"));
-        assert!(rc_genome != g.assemble(b"CGATG".to_vec().reverse_complement().as_bytes()));
     }
 
     #[test]

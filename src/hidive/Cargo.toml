@@ -2,7 +2,7 @@
 name = "hidive"
 version = "0.1.28"
 edition = "2021"
-resolver = "1"
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,6 +29,3 @@ serde = "*"
 serde_json = "*"
 skydive = { path = "../skydive" }
 url = "*"
-
-[profile.release]
-debug = true
