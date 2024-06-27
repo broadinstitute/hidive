@@ -795,8 +795,11 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
     let mut file = File::create(filename)?;
 
     writeln!(file, "H\tVN:Z:1.0")?;
-
-    for (anchor, data) in &graph.anchor {
+    
+    let mut keys: Vec<_> = graph.anchor.keys().collect();
+    keys.sort();
+    for anchor in keys.iter() {
+        let data = &graph.anchor[*anchor];
         let seq = data["seq"].as_str().unwrap_or_default();
         let mut data_clone = data.clone();
         data_clone.as_object_mut().unwrap().remove("seq");
@@ -806,10 +809,13 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
     let mut edge_output = Vec::new();
     let mut link_output = Vec::new();
 
-    for (edge, edge_data) in &graph.edges {
+    let mut edge_keys: Vec<_> = graph.edges.keys().collect();
+    edge_keys.sort();
+    for edge in edge_keys.iter() {
+        let edge_data = &graph.edges[*edge];
         let seq = edge_data["seq"].as_str().unwrap_or_default();
-        let src = graph.incoming[edge][0].clone();
-        let dst = graph.outgoing[edge][0].clone();
+        let src = graph.incoming[*edge][0].clone();
+        let dst = graph.outgoing[*edge][0].clone();
         let mut edge_data_clone = edge_data.clone();
         edge_data_clone.as_object_mut().unwrap().remove("seq");
         let json_string = serde_json::to_string(&edge_data_clone).unwrap_or_else(|_| "{}".to_string());
@@ -897,10 +903,11 @@ pub fn start(
     let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
     // println!("{:?}", graph.anchor)
 
-    // let mut sp_graph = GetSeriesParallelGraph::new(&graph);
-    // let outputfilename_str = output.with_extension("sp.gfa");
+    let mut sp_graph = GetSeriesParallelGraph::new(&graph);
+    let outputfilename_str = output.with_extension("sp.gfa");
     // println!("{:?}", outputfilename_str);
-    // write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);    println!("{:?}", outputfilename_str);
+    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);    
+    println!("{:?}", outputfilename_str);
     // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
 
 }
