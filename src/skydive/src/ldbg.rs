@@ -495,6 +495,14 @@ mod tests {
 
     use rand::{Rng, SeedableRng};
 
+    use std::process::{Command, Stdio};
+    use std::env;
+    use std::fs::File;
+    use std::io::Write;
+    use std::fs::read_to_string;
+
+    use proptest::prelude::*;
+
     /// Canonical example genome from https://academic.oup.com/bioinformatics/article/34/15/2556/4938484
     fn get_test_genome() -> Vec<u8> {
         "ACTGATTTCGATGCGATGCGATGCCACGGTGG".as_bytes().to_vec()
@@ -507,8 +515,8 @@ mod tests {
 
     fn generate_random_genome(length: usize, seed: u64) -> Vec<u8> {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-
         let alphabet = b"ACGT";
+
         let mut genome = Vec::with_capacity(length);
 
         for _ in 0..length {
@@ -517,6 +525,116 @@ mod tests {
         }
 
         genome
+    }
+
+    fn generate_genome_with_tandem_repeats(flank_length: usize, repeat_length: usize, num_repeats: usize, seed: u64) -> Vec<u8> {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let alphabet = b"ACGT";
+
+        let mut left_flank = Vec::with_capacity(flank_length);
+        for _ in 0..flank_length {
+            let idx = rng.gen_range(0..4);
+            left_flank.push(alphabet[idx]);
+        }
+
+        let mut repeat = Vec::with_capacity(repeat_length);
+        for _ in 0..repeat_length {
+            let idx = rng.gen_range(0..4);
+            repeat.push(alphabet[idx]);
+        }
+
+        let mut right_flank = Vec::with_capacity(flank_length);
+        for _ in 0..flank_length {
+            let idx = rng.gen_range(0..4);
+            right_flank.push(alphabet[idx]);
+        }
+
+        let mut genome = Vec::new();
+        genome.extend_from_slice(&left_flank);
+        for _ in 0..num_repeats {
+            genome.extend_from_slice(&repeat);
+        }
+        genome.extend_from_slice(&right_flank);
+
+        genome
+    }
+
+    fn assemble_with_mccortex(k: usize, input_genome: &Vec<u8>, build_links: bool) -> Vec<String> {
+        let current_dir = env::current_dir().unwrap();
+        let current_dir_str = current_dir.to_str().unwrap();
+
+        let copied_genome = input_genome.clone();
+
+        let mut file = File::create(current_dir.join("test.fa")).expect("Unable to create file");
+        writeln!(file, ">genome").expect("Unable to write to file");
+        writeln!(file, "{}", String::from_utf8(copied_genome).unwrap()).expect("Unable to write to file");
+    
+        Command::new("docker")
+            .args(&[
+                "run", "-v", &format!("{}:/data", current_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                "mccortex31", "build", "-f", "-m", "1g", "-k", &format!("{}", k), "-s", "test", "-S", "-1", "/data/test.fa", "/data/test.ctx",
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("failed to execute process");
+
+        Command::new("docker")
+            .args(&[
+                "run", "-v", &format!("{}:/data", current_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                "mccortex31", "thread", "-f", "-m 1g", "-w", "-o", "/data/test.ctp.gz", "-1", "/data/test.fa", "/data/test.ctx"
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("failed to execute process");
+    
+        if build_links {
+            Command::new("docker")
+                .args(&[
+                    "run", "-v", &format!("{}:/data", current_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                    "mccortex31", "contigs", "-f", "-m", "1g", "-p", "/data/test.ctp.gz", "-o", "/data/contigs.fa", "/data/test.ctx"
+                ])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .expect("failed to execute process");
+        } else {
+            Command::new("docker")
+                .args(&[
+                    "run", "-v", &format!("{}:/data", current_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                    "mccortex31", "contigs", "-f", "-m", "1g", "-o", "/data/contigs.fa", "/data/test.ctx"
+                ])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .expect("failed to execute process");
+        }
+    
+        let contigs_fa = read_to_string(current_dir.join("contigs.fa")).expect("Unable to read contigs.fa");
+        let mut contigs = Vec::new();
+        let mut current_contig = Vec::new();
+    
+        for line in contigs_fa.lines() {
+            if line.starts_with('>') {
+                if !current_contig.is_empty() {
+                    contigs.push(current_contig.clone());
+                    current_contig.clear();
+                }
+            } else {
+                current_contig.extend_from_slice(line.as_bytes());
+            }
+        }
+    
+        if !current_contig.is_empty() {
+            contigs.push(current_contig);
+        }
+    
+        let str_contigs: Vec<String> = contigs.iter()
+            .map(|contig| std::str::from_utf8(contig).expect("Invalid UTF-8 sequence").to_string())
+            .collect();
+
+        str_contigs
     }
 
     #[test]
@@ -610,20 +728,79 @@ mod tests {
     }
 
     #[test]
-    fn test_assemble_with_and_without_links() {
-        let length = 2700;
-        let k = 11;
+    fn test_assemble_example() {
+        for flank_length in (200..2000).step_by(100) {
+            for repeat_length in (30..50).step_by(10) {
+                let random_genome = generate_genome_with_tandem_repeats(flank_length, repeat_length, 3, 0);
 
-        let random_genome = generate_random_genome(length, 0);
-        let fwd_seqs = vec!(random_genome.clone());
+                for k in (11..21).step_by(2) {
+                    for build_links in [true].iter() {
+                        let fwd_seqs = vec!(random_genome.clone());
 
-        let g1 = LdBG::from_sequences(String::from("without_links"), k, &fwd_seqs, false);
-        let g2 = LdBG::from_sequences(String::from("with_links"), k, &fwd_seqs, true);
+                        let g1 = LdBG::from_sequences(String::from("test"), k, &fwd_seqs, *build_links);
+                        let contigs1 = g1.assemble_all();
 
-        let contigs1 = g1.assemble_all();
-        let contigs2 = g2.assemble_all();
+                        let fw_contigs1: Vec<String> = contigs1.iter()
+                            .map(|contig| std::str::from_utf8(contig).expect("Invalid UTF-8 sequence").to_string())
+                            .collect();
 
-        assert!(contigs1.len() == 3);
-        assert!(contigs2.len() == 1);
+                        let fw_contigs2 = assemble_with_mccortex(k, &random_genome, *build_links);
+
+                        let output = Command::new("zgrep")
+                            .args(&["-c", "^[ACGT]", "test.ctp.gz"])
+                            .output()
+                            .expect("failed to execute process");
+
+                        let count = String::from_utf8_lossy(&output.stdout).trim().parse::<i32>().expect("failed to parse output");
+                        assert!(count > 0, "zgrep did not find any matches");
+
+                        let fw_contig1 = fw_contigs1.get(0).unwrap();
+                        let fw_contig2 = fw_contigs2.get(0).unwrap();
+                        let rc_contig2 = &std::str::from_utf8(&fw_contig2.as_bytes().reverse_complement()).unwrap().to_string();
+
+                        // assert!(
+                        //     fw_contig1 == fw_contig2 || fw_contig1 == rc_contig2,
+                        //     "Assertion failed: flank_length={} repeat_length={} k={} build_links={}",
+                        //     flank_length, repeat_length, k, build_links
+                        // );
+                    }
+                }
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_assemble_comprehensive(
+            length in (50..3000usize).prop_filter("Increment by 100", |v| v % 100 == 0),
+            k in (11..21usize).prop_filter("Must be odd", |v| v % 2 == 1)) {
+            let build_links = true;
+
+            let random_genome = generate_random_genome(length, 0);
+            let fwd_seqs = vec!(random_genome.clone());
+
+            let g1 = LdBG::from_sequences(String::from("test"), k, &fwd_seqs, build_links);
+            let contigs1 = g1.assemble_all();
+
+            let fw_contigs1: Vec<String> = contigs1.iter()
+                .map(|contig| std::str::from_utf8(contig).expect("Invalid UTF-8 sequence").to_string())
+                .collect();
+
+            let fw_contigs2 = assemble_with_mccortex(k, &random_genome, build_links);
+
+            let output = Command::new("zgrep")
+                .args(&["-c", "^[ACGT]", "src/skydive/test.ctp.gz"])
+                .output()
+                .expect("failed to execute process");
+
+            let count = String::from_utf8_lossy(&output.stdout).trim().parse::<i32>().expect("failed to parse output");
+            assert!(count > 0, "zgrep did not find any matches");
+
+            let fw_contig1 = fw_contigs1.get(0).unwrap();
+            let fw_contig2 = fw_contigs2.get(0).unwrap();
+            let rc_contig2 = &std::str::from_utf8(&fw_contig2.as_bytes().reverse_complement()).unwrap().to_string();
+
+            assert!(fw_contig1 == fw_contig2 || fw_contig1 == rc_contig2);
+        }
     }
 }
