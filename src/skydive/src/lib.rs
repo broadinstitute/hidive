@@ -1,3 +1,7 @@
+//! Crate for building and manipulating a series-parallel graph representation
+//! of long-read data and a linked de Bruijn graph representation of short-read data.
+//!
+
 pub mod ldbg;
 pub mod link;
 pub mod edges;

@@ -1,3 +1,54 @@
+//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
+//! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
+//! loci with short-read data. Hidive is built on top of the Skydive library, which provides
+//! a series-parallel graph representation of long-read data and a linked de Bruijn graph
+//! representation of short-read data.
+//!
+//! # Quick Start
+//!
+//! The following commands will compile the Rust and Python codebase.
+//!
+//! ## Install Rust
+//!
+//! ```sh
+//! curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+//! ```
+//!
+//! ## Download and Build Hidive
+//!
+//! ```sh
+//! git clone https://github.com/broadinstitute/hidive.git
+//! cd hidive
+//! cargo build --release
+//! ```
+//!
+//! ## Configure Python Environment
+//!
+//! ```sh
+//! python -m venv venv
+//! . venv/bin/activate
+//! pip install -r dev-requirements.txt
+//! ```
+//!
+//! ## Build Hidive's Python Codebase, Pydive
+//!
+//! ```sh
+//! cd src/pydive/
+//! maturin develop --release
+//! ```
+//! # Prerequisites
+//! Hidive is designed to access local files or data in Google Cloud Storage (GCS).
+//! Within certain cloud-computing environments (i.e. Terra, All of Us Researcher Workbench),
+//! access to GCS is already configured. For accessing files in GCS on your local machine,
+//! you will also need to install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install-sdk).
+//! Then, configure your [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/provide-credentials-adc#local-dev).
+//! If accessing [requester pays buckets](https://cloud.google.com/storage/docs/requester-pays)
+//! set the following environment variable before running hidive commands:
+//! ```sh
+//!  export GCS_REQUESTER_PAYS_PROJECT=<Google Project ID>
+//! ```
+
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
