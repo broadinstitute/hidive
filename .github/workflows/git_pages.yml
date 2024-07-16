@@ -37,3 +37,10 @@ jobs:
           echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive\">" > ./target/doc/hidive/index.html
           cp -r ./target/doc/hidive ./docs
 
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+
+
