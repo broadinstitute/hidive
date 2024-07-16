@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["parse_file_names","parse_loci","parse_locus"]};

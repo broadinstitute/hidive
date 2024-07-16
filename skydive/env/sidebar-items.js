@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["gcs_authorize_data_access","gcs_gcloud_is_installed","local_guess_curl_ca_bundle"]};
