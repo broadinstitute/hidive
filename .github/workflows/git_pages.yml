@@ -28,19 +28,21 @@ jobs:
 #        with:
 #          BRANCH: gh-pages
 #          FOLDER: ./docs/doc/hidive
-      - name: Build Docs
-        run: |
-          cargo doc --no-deps 
+#      - name: Build Docs
+#        run: |
+#          cargo doc --no-deps
+#
+#      - name: Deploy
+#        run: |
+#          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive\">" > ./target/doc/hidive/index.html
+#          cp -r ./target/doc/hidive ./docs
 
-      - name: Deploy
-        run: |
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive\">" > ./target/doc/hidive/index.html
-          cp -r ./target/doc/hidive ./docs
+      - name: Build documentation
+        run: cargo doc --no-deps
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-
+          publish_dir: ./target/doc/hidive
 
