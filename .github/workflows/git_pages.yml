@@ -40,9 +40,20 @@ jobs:
       - name: Build documentation
         run: cargo doc --no-deps
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Finalize documentation
+        run: |
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive/index.html\">" > target/doc/index.html
+          touch target/doc/.nojekyll
+
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./target/doc
+          name: Documentation
+          path: target/doc
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages  # Ensure this is the correct branch for GitHub Pages
+          folder: target/doc
 
