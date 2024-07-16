@@ -13,18 +13,27 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: cargo test
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           override: true
 
+#      - name: Build Docs
+#        run: |
+#          cargo doc --no-deps --target-dir ./docs
+
+#      - name: Deploy
+#        uses: JamesIves/github-pages-deploy-action@releases/v4
+#        with:
+#          BRANCH: gh-pages
+#          FOLDER: ./docs/doc/hidive
       - name: Build Docs
         run: |
           cargo doc --no-deps --target-dir ./docs
 
       - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@releases/v4
-        with:
-          BRANCH: gh-pages
-          FOLDER: ./docs/doc/hidive
+        run: |
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive\">" > ./target/doc/hidive/index.html
+          cp -r ./target/doc/hidive ./docs
+
