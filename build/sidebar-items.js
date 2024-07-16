@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["construct_edges","create_edge_file","filter_undersupported_edges","find_sequences_between_sanchor_eanchor","get_anchor_information","get_anchors","get_final_anchor","get_reference_kmer_profile","map_reference_unique_kmers_to_seq","mapping_info","reverse_complement","start","write_gfa"],"struct":["AnchorInfo","EdgeInfo","GraphicalGenome"]};
