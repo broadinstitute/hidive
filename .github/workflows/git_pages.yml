@@ -30,7 +30,7 @@ jobs:
 #          FOLDER: ./docs/doc/hidive
       - name: Build Docs
         run: |
-          cargo doc --no-deps --target-dir ./docs
+          cargo doc --no-deps 
 
       - name: Deploy
         run: |
