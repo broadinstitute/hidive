@@ -19,24 +19,6 @@ jobs:
           toolchain: stable
           override: true
 
-#      - name: Build Docs
-#        run: |
-#          cargo doc --no-deps --target-dir ./docs
-
-#      - name: Deploy
-#        uses: JamesIves/github-pages-deploy-action@releases/v4
-#        with:
-#          BRANCH: gh-pages
-#          FOLDER: ./docs/doc/hidive
-#      - name: Build Docs
-#        run: |
-#          cargo doc --no-deps
-#
-#      - name: Deploy
-#        run: |
-#          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive\">" > ./target/doc/hidive/index.html
-#          cp -r ./target/doc/hidive ./docs
-
       - name: Build documentation
         run: cargo doc --no-deps
 
@@ -56,4 +38,3 @@ jobs:
         with:
           branch: gh-pages  # Ensure this is the correct branch for GitHub Pages
           folder: target/doc
-
