@@ -15,7 +15,10 @@ pub fn start(
     let mut g = MLdBG::new();
 
     for seq_url in long_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(&seq_url, &[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
+        let basename = skydive::utils::basename_without_extension(
+            &seq_url,
+            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
+        );
 
         let fasta_path = seq_url.to_file_path().unwrap();
 
@@ -23,5 +26,17 @@ pub fn start(
         let l = LdBG::from_file(basename, 11, &fasta_path, true);
 
         g.push(l);
+    }
+    // let mut l = g.ldbgs;
+    // println!("{:?}", l.len());
+    // println!("{:?}", &l[0].kmers);
+
+    for gi in &g.ldbgs {
+        gi.kmers.iter().for_each(|(kmer, record)| {
+            let kmer_str = String::from_utf8_lossy(kmer).to_string();
+
+            println!("{} {}", kmer_str, record);
+        });
+        
     }
 }

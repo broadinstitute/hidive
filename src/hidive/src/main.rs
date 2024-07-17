@@ -101,7 +101,7 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Assemble target locus from long-read data in series-parallel graph.
+    /// Assemble target locus from long-read data in anchor-based series-parallel graph.
     #[clap(arg_required_else_help = true)]
     Assemble {
         /// Output path for assembled long-read sequences.
