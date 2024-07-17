@@ -148,8 +148,14 @@ impl LdBG {
 
         // println!("first anchor = {}", String::from_utf8_lossy(anchor_kmer).to_string());
 
+        let range = if reverse {
+            (0..seq.len()-k+1).rev().collect::<Vec<_>>()
+        } else {
+            (0..seq.len()-k+1).collect::<Vec<_>>()
+        };
+
         // Iterate over k-mers to find junctions.
-        for i in 0..seq.len()-k+1 {
+        for i in range {
             let fw_kmer = &seq[i..i+k];
 
             // if i >= 37 {
@@ -157,18 +163,25 @@ impl LdBG {
             // }
 
             // if !LdBG::has_junction(&graph, junctions, fw_kmer, false) && !LdBG::has_junction(&graph, junctions, fw_kmer, true) {
-            if !LdBG::has_junction(&graph, junctions, fw_kmer, true) {
+            if !LdBG::has_junction(&graph, junctions, fw_kmer, reverse) {
                 anchor_kmer = &seq[i..i+k];
             }
 
-            if anchor_kmer.len() == k && LdBG::has_junction(&graph, junctions, fw_kmer, true) {
+            if anchor_kmer.len() == k && LdBG::has_junction(&graph, junctions, fw_kmer, reverse) {
                 let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
                 let cn_anchor_kmer = cn_anchor_kmer_vec.as_bytes();
 
                 // Populate link.
                 let mut link = Link::new(anchor_kmer == cn_anchor_kmer);
 
-                for j in i..seq.len()-k {
+                let sub_range = if reverse {
+                    (k..i).rev().collect::<Vec<_>>()
+                } else {
+                    (i..seq.len()-k).collect::<Vec<_>>()
+                };
+
+                // for j in i..seq.len()-k {
+                for j in sub_range {
                     let next_kmer = &seq[j..j+k];
 
                     let next_kmer_cn = LdBG::canonicalize_kmer(next_kmer);
@@ -181,40 +194,40 @@ impl LdBG {
                     // }
 
                     // Debug
-                    let next_kmer_str = String::from_utf8_lossy(next_kmer).to_string();
-                    let mut jc = String::from_utf8_lossy(&link.junctions.make_contiguous()).to_string();
+                    // let next_kmer_str = String::from_utf8_lossy(next_kmer).to_string();
+                    // let mut jc = String::from_utf8_lossy(&link.junctions.make_contiguous()).to_string();
 
-                    let has_junction = LdBG::has_junction(&graph, junctions, next_kmer, true);
+                    let has_junction = LdBG::has_junction(&graph, junctions, next_kmer, reverse);
                     if has_junction {
-                        let choice = vec![seq[j+k]];
-                        let choice_str = String::from_utf8_lossy(&choice).to_string();
+                        let choice = if reverse { seq[j-1] } else { seq[j+k] };
+                        // let choice_str = String::from_utf8_lossy(&choice).to_string();
 
-                        let cn_anchor_kmer_str = String::from_utf8_lossy(cn_anchor_kmer).to_string();
+                        // let cn_anchor_kmer_str = String::from_utf8_lossy(cn_anchor_kmer).to_string();
 
-                        if cn_anchor_kmer_str == String::from("GACGC") {
-                            std::io::stderr().flush().unwrap();
+                        // if cn_anchor_kmer_str == String::from("GACGC") {
+                        //     std::io::stderr().flush().unwrap();
 
-                            let log = format!("{} ori={} choice={} next={} in={} out={} rec={}",
-                                String::from_utf8_lossy(cn_anchor_kmer).to_string(),
-                                anchor_kmer == cn_anchor_kmer,
-                                choice_str,
-                                String::from_utf8_lossy(next_kmer_cn.as_bytes()).to_string(),
-                                r.in_degree(),
-                                r.out_degree(),
-                                r.to_string()
-                            );
+                        //     let log = format!("{} ori={} choice={} next={} in={} out={} rec={}",
+                        //         String::from_utf8_lossy(cn_anchor_kmer).to_string(),
+                        //         anchor_kmer == cn_anchor_kmer,
+                        //         choice_str,
+                        //         String::from_utf8_lossy(next_kmer_cn.as_bytes()).to_string(),
+                        //         r.in_degree(),
+                        //         r.out_degree(),
+                        //         r.to_string()
+                        //     );
 
-                            // println!("{}", log);
+                        //     // println!("{}", log);
 
-                            let fwd_seq_str = String::from_utf8_lossy(seq).to_string();
-                            let fwd_chr = fwd_seq_str.split("").nth(j+k).unwrap().to_string();
+                        //     let fwd_seq_str = String::from_utf8_lossy(seq).to_string();
+                        //     let fwd_chr = fwd_seq_str.split("").nth(j+k).unwrap().to_string();
 
-                            std::io::stderr().flush().unwrap();
-                        }
+                        //     std::io::stderr().flush().unwrap();
+                        // }
 
-                        link.push_back(seq[j+k]);
+                        link.push_back(choice);
 
-                        jc = String::from_utf8_lossy(&link.junctions.make_contiguous()).to_string();
+                        // jc = String::from_utf8_lossy(&link.junctions.make_contiguous()).to_string();
                     }
                 }
 
@@ -876,6 +889,8 @@ mod tests {
 
         let fwd_seqs = vec!(fw_genome.clone());
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
+
+        println!("links: {:?}", g.links);
 
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
