@@ -19,8 +19,11 @@ jobs:
     - name: Install clang and libclang-dev
       run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
 
-    - name: Set up environment
-      run: echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
+    - name: Set LIBCLANG_PATH environment variable
+      run: echo "LIBCLANG_PATH=/usr/lib/llvm-10/lib" >> $GITHUB_ENV
+
+    - name: Verify libclang location
+      run: ls -l /usr/lib/llvm-10/lib | grep libclang
 
     - id: 'auth'
       name: 'Authenticate to Google Cloud'
