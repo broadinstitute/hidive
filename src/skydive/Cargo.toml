@@ -16,6 +16,7 @@ chrono = "*"
 cloud-storage = { version = "*", features = ["sync"] }
 color-eyre = {version = "*"}
 crossbeam-utils = "0.8.19"
+flate2 = "*"
 fs_extra = "1.2"
 gag = "*"
 glob = "0.3"
@@ -53,3 +54,4 @@ url = "*"
 [dev-dependencies]
 pretty_assertions = "1"
 proptest = "*"
+md5 = "*"
