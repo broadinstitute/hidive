@@ -86,8 +86,8 @@
 <span class="doccomment">/// Represents metadata on a link (a series of junction choices in de Bruijn graph).
 </span><span class="attr">#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 </span><span class="kw">pub struct </span>Link {
-    is_forward: bool,
-    junctions: VecDeque&lt;u8&gt;
+    <span class="kw">pub </span>is_forward: bool,
+    <span class="kw">pub </span>junctions: VecDeque&lt;u8&gt;
 }
 
 <span class="kw">impl </span>Link {
