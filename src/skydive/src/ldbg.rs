@@ -1097,6 +1097,8 @@ mod tests {
         let fwd_seqs = vec!(fw_genome.clone());
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
 
+        println!("links: {:?}", g.links);
+
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
         assert!(fw_genome == g.assemble(b"TTCGA"));
