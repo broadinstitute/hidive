@@ -12,7 +12,7 @@ use url::Url;
 use skydive;
 
 pub fn start(output: &PathBuf, graph: &PathBuf) {
-    // let graph = skydive::agg::GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
+    let graph = skydive::agg::GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
 
     println!("The answer is {:?} {:?}!", output, graph);
 }
