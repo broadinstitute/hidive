@@ -16,6 +16,12 @@ jobs:
       run: git config --global --add safe.directory /__w/hidive/hidive
     - uses: 'actions/checkout@v2'
 
+    - name: Install clang and libclang-dev
+      run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
+
+    - name: Set up environment
+      run: echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
+
     - id: 'auth'
       name: 'Authenticate to Google Cloud'
       uses: 'google-github-actions/auth@v0'
