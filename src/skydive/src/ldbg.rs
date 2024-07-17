@@ -95,6 +95,14 @@ impl LdBG {
             false => Links::new()
         };
 
+        for (kmer, link_map) in &links {
+            println!("{:?}", String::from_utf8_lossy(kmer).to_string());
+            for (link, count) in link_map {
+                // println!("{} {} Link: {}", if link.is_forward() { "F" } else { "R" }, count, link);
+                println!("{} {}", link, count);
+            }
+        }
+
         LdBG {
             name,
             kmer_size,
@@ -525,7 +533,7 @@ impl LdBG {
                     if r.incoming_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
                         links_in_scope.retain(|link| !link.is_empty());
-                        consensus_junction_choice
+                        complement(consensus_junction_choice)
                     } else {
                         return None;
                     }
@@ -603,7 +611,7 @@ impl LdBG {
                     if r.outgoing_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
                         links_in_scope.retain(|link| !link.is_empty());
-                        consensus_junction_choice
+                        complement(consensus_junction_choice)
                     } else {
                         return None;
                     }
