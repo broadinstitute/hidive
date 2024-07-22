@@ -158,23 +158,14 @@ impl LdBG {
             (0..seq.len()-k+1).collect::<Vec<_>>()
         };
 
-        let mut _dbg_seen = 0;
-
         // Iterate over k-mers to find junctions.
         for i in range {
             let fw_kmer = &seq[i..i+k];
             let rc_kmer = fw_kmer.reverse_complement();
 
-            let _dbg_fw_kmer_str = String::from_utf8_lossy(fw_kmer).to_string();
-            let _dbg_rc_kmer_str = String::from_utf8_lossy(rc_kmer.as_bytes()).to_string();
-            let _dbg_has_junction_reverse = LdBG::has_junction(&graph, junctions, fw_kmer, reverse);
-            let _dbg_has_junction_forward = LdBG::has_junction(&graph, junctions, fw_kmer, !reverse);
-
             if LdBG::has_junction(&graph, junctions, fw_kmer, !reverse) {
                 if let Some((anchor_kmer_vec, index)) = Self::find_anchor_kmer(i, seq, k, graph, junctions, !reverse) {
                     let anchor_kmer = anchor_kmer_vec.as_bytes();
-
-                    let _dbg_anchor_kmer_str = String::from_utf8_lossy(anchor_kmer).to_string();
 
                     let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
                     let cn_anchor_kmer = cn_anchor_kmer_vec.as_bytes();
@@ -331,6 +322,14 @@ impl LdBG {
                 0 => return None,
                 1 => r.outgoing_edges()[0],
                 _ => {
+                    links_in_scope.retain(|link| {
+                        if let Some(&next_char) = link.front() {
+                            r.outgoing_edges().contains(&next_char)
+                        } else {
+                            false
+                        }
+                    });
+
                     let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
 
                     if r.outgoing_edges().contains(&consensus_junction_choice) {
@@ -347,6 +346,14 @@ impl LdBG {
                 0 => return None,
                 1 => complement(r.incoming_edges()[0]),
                 _ => {
+                    links_in_scope.retain(|link| {
+                        if let Some(&next_char) = link.front() {
+                            r.incoming_edges().contains(&complement(next_char))
+                        } else {
+                            false
+                        }
+                    });
+
                     let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
 
                     if r.incoming_edges().contains(&complement(consensus_junction_choice)) {
@@ -378,6 +385,14 @@ impl LdBG {
                 0 => return None,
                 1 => r.incoming_edges()[0],
                 _ => {
+                    links_in_scope.retain(|link| {
+                        if let Some(&next_char) = link.front() {
+                            r.incoming_edges().contains(&next_char)
+                        } else {
+                            false
+                        }
+                    });
+
                     let consensus_junction_choice = match links_in_scope.get(0)?.front() {
                         Some(choice) => *choice,
                         None => return None,
@@ -397,6 +412,14 @@ impl LdBG {
                 0 => return None,
                 1 => complement(r.outgoing_edges()[0]),
                 _ => {
+                    links_in_scope.retain(|link| {
+                        if let Some(&next_char) = link.front() {
+                            r.outgoing_edges().contains(&complement(next_char))
+                        } else {
+                            false
+                        }
+                    });
+
                     let consensus_junction_choice = match links_in_scope.get(0)?.front() {
                         Some(choice) => *choice,
                         None => return None,
@@ -469,7 +492,7 @@ impl LdBG {
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links);
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
 
             match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
@@ -489,7 +512,7 @@ impl LdBG {
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links);
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
 
             match self.prev_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
@@ -504,7 +527,7 @@ impl LdBG {
     }
 
     /// Update links available to inform navigation during graph traversal.
-    fn update_links(&self, links_in_scope: &mut Vec<Link>, last_kmer: &Vec<u8>, used_links: &mut HashSet<Link>) {
+    fn update_links(&self, links_in_scope: &mut Vec<Link>, last_kmer: &Vec<u8>, used_links: &mut HashSet<Link>, forward: bool) {
         let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
@@ -517,7 +540,7 @@ impl LdBG {
                 let link_goes_forward = record_orientation_matches_kmer == jv.0.is_forward();
                 let new_link = if link_goes_forward { jv.0.clone() } else { jv.0.complement() };
 
-                if !used_links.contains(&new_link) {
+                if forward == link_goes_forward && !used_links.contains(&new_link) {
                     used_links.insert(new_link.clone());
                     links_in_scope.push(new_link);
                 }
@@ -888,16 +911,6 @@ mod tests {
                     (Some(mc_map), Some(hd_map)) => {
                         assert_eq!(mc_map.len(), hd_map.len(), "Maps have different lengths for kmer: {}", String::from_utf8_lossy(kmer));
                         for mc_link in mc_map.keys() {
-                            // if !hd_map.contains_key(mc_link) {
-                            //     println!("mc {} {}", String::from_utf8_lossy(kmer), mc_link);
-
-                            //     for hd_link in hd_map.keys() {
-                            //         println!("hd {} {}", String::from_utf8_lossy(kmer), hd_link);
-                            //     }
-
-                            //     println!("");
-                            // }
-
                             assert!(hd_map.contains_key(mc_link), "Link {} not in hd map for kmer: {}", mc_link, String::from_utf8_lossy(kmer));
                         }
                     }

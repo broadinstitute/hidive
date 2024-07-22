@@ -35,7 +35,7 @@ impl Link {
     }
 
     /// Return the number of junction choices in the link.
-    pub fn length(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.junctions.len()
     }
 
