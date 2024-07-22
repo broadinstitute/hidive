@@ -638,10 +638,10 @@ mod tests {
         let md5_hash = format!("{:x}", md5::compute(&copied_genome));
 
         let genome_path = test_dir.join(format!("test.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
-        let contigs_path = test_dir.join(format!("contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
         let links_path = test_dir.join(format!("links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links));
+        let contigs_path = test_dir.join(format!("contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
 
-        if !use_cache || !contigs_path.exists() || !genome_path.exists() || !links_path.exists() {
+        if !use_cache || !contigs_path.exists() || !links_path.exists() {
             let mut genome_file = File::create(genome_path).expect("Unable to create file");
 
             writeln!(genome_file, ">genome").expect("Unable to write to file");
@@ -877,26 +877,19 @@ mod tests {
         assert!(rc_genome == g.assemble(b"GGTGG".to_vec().reverse_complement().as_bytes()));
     }
 
-    // flank_length in (200..2000usize).prop_filter("Increment by 100", |v| v % 200 == 0),
-    // repeat_length in (3..18usize).prop_filter("Increment by 3", |v| v % 3 == 0),
-    // num_repeats in (2..3usize),
-    // k in (11..17usize).prop_filter("Must be odd", |v| v % 2 == 1)
-
     proptest! {
         #[test]
-        fn test_assemble_random_genomes_without_links(
-            flank_length in (44..45usize).prop_filter("Increment by 100", |v| v % 2 == 0),
-            repeat_length in (6..7usize).prop_filter("Increment by 3", |v| v % 3 == 0),
-            num_repeats in (2..3usize).prop_filter("Increment by 2", |v| v % 2 == 0),
-            k in (5..6usize).prop_filter("Must be odd", |v| v % 2 == 1)
+        fn test_assemble_random_genomes(
+            repeat_length in (3..18usize).prop_filter("Increment by 3", |v| v % 3 == 0),
+            num_repeats in (2..3usize),
+            k in (11..17usize).prop_filter("Must be odd", |v| v % 2 == 1)
         ) {
-            let build_links = true;
-            let random_genome = generate_genome_with_tandem_repeats(flank_length, repeat_length, num_repeats, 0);
+            let random_genome = generate_genome_with_tandem_repeats(500, repeat_length, num_repeats, 0);
 
-            let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()), build_links);
+            let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()), true);
             let hd_links = g.links.clone();
 
-            let (mc_contigs, mc_links) = assemble_with_mccortex(k, &random_genome, build_links, true);
+            let (mc_contigs, mc_links) = assemble_with_mccortex(k, &random_genome, true, true);
             let mc_links: BTreeMap<Vec<u8>, BTreeMap<Link, u16>> = mc_links.into_iter()
                 .map(|(k, v)| (k, v.into_iter().collect()))
                 .collect();
@@ -933,9 +926,7 @@ mod tests {
             for (seed, mc_contig) in mc_contigs {
                 let hd_contig = String::from_utf8(g.assemble(seed.as_bytes())).expect("Invalid UTF-8 sequence");
 
-                println!("{} mc={}", seed, mc_contig);
-                println!("{} hd={}", seed, hd_contig);
-                println!("");
+                assert_eq!(mc_contig, hd_contig);
             }
         }
     }
