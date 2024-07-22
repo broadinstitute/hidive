@@ -24,6 +24,7 @@ type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
 #[derive(Debug)]
 pub struct LdBG {
     pub name: String,
+    pub kmer_size: usize,
     pub kmers: KmerGraph,
     pub links: Links,
     pub junctions: HashMap<Vec<u8>, bool>,
@@ -42,7 +43,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_file(name: String, k: usize, seq_path: &PathBuf, build_links: bool) -> Self {
+    pub fn from_file(name: String, kmer_size: usize, seq_path: &PathBuf, build_links: bool) -> Self {
         let reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
@@ -51,17 +52,18 @@ impl LdBG {
             .map(|r| r.seq().as_bytes().to_vec())
             .collect();
 
-        let kmers = Self::build_graph(k, &fwd_seqs);
+        let kmers = Self::build_graph(kmer_size, &fwd_seqs);
 
         let junctions = Self::find_junctions(&kmers);
 
         let links = match build_links {
-            true => Self::build_links(k, &fwd_seqs, &kmers, &junctions),
+            true => Self::build_links(kmer_size, &fwd_seqs, &kmers, &junctions),
             false => Links::new()
         };
 
         LdBG {
             name,
+            kmer_size,
             kmers,
             links,
             junctions
@@ -92,6 +94,7 @@ impl LdBG {
 
         LdBG {
             name,
+            kmer_size: k,
             kmers,
             links,
             junctions
@@ -317,7 +320,7 @@ impl LdBG {
     ///
     /// A vector containing the canonical k-mer.
     #[inline(always)]
-    fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
         let rc_kmer = kmer.reverse_complement();
         if kmer < rc_kmer.as_bytes() {
             kmer.to_vec()
@@ -590,13 +593,11 @@ impl LdBG {
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
-        let k = self.kmers.keys().next().unwrap().len();
-
         assert!(
-            kmer.len() == k,
+            kmer.len() == self.kmer_size,
             "kmer length {} does not match expected length {}",
             kmer.len(),
-            k
+            self.kmer_size
         );
 
         self.assemble_forward(&mut contig, kmer.to_vec());
@@ -794,6 +795,7 @@ mod tests {
         genome
     }
 
+    /// Assemble using the reference implementation, McCortex.
     fn assemble_with_mccortex(k: usize, input_genome: &Vec<u8>, build_links: bool, use_cache: bool) -> (BTreeMap<String, String>, Links) {
         let current_dir = env::current_dir().unwrap();
         let test_dir = current_dir.join("tests/test_data");
@@ -871,6 +873,7 @@ mod tests {
         (contig_map, links)
     }
 
+    /// Parse the McCortex contigs file, grabbing both the assembly seed and assembled sequence.
     fn parse_mccortex_fasta(contigs_path: PathBuf) -> BTreeMap<String, String> {
         let contigs = bio::io::fasta::Reader::from_file(contigs_path).unwrap();
         let contig_map: BTreeMap<_, _> = contigs.records().into_iter()
@@ -895,6 +898,7 @@ mod tests {
         contig_map
     }
     
+    /// Parse the McCortex links file.
     fn parse_mccortex_ctp_file(links_path: PathBuf) -> Links {
         let mut links = Links::new();
     

@@ -32,9 +32,7 @@ minimap2 -ayYL --MD --eqx -x map-hifi -R '@RG\tID:ar\tSM:ar' HG00438.LR.$NAME.fa
 
 #./target/release/hidive build -r GCA_000001405.15_GRCh38_no_alt_analysis_set -o $NAME.gfa $NAME.fasta
 
-./target/release/hidive coassemble \
-	-o coassemble.fa \
-	HG00438.LR.$NAME.fasta
+./target/release/hidive coassemble -o coassemble.fa -s HG00438.SR.$NAME.fasta HG00438.LR.$NAME.fasta
 
 minimap2 -ayYL --MD --eqx -x map-hifi -R '@RG\tID:asm\tSM:asm' GCA_000001405.15_GRCh38_no_alt_analysis_set.fa coassemble.fa | \
 	samtools sort -O BAM -o coassemble.bam && \

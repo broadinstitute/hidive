@@ -120,6 +120,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value = "11")]
+        kmer_size: usize,
+
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(short, long, required = false, value_parser)]
         short_read_fasta_paths: Vec<PathBuf>,
@@ -174,10 +178,11 @@ fn main() {
         }
         Commands::Coassemble {
             output,
+            kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
         } => {
-            coassemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
+            coassemble::start(&output, kmer_size, &long_read_fasta_paths, &short_read_fasta_paths);
         }
     }
 
