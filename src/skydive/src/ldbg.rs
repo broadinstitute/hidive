@@ -234,7 +234,7 @@ impl LdBG {
                     // Populate link.
                     let mut link = Link::new(anchor_kmer == cn_anchor_kmer);
 
-                    let sub_range = (index..seq.len()-k+1).collect::<Vec<_>>();
+                    let sub_range = (index..seq.len()-k).collect::<Vec<_>>();
 
                     for j in sub_range {
                         let next_kmer = &seq[j..j+k];
