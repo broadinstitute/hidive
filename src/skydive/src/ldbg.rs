@@ -95,6 +95,14 @@ impl LdBG {
             false => Links::new()
         };
 
+        for (kmer, link_map) in &links {
+            println!("{:?}", String::from_utf8_lossy(kmer).to_string());
+            for (link, count) in link_map {
+                // println!("{} {} Link: {}", if link.is_forward() { "F" } else { "R" }, count, link);
+                println!("{} {}", link, count);
+            }
+        }
+
         LdBG {
             name,
             kmer_size,
@@ -288,12 +296,9 @@ impl LdBG {
     fn add_record_to_links(links: &mut Links, seq: &Vec<u8>, k: usize, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>) {
         let range = (0..seq.len()-k+1).collect::<Vec<_>>();
 
-        let mut seen = 0;
-
         // Iterate over k-mers to find junctions.
         for i in range {
             let fw_kmer = &seq[i..i+k];
-            let rc_kmer = fw_kmer.reverse_complement();
 
             if LdBG::has_junction(&graph, junctions, fw_kmer, true) {
                 if let Some((anchor_kmer_vec, index)) = Self::find_anchor_kmer(i, seq, k, graph, junctions, true) {
@@ -528,7 +533,7 @@ impl LdBG {
                     if r.incoming_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
                         links_in_scope.retain(|link| !link.is_empty());
-                        consensus_junction_choice
+                        complement(consensus_junction_choice)
                     } else {
                         return None;
                     }
@@ -606,7 +611,7 @@ impl LdBG {
                     if r.outgoing_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
                         links_in_scope.retain(|link| !link.is_empty());
-                        consensus_junction_choice
+                        complement(consensus_junction_choice)
                     } else {
                         return None;
                     }
@@ -1118,11 +1123,7 @@ mod tests {
             let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()), true);
             let hd_links = g.links.clone();
 
-<<<<<<< HEAD
             let (mc_contigs, mc_links) = assemble_with_mccortex(k, &random_genome, true, true);
-=======
-            let (mc_contigs, mc_links) = assemble_with_mccortex(k, &random_genome, build_links, true);
->>>>>>> f0f41bc (Many bug fixes to link construction)
             let mc_links: BTreeMap<Vec<u8>, BTreeMap<Link, u16>> = mc_links.into_iter()
                 .map(|(k, v)| (k, v.into_iter().collect()))
                 .collect();
@@ -1135,7 +1136,6 @@ mod tests {
 
                 match (mc_links_map, hd_links_map) {
                     (Some(mc_map), Some(hd_map)) => {
-<<<<<<< HEAD
                         assert_eq!(mc_map.len(), hd_map.len(), "Maps have different lengths for kmer: {}", String::from_utf8_lossy(kmer));
                         for mc_link in mc_map.keys() {
                             assert!(hd_map.contains_key(mc_link), "Link {} not in hd map for kmer: {}", mc_link, String::from_utf8_lossy(kmer));
@@ -1147,70 +1147,21 @@ mod tests {
                         }
                         panic!("There are links unique to reference implementation.");
                     }
-=======
-                        // for (link, count) in mc_map {
-                        //     println!("mc: {} {} {}", String::from_utf8_lossy(kmer), link, count);
-                        // }
-                        // for (link, count) in hd_map {
-                        //     println!("hd: {} {} {}", String::from_utf8_lossy(kmer), link, count);
-                        // }
-                    }
-                    (Some(mc_map), None) => {
-                        for (link, count) in mc_map {
-                            println!("mc only: {} {} {}", String::from_utf8_lossy(kmer), link, count);
-                        }
-                    }
->>>>>>> f0f41bc (Many bug fixes to link construction)
                     (None, Some(hd_map)) => {
                         for (link, count) in hd_map {
                             println!("hd only: {} {} {}", String::from_utf8_lossy(kmer), link, count);
                         }
-<<<<<<< HEAD
                         panic!("There are links unique to skydive implementation.");
-=======
->>>>>>> f0f41bc (Many bug fixes to link construction)
                     }
                     (None, None) => {}
                 }
             }
-<<<<<<< HEAD
 
             for (seed, mc_contig) in mc_contigs {
                 let hd_contig = String::from_utf8(g.assemble(seed.as_bytes())).expect("Invalid UTF-8 sequence");
 
                 assert_eq!(mc_contig, hd_contig);
-=======
-
-            println!("");
-
-            println!("{}", String::from_utf8_lossy(&random_genome));
-            println!("{} {} {} {} {:?}", flank_length, repeat_length, num_repeats, k, mc_contigs);
-
-            for (seed, mc_contig) in mc_contigs {
-                let hd_contig = String::from_utf8(g.assemble(seed.as_bytes())).expect("Invalid UTF-8 sequence");
-
-                println!("{} mc={}", seed, mc_contig);
-                println!("{} hd={}", seed, hd_contig);
->>>>>>> f0f41bc (Many bug fixes to link construction)
             }
-
-            println!("--------------\n");
-
-            // println!("     genome = '{}'", String::from_utf8_lossy(&random_genome));
-
-            // for (seed, mc_contig) in mc_contigs {
-            //     let hd_contig = String::from_utf8(g.assemble(seed.as_bytes())).expect("Invalid UTF-8 sequence");
-            //     assert!(
-            //         hd_contig == mc_contig,
-            //         "Assertion failed: {}\n       seed = '{}'\n     genome = '{}'\n  hd_contig = '{}'\n  mc_contig = '{}'\n    n_kmers = '{}'",
-            //         format!("{:x}", md5::compute(&random_genome)),
-            //         seed,
-            //         String::from_utf8_lossy(&random_genome),
-            //         hd_contig,
-            //         mc_contig,
-            //         g.kmers.len()
-            //     );
-            // }
         }
     }
 }
