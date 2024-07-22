@@ -1046,8 +1046,8 @@ mod tests {
         #[test]
         fn test_assemble_random_genomes(
             repeat_length in (3..18usize).prop_filter("Increment by 3", |v| v % 3 == 0),
-            num_repeats in (2..3usize),
-            k in (11..17usize).prop_filter("Must be odd", |v| v % 2 == 1)
+            num_repeats in (2..=3usize),
+            k in (11..=17usize).prop_filter("Must be odd", |v| v % 2 == 1)
         ) {
             let random_genome = generate_genome_with_tandem_repeats(500, repeat_length, num_repeats, 0);
 
