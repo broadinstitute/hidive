@@ -22,6 +22,11 @@ pub fn start(
         skydive::elog!("Processing {}...", basename);
         let l = LdBG::from_file(basename, 11, &fasta_path, true);
 
+        let unitigs = l.assemble_all();
+        for unitig in unitigs {
+            println!("{}", String::from_utf8_lossy(&unitig));
+        }
+
         g.push(l);
     }
 }
