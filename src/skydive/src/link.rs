@@ -21,6 +21,14 @@ impl Link {
         }
     }
 
+    /// Create a link from a sequence of junction choices.
+    pub fn from_junctions(is_forward: bool, seq: &[u8]) -> Self {
+        Link {
+            is_forward: is_forward,
+            junctions: VecDeque::from(seq.to_vec())
+        }
+    }
+
     /// Return orientation of the link.
     pub fn is_forward(&self) -> bool {
         self.is_forward
