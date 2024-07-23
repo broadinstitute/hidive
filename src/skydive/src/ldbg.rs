@@ -320,7 +320,7 @@ impl LdBG {
     ///
     /// A vector containing the canonical k-mer.
     #[inline(always)]
-    fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
         let rc_kmer = kmer.reverse_complement();
         if kmer < rc_kmer.as_bytes() {
             kmer.to_vec()
