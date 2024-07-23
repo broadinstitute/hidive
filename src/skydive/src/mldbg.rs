@@ -77,6 +77,16 @@ impl MLdBG {
         kmer_union
     }
 
+    /// Returns an iterator over the LdBGs in the MLdBG.
+    pub fn iter(&self) -> std::slice::Iter<LdBG> {
+        self.ldbgs.iter()
+    }
+
+    /// Returns a mutable iterator over the LdBGs in the MLdBG.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<LdBG> {
+        self.ldbgs.iter_mut()
+    }
+
     /// Clear all LdBGs from the MLdBG.
     pub fn clear(&mut self) {
         self.ldbgs.clear();

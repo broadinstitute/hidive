@@ -140,6 +140,8 @@ fn main() {
     skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
     skydive::elog!("{:?}", args);
 
+    let start_time = std::time::Instant::now();
+
     match args.command {
         Commands::Fetch {
             output,
@@ -186,5 +188,8 @@ fn main() {
         }
     }
 
-    skydive::elog!("Complete.");
+    let end_time = std::time::Instant::now();
+    let elapsed_time = end_time.duration_since(start_time);
+
+    skydive::elog!("Complete. Elapsed time: {:.2?} seconds.", elapsed_time.as_secs_f64());
 }

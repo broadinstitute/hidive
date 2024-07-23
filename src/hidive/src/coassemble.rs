@@ -42,4 +42,10 @@ pub fn start(
             num_contained > 3
         });
     }
+
+    // Print stats.
+    println!("Num colors: {}", g.len());
+    for l in g.iter() {
+        println!(" -- {}: {}", l.name(), l.kmers.len());
+    }
 }

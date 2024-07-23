@@ -320,7 +320,7 @@ impl LdBG {
     ///
     /// A vector containing the canonical k-mer.
     #[inline(always)]
-    pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
         let rc_kmer = kmer.reverse_complement();
         if kmer < rc_kmer.as_bytes() {
             kmer.to_vec()
@@ -727,30 +727,6 @@ mod tests {
         "TTTCGATGCGATGCGATGCCACG".as_bytes().to_vec()
     }
 
-    /// Generate a random genome sequence.
-    ///
-    /// # Arguments
-    ///
-    /// * `length` - The length of the genome.
-    /// * `seed` - The seed for the random number generator.
-    ///
-    /// # Returns
-    ///
-    /// A vector containing the random genome sequence.
-    fn generate_random_genome(length: usize, seed: u64) -> Vec<u8> {
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        let alphabet = b"ACGT";
-
-        let mut genome = Vec::with_capacity(length);
-
-        for _ in 0..length {
-            let idx = rng.gen_range(0..4);
-            genome.push(alphabet[idx]);
-        }
-
-        genome
-    }
-
     /// Generate a genome sequence with tandem repeats.
     ///
     /// # Arguments
@@ -961,6 +937,22 @@ mod tests {
         }
 
         links
+    }
+
+    #[test]
+    fn test_canonicalize_kmer() {
+        let kmer1 = b"CGTA";
+        let kmer2 = b"TACG";
+        let kmer3 = b"AAAA";
+        let kmer4 = b"TTTT";
+
+        // Test canonical k-mer for kmer1 and kmer2
+        assert_eq!(LdBG::canonicalize_kmer(kmer1), b"CGTA".to_vec());
+        assert_eq!(LdBG::canonicalize_kmer(kmer2), b"CGTA".to_vec());
+
+        // Test canonical k-mer for kmer3 and kmer4
+        assert_eq!(LdBG::canonicalize_kmer(kmer3), b"AAAA".to_vec());
+        assert_eq!(LdBG::canonicalize_kmer(kmer4), b"AAAA".to_vec());
     }
     
     #[test]
