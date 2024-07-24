@@ -73,56 +73,34 @@ pub fn find_sequences_between_sanchor_eanchor(
 }
 
 pub fn map_reference_unique_kmers_to_seq(
-    unique_kmerlist: Vec<String>,
-    hla_seq: &HashMap<String, String>,
-    k: usize,
-) -> (
-    Mutex<HashMap<String, HashSet<String>>>,
-    Mutex<HashMap<String, HashMap<String, Vec<usize>>>>,
-) {
-    let sample_dict: Mutex<HashMap<String, HashSet<String>>> = Mutex::new(HashMap::new());
-    let position_dict: Mutex<HashMap<String, HashMap<String, Vec<usize>>>> =
-        Mutex::new(HashMap::new());
+    unique_kmerlist: Vec<String>, 
+    hla_seq: &HashMap<String, String>, 
+    k: usize
+) -> (HashMap<String, HashSet<String>>, HashMap<String, HashMap<String, Vec<usize>>>) {
+    let mut sample_dict: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut position_dict: HashMap<String, HashMap<String, Vec<usize>>> = HashMap::new();
 
-    unique_kmerlist.iter().for_each(|kmer| {
-        let kmer_upper = kmer.to_uppercase();
-        let rev = reverse_complement(&kmer_upper);
-        {
-            let mut sample_dict = sample_dict.lock().unwrap();
-            sample_dict.entry(kmer_upper.clone()).or_default();
-            sample_dict.entry(rev.clone()).or_default();
-        }
-        {
-            let mut position_dict = position_dict.lock().unwrap();
-            position_dict.entry(kmer_upper.clone()).or_default();
-            position_dict.entry(rev.clone()).or_default();
-        }
-    });
+    for kmer in unique_kmerlist.iter() {
+        let kmer_rev = reverse_complement(kmer);
+        sample_dict.entry(kmer.clone()).or_default();
+        sample_dict.entry(kmer_rev.clone()).or_default();
+        position_dict.entry(kmer.clone()).or_default();
+        position_dict.entry(kmer_rev.clone()).or_default();
+    }
 
-    hla_seq.par_iter().for_each(|(readname, seq)| {
+    for (read, seq) in hla_seq.iter() {
         let seq_len = seq.len();
-
         if seq_len >= k {
             for i in 0..=seq_len - k {
-                let kmer: String = seq[i..i + k].to_uppercase();
-                // Direct slice instead of skip and take
-                {
-                    let mut sample_dict = sample_dict.lock().unwrap();
-                    if let Some(samples) = sample_dict.get_mut(&kmer) {
-                        samples.insert(readname.split('|').last().unwrap_or_default().to_string());
-                    }
-                }
-                {
-                    let mut position_dict = position_dict.lock().unwrap();
-                    if let Some(positions) = position_dict.get_mut(&kmer) {
-                        positions.entry(readname.clone()).or_default().push(i);
-                    }
+                let kmer: String = seq[i..i + k].to_string();
+                if sample_dict.contains_key(&kmer) {
+                    let sample = read.split('|').last().unwrap_or_default().to_string();
+                    sample_dict.entry(kmer.clone()).or_default().insert(sample);
+                    position_dict.entry(kmer.clone()).or_default().entry(read.clone()).or_default().push(i);
                 }
             }
-        } else {
-            println!("Panic! Read sequences are too short!");
         }
-    });
+    }
 
     (sample_dict, position_dict)
 }
@@ -202,31 +180,17 @@ pub fn get_final_anchor(
     anchornames.sort();
 
     let mut anchor_unadjacent_list = Vec::new();
-    let mut index = 0;
+    let mut last_position = 0;
 
-    while index < anchornames.len() - 1 {
-        let sanchor = anchornames[index];
-        let mut danchor = sanchor;
-        let mut next_index = index;
-        for (i, next_anchor) in anchornames[index + 1..].iter().enumerate() {
-            if anchor_info.get(*next_anchor).unwrap().pos
-                > anchor_info.get(sanchor).unwrap().pos + k + 1
-            {
-                break;
-            }
-            next_index = index + i + 1;
-            danchor = next_anchor;
+    for anchor in anchornames{
+        let mut position = anchor_info[anchor].pos;
+        if position > last_position + k{
+            anchor_unadjacent_list.push(anchor.to_string());
+            last_position = position;
         }
-        index = next_index + 1;
 
-        // index = anchornames.iter().enumerate().find(|&(_, ref e)| *e == &danchor).map(|(index, _)| index).unwrap_or(0);
-        // println!("{}, {}",index, danchor);
-        anchor_unadjacent_list.push(sanchor.clone());
-        anchor_unadjacent_list.push(danchor.clone());
     }
 
-    anchor_unadjacent_list.sort();
-    anchor_unadjacent_list.dedup();
 
     for anchor_name in &anchor_unadjacent_list {
         if let Some(anchor) = anchor_info.get(anchor_name) {
@@ -450,14 +414,17 @@ pub fn create_edge_file(
 pub fn write_gfa(
     final_anchor: &HashMap<String, AnchorInfo>,
     edge_info: &HashMap<String, EdgeInfo>,
-    output_filename: &PathBuf,
-) -> Result<(), Box<dyn Error>> {
+    output_filename: &str,
+) -> std::result::Result<(), Box<dyn Error>> {
     let mut file = File::create(output_filename)?;
 
     writeln!(file, "H\tVN:Z:1.0")?;
 
     let mut anchor_output = Vec::new();
-    for (anchor, info) in final_anchor.iter() {
+    let mut keys: Vec<_> = final_anchor.keys().collect();
+    keys.sort();
+    for anchor in keys.iter() {
+        let info = &final_anchor[*anchor];
         let seq = &info.seq;
         let mut anchor_info_clone = HashMap::new();
         anchor_info_clone.insert("pos".to_string(), info.pos);
@@ -471,7 +438,10 @@ pub fn write_gfa(
     let mut edge_output = Vec::new();
     let mut link_output = Vec::new();
 
-    for (edge, edge_data) in edge_info {
+    let mut edge_keys: Vec<_> = edge_info.keys().collect();
+    edge_keys.sort();
+    for edge in edge_keys {
+        let edge_data = &edge_info[edge];
         let seq = &edge_data.seq;
         let src = &edge_data.src;
         let dst = &edge_data.dst;
@@ -510,15 +480,12 @@ pub fn write_gfa(
     for s in anchor_output {
         writeln!(file, "{}", s)?;
     }
-
     for s in edge_output {
         writeln!(file, "{}", s)?;
     }
-
     for l in link_output {
         writeln!(file, "{}", l)?;
     }
-
     Ok(())
 }
 
@@ -699,7 +666,7 @@ pub struct GetSeriesParallelGraph {
 impl GetSeriesParallelGraph {
     pub fn new(graph: &GraphicalGenome) -> GraphicalGenome {
         let nodelist = Self::series_parallel_graph_nodelist(graph);
-        println!("{:?}", nodelist);
+        // println!("{:?}", nodelist);
         // let (anchor, edges, outgoing, incoming) = Self::series_parallel_graph(&nodelist, graph);
         let (anchor, edges, outgoing, incoming) = Self::series_parallel_graph(&nodelist, graph);
         GraphicalGenome {
@@ -828,32 +795,46 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
     let mut file = File::create(filename)?;
 
     writeln!(file, "H\tVN:Z:1.0")?;
-
-    for (anchor, data) in &graph.anchor {
+    
+    let mut keys: Vec<_> = graph.anchor.keys().collect();
+    keys.sort();
+    for anchor in keys.iter() {
+        let data = &graph.anchor[*anchor];
         let seq = data["seq"].as_str().unwrap_or_default();
         let mut data_clone = data.clone();
         data_clone.as_object_mut().unwrap().remove("seq");
         let json_string = serde_json::to_string(&data_clone).unwrap_or_else(|_| "{}".to_string());
         writeln!(file, "S\t{}\t{}\tPG:J:{}", anchor, seq, json_string)?;
     }
+    let mut edge_output = Vec::new();
+    let mut link_output = Vec::new();
 
-    for (edge, edge_data) in &graph.edges {
+    let mut edge_keys: Vec<_> = graph.edges.keys().collect();
+    edge_keys.sort();
+    for edge in edge_keys.iter() {
+        let edge_data = &graph.edges[*edge];
         let seq = edge_data["seq"].as_str().unwrap_or_default();
-        let src = graph.incoming[edge][0].clone();
-        let dst = graph.outgoing[edge][0].clone();
+        let src = graph.incoming[*edge][0].clone();
+        let dst = graph.outgoing[*edge][0].clone();
         let mut edge_data_clone = edge_data.clone();
         edge_data_clone.as_object_mut().unwrap().remove("seq");
         let json_string = serde_json::to_string(&edge_data_clone).unwrap_or_else(|_| "{}".to_string());
-        if edge_data_clone.get("reads").is_some() {
-            let read_count = edge_data_clone["reads"].as_array().unwrap().len();
-            writeln!(file, "S\t{}\t{}\tPG:J:{}\tRC:i:{}", edge, seq, json_string, read_count)?;
+        let formatted_string = if edge_data.get("reads").and_then(|r| r.as_array()).map_or(false, |arr| !arr.is_empty()) {
+            format!("S\t{}\t{}\tPG:J:{}\tRC:i:{}", edge, seq, json_string, edge_data.get("reads").and_then(|r| r.as_array()).map_or(0, |arr| arr.len()))
         } else {
-            writeln!(file, "S\t{}\t{}", edge, seq)?;
-        }
-        writeln!(file, "L\t{}\t+\t{}\t+\t0M", src, edge)?;
-        writeln!(file, "L\t{}\t+\t{}\t+\t0M", edge, dst)?;
-    }
+            format!("S\t{}\t{}", edge, seq)
+        };
+        edge_output.push(formatted_string);
 
+        link_output.push(format!("L\t{}\t+\t{}\t+\t0M", src, edge));
+        link_output.push(format!("L\t{}\t+\t{}\t+\t0M", edge, dst));
+    }
+    for s in edge_output {
+        writeln!(file, "{}", s)?;
+    }
+    for l in link_output {
+        writeln!(file, "{}", l)?;
+    }
     Ok(())
 }
 
@@ -898,12 +879,12 @@ pub fn start(
 
     // Compute anchors.
     let anchorlist = get_anchor_information(
-        &sample_dict.lock().unwrap(),
+        &sample_dict,
         &hla_samples,
-        &position_dict.lock().unwrap(),
+        &position_dict,
         &stem,
     );
-    let anchors = get_anchors(&anchorlist, &position_dict.lock().unwrap(), k, &stem);
+    let anchors = get_anchors(&anchorlist, &position_dict, k, &stem);
 
     let final_anchor = get_final_anchor(&anchors, k);
     let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
@@ -917,14 +898,16 @@ pub fn start(
     let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
 
     // Write final graph to disk.
-    write_gfa(&dereferenced_final_anchor, &filtered_edges, output);
+    write_gfa(&dereferenced_final_anchor, &filtered_edges, output.to_str().unwrap());
 
     let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
     // println!("{:?}", graph.anchor)
 
     let mut sp_graph = GetSeriesParallelGraph::new(&graph);
-    let outputfilename = output.join(".sp.gfa");
-    let outputfilename_str = outputfilename.to_str().expect("Failed to convert path to string");
-    write_graph_from_graph(outputfilename_str, &mut sp_graph);
+    let outputfilename_str = output.with_extension("sp.gfa");
+    // println!("{:?}", outputfilename_str);
+    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);    
+    println!("{:?}", outputfilename_str);
+    // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
 
 }
