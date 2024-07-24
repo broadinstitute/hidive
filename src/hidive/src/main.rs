@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 mod assemble;
 mod build;
+mod cluster;
 mod coassemble;
 mod fetch;
 mod impute;
@@ -20,7 +21,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Stream selected loci from long-read WGS BAM files stored locally or in Google Cloud Storage.
+    /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
         /// Output path for multi-sample BAM file with reads spanning locus of interest.
@@ -34,6 +35,22 @@ enum Commands {
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
+    },
+
+    /// Cluster sequences based on k-mer presence/absence.
+    #[clap(arg_required_else_help = true)]
+    Cluster {
+        /// Output path for clustered sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value = "11")]
+        kmer_size: usize,
+
+        /// Multi-sample FASTA file with reads spanning locus of interest.
+        #[clap(required = true, value_parser)]
+        fasta_path: PathBuf,
     },
 
     /// Trim reads to a specific window around locus.
@@ -69,7 +86,7 @@ enum Commands {
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
-        fasta_path: PathBuf
+        fasta_path: PathBuf,
     },
 
     /// Cluster edge matrix and impute missing edges.
@@ -84,7 +101,7 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Assemble target locus from long-read data in series-parallel graph.
+    /// Assemble target locus from long-read data in anchor-based series-parallel graph.
     #[clap(arg_required_else_help = true)]
     Assemble {
         /// Output path for assembled long-read sequences.
@@ -94,22 +111,26 @@ enum Commands {
         /// Series-parallel graph.
         #[clap(required = true, value_parser)]
         graph: PathBuf,
+
+        ///K nearest _neighbor
+        #[clap(required = true, value_parser, default_value_t = 3)]
+        k_nearest_neighbor: usize
     },
 
-    /// Co-assemble target locus from short-read data using the series-parallel graph to assist.
+    /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
         /// Output path for assembled short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Series-parallel graph.
-        #[clap(required = true, value_parser)]
-        graph: PathBuf,
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, required = false, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
 
-        /// Single-sample WGS CRAM.
+        /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        bam_or_cram_paths: Vec<PathBuf>,
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 }
 
@@ -118,25 +139,49 @@ fn main() {
 
     skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
     skydive::elog!("{:?}", args);
-    
+
     match args.command {
-        Commands::Fetch { output, loci, seq_paths, } => {
+        Commands::Fetch {
+            output,
+            loci,
+            seq_paths,
+        } => {
             fetch::start(&output, &loci, &seq_paths);
         }
-        Commands::Trim { output, loci, bam_path, } => {
+        Commands::Cluster {
+            output,
+            kmer_size,
+            fasta_path,
+        } => {
+            cluster::start(&output, kmer_size, &fasta_path);
+        }
+        Commands::Trim {
+            output,
+            loci,
+            bam_path,
+        } => {
             trim::start(&output, &loci, &bam_path);
         }
-        Commands::Build { output, kmer_size, fasta_path , reference_name } => {
+        Commands::Build {
+            output,
+            kmer_size,
+            fasta_path,
+            reference_name,
+        } => {
             build::start(&output, kmer_size, &fasta_path, reference_name);
         }
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph } => {
-            assemble::start(&output, &graph);
+        Commands::Assemble { output, graph, k_nearest_neighbor } => {
+            assemble::start(&output, &graph, k_nearest_neighbor);
         }
-        Commands::Coassemble { output, graph, bam_or_cram_paths, } => {
-            coassemble::start(&output, &graph, &bam_or_cram_paths);
+        Commands::Coassemble {
+            output,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            coassemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
     }
 

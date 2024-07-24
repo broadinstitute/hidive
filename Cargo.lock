@@ -124,15 +124,24 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.71"
+version = "1.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
+checksum = "62e1f47f7dc0422027a4e370dd4548d4d66b26782e513e98dca1e689e058a80e"
 
 [[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0e60b75072ecd4168020818c0107f2857bb6c4e64252d8d3983f6263b40a5c3"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "approx"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
 dependencies = [
  "num-traits",
 ]
@@ -1602,7 +1611,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hidive"
-version = "0.1.21"
+version = "0.1.34"
 dependencies = [
  "anyhow",
  "bio",
@@ -1611,7 +1620,8 @@ dependencies = [
  "env_logger",
  "eyre",
  "flate2",
- "log",
+ "linfa",
+ "ndarray",
  "needletail",
  "noodles",
  "parquet",
@@ -2055,6 +2065,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfae20f6b19ad527b550c223fddc3077a547fc70cda94b9b566575423fd303ee"
 
 [[package]]
+name = "linfa"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8fdc219ba54965c5574c88b43053790765f6f4e3bf6a6bf1db48ba9c1c11806"
+dependencies = [
+ "anyhow",
+ "approx 0.4.0",
+ "ndarray",
+ "num-traits",
+ "rand",
+ "thiserror",
+]
+
+[[package]]
 name = "link-cplusplus"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2261,6 +2285,7 @@ version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
 dependencies = [
+ "approx 0.4.0",
  "matrixmultiply",
  "num-complex 0.4.2",
  "num-integer",
@@ -3391,7 +3416,7 @@ dependencies = [
 
 [[package]]
 name = "skydive"
-version = "0.1.21"
+version = "0.1.34"
 dependencies = [
  "anyhow",
  "backoff",
@@ -3402,6 +3427,7 @@ dependencies = [
  "cloud-storage",
  "color-eyre",
  "crossbeam-utils",
+ "flate2",
  "fs_extra",
  "gag",
  "glob",
