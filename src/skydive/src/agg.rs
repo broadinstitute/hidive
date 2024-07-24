@@ -1,6 +1,13 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use serde_json::Value;
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::fs::File;
+use flate2::read::GzDecoder;
 
+#[derive(Debug)]
 pub struct GraphicalGenome {
     pub anchor: HashMap<String, Value>,
     pub edges: HashMap<String, Value>,
@@ -59,5 +66,53 @@ impl GraphicalGenome {
             outgoing: outgoing,
             incoming: incoming,
         })
+    }
+    // Method to extract a single sample graph
+    pub fn extract_single_sample_graph(
+        &self,
+        df_single_sample: &HashMap<String, HashMap<String, usize>>, // Assuming df_single_sample is a HashMap with anchor as key and another HashMap of readset and edge index as value
+        sample: &str,
+    ) -> (HashMap<String, Value>, HashMap<String, Value>, HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+        let mut new_edges = HashMap::new();
+        let mut new_incoming = HashMap::new();
+        let mut new_outgoing = HashMap::new();
+
+        for (anchor, readsets) in df_single_sample {
+            if let Some(outgoinglist) = self.outgoing.get(anchor) {
+                for (read, &edge_index) in readsets {
+                    if let Some(edgename) = outgoinglist.get(edge_index) {
+                        let default_edge_data = serde_json::json!({}); // Create a longer-lived value
+                        let edge_data = self.edges.get(edgename).unwrap_or(&default_edge_data);
+                        let mut edge_value = edge_data.clone();
+
+                        // Update sequence data
+                        edge_value["seq"] = edge_data["seq"].clone();
+
+                        // Update reads and strain
+                        let edge_object = edge_value.as_object_mut().unwrap();
+                        {
+                            let reads = edge_object.entry("reads").or_insert_with(|| serde_json::json!([]));
+                            reads.as_array_mut().unwrap().push(serde_json::json!(read));
+                        }
+                        {
+                            let strain = edge_object.entry("strain").or_insert_with(|| serde_json::json!(HashSet::<String>::new()));
+                            strain.as_array_mut().unwrap().push(serde_json::json!(sample));
+                        }
+                        
+                        new_edges.insert(edgename.to_string(), edge_value);
+
+                        // Update incoming and outgoing
+                        if let Some(dst) = outgoinglist.get(0) { // Assuming the first element is the destination
+                            new_incoming.entry(edgename.to_string()).or_insert_with(Vec::new).push(anchor.to_string());
+                            new_incoming.entry(dst.to_string()).or_insert_with(Vec::new).push(edgename.to_string());
+                            new_outgoing.entry(anchor.to_string()).or_insert_with(Vec::new).push(edgename.to_string());
+                            new_outgoing.entry(edgename.to_string()).or_insert_with(Vec::new).push(dst.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        (self.anchor.clone(), new_edges, new_outgoing, new_incoming)
     }
 }
