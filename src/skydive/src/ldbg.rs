@@ -14,6 +14,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use indicatif::ParallelProgressIterator;
 
+use crate::edges::Edges;
 use crate::record::Record;
 use crate::link::Link;
 
@@ -36,7 +37,7 @@ impl LdBG {
     /// # Arguments
     ///
     /// * `name` - A string representing the name of the graph.
-    /// * `k` - The k-mer size.
+    /// * `kmer_size` - The k-mer size.
     /// * `seq_path` - A path to the sequence file.
     /// * `build_links` - A boolean indicating whether to build links.
     ///
@@ -52,7 +53,8 @@ impl LdBG {
             .map(|r| r.seq().as_bytes().to_vec())
             .collect();
 
-        let kmers = Self::build_graph(kmer_size, &fwd_seqs);
+        let raw_kmers = Self::build_graph(kmer_size, &fwd_seqs);
+        let kmers = Self::clean_graph(&raw_kmers);
 
         let junctions = Self::find_junctions(&kmers);
 
@@ -75,26 +77,27 @@ impl LdBG {
     /// # Arguments
     ///
     /// * `name` - A string representing the name of the graph.
-    /// * `k` - The k-mer size.
+    /// * `kmer_size` - The k-mer size.
     /// * `fwd_seqs` - A vector of forward sequences.
     /// * `build_links` - A boolean indicating whether to build links.
     ///
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_sequences(name: String, k: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
-        let kmers = Self::build_graph(k, fwd_seqs);
+    pub fn from_sequences(name: String, kmer_size: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
+        let raw_kmers = Self::build_graph(kmer_size, fwd_seqs);
+        let kmers = Self::clean_graph(&raw_kmers);
 
         let junctions = Self::find_junctions(&kmers);
 
         let links = match build_links {
-            true => Self::build_links(k, fwd_seqs, &kmers, &junctions),
+            true => Self::build_links(kmer_size, fwd_seqs, &kmers, &junctions),
             false => Links::new()
         };
 
         LdBG {
             name,
-            kmer_size: k,
+            kmer_size,
             kmers,
             links,
             junctions
@@ -174,6 +177,68 @@ impl LdBG {
         }
 
         graph
+    }
+
+    fn get_cleaning_threshold(graph: &HashMap<Vec<u8>, Record>) -> u16 {
+        let mut coverages = Vec::new();
+
+        for (_, record) in graph {
+            if record.coverage() > 0 {
+                coverages.push(record.coverage() as u32);
+            }
+        }
+
+        let sum: u32 = coverages.iter().sum();
+        let mean = sum as f64 / coverages.len() as f64;
+
+        let variance: f64 = coverages.iter().map(|&x| {
+            let diff = x as f64 - mean;
+            diff * diff
+        }).sum::<f64>() / coverages.len() as f64;
+
+        let std_dev = variance.sqrt();
+
+        let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
+
+        cleaning_threshold
+    }
+
+    fn clean_graph(graph: &KmerGraph) -> KmerGraph {
+        let threshold = Self::get_cleaning_threshold(graph);
+
+        let mut cleaned_graph = KmerGraph::new();
+
+        for (kmer, record) in graph {
+            if record.coverage() > threshold {
+                cleaned_graph.insert(kmer.clone(), record.clone());
+            }
+        }
+
+        for (cn_kmer, record) in graph {
+            if cleaned_graph.contains_key(cn_kmer) {
+                let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
+
+                for e in record.incoming_edges() {
+                    let prev_kmer = std::iter::once(e).chain(cn_kmer[0..cn_kmer.len()-1].iter().cloned()).collect::<Vec<u8>>();
+
+                    if cleaned_graph.contains_key(&LdBG::canonicalize_kmer(&prev_kmer)) {
+                        new_record.set_incoming_edge(e);
+                    }
+                }
+
+                for e in record.outgoing_edges() {
+                    let next_kmer = cn_kmer[1..].iter().cloned().chain(std::iter::once(e)).collect::<Vec<u8>>();
+
+                    if cleaned_graph.contains_key(&LdBG::canonicalize_kmer(&next_kmer)) {
+                        new_record.set_outgoing_edge(e);
+                    }
+                }
+
+                cleaned_graph.insert(cn_kmer.clone(), new_record);
+            }
+        }
+
+        cleaned_graph
     }
 
     /// Find an anchor k-mer in a sequence.

@@ -77,6 +77,11 @@ impl MLdBG {
         kmer_union
     }
 
+    /// Get a reference to the LdBG at a specific index.
+    pub fn get(&self, index: usize) -> Option<&LdBG> {
+        self.ldbgs.get(index)
+    }
+
     /// Returns an iterator over the LdBGs in the MLdBG.
     pub fn iter(&self) -> std::slice::Iter<LdBG> {
         self.ldbgs.iter()
@@ -128,6 +133,4 @@ impl MLdBG {
             None
         }
     }
-
-
 }

@@ -29,6 +29,16 @@ pub fn start(
         g.append_from_file(basename, &fasta_path);
     }
 
+    // Print contigs.
+    let l = g.get(0).unwrap();
+    let contigs = l.assemble_all();
+    let output_file = File::create(output).unwrap();
+    let mut writer = BufWriter::new(output_file);
+
+    for (i, contig) in contigs.iter().enumerate() {
+        writeln!(writer, ">unitig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+    }
+
     // Construct a graph from the short read data, filtered for k-mer overlap with the existing graph, and add it to g as a separate color.
     for short_read_seq_url in short_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(&short_read_seq_url, &[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
@@ -39,7 +49,8 @@ pub fn start(
             let num_contained = r.seq().windows(kmer_size)
                 .filter(|kmer| kmer_union.contains(&skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
                 .count();
-            num_contained > 3
+
+            num_contained > 3 && num_contained < r.seq().len() - kmer_size
         });
     }
 
