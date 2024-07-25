@@ -11,7 +11,7 @@ anyhow = "1.0"
 backoff = "0.4.0"
 bio = "*"
 bio-types = "1.0.1"
-bitflags = "*"
+bitflags = "=2.5.0"
 chrono = "*"
 cloud-storage = { version = "*", features = ["sync"] }
 color-eyre = {version = "*"}
