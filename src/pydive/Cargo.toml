@@ -1,6 +1,6 @@
 [package]
 name = "pydive"
-version = "0.1.45"
+version = "0.1.46"
 edition = "2021"
 resolver = "2"
 
