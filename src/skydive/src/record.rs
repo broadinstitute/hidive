@@ -13,7 +13,7 @@ impl Record {
     /// Create an empty de Bruijn graph record.
     pub fn new(coverage: u16, edges: Option<Edges>) -> Self {
         Record {
-            coverage: coverage,
+            coverage,
             edges: edges.unwrap_or(Edges::empty()),
         }
     }

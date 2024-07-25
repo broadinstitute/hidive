@@ -7,15 +7,17 @@ use crate::ldbg::LdBG;
 pub struct MLdBG {
     pub ldbgs: Vec<LdBG>,
     pub kmer_size: usize,
+    pub clean: bool,
     pub build_links: bool
 }
 
 impl MLdBG {
     /// Create an empty multi-color LdBG.
-    pub fn new(kmer_size: usize, build_links: bool) -> Self {
+    pub fn new(kmer_size: usize, clean: bool, build_links: bool) -> Self {
         MLdBG {
             ldbgs: Vec::new(),
             kmer_size,
+            clean,
             build_links
         }
     }
@@ -41,7 +43,7 @@ impl MLdBG {
 
     /// Append an LdBG to the end of the MLdBG, created anew from a fasta file.
     pub fn append_from_file(&mut self, name: String, seq_path: &PathBuf) {
-        let l = LdBG::from_file(name, self.kmer_size, seq_path, self.build_links);
+        let l = LdBG::from_file(name, self.kmer_size, seq_path, self.clean, self.build_links);
         self.ldbgs.push(l);
     }
 
@@ -60,8 +62,26 @@ impl MLdBG {
             .map(|r| r.seq().to_vec())
             .collect();
 
-        let l = LdBG::from_sequences(name, self.kmer_size, &filtered_reads, self.build_links);
+        let l = LdBG::from_sequences(name, self.kmer_size, &filtered_reads, self.clean, self.build_links);
         self.ldbgs.push(l);
+    }
+
+    pub fn filter_reads<F>(&mut self, seq_path: &PathBuf, filter: F) -> Vec<Vec<u8>>
+    where
+        F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
+    {
+        let reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
+        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
+
+        let kmer_union = self.union_of_kmers();
+
+        let filtered_reads: Vec<Vec<u8>> = all_reads
+            .into_iter()
+            .filter(|r| filter(r, &kmer_union))
+            .map(|r| r.seq().to_vec())
+            .collect();
+
+        filtered_reads
     }
 
     /// Get the union of kmers from all LdBGs in the MLdBG.
@@ -126,7 +146,7 @@ impl MLdBG {
     where
         F: Fn(&LdBG) -> bool,
     {
-        let index = self.ldbgs.iter().position(|x| condition(x));
+        let index = self.ldbgs.iter().position(condition);
         if let Some(index) = index {
             Some(self.ldbgs.remove(index))
         } else {

@@ -1,11 +1,11 @@
 // Import necessary standard library modules
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::{collections::HashSet, io::Write};
+use std::io::Write;
 
 use bio::io::fasta::{Reader, Record};
 // Import the skydive module, which contains the necessary functions for building graphs
-use skydive;
+// use skydive;
 
 pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf) {
     // Read the reads records (name and sequence) into a vector.

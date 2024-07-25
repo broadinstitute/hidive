@@ -126,8 +126,8 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
 }
 
 // Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_aligned_bam_reads(_basename: &String, bam: &mut IndexedReader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
-    let rg_sm_map = get_rg_to_sm_mapping(&bam);
+fn extract_aligned_bam_reads(_basename: &str, bam: &mut IndexedReader, chr: &str, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+    let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let mut bmap = HashMap::new();
 
@@ -155,17 +155,14 @@ fn extract_aligned_bam_reads(_basename: &String, bam: &mut IndexedReader, chr: &
                     bmap.get_mut(&seq_name).unwrap().push(a as char);
                 }
 
-                match alignment.indel() {
-                    bam::pileup::Indel::Ins(len) => {
-                        let pos1 = alignment.qpos().unwrap() as usize;
-                        let pos2 = pos1 + (len as usize);
-                        for pos in pos1..pos2 {
-                            let a = alignment.record().seq()[pos];
+                if let bam::pileup::Indel::Ins(len) = alignment.indel() {
+                    let pos1 = alignment.qpos().unwrap();
+                    let pos2 = pos1 + (len as usize);
+                    for pos in pos1..pos2 {
+                        let a = alignment.record().seq()[pos];
 
-                            bmap.get_mut(&seq_name).unwrap().push(a as char);
-                        }
+                        bmap.get_mut(&seq_name).unwrap().push(a as char);
                     }
-                    _ => {}
                 }
             }
         }
@@ -180,8 +177,8 @@ fn extract_aligned_bam_reads(_basename: &String, bam: &mut IndexedReader, chr: &
 }
 
 // Function to extract unaligned seqs from a BAM file
-fn extract_unaligned_bam_reads(_basename: &String, bam: &mut IndexedReader) -> Result<Vec<fasta::Record>> {
-    let rg_sm_map = get_rg_to_sm_mapping(&bam);
+fn extract_unaligned_bam_reads(_basename: &str, bam: &mut IndexedReader) -> Result<Vec<fasta::Record>> {
+    let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let _ = bam.fetch(FetchDefinition::Unmapped);
     let records = bam

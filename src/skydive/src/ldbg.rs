@@ -1,7 +1,4 @@
-use std::collections::{HashMap, HashSet, BTreeMap};
-use std::io::{stdout, Write, BufRead, BufReader};
-use std::fs::File;
-use flate2::read::GzDecoder;
+use std::collections::{HashMap, HashSet};
 
 use indicatif::ProgressIterator;
 use parquet::data_type::AsBytes;
@@ -28,7 +25,6 @@ pub struct LdBG {
     pub kmer_size: usize,
     pub kmers: KmerGraph,
     pub links: Links,
-    pub junctions: HashMap<Vec<u8>, bool>,
 }
 
 impl LdBG {
@@ -44,7 +40,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_file(name: String, kmer_size: usize, seq_path: &PathBuf, build_links: bool) -> Self {
+    pub fn from_file(name: String, kmer_size: usize, seq_path: &PathBuf, clean: bool, build_links: bool) -> Self {
         let reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
@@ -53,13 +49,14 @@ impl LdBG {
             .map(|r| r.seq().as_bytes().to_vec())
             .collect();
 
-        let raw_kmers = Self::build_graph(kmer_size, &fwd_seqs);
-        let kmers = Self::clean_graph(&raw_kmers);
+        let mut kmers = Self::build_graph(kmer_size, &fwd_seqs);
 
-        let junctions = Self::find_junctions(&kmers);
+        if clean {
+            kmers = Self::clean_graph(&kmers);
+        }
 
         let links = match build_links {
-            true => Self::build_links(kmer_size, &fwd_seqs, &kmers, &junctions),
+            true => Self::build_links(kmer_size, &fwd_seqs, &kmers),
             false => Links::new()
         };
 
@@ -68,7 +65,6 @@ impl LdBG {
             kmer_size,
             kmers,
             links,
-            junctions
         }
     }
 
@@ -84,14 +80,15 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_sequences(name: String, kmer_size: usize, fwd_seqs: &Vec<Vec<u8>>, build_links: bool) -> Self {
-        let raw_kmers = Self::build_graph(kmer_size, fwd_seqs);
-        let kmers = Self::clean_graph(&raw_kmers);
+    pub fn from_sequences(name: String, kmer_size: usize, fwd_seqs: &Vec<Vec<u8>>, clean: bool, build_links: bool) -> Self {
+        let mut kmers = Self::build_graph(kmer_size, fwd_seqs);
 
-        let junctions = Self::find_junctions(&kmers);
+        if clean {
+            kmers = Self::clean_graph(&kmers);
+        }
 
         let links = match build_links {
-            true => Self::build_links(kmer_size, fwd_seqs, &kmers, &junctions),
+            true => Self::build_links(kmer_size, fwd_seqs, &kmers),
             false => Links::new()
         };
 
@@ -100,7 +97,6 @@ impl LdBG {
             kmer_size,
             kmers,
             links,
-            junctions
         }
     }
 
@@ -179,32 +175,37 @@ impl LdBG {
         graph
     }
 
-    fn get_cleaning_threshold(graph: &HashMap<Vec<u8>, Record>) -> u16 {
-        let mut coverages = Vec::new();
+    // fn get_cleaning_threshold(graph: &HashMap<Vec<u8>, Record>) -> u16 {
+    //     let mut coverages = Vec::new();
 
-        for (_, record) in graph {
-            if record.coverage() > 0 {
-                coverages.push(record.coverage() as u32);
-            }
-        }
+    //     for record in graph.values() {
+    //         if record.coverage() > 0 {
+    //             coverages.push(record.coverage() as u32);
+    //         }
+    //     }
 
-        let sum: u32 = coverages.iter().sum();
-        let mean = sum as f64 / coverages.len() as f64;
+    //     let sum: u32 = coverages.iter().sum();
+    //     let mean = sum as f64 / coverages.len() as f64;
 
-        let variance: f64 = coverages.iter().map(|&x| {
-            let diff = x as f64 - mean;
-            diff * diff
-        }).sum::<f64>() / coverages.len() as f64;
+    //     let variance: f64 = coverages.iter().map(|&x| {
+    //         let diff = x as f64 - mean;
+    //         diff * diff
+    //     }).sum::<f64>() / coverages.len() as f64;
 
-        let std_dev = variance.sqrt();
+    //     let std_dev = variance.sqrt();
 
-        let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
+    //     let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
 
-        cleaning_threshold
-    }
+    //     println!("Mean coverage: {}", mean);
+    //     println!("Standard deviation: {}", std_dev);
+    //     println!("Cleaning threshold: {}", cleaning_threshold);
+
+    //     cleaning_threshold
+    // }
 
     fn clean_graph(graph: &KmerGraph) -> KmerGraph {
-        let threshold = Self::get_cleaning_threshold(graph);
+        // let threshold = Self::get_cleaning_threshold(graph);
+        let threshold = 10;
 
         let mut cleaned_graph = KmerGraph::new();
 
@@ -249,13 +250,12 @@ impl LdBG {
     /// * `seq` - A reference to the sequence.
     /// * `k` - The k-mer size.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `reverse` - A boolean indicating whether to search in reverse.
     ///
     /// # Returns
     ///
     /// An optional tuple containing the anchor k-mer and its index.
-    fn find_anchor_kmer(index: usize, seq: &Vec<u8>, k: usize, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>, reverse: bool) -> Option<(Vec<u8>, usize)> {
+    fn find_anchor_kmer(index: usize, seq: &[u8], k: usize, graph: &KmerGraph, reverse: bool) -> Option<(Vec<u8>, usize)> {
         if index > 0 {
             let mut index = index - 1;
             loop {
@@ -263,7 +263,7 @@ impl LdBG {
 
                 let anchor_kmer = &seq[index..index+k];
 
-                if !LdBG::has_junction(&graph, junctions, anchor_kmer, !reverse) || LdBG::has_junction(&graph, junctions, anchor_kmer, reverse) {
+                if !LdBG::has_junction(graph, anchor_kmer, !reverse) || LdBG::has_junction(graph, anchor_kmer, reverse) {
                     return Some((anchor_kmer.to_vec(), index));
                 }
 
@@ -282,18 +282,17 @@ impl LdBG {
     /// * `seq` - A reference to the sequence.
     /// * `k` - The k-mer size.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `reverse` - A boolean indicating whether to search in reverse.
     /// * `fw` - A boolean indicating whether the sequence is forward.
-    fn add_record_to_links(links: &mut Links, seq: &Vec<u8>, k: usize, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>) {
+    fn add_record_to_links(links: &mut Links, seq: &[u8], k: usize, graph: &KmerGraph) {
         let range = (0..seq.len()-k+1).collect::<Vec<_>>();
 
         // Iterate over k-mers to find junctions.
         for i in range {
             let fw_kmer = &seq[i..i+k];
 
-            if LdBG::has_junction(&graph, junctions, fw_kmer, true) {
-                if let Some((anchor_kmer_vec, index)) = Self::find_anchor_kmer(i, seq, k, graph, junctions, true) {
+            if LdBG::has_junction(graph, fw_kmer, true) {
+                if let Some((anchor_kmer_vec, index)) = Self::find_anchor_kmer(i, seq, k, graph, true) {
                     let anchor_kmer = anchor_kmer_vec.as_bytes();
 
                     let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
@@ -307,14 +306,14 @@ impl LdBG {
                     for j in sub_range {
                         let next_kmer = &seq[j..j+k];
 
-                        let has_junction = LdBG::has_junction(&graph, junctions, next_kmer, false);
+                        let has_junction = LdBG::has_junction(graph, next_kmer, false);
                         if has_junction {
                             let choice = seq[j+k];
                             link.push_back(choice);
                         }
                     }
 
-                    if link.junctions.len() > 0 {
+                    if !link.junctions.is_empty() {
                         // Add link to links map.
                         if !links.contains_key(cn_anchor_kmer) {
                             links.insert(cn_anchor_kmer.to_owned(), HashMap::new());
@@ -344,30 +343,28 @@ impl LdBG {
     /// * `k` - The k-mer size.
     /// * `fwd_seqs` - A vector of forward sequences.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     ///
     /// # Returns
     ///
     /// A map of links.
-    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>) -> Links {
+    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
         let progress_bar_style = indicatif::ProgressStyle::default_bar()
             .template("Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
             .unwrap()
             .progress_chars("#>-");
 
         let links: Links = fwd_seqs.par_iter().progress_with_style(progress_bar_style).map(|fwd_seq| {
-        // let links: Links = fwd_seqs.par_iter().map(|fwd_seq| {
             let mut local_links = Links::new();
             let fw_seq = fwd_seq.clone();
             let rc_seq = fw_seq.reverse_complement();
 
-            LdBG::add_record_to_links(&mut local_links, &fw_seq, k, graph, junctions);
-            LdBG::add_record_to_links(&mut local_links, &rc_seq, k, graph, junctions);
+            LdBG::add_record_to_links(&mut local_links, &fw_seq, k, graph);
+            LdBG::add_record_to_links(&mut local_links, &rc_seq, k, graph);
 
             local_links
         }).reduce(Links::new, |mut acc, local_links| {
             for (k, v) in local_links {
-                acc.entry(k).or_insert_with(HashMap::new).extend(v);
+                acc.entry(k).or_default().extend(v);
             }
             acc
         });
@@ -394,73 +391,27 @@ impl LdBG {
         }
     }
 
-    /// Find junctions in the graph.
-    ///
-    /// # Arguments
-    ///
-    /// * `kmers` - A reference to the k-mer graph.
-    ///
-    /// # Returns
-    ///
-    /// A map of junctions.
-    fn find_junctions(kmers: &KmerGraph) -> HashMap<Vec<u8>, bool> {
-        kmers
-            .par_iter()
-            .flat_map(|(cn_kmer, r)| {
-                let mut junction_kmers = HashMap::new();
-
-                let fw_kmer = cn_kmer.clone();
-                let rc_kmer = cn_kmer.reverse_complement();
-
-                let (in_degree, out_degree) = (r.in_degree(), r.out_degree());
-
-                if out_degree > 1 {
-                    junction_kmers.insert(fw_kmer.clone(), true);
-                    junction_kmers.insert(rc_kmer.clone(), false);
-                }
-
-                if in_degree > 1 {
-                    junction_kmers.insert(fw_kmer.clone(), false);
-                    junction_kmers.insert(rc_kmer.clone(), true);
-                }
-
-                junction_kmers
-            })
-            .collect()
-    }
-
     /// Check if the given k-mer represents a junction (in the orientation of the given k-mer).
     ///
     /// # Arguments
     ///
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `kmer` - A slice representing the k-mer.
     /// * `reverse` - A boolean indicating whether to check in reverse.
     ///
     /// # Returns
     ///
     /// A boolean indicating whether the k-mer is a junction.
-    fn has_junction(graph: &KmerGraph, junctions: &HashMap<Vec<u8>, bool>, kmer: &[u8], reverse: bool) -> bool {
+    fn has_junction(graph: &KmerGraph, kmer: &[u8], reverse: bool) -> bool {
         let cn_kmer = LdBG::canonicalize_kmer(kmer);
 
         if let Some(r) = graph.get(&cn_kmer) {
-            let is_canonical = String::from_utf8_lossy(kmer).to_string() == String::from_utf8_lossy(&cn_kmer).to_string();
+            let is_canonical = String::from_utf8_lossy(kmer) == String::from_utf8_lossy(&cn_kmer);
             let (in_degree, out_degree) = (r.in_degree(), r.out_degree());
 
-            if is_canonical {
-                if !reverse {
-                    return out_degree > 1;
-                } else {
-                    return in_degree > 1;
-                }
-            } else {
-                if !reverse {
-                    return in_degree > 1;
-                } else {
-                    return out_degree > 1;
-                }
-            }
+            return if is_canonical {
+                if !reverse { out_degree > 1 } else { in_degree > 1 }
+            } else if !reverse { in_degree > 1 } else { out_degree > 1 };
         }
 
         false
@@ -496,7 +447,7 @@ impl LdBG {
                         }
                     });
 
-                    let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
+                    let consensus_junction_choice = *links_in_scope.first()?.front().unwrap();
 
                     if r.outgoing_edges().contains(&consensus_junction_choice) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
@@ -520,7 +471,7 @@ impl LdBG {
                         }
                     });
 
-                    let consensus_junction_choice = *links_in_scope.get(0)?.front().unwrap();
+                    let consensus_junction_choice = *links_in_scope.first()?.front().unwrap();
 
                     if r.incoming_edges().contains(&complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
@@ -568,7 +519,7 @@ impl LdBG {
                         }
                     });
 
-                    let consensus_junction_choice = match links_in_scope.get(0)?.front() {
+                    let consensus_junction_choice = match links_in_scope.first()?.front() {
                         Some(choice) => *choice,
                         None => return None,
                     };
@@ -595,7 +546,7 @@ impl LdBG {
                         }
                     });
 
-                    let consensus_junction_choice = match links_in_scope.get(0)?.front() {
+                    let consensus_junction_choice = match links_in_scope.first()?.front() {
                         Some(choice) => *choice,
                         None => return None,
                     };
@@ -625,9 +576,17 @@ impl LdBG {
         let mut contigs = Vec::new();
 
         let mut used_kmers = HashSet::new();
-        let k = self.kmers.keys().next().unwrap().len();
+        let k = self.kmer_size;
 
-        for cn_kmer in self.kmers.keys() {
+        let progress_bar_style = indicatif::ProgressStyle::default_bar()
+            .template("Assembling contigs... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
+            .unwrap()
+            .progress_chars("#>-");
+
+        let progress_bar = indicatif::ProgressBar::new(self.kmers.len() as u64);
+        progress_bar.set_style(progress_bar_style);
+
+        for cn_kmer in self.kmers.keys().progress_with(progress_bar) {
             if !used_kmers.contains(cn_kmer) {
                 let r = self.kmers.get(cn_kmer).unwrap();
 
@@ -665,7 +624,10 @@ impl LdBG {
             self.kmer_size
         );
 
+        // println!("fw: {}", String::from_utf8_lossy(kmer));
         self.assemble_forward(&mut contig, kmer.to_vec());
+
+        // println!("rc: {}", String::from_utf8_lossy(kmer));
         self.assemble_backward(&mut contig, kmer.to_vec());
 
         contig
@@ -750,22 +712,14 @@ impl LdBG {
         }
     }
 
-    /// Pretty-print k-mer, edge, and record information.
-    ///
-    /// # Arguments
-    ///
-    /// * `kmer` - A slice representing the k-mer.
-    /// * `prev_base` - The preceding base.
-    /// * `next_base` - The following base.
-    /// * `record` - An optional reference to the record.
-    fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
-        println!("{} {} {} {}",
-            std::char::from_u32(prev_base as u32).unwrap_or('.'),
-            std::str::from_utf8(kmer).unwrap(),
-            std::char::from_u32(next_base as u32).unwrap_or('.'),
-            record.map_or(String::from(""), |r| format!("{}", r))
-        );
-    }
+    // fn print_kmer(kmer: &[u8], prev_base: u8, next_base: u8, record: Option<&Record>) {
+    //     println!("{} {} {} {}",
+    //         std::char::from_u32(prev_base as u32).unwrap_or('.'),
+    //         std::str::from_utf8(kmer).unwrap(),
+    //         std::char::from_u32(next_base as u32).unwrap_or('.'),
+    //         record.map_or(String::from(""), |r| format!("{}", r))
+    //     );
+    // }
 }
 
 #[cfg(test)]
@@ -778,7 +732,10 @@ mod tests {
     use std::process::{Command, Stdio};
     use std::env;
     use std::fs::File;
-    use std::io::Write;
+    use std::io::{Write, BufRead, BufReader};
+    use std::collections::BTreeMap;
+
+    use flate2::read::GzDecoder;
 
     use proptest::prelude::*;
 
@@ -1025,7 +982,7 @@ mod tests {
         let genome = get_test_genome();
         let fwd_seqs = vec!(genome);
 
-        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, true);
 
         let mut exp_graph = KmerGraph::new();
         exp_graph.insert(b"AAATC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
@@ -1087,7 +1044,7 @@ mod tests {
         let rc_genome = fw_genome.reverse_complement();
 
         let fwd_seqs = vec!(fw_genome.clone());
-        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, true);
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, true);
 
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
@@ -1112,7 +1069,7 @@ mod tests {
         ) {
             let random_genome = generate_genome_with_tandem_repeats(500, repeat_length, num_repeats, 0);
 
-            let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()), true);
+            let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()), false, true);
             let hd_links = g.links.clone();
 
             let (mc_contigs, mc_links) = assemble_with_mccortex(k, &random_genome, true, true);
