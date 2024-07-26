@@ -3,7 +3,7 @@ name: Build and deploy site to GitHub Pages
 on:
   push:
     branches:
-      - bs_auto_docs  # Todo Set to main before merging
+      - main
   workflow_dispatch:
 
 jobs:
