@@ -59,16 +59,4 @@ pub fn start(
     for l in g.iter() {
         println!(" -- {}: {}", l.name(), l.kmers.len());
     }
-    // let mut l = g.ldbgs;
-    // println!("{:?}", l.len());
-    // println!("{:?}", &l[0].kmers);
-
-    for gi in &g.ldbgs {
-        gi.kmers.iter().for_each(|(kmer, record)| {
-            let kmer_str = String::from_utf8_lossy(kmer).to_string();
-
-            println!("{} {}", kmer_str, record);
-        });
-        
-    }
 }
