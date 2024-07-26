@@ -8,7 +8,6 @@ pub mod edges;
 pub mod record;
 
 pub mod mldbg;
-pub mod agg;
 
 pub mod env;
 pub mod parse;
