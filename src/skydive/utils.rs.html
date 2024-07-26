@@ -37,11 +37,7 @@
 <a href="#37" id="37">37</a>
 <a href="#38" id="38">38</a>
 <a href="#39" id="39">39</a>
-<a href="#40" id="40">40</a>
-<a href="#41" id="41">41</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>url::Url;
-
-<span class="doccomment">/// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
+</pre></div><pre class="rust"><code><span class="doccomment">/// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
 /// without any of the provided extensions. It does this by first extracting the last segment of the URL path,
 /// and then iteratively removing any of the specified extensions from the end of the base name.
 ///
@@ -72,7 +68,7 @@
         .to_string();
 
     <span class="kw">let </span><span class="kw-2">mut </span>sorted_extensions = extensions.to_vec();
-    sorted_extensions.sort_by(|a, b| b.len().cmp(<span class="kw-2">&amp;</span>a.len()));
+    sorted_extensions.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
     <span class="kw">for </span>ext <span class="kw">in </span>sorted_extensions {
         basename = basename.trim_end_matches(ext).to_string();

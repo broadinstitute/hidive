@@ -102,7 +102,7 @@
     <span class="doccomment">/// Create an empty link record.
     </span><span class="kw">pub fn </span>new(is_forward: bool) -&gt; <span class="self">Self </span>{
         Link {
-            is_forward: is_forward,
+            is_forward,
             junctions: VecDeque::new()
         }
     }
@@ -110,7 +110,7 @@
     <span class="doccomment">/// Create a link from a sequence of junction choices.
     </span><span class="kw">pub fn </span>from_junctions(is_forward: bool, seq: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="self">Self </span>{
         Link {
-            is_forward: is_forward,
+            is_forward,
             junctions: VecDeque::from(seq.to_vec())
         }
     }

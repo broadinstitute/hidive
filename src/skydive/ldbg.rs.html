@@ -1114,53 +1114,7 @@
 <a href="#1114" id="1114">1114</a>
 <a href="#1115" id="1115">1115</a>
 <a href="#1116" id="1116">1116</a>
-<a href="#1117" id="1117">1117</a>
-<a href="#1118" id="1118">1118</a>
-<a href="#1119" id="1119">1119</a>
-<a href="#1120" id="1120">1120</a>
-<a href="#1121" id="1121">1121</a>
-<a href="#1122" id="1122">1122</a>
-<a href="#1123" id="1123">1123</a>
-<a href="#1124" id="1124">1124</a>
-<a href="#1125" id="1125">1125</a>
-<a href="#1126" id="1126">1126</a>
-<a href="#1127" id="1127">1127</a>
-<a href="#1128" id="1128">1128</a>
-<a href="#1129" id="1129">1129</a>
-<a href="#1130" id="1130">1130</a>
-<a href="#1131" id="1131">1131</a>
-<a href="#1132" id="1132">1132</a>
-<a href="#1133" id="1133">1133</a>
-<a href="#1134" id="1134">1134</a>
-<a href="#1135" id="1135">1135</a>
-<a href="#1136" id="1136">1136</a>
-<a href="#1137" id="1137">1137</a>
-<a href="#1138" id="1138">1138</a>
-<a href="#1139" id="1139">1139</a>
-<a href="#1140" id="1140">1140</a>
-<a href="#1141" id="1141">1141</a>
-<a href="#1142" id="1142">1142</a>
-<a href="#1143" id="1143">1143</a>
-<a href="#1144" id="1144">1144</a>
-<a href="#1145" id="1145">1145</a>
-<a href="#1146" id="1146">1146</a>
-<a href="#1147" id="1147">1147</a>
-<a href="#1148" id="1148">1148</a>
-<a href="#1149" id="1149">1149</a>
-<a href="#1150" id="1150">1150</a>
-<a href="#1151" id="1151">1151</a>
-<a href="#1152" id="1152">1152</a>
-<a href="#1153" id="1153">1153</a>
-<a href="#1154" id="1154">1154</a>
-<a href="#1155" id="1155">1155</a>
-<a href="#1156" id="1156">1156</a>
-<a href="#1157" id="1157">1157</a>
-<a href="#1158" id="1158">1158</a>
-<a href="#1159" id="1159">1159</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet, BTreeMap};
-<span class="kw">use </span>std::io::{stdout, Write, BufRead, BufReader};
-<span class="kw">use </span>std::fs::File;
-<span class="kw">use </span>flate2::read::GzDecoder;
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet};
 
 <span class="kw">use </span>indicatif::ProgressIterator;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -1187,7 +1141,6 @@
     <span class="kw">pub </span>kmer_size: usize,
     <span class="kw">pub </span>kmers: KmerGraph,
     <span class="kw">pub </span>links: Links,
-    <span class="kw">pub </span>junctions: HashMap&lt;Vec&lt;u8&gt;, bool&gt;,
 }
 
 <span class="kw">impl </span>LdBG {
@@ -1203,7 +1156,7 @@
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    </span><span class="kw">pub fn </span>from_file(name: String, kmer_size: usize, seq_path: <span class="kw-2">&amp;</span>PathBuf, build_links: bool) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">pub fn </span>from_file(name: String, kmer_size: usize, seq_path: <span class="kw-2">&amp;</span>PathBuf, clean: bool, build_links: bool) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
         <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
 
@@ -1212,13 +1165,14 @@
             .map(|r| r.seq().as_bytes().to_vec())
             .collect();
 
-        <span class="kw">let </span>raw_kmers = <span class="self">Self</span>::build_graph(kmer_size, <span class="kw-2">&amp;</span>fwd_seqs);
-        <span class="kw">let </span>kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>raw_kmers);
+        <span class="kw">let </span><span class="kw-2">mut </span>kmers = <span class="self">Self</span>::build_graph(kmer_size, <span class="kw-2">&amp;</span>fwd_seqs);
 
-        <span class="kw">let </span>junctions = <span class="self">Self</span>::find_junctions(<span class="kw-2">&amp;</span>kmers);
+        <span class="kw">if </span>clean {
+            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers);
+        }
 
         <span class="kw">let </span>links = <span class="kw">match </span>build_links {
-            <span class="bool-val">true </span>=&gt; <span class="self">Self</span>::build_links(kmer_size, <span class="kw-2">&amp;</span>fwd_seqs, <span class="kw-2">&amp;</span>kmers, <span class="kw-2">&amp;</span>junctions),
+            <span class="bool-val">true </span>=&gt; <span class="self">Self</span>::build_links(kmer_size, <span class="kw-2">&amp;</span>fwd_seqs, <span class="kw-2">&amp;</span>kmers),
             <span class="bool-val">false </span>=&gt; Links::new()
         };
 
@@ -1227,7 +1181,6 @@
             kmer_size,
             kmers,
             links,
-            junctions
         }
     }
 
@@ -1243,14 +1196,15 @@
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    </span><span class="kw">pub fn </span>from_sequences(name: String, kmer_size: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, build_links: bool) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>raw_kmers = <span class="self">Self</span>::build_graph(kmer_size, fwd_seqs);
-        <span class="kw">let </span>kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>raw_kmers);
+    </span><span class="kw">pub fn </span>from_sequences(name: String, kmer_size: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, clean: bool, build_links: bool) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>kmers = <span class="self">Self</span>::build_graph(kmer_size, fwd_seqs);
 
-        <span class="kw">let </span>junctions = <span class="self">Self</span>::find_junctions(<span class="kw-2">&amp;</span>kmers);
+        <span class="kw">if </span>clean {
+            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers);
+        }
 
         <span class="kw">let </span>links = <span class="kw">match </span>build_links {
-            <span class="bool-val">true </span>=&gt; <span class="self">Self</span>::build_links(kmer_size, fwd_seqs, <span class="kw-2">&amp;</span>kmers, <span class="kw-2">&amp;</span>junctions),
+            <span class="bool-val">true </span>=&gt; <span class="self">Self</span>::build_links(kmer_size, fwd_seqs, <span class="kw-2">&amp;</span>kmers),
             <span class="bool-val">false </span>=&gt; Links::new()
         };
 
@@ -1259,7 +1213,6 @@
             kmer_size,
             kmers,
             links,
-            junctions
         }
     }
 
@@ -1338,32 +1291,37 @@
         graph
     }
 
-    <span class="kw">fn </span>get_cleaning_threshold(graph: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, Record&gt;) -&gt; u16 {
-        <span class="kw">let </span><span class="kw-2">mut </span>coverages = Vec::new();
+    <span class="comment">// fn get_cleaning_threshold(graph: &amp;HashMap&lt;Vec&lt;u8&gt;, Record&gt;) -&gt; u16 {
+    //     let mut coverages = Vec::new();
 
-        <span class="kw">for </span>(<span class="kw">_</span>, record) <span class="kw">in </span>graph {
-            <span class="kw">if </span>record.coverage() &gt; <span class="number">0 </span>{
-                coverages.push(record.coverage() <span class="kw">as </span>u32);
-            }
-        }
+    //     for record in graph.values() {
+    //         if record.coverage() &gt; 0 {
+    //             coverages.push(record.coverage() as u32);
+    //         }
+    //     }
 
-        <span class="kw">let </span>sum: u32 = coverages.iter().sum();
-        <span class="kw">let </span>mean = sum <span class="kw">as </span>f64 / coverages.len() <span class="kw">as </span>f64;
+    //     let sum: u32 = coverages.iter().sum();
+    //     let mean = sum as f64 / coverages.len() as f64;
 
-        <span class="kw">let </span>variance: f64 = coverages.iter().map(|<span class="kw-2">&amp;</span>x| {
-            <span class="kw">let </span>diff = x <span class="kw">as </span>f64 - mean;
-            diff * diff
-        }).sum::&lt;f64&gt;() / coverages.len() <span class="kw">as </span>f64;
+    //     let variance: f64 = coverages.iter().map(|&amp;x| {
+    //         let diff = x as f64 - mean;
+    //         diff * diff
+    //     }).sum::&lt;f64&gt;() / coverages.len() as f64;
 
-        <span class="kw">let </span>std_dev = variance.sqrt();
+    //     let std_dev = variance.sqrt();
 
-        <span class="kw">let </span>cleaning_threshold = ((mean - std_dev).floor() <span class="kw">as </span>u16).max(<span class="number">1</span>);
+    //     let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
 
-        cleaning_threshold
-    }
+    //     println!("Mean coverage: {}", mean);
+    //     println!("Standard deviation: {}", std_dev);
+    //     println!("Cleaning threshold: {}", cleaning_threshold);
 
-    <span class="kw">fn </span>clean_graph(graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; KmerGraph {
-        <span class="kw">let </span>threshold = <span class="self">Self</span>::get_cleaning_threshold(graph);
+    //     cleaning_threshold
+    // }
+
+    </span><span class="kw">fn </span>clean_graph(graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; KmerGraph {
+        <span class="comment">// let threshold = Self::get_cleaning_threshold(graph);
+        </span><span class="kw">let </span>threshold = <span class="number">10</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>cleaned_graph = KmerGraph::new();
 
@@ -1408,13 +1366,12 @@
     /// * `seq` - A reference to the sequence.
     /// * `k` - The k-mer size.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `reverse` - A boolean indicating whether to search in reverse.
     ///
     /// # Returns
     ///
     /// An optional tuple containing the anchor k-mer and its index.
-    </span><span class="kw">fn </span>find_anchor_kmer(index: usize, seq: <span class="kw-2">&amp;</span>Vec&lt;u8&gt;, k: usize, graph: <span class="kw-2">&amp;</span>KmerGraph, junctions: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, bool&gt;, reverse: bool) -&gt; <span class="prelude-ty">Option</span>&lt;(Vec&lt;u8&gt;, usize)&gt; {
+    </span><span class="kw">fn </span>find_anchor_kmer(index: usize, seq: <span class="kw-2">&amp;</span>[u8], k: usize, graph: <span class="kw-2">&amp;</span>KmerGraph, reverse: bool) -&gt; <span class="prelude-ty">Option</span>&lt;(Vec&lt;u8&gt;, usize)&gt; {
         <span class="kw">if </span>index &gt; <span class="number">0 </span>{
             <span class="kw">let </span><span class="kw-2">mut </span>index = index - <span class="number">1</span>;
             <span class="kw">loop </span>{
@@ -1422,7 +1379,7 @@
 
                 <span class="kw">let </span>anchor_kmer = <span class="kw-2">&amp;</span>seq[index..index+k];
 
-                <span class="kw">if </span>!LdBG::has_junction(<span class="kw-2">&amp;</span>graph, junctions, anchor_kmer, !reverse) || LdBG::has_junction(<span class="kw-2">&amp;</span>graph, junctions, anchor_kmer, reverse) {
+                <span class="kw">if </span>!LdBG::has_junction(graph, anchor_kmer, !reverse) || LdBG::has_junction(graph, anchor_kmer, reverse) {
                     <span class="kw">return </span><span class="prelude-val">Some</span>((anchor_kmer.to_vec(), index));
                 }
 
@@ -1441,18 +1398,17 @@
     /// * `seq` - A reference to the sequence.
     /// * `k` - The k-mer size.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `reverse` - A boolean indicating whether to search in reverse.
     /// * `fw` - A boolean indicating whether the sequence is forward.
-    </span><span class="kw">fn </span>add_record_to_links(links: <span class="kw-2">&amp;mut </span>Links, seq: <span class="kw-2">&amp;</span>Vec&lt;u8&gt;, k: usize, graph: <span class="kw-2">&amp;</span>KmerGraph, junctions: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, bool&gt;) {
+    </span><span class="kw">fn </span>add_record_to_links(links: <span class="kw-2">&amp;mut </span>Links, seq: <span class="kw-2">&amp;</span>[u8], k: usize, graph: <span class="kw-2">&amp;</span>KmerGraph) {
         <span class="kw">let </span>range = (<span class="number">0</span>..seq.len()-k+<span class="number">1</span>).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="comment">// Iterate over k-mers to find junctions.
         </span><span class="kw">for </span>i <span class="kw">in </span>range {
             <span class="kw">let </span>fw_kmer = <span class="kw-2">&amp;</span>seq[i..i+k];
 
-            <span class="kw">if </span>LdBG::has_junction(<span class="kw-2">&amp;</span>graph, junctions, fw_kmer, <span class="bool-val">true</span>) {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>((anchor_kmer_vec, index)) = <span class="self">Self</span>::find_anchor_kmer(i, seq, k, graph, junctions, <span class="bool-val">true</span>) {
+            <span class="kw">if </span>LdBG::has_junction(graph, fw_kmer, <span class="bool-val">true</span>) {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((anchor_kmer_vec, index)) = <span class="self">Self</span>::find_anchor_kmer(i, seq, k, graph, <span class="bool-val">true</span>) {
                     <span class="kw">let </span>anchor_kmer = anchor_kmer_vec.as_bytes();
 
                     <span class="kw">let </span>cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
@@ -1466,14 +1422,14 @@
                     <span class="kw">for </span>j <span class="kw">in </span>sub_range {
                         <span class="kw">let </span>next_kmer = <span class="kw-2">&amp;</span>seq[j..j+k];
 
-                        <span class="kw">let </span>has_junction = LdBG::has_junction(<span class="kw-2">&amp;</span>graph, junctions, next_kmer, <span class="bool-val">false</span>);
+                        <span class="kw">let </span>has_junction = LdBG::has_junction(graph, next_kmer, <span class="bool-val">false</span>);
                         <span class="kw">if </span>has_junction {
                             <span class="kw">let </span>choice = seq[j+k];
                             link.push_back(choice);
                         }
                     }
 
-                    <span class="kw">if </span>link.junctions.len() &gt; <span class="number">0 </span>{
+                    <span class="kw">if </span>!link.junctions.is_empty() {
                         <span class="comment">// Add link to links map.
                         </span><span class="kw">if </span>!links.contains_key(cn_anchor_kmer) {
                             links.insert(cn_anchor_kmer.to_owned(), HashMap::new());
@@ -1503,30 +1459,28 @@
     /// * `k` - The k-mer size.
     /// * `fwd_seqs` - A vector of forward sequences.
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     ///
     /// # Returns
     ///
     /// A map of links.
-    </span><span class="kw">fn </span>build_links(k: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, graph: <span class="kw-2">&amp;</span>KmerGraph, junctions: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, bool&gt;) -&gt; Links {
+    </span><span class="kw">fn </span>build_links(k: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; Links {
         <span class="kw">let </span>progress_bar_style = indicatif::ProgressStyle::default_bar()
             .template(<span class="string">"Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})"</span>)
             .unwrap()
             .progress_chars(<span class="string">"#&gt;-"</span>);
 
         <span class="kw">let </span>links: Links = fwd_seqs.par_iter().progress_with_style(progress_bar_style).map(|fwd_seq| {
-        <span class="comment">// let links: Links = fwd_seqs.par_iter().map(|fwd_seq| {
-            </span><span class="kw">let </span><span class="kw-2">mut </span>local_links = Links::new();
+            <span class="kw">let </span><span class="kw-2">mut </span>local_links = Links::new();
             <span class="kw">let </span>fw_seq = fwd_seq.clone();
             <span class="kw">let </span>rc_seq = fw_seq.reverse_complement();
 
-            LdBG::add_record_to_links(<span class="kw-2">&amp;mut </span>local_links, <span class="kw-2">&amp;</span>fw_seq, k, graph, junctions);
-            LdBG::add_record_to_links(<span class="kw-2">&amp;mut </span>local_links, <span class="kw-2">&amp;</span>rc_seq, k, graph, junctions);
+            LdBG::add_record_to_links(<span class="kw-2">&amp;mut </span>local_links, <span class="kw-2">&amp;</span>fw_seq, k, graph);
+            LdBG::add_record_to_links(<span class="kw-2">&amp;mut </span>local_links, <span class="kw-2">&amp;</span>rc_seq, k, graph);
 
             local_links
         }).reduce(Links::new, |<span class="kw-2">mut </span>acc, local_links| {
             <span class="kw">for </span>(k, v) <span class="kw">in </span>local_links {
-                acc.entry(k).or_insert_with(HashMap::new).extend(v);
+                acc.entry(k).or_default().extend(v);
             }
             acc
         });
@@ -1553,73 +1507,27 @@
         }
     }
 
-    <span class="doccomment">/// Find junctions in the graph.
-    ///
-    /// # Arguments
-    ///
-    /// * `kmers` - A reference to the k-mer graph.
-    ///
-    /// # Returns
-    ///
-    /// A map of junctions.
-    </span><span class="kw">fn </span>find_junctions(kmers: <span class="kw-2">&amp;</span>KmerGraph) -&gt; HashMap&lt;Vec&lt;u8&gt;, bool&gt; {
-        kmers
-            .par_iter()
-            .flat_map(|(cn_kmer, r)| {
-                <span class="kw">let </span><span class="kw-2">mut </span>junction_kmers = HashMap::new();
-
-                <span class="kw">let </span>fw_kmer = cn_kmer.clone();
-                <span class="kw">let </span>rc_kmer = cn_kmer.reverse_complement();
-
-                <span class="kw">let </span>(in_degree, out_degree) = (r.in_degree(), r.out_degree());
-
-                <span class="kw">if </span>out_degree &gt; <span class="number">1 </span>{
-                    junction_kmers.insert(fw_kmer.clone(), <span class="bool-val">true</span>);
-                    junction_kmers.insert(rc_kmer.clone(), <span class="bool-val">false</span>);
-                }
-
-                <span class="kw">if </span>in_degree &gt; <span class="number">1 </span>{
-                    junction_kmers.insert(fw_kmer.clone(), <span class="bool-val">false</span>);
-                    junction_kmers.insert(rc_kmer.clone(), <span class="bool-val">true</span>);
-                }
-
-                junction_kmers
-            })
-            .collect()
-    }
-
     <span class="doccomment">/// Check if the given k-mer represents a junction (in the orientation of the given k-mer).
     ///
     /// # Arguments
     ///
     /// * `graph` - A reference to the k-mer graph.
-    /// * `junctions` - A reference to the junctions map.
     /// * `kmer` - A slice representing the k-mer.
     /// * `reverse` - A boolean indicating whether to check in reverse.
     ///
     /// # Returns
     ///
     /// A boolean indicating whether the k-mer is a junction.
-    </span><span class="kw">fn </span>has_junction(graph: <span class="kw-2">&amp;</span>KmerGraph, junctions: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, bool&gt;, kmer: <span class="kw-2">&amp;</span>[u8], reverse: bool) -&gt; bool {
+    </span><span class="kw">fn </span>has_junction(graph: <span class="kw-2">&amp;</span>KmerGraph, kmer: <span class="kw-2">&amp;</span>[u8], reverse: bool) -&gt; bool {
         <span class="kw">let </span>cn_kmer = LdBG::canonicalize_kmer(kmer);
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(r) = graph.get(<span class="kw-2">&amp;</span>cn_kmer) {
-            <span class="kw">let </span>is_canonical = String::from_utf8_lossy(kmer).to_string() == String::from_utf8_lossy(<span class="kw-2">&amp;</span>cn_kmer).to_string();
+            <span class="kw">let </span>is_canonical = String::from_utf8_lossy(kmer) == String::from_utf8_lossy(<span class="kw-2">&amp;</span>cn_kmer);
             <span class="kw">let </span>(in_degree, out_degree) = (r.in_degree(), r.out_degree());
 
-            <span class="kw">if </span>is_canonical {
-                <span class="kw">if </span>!reverse {
-                    <span class="kw">return </span>out_degree &gt; <span class="number">1</span>;
-                } <span class="kw">else </span>{
-                    <span class="kw">return </span>in_degree &gt; <span class="number">1</span>;
-                }
-            } <span class="kw">else </span>{
-                <span class="kw">if </span>!reverse {
-                    <span class="kw">return </span>in_degree &gt; <span class="number">1</span>;
-                } <span class="kw">else </span>{
-                    <span class="kw">return </span>out_degree &gt; <span class="number">1</span>;
-                }
-            }
+            <span class="kw">return if </span>is_canonical {
+                <span class="kw">if </span>!reverse { out_degree &gt; <span class="number">1 </span>} <span class="kw">else </span>{ in_degree &gt; <span class="number">1 </span>}
+            } <span class="kw">else if </span>!reverse { in_degree &gt; <span class="number">1 </span>} <span class="kw">else </span>{ out_degree &gt; <span class="number">1 </span>};
         }
 
         <span class="bool-val">false
@@ -1655,7 +1563,7 @@
                         </span>}
                     });
 
-                    <span class="kw">let </span>consensus_junction_choice = <span class="kw-2">*</span>links_in_scope.get(<span class="number">0</span>)<span class="question-mark">?</span>.front().unwrap();
+                    <span class="kw">let </span>consensus_junction_choice = <span class="kw-2">*</span>links_in_scope.first()<span class="question-mark">?</span>.front().unwrap();
 
                     <span class="kw">if </span>r.outgoing_edges().contains(<span class="kw-2">&amp;</span>consensus_junction_choice) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
@@ -1679,7 +1587,7 @@
                         </span>}
                     });
 
-                    <span class="kw">let </span>consensus_junction_choice = <span class="kw-2">*</span>links_in_scope.get(<span class="number">0</span>)<span class="question-mark">?</span>.front().unwrap();
+                    <span class="kw">let </span>consensus_junction_choice = <span class="kw-2">*</span>links_in_scope.first()<span class="question-mark">?</span>.front().unwrap();
 
                     <span class="kw">if </span>r.incoming_edges().contains(<span class="kw-2">&amp;</span>complement(consensus_junction_choice)) {
                         links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
@@ -1727,7 +1635,7 @@
                         </span>}
                     });
 
-                    <span class="kw">let </span>consensus_junction_choice = <span class="kw">match </span>links_in_scope.get(<span class="number">0</span>)<span class="question-mark">?</span>.front() {
+                    <span class="kw">let </span>consensus_junction_choice = <span class="kw">match </span>links_in_scope.first()<span class="question-mark">?</span>.front() {
                         <span class="prelude-val">Some</span>(choice) =&gt; <span class="kw-2">*</span>choice,
                         <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
                     };
@@ -1754,7 +1662,7 @@
                         </span>}
                     });
 
-                    <span class="kw">let </span>consensus_junction_choice = <span class="kw">match </span>links_in_scope.get(<span class="number">0</span>)<span class="question-mark">?</span>.front() {
+                    <span class="kw">let </span>consensus_junction_choice = <span class="kw">match </span>links_in_scope.first()<span class="question-mark">?</span>.front() {
                         <span class="prelude-val">Some</span>(choice) =&gt; <span class="kw-2">*</span>choice,
                         <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
                     };
@@ -1784,9 +1692,17 @@
         <span class="kw">let </span><span class="kw-2">mut </span>contigs = Vec::new();
 
         <span class="kw">let </span><span class="kw-2">mut </span>used_kmers = HashSet::new();
-        <span class="kw">let </span>k = <span class="self">self</span>.kmers.keys().next().unwrap().len();
+        <span class="kw">let </span>k = <span class="self">self</span>.kmer_size;
 
-        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="self">self</span>.kmers.keys() {
+        <span class="kw">let </span>progress_bar_style = indicatif::ProgressStyle::default_bar()
+            .template(<span class="string">"Assembling contigs... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})"</span>)
+            .unwrap()
+            .progress_chars(<span class="string">"#&gt;-"</span>);
+
+        <span class="kw">let </span>progress_bar = indicatif::ProgressBar::new(<span class="self">self</span>.kmers.len() <span class="kw">as </span>u64);
+        progress_bar.set_style(progress_bar_style);
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="self">self</span>.kmers.keys().progress_with(progress_bar) {
             <span class="kw">if </span>!used_kmers.contains(cn_kmer) {
                 <span class="kw">let </span>r = <span class="self">self</span>.kmers.get(cn_kmer).unwrap();
 
@@ -1824,8 +1740,11 @@
             <span class="self">self</span>.kmer_size
         );
 
-        <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>contig, kmer.to_vec());
-        <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>contig, kmer.to_vec());
+        <span class="comment">// println!("fw: {}", String::from_utf8_lossy(kmer));
+        </span><span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>contig, kmer.to_vec());
+
+        <span class="comment">// println!("rc: {}", String::from_utf8_lossy(kmer));
+        </span><span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>contig, kmer.to_vec());
 
         contig
     }
@@ -1909,23 +1828,15 @@
         }
     }
 
-    <span class="doccomment">/// Pretty-print k-mer, edge, and record information.
-    ///
-    /// # Arguments
-    ///
-    /// * `kmer` - A slice representing the k-mer.
-    /// * `prev_base` - The preceding base.
-    /// * `next_base` - The following base.
-    /// * `record` - An optional reference to the record.
-    </span><span class="kw">fn </span>print_kmer(kmer: <span class="kw-2">&amp;</span>[u8], prev_base: u8, next_base: u8, record: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Record&gt;) {
-        <span class="macro">println!</span>(<span class="string">"{} {} {} {}"</span>,
-            std::char::from_u32(prev_base <span class="kw">as </span>u32).unwrap_or(<span class="string">'.'</span>),
-            std::str::from_utf8(kmer).unwrap(),
-            std::char::from_u32(next_base <span class="kw">as </span>u32).unwrap_or(<span class="string">'.'</span>),
-            record.map_or(String::from(<span class="string">""</span>), |r| <span class="macro">format!</span>(<span class="string">"{}"</span>, r))
-        );
-    }
-}
+    <span class="comment">// fn print_kmer(kmer: &amp;[u8], prev_base: u8, next_base: u8, record: Option&lt;&amp;Record&gt;) {
+    //     println!("{} {} {} {}",
+    //         std::char::from_u32(prev_base as u32).unwrap_or('.'),
+    //         std::str::from_utf8(kmer).unwrap(),
+    //         std::char::from_u32(next_base as u32).unwrap_or('.'),
+    //         record.map_or(String::from(""), |r| format!("{}", r))
+    //     );
+    // }
+</span>}
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
@@ -1937,7 +1848,10 @@
     <span class="kw">use </span>std::process::{Command, Stdio};
     <span class="kw">use </span>std::env;
     <span class="kw">use </span>std::fs::File;
-    <span class="kw">use </span>std::io::Write;
+    <span class="kw">use </span>std::io::{Write, BufRead, BufReader};
+    <span class="kw">use </span>std::collections::BTreeMap;
+
+    <span class="kw">use </span>flate2::read::GzDecoder;
 
     <span class="kw">use </span>proptest::prelude::<span class="kw-2">*</span>;
 
@@ -2184,7 +2098,7 @@
         <span class="kw">let </span>genome = get_test_genome();
         <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>(genome);
 
-        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">true</span>);
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">true</span>);
 
         <span class="kw">let </span><span class="kw-2">mut </span>exp_graph = KmerGraph::new();
         exp_graph.insert(<span class="string">b"AAATC"</span>.to_vec(), Record::new(<span class="number">1</span>, <span class="prelude-val">Some</span>(Edges::from_string(<span class="string">"..g.A..."</span>.to_string()))));
@@ -2246,7 +2160,7 @@
         <span class="kw">let </span>rc_genome = fw_genome.reverse_complement();
 
         <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>(fw_genome.clone());
-        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">true</span>);
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">true</span>);
 
         <span class="comment">// assembly outside cycle should recapitulate entire genome
         </span><span class="macro">assert!</span>(fw_genome == g.assemble(<span class="string">b"ACTGA"</span>));
@@ -2271,7 +2185,7 @@
         ) {
             <span class="kw">let </span>random_genome = generate_genome_with_tandem_repeats(<span class="number">500</span>, repeat_length, num_repeats, <span class="number">0</span>);
 
-            <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), k, <span class="kw-2">&amp;</span><span class="macro">vec!</span>(random_genome.clone()), <span class="bool-val">true</span>);
+            <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), k, <span class="kw-2">&amp;</span><span class="macro">vec!</span>(random_genome.clone()), <span class="bool-val">false</span>, <span class="bool-val">true</span>);
             <span class="kw">let </span>hd_links = g.links.clone();
 
             <span class="kw">let </span>(mc_contigs, mc_links) = assemble_with_mccortex(k, <span class="kw-2">&amp;</span>random_genome, <span class="bool-val">true</span>, <span class="bool-val">true</span>);

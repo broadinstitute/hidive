@@ -117,8 +117,6 @@
 <a href="#117" id="117">117</a>
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, io::BufRead, path::PathBuf};
 
 <span class="kw">use </span>anyhow::Result;
@@ -149,7 +147,7 @@
 }
 
 <span class="kw">pub fn </span>parse_locus(locus: String) -&gt; <span class="prelude-ty">Result</span>&lt;(String, u64, u64)&gt; {
-    <span class="kw">let </span>l_fmt = locus.replace(<span class="string">","</span>, <span class="string">""</span>);
+    <span class="kw">let </span>l_fmt = locus.replace(<span class="string">','</span>, <span class="string">""</span>);
     <span class="kw">let </span>parts1: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = l_fmt.split(|c| c == <span class="string">':'</span>).collect();
     <span class="kw">let </span>parts2: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = parts1[<span class="number">1</span>].split(|c| c == <span class="string">'-'</span>).collect();
 
@@ -185,7 +183,7 @@
     }
 }
 
-<span class="kw">pub fn </span>parse_file_names(bam_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) -&gt; HashSet&lt;Url&gt; {
+<span class="kw">pub fn </span>parse_file_names(bam_paths: <span class="kw-2">&amp;</span>[PathBuf]) -&gt; HashSet&lt;Url&gt; {
     <span class="comment">// Convert the list of BAM file paths into a HashSet of URLs
     </span><span class="kw">let </span><span class="kw-2">mut </span>reads_urls: HashSet&lt;Url&gt; = bam_paths
         .iter()
@@ -209,11 +207,9 @@
             <span class="kw">if </span>path.extension().and_then(std::ffi::OsStr::to_str) == <span class="prelude-val">Some</span>(<span class="string">"txt"</span>) {
                 <span class="kw">if let </span><span class="prelude-val">Ok</span>(file) = std::fs::File::open(<span class="kw-2">&amp;</span>path) {
                     <span class="kw">let </span>reader = std::io::BufReader::new(file);
-                    <span class="kw">for </span>line <span class="kw">in </span>reader.lines() {
-                        <span class="kw">if let </span><span class="prelude-val">Ok</span>(line_path) = line {
-                            <span class="kw">let </span>abs_path = PathBuf::from(line_path);
-                            local_file_contents.insert(abs_path);
-                        }
+                    <span class="kw">for </span>line <span class="kw">in </span>reader.lines().map_while(Result::ok) {
+                        <span class="kw">let </span>abs_path = PathBuf::from(line);
+                        local_file_contents.insert(abs_path);
                     }
                 }
 

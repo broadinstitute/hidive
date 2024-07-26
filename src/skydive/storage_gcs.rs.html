@@ -70,9 +70,9 @@
 <span class="kw">use </span>cloud_storage::{ sync::<span class="kw-2">*</span>, ListRequest, object::ObjectList };
 <span class="kw">use </span>chrono::{ DateTime, Utc };
 
-<span class="kw">pub fn </span>gcs_split_path(path: <span class="kw-2">&amp;</span>String) -&gt; (String, String) {
+<span class="kw">pub fn </span>gcs_split_path(path: <span class="kw-2">&amp;</span>str) -&gt; (String, String) {
     <span class="kw">let </span>re = regex::Regex::new(<span class="string">r"^gs://"</span>).unwrap();
-    <span class="kw">let </span>path = re.replace(<span class="kw-2">&amp;</span>path, <span class="string">""</span>);
+    <span class="kw">let </span>path = re.replace(path, <span class="string">""</span>);
     <span class="kw">let </span>split: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = path.split(<span class="string">'/'</span>).collect();
 
     <span class="kw">let </span>bucket_name = split[<span class="number">0</span>].to_string();
@@ -81,7 +81,7 @@
     (bucket_name, prefix)
 }
 
-<span class="kw">pub fn </span>gcs_list_files(path: <span class="kw-2">&amp;</span>String) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;ObjectList&gt;&gt; {
+<span class="kw">pub fn </span>gcs_list_files(path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;ObjectList&gt;&gt; {
     <span class="kw">let </span>(bucket_name, prefix) = gcs_split_path(path);
 
     <span class="kw">let </span>client = Client::new()<span class="question-mark">?</span>;
@@ -92,7 +92,7 @@
     <span class="prelude-val">Ok</span>(file_list)
 }
 
-<span class="kw">pub fn </span>gcs_get_file_update_time(path: <span class="kw-2">&amp;</span>String) -&gt; <span class="prelude-ty">Result</span>&lt;DateTime&lt;Utc&gt;&gt; {
+<span class="kw">pub fn </span>gcs_get_file_update_time(path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;DateTime&lt;Utc&gt;&gt; {
     <span class="kw">let </span>(bucket_name, prefix) = gcs_split_path(path);
 
     <span class="kw">let </span>client = Client::new()<span class="question-mark">?</span>;
@@ -109,7 +109,7 @@
         <span class="kw">let </span>client = Client::new().unwrap();
         <span class="kw">let </span>bytes = client.object().download(<span class="kw-2">&amp;</span>bucket_name, <span class="kw-2">&amp;</span>prefix).unwrap();
 
-        std::fs::write(<span class="kw-2">&amp;</span>filename, <span class="kw-2">&amp;</span>bytes)<span class="question-mark">?</span>;
+        std::fs::write(<span class="kw-2">&amp;</span>filename, bytes)<span class="question-mark">?</span>;
     }
 
     <span class="prelude-val">Ok</span>(filename)

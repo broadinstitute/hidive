@@ -82,13 +82,13 @@
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
 </span><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::path::PathBuf;
-<span class="kw">use </span>std::{collections::HashSet, io::Write};
+<span class="kw">use </span>std::io::Write;
 
 <span class="kw">use </span>bio::io::fasta::{Reader, Record};
 <span class="comment">// Import the skydive module, which contains the necessary functions for building graphs
-</span><span class="kw">use </span>skydive;
+// use skydive;
 
-<span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, k: usize, fasta_path: <span class="kw-2">&amp;</span>PathBuf) {
+</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, k: usize, fasta_path: <span class="kw-2">&amp;</span>PathBuf) {
     <span class="comment">// Read the reads records (name and sequence) into a vector.
     </span><span class="kw">let </span>reader = Reader::from_file(fasta_path).unwrap();
     <span class="kw">let </span>all_reads: Vec&lt;Record&gt; = reader.records().map(|r| r.unwrap()).collect();

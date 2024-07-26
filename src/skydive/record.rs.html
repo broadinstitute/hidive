@@ -328,7 +328,7 @@
     <span class="doccomment">/// Create an empty de Bruijn graph record.
     </span><span class="kw">pub fn </span>new(coverage: u16, edges: <span class="prelude-ty">Option</span>&lt;Edges&gt;) -&gt; <span class="self">Self </span>{
         Record {
-            coverage: coverage,
+            coverage,
             edges: edges.unwrap_or(Edges::empty()),
         }
     }

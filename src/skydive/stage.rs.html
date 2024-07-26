@@ -415,9 +415,6 @@
 <a href="#415" id="415">415</a>
 <a href="#416" id="416">416</a>
 <a href="#417" id="417">417</a>
-<a href="#418" id="418">418</a>
-<a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import the Result type from the anyhow crate for error handling.
 </span><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -546,8 +543,8 @@
 }
 
 <span class="comment">// Function to extract seqs from a BAM file within a specified genomic region.
-</span><span class="kw">fn </span>extract_aligned_bam_reads(_basename: <span class="kw-2">&amp;</span>String, bam: <span class="kw-2">&amp;mut </span>IndexedReader, chr: <span class="kw-2">&amp;</span>String, start: <span class="kw-2">&amp;</span>u64, stop: <span class="kw-2">&amp;</span>u64) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
-    <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(<span class="kw-2">&amp;</span>bam);
+</span><span class="kw">fn </span>extract_aligned_bam_reads(_basename: <span class="kw-2">&amp;</span>str, bam: <span class="kw-2">&amp;mut </span>IndexedReader, chr: <span class="kw-2">&amp;</span>str, start: <span class="kw-2">&amp;</span>u64, stop: <span class="kw-2">&amp;</span>u64) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
+    <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(bam);
 
     <span class="kw">let </span><span class="kw-2">mut </span>bmap = HashMap::new();
 
@@ -575,17 +572,14 @@
                     bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
                 }
 
-                <span class="kw">match </span>alignment.indel() {
-                    bam::pileup::Indel::Ins(len) =&gt; {
-                        <span class="kw">let </span>pos1 = alignment.qpos().unwrap() <span class="kw">as </span>usize;
-                        <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
-                        <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
-                            <span class="kw">let </span>a = alignment.record().seq()[pos];
+                <span class="kw">if let </span>bam::pileup::Indel::Ins(len) = alignment.indel() {
+                    <span class="kw">let </span>pos1 = alignment.qpos().unwrap();
+                    <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
+                    <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
+                        <span class="kw">let </span>a = alignment.record().seq()[pos];
 
-                            bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
-                        }
+                        bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
                     }
-                    <span class="kw">_ </span>=&gt; {}
                 }
             }
         }
@@ -600,8 +594,8 @@
 }
 
 <span class="comment">// Function to extract unaligned seqs from a BAM file
-</span><span class="kw">fn </span>extract_unaligned_bam_reads(_basename: <span class="kw-2">&amp;</span>String, bam: <span class="kw-2">&amp;mut </span>IndexedReader) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
-    <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(<span class="kw-2">&amp;</span>bam);
+</span><span class="kw">fn </span>extract_unaligned_bam_reads(_basename: <span class="kw-2">&amp;</span>str, bam: <span class="kw-2">&amp;mut </span>IndexedReader) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
+    <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(bam);
 
     <span class="kw">let _ </span>= bam.fetch(FetchDefinition::Unmapped);
     <span class="kw">let </span>records = bam
