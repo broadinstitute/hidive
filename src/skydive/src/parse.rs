@@ -28,7 +28,7 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
 }
 
 pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
-    let l_fmt = locus.replace(",", "");
+    let l_fmt = locus.replace(',', "");
     let parts1: Vec<&str> = l_fmt.split(|c| c == ':').collect();
     let parts2: Vec<&str> = parts1[1].split(|c| c == '-').collect();
 
@@ -64,7 +64,7 @@ pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
     }
 }
 
-pub fn parse_file_names(bam_paths: &Vec<PathBuf>) -> HashSet<Url> {
+pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     // Convert the list of BAM file paths into a HashSet of URLs
     let mut reads_urls: HashSet<Url> = bam_paths
         .iter()
@@ -88,11 +88,9 @@ pub fn parse_file_names(bam_paths: &Vec<PathBuf>) -> HashSet<Url> {
             if path.extension().and_then(std::ffi::OsStr::to_str) == Some("txt") {
                 if let Ok(file) = std::fs::File::open(&path) {
                     let reader = std::io::BufReader::new(file);
-                    for line in reader.lines() {
-                        if let Ok(line_path) = line {
-                            let abs_path = PathBuf::from(line_path);
-                            local_file_contents.insert(abs_path);
-                        }
+                    for line in reader.lines().map_while(Result::ok) {
+                        let abs_path = PathBuf::from(line);
+                        local_file_contents.insert(abs_path);
                     }
                 }
 

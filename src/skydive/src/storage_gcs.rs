@@ -3,9 +3,9 @@ use anyhow::Result;
 use cloud_storage::{ sync::*, ListRequest, object::ObjectList };
 use chrono::{ DateTime, Utc };
 
-pub fn gcs_split_path(path: &String) -> (String, String) {
+pub fn gcs_split_path(path: &str) -> (String, String) {
     let re = regex::Regex::new(r"^gs://").unwrap();
-    let path = re.replace(&path, "");
+    let path = re.replace(path, "");
     let split: Vec<&str> = path.split('/').collect();
 
     let bucket_name = split[0].to_string();
@@ -14,7 +14,7 @@ pub fn gcs_split_path(path: &String) -> (String, String) {
     (bucket_name, prefix)
 }
 
-pub fn gcs_list_files(path: &String) -> Result<Vec<ObjectList>> {
+pub fn gcs_list_files(path: &str) -> Result<Vec<ObjectList>> {
     let (bucket_name, prefix) = gcs_split_path(path);
 
     let client = Client::new()?;
@@ -25,7 +25,7 @@ pub fn gcs_list_files(path: &String) -> Result<Vec<ObjectList>> {
     Ok(file_list)
 }
 
-pub fn gcs_get_file_update_time(path: &String) -> Result<DateTime<Utc>> {
+pub fn gcs_get_file_update_time(path: &str) -> Result<DateTime<Utc>> {
     let (bucket_name, prefix) = gcs_split_path(path);
 
     let client = Client::new()?;
@@ -42,7 +42,7 @@ pub fn gcs_download_file(path: String) -> Result<String> {
         let client = Client::new().unwrap();
         let bytes = client.object().download(&bucket_name, &prefix).unwrap();
 
-        std::fs::write(&filename, &bytes)?;
+        std::fs::write(&filename, bytes)?;
     }
 
     Ok(filename)

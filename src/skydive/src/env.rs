@@ -27,7 +27,7 @@ pub fn gcs_authorize_data_access() {
     // Execute the command and capture the output
     let output = std::process::Command
         ::new("gcloud")
-        .args(&["auth", "application-default", "print-access-token"])
+        .args(["auth", "application-default", "print-access-token"])
         .output()
         .expect("Failed to execute command");
 

@@ -16,7 +16,7 @@ impl Link {
     /// Create an empty link record.
     pub fn new(is_forward: bool) -> Self {
         Link {
-            is_forward: is_forward,
+            is_forward,
             junctions: VecDeque::new()
         }
     }
@@ -24,7 +24,7 @@ impl Link {
     /// Create a link from a sequence of junction choices.
     pub fn from_junctions(is_forward: bool, seq: &[u8]) -> Self {
         Link {
-            is_forward: is_forward,
+            is_forward,
             junctions: VecDeque::from(seq.to_vec())
         }
     }
