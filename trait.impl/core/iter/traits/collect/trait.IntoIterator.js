@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"skydive":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.79.0/core/iter/traits/collect/trait.IntoIterator.html\" title=\"trait core::iter::traits::collect::IntoIterator\">IntoIterator</a> for <a class=\"struct\" href=\"skydive/edges/struct.Edges.html\" title=\"struct skydive::edges::Edges\">Edges</a>"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
