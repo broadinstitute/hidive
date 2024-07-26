@@ -1,0 +1,40 @@
+name: Build and deploy site to GitHub Pages
+
+on:
+  push:
+    branches:
+      - bs_auto_docs  # Todo Set to main before merging
+  workflow_dispatch:
+
+jobs:
+  github-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build documentation
+        run: cargo doc --no-deps
+
+      - name: Finalize documentation
+        run: |
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=hidive/index.html\">" > target/doc/index.html
+          touch target/doc/.nojekyll
+
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: Documentation
+          path: target/doc
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages  # Ensure this is the correct branch for GitHub Pages
+          folder: target/doc

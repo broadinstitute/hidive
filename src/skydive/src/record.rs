@@ -3,7 +3,7 @@ use std::fmt;
 use crate::edges::Edges;
 
 /// Represents a de Bruijn graph record.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     coverage: u16,
     edges: Edges
@@ -312,10 +312,4 @@ mod tests {
         r.set_outgoing_edge('C' as u8);
         assert!(r.is_junction() == true);
     }
-
-    // proptest! {
-    //     #[test]
-    //     fn test_set_coverage() {
-    //     }
-    // }
 }

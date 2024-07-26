@@ -118,10 +118,10 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
         if let Some(sm) = rg_sm_map.get(v) {
             Ok(sm.to_owned())
         } else {
-            Err(anyhow::Error::msg(format!("Sample name not found for read group: {}", v)))
+            Err(anyhow::anyhow!("Sample name not found for read group: {}", v))
         }
     } else {
-        Err(anyhow::Error::msg("Read group is not a string"))
+        Err(anyhow::anyhow!("Read group is not a string"))
     }
 }
 
@@ -138,7 +138,10 @@ fn extract_aligned_bam_reads(_basename: &String, bam: &mut IndexedReader, chr: &
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
             for alignment in pileup.alignments() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
-                let sm = get_sm_name_from_rg(&alignment.record(), &rg_sm_map)?;
+                let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
+                    Ok(a) => a,
+                    Err(_) => String::from("unknown")
+                };
 
                 let seq_name = format!("{}|{}", qname, sm);
 
