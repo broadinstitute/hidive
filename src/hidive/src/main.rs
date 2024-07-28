@@ -58,6 +58,7 @@ mod build;
 mod cluster;
 mod coassemble;
 mod fetch;
+mod sift;
 mod impute;
 mod trim;
 
@@ -75,13 +76,33 @@ enum Commands {
     /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
-        /// Output path for multi-sample BAM file with reads spanning locus of interest.
+        /// Output path for FASTA file with reads spanning locus of interest.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        #[clap(short, long, value_parser)]
+        /// Zero or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = false)]
         loci: Vec<String>,
+
+        /// Include unmapped reads.
+        #[clap(short, long, value_parser)]
+        unmapped: bool,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(required = true, value_parser)]
+        seq_paths: Vec<PathBuf>,
+    },
+
+    /// Find more sequences (aligned or unaligned) overlapping previously fetched reads.
+    #[clap(arg_required_else_help = true)]
+    Sift {
+        /// Output path for FASTA file with reads spanning locus of interest.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// FASTA files with reads to use as a filter for finding more reads.
+        #[clap(short, long, value_parser, required = true)]
+        fasta_paths: Vec<PathBuf>,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
@@ -197,9 +218,17 @@ fn main() {
         Commands::Fetch {
             output,
             loci,
+            unmapped,
             seq_paths,
         } => {
-            fetch::start(&output, &loci, &seq_paths);
+            fetch::start(&output, &loci, unmapped, &seq_paths);
+        }
+        Commands::Sift{
+            output,
+            fasta_paths,
+            seq_paths,
+        } => {
+            sift::start(&output, &fasta_paths, &seq_paths);
         }
         Commands::Cluster {
             output,
@@ -239,8 +268,23 @@ fn main() {
         }
     }
 
+    skydive::elog!("Complete. Elapsed time: {}.", elapsed_time(start_time));
+}
+
+fn elapsed_time(start_time: std::time::Instant) -> String {
     let end_time = std::time::Instant::now();
     let elapsed_time = end_time.duration_since(start_time);
+    
+    let elapsed_secs = elapsed_time.as_secs_f64();
+    let elapsed_str = if elapsed_secs < 60.0 {
+        format!("{:.2} seconds", elapsed_secs)
+    } else if elapsed_secs < 3600.0 {
+        format!("{:.2} minutes", elapsed_secs / 60.0)
+    } else if elapsed_secs < 86400.0 {
+        format!("{:.2} hours", elapsed_secs / 3600.0)
+    } else {
+        format!("{:.2} days", elapsed_secs / 86400.0)
+    };
 
-    skydive::elog!("Complete. Elapsed time: {:.2?} seconds.", elapsed_time.as_secs_f64());
+    elapsed_str
 }

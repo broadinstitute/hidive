@@ -348,12 +348,9 @@ impl LdBG {
     ///
     /// A map of links.
     fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
-        let progress_bar_style = indicatif::ProgressStyle::default_bar()
-            .template("Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
-            .unwrap()
-            .progress_chars("#>-");
+        let progress_bar= crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
 
-        let links: Links = fwd_seqs.par_iter().progress_with_style(progress_bar_style).map(|fwd_seq| {
+        let links: Links = fwd_seqs.par_iter().progress_with(progress_bar).map(|fwd_seq| {
             let mut local_links = Links::new();
             let fw_seq = fwd_seq.clone();
             let rc_seq = fw_seq.reverse_complement();
@@ -578,13 +575,7 @@ impl LdBG {
         let mut used_kmers = HashSet::new();
         let k = self.kmer_size;
 
-        let progress_bar_style = indicatif::ProgressStyle::default_bar()
-            .template("Assembling contigs... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})")
-            .unwrap()
-            .progress_chars("#>-");
-
-        let progress_bar = indicatif::ProgressBar::new(self.kmers.len() as u64);
-        progress_bar.set_style(progress_bar_style);
+        let progress_bar = crate::utils::default_bounded_progress_bar("Assembling contigs", self.kmers.len() as u64);
 
         for cn_kmer in self.kmers.keys().progress_with(progress_bar) {
             if !used_kmers.contains(cn_kmer) {
