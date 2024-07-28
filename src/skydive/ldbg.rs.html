@@ -1105,15 +1105,6 @@
 <a href="#1105" id="1105">1105</a>
 <a href="#1106" id="1106">1106</a>
 <a href="#1107" id="1107">1107</a>
-<a href="#1108" id="1108">1108</a>
-<a href="#1109" id="1109">1109</a>
-<a href="#1110" id="1110">1110</a>
-<a href="#1111" id="1111">1111</a>
-<a href="#1112" id="1112">1112</a>
-<a href="#1113" id="1113">1113</a>
-<a href="#1114" id="1114">1114</a>
-<a href="#1115" id="1115">1115</a>
-<a href="#1116" id="1116">1116</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet};
 
 <span class="kw">use </span>indicatif::ProgressIterator;
@@ -1464,12 +1455,9 @@
     ///
     /// A map of links.
     </span><span class="kw">fn </span>build_links(k: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; Links {
-        <span class="kw">let </span>progress_bar_style = indicatif::ProgressStyle::default_bar()
-            .template(<span class="string">"Building links... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})"</span>)
-            .unwrap()
-            .progress_chars(<span class="string">"#&gt;-"</span>);
+        <span class="kw">let </span>progress_bar= <span class="kw">crate</span>::utils::default_bounded_progress_bar(<span class="string">"Building links"</span>, fwd_seqs.len() <span class="kw">as </span>u64);
 
-        <span class="kw">let </span>links: Links = fwd_seqs.par_iter().progress_with_style(progress_bar_style).map(|fwd_seq| {
+        <span class="kw">let </span>links: Links = fwd_seqs.par_iter().progress_with(progress_bar).map(|fwd_seq| {
             <span class="kw">let </span><span class="kw-2">mut </span>local_links = Links::new();
             <span class="kw">let </span>fw_seq = fwd_seq.clone();
             <span class="kw">let </span>rc_seq = fw_seq.reverse_complement();
@@ -1694,13 +1682,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>used_kmers = HashSet::new();
         <span class="kw">let </span>k = <span class="self">self</span>.kmer_size;
 
-        <span class="kw">let </span>progress_bar_style = indicatif::ProgressStyle::default_bar()
-            .template(<span class="string">"Assembling contigs... [{elapsed_precise}] [{bar:40.white/white}] {pos}/{len} ({eta})"</span>)
-            .unwrap()
-            .progress_chars(<span class="string">"#&gt;-"</span>);
-
-        <span class="kw">let </span>progress_bar = indicatif::ProgressBar::new(<span class="self">self</span>.kmers.len() <span class="kw">as </span>u64);
-        progress_bar.set_style(progress_bar_style);
+        <span class="kw">let </span>progress_bar = <span class="kw">crate</span>::utils::default_bounded_progress_bar(<span class="string">"Assembling contigs"</span>, <span class="self">self</span>.kmers.len() <span class="kw">as </span>u64);
 
         <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="self">self</span>.kmers.keys().progress_with(progress_bar) {
             <span class="kw">if </span>!used_kmers.contains(cn_kmer) {

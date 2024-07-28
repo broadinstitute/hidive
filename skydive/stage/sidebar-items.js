@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["read_spans_locus","stage_data"]};
+window.SIDEBAR_ITEMS = {"fn":["open_bam","open_fasta","read_spans_locus","stage_data"]};

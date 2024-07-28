@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["basename_without_extension"]};
+window.SIDEBAR_ITEMS = {"fn":["basename_without_extension","default_bounded_progress_bar","default_unbounded_progress_bar"]};

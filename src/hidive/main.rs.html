@@ -244,6 +244,50 @@
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
 <a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -304,6 +348,7 @@
 <span class="kw">mod </span>cluster;
 <span class="kw">mod </span>coassemble;
 <span class="kw">mod </span>fetch;
+<span class="kw">mod </span>sift;
 <span class="kw">mod </span>impute;
 <span class="kw">mod </span>trim;
 
@@ -321,13 +366,33 @@
     <span class="doccomment">/// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
     </span>Fetch {
-        <span class="doccomment">/// Output path for multi-sample BAM file with reads spanning locus of interest.
+        <span class="doccomment">/// Output path for FASTA file with reads spanning locus of interest.
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
 
-        <span class="doccomment">/// One or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        </span><span class="attr">#[clap(short, long, value_parser)]
+        <span class="doccomment">/// Zero or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">false</span>)]
         </span>loci: Vec&lt;String&gt;,
+
+        <span class="doccomment">/// Include unmapped reads.
+        </span><span class="attr">#[clap(short, long, value_parser)]
+        </span>unmapped: bool,
+
+        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
+        </span>seq_paths: Vec&lt;PathBuf&gt;,
+    },
+
+    <span class="doccomment">/// Find more sequences (aligned or unaligned) overlapping previously fetched reads.
+    </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
+    </span>Sift {
+        <span class="doccomment">/// Output path for FASTA file with reads spanning locus of interest.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
+        </span>output: PathBuf,
+
+        <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span>fasta_paths: Vec&lt;PathBuf&gt;,
 
         <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
@@ -443,9 +508,17 @@
         Commands::Fetch {
             output,
             loci,
+            unmapped,
             seq_paths,
         } =&gt; {
-            fetch::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_paths);
+            fetch::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, unmapped, <span class="kw-2">&amp;</span>seq_paths);
+        }
+        Commands::Sift{
+            output,
+            fasta_paths,
+            seq_paths,
+        } =&gt; {
+            sift::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
         }
         Commands::Cluster {
             output,
@@ -485,9 +558,24 @@
         }
     }
 
+    <span class="macro">skydive::elog!</span>(<span class="string">"Complete. Elapsed time: {}."</span>, elapsed_time(start_time));
+}
+
+<span class="kw">fn </span>elapsed_time(start_time: std::time::Instant) -&gt; String {
     <span class="kw">let </span>end_time = std::time::Instant::now();
     <span class="kw">let </span>elapsed_time = end_time.duration_since(start_time);
+    
+    <span class="kw">let </span>elapsed_secs = elapsed_time.as_secs_f64();
+    <span class="kw">let </span>elapsed_str = <span class="kw">if </span>elapsed_secs &lt; <span class="number">60.0 </span>{
+        <span class="macro">format!</span>(<span class="string">"{:.2} seconds"</span>, elapsed_secs)
+    } <span class="kw">else if </span>elapsed_secs &lt; <span class="number">3600.0 </span>{
+        <span class="macro">format!</span>(<span class="string">"{:.2} minutes"</span>, elapsed_secs / <span class="number">60.0</span>)
+    } <span class="kw">else if </span>elapsed_secs &lt; <span class="number">86400.0 </span>{
+        <span class="macro">format!</span>(<span class="string">"{:.2} hours"</span>, elapsed_secs / <span class="number">3600.0</span>)
+    } <span class="kw">else </span>{
+        <span class="macro">format!</span>(<span class="string">"{:.2} days"</span>, elapsed_secs / <span class="number">86400.0</span>)
+    };
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"Complete. Elapsed time: {:.2?} seconds."</span>, elapsed_time.as_secs_f64());
+    elapsed_str
 }
 </code></pre></div></section></main></body></html>

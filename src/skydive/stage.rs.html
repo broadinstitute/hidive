@@ -415,6 +415,8 @@
 <a href="#415" id="415">415</a>
 <a href="#416" id="416">416</a>
 <a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import the Result type from the anyhow crate for error handling.
 </span><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -446,7 +448,7 @@
 </span><span class="kw">use </span><span class="kw">crate</span>::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
 
 <span class="comment">// Function to open a BAM/CRAM file from a URL and cache its contents locally.
-</span><span class="kw">fn </span>open_bam(seqs_url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="prelude-ty">Result</span>&lt;IndexedReader&gt; {
+</span><span class="kw">pub fn </span>open_bam(seqs_url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="prelude-ty">Result</span>&lt;IndexedReader&gt; {
     <span class="kw">if </span>env::var(<span class="string">"GCS_OAUTH_TOKEN"</span>).is_err() {
         gcs_authorize_data_access();
     }
@@ -480,7 +482,7 @@
 }
 
 <span class="comment">// Function to open a FASTA file from a URL and cache its contents locally.
-</span><span class="kw">fn </span>open_fasta(seqs_url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="prelude-ty">Result</span>&lt;Reader&gt; {
+</span><span class="kw">pub fn </span>open_fasta(seqs_url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="prelude-ty">Result</span>&lt;Reader&gt; {
     <span class="kw">if </span>env::var(<span class="string">"GCS_OAUTH_TOKEN"</span>).is_err() {
         gcs_authorize_data_access();
     }
@@ -636,7 +638,8 @@
 <span class="comment">// Function to stage data from a single file.
 </span><span class="kw">fn </span>stage_data_from_one_file(
     seqs_url: <span class="kw-2">&amp;</span>Url,
-    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;
+    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
+    unmapped: bool
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>all_seqs = Vec::new();
 
@@ -651,17 +654,16 @@
             .to_string();
         <span class="kw">let </span><span class="kw-2">mut </span>bam = open_bam(seqs_url)<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>(chr, start, stop) <span class="kw">in </span>loci.iter() {
-            <span class="comment">// Extract seqs for the current locus.
-            </span><span class="kw">let </span>aligned_seqs = extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop).unwrap();
+        <span class="comment">// Extract seqs for the current locus.
+        </span><span class="kw">for </span>(chr, start, stop) <span class="kw">in </span>loci.iter() {
+            <span class="kw">let </span>aligned_seqs = extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop).unwrap();
+            all_seqs.extend(aligned_seqs);
+        }
 
-            <span class="comment">// Extend the all_seqs vector with the seqs from the current locus.
-            </span>all_seqs.extend(aligned_seqs);
-
-            <span class="kw">if </span>seqs_str.ends_with(<span class="string">".cram"</span>) {
-                <span class="kw">let </span>unaligned_seqs = extract_unaligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam).unwrap();
-                all_seqs.extend(unaligned_seqs);
-            }
+        <span class="comment">// Optionally extract unaligned reads.
+        </span><span class="kw">if </span>unmapped {
+            <span class="kw">let </span>unaligned_seqs = extract_unaligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam).unwrap();
+            all_seqs.extend(unaligned_seqs);
         }
     } <span class="kw">else if </span>seqs_str.ends_with(<span class="string">".fa"</span>) || seqs_str.ends_with(<span class="string">".fasta"</span>) || seqs_str.ends_with(<span class="string">".fa.gz"</span>) || seqs_str.ends_with(<span class="string">".fasta.gz"</span>) {
         <span class="comment">// Handle FASTA file processing
@@ -692,6 +694,7 @@
 </span><span class="kw">fn </span>stage_data_from_all_files(
     seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;,
     loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
+    unmapped: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
 
     <span class="comment">// Use a parallel iterator to process multiple BAM files concurrently.
@@ -700,7 +703,7 @@
         .map(|seqs_url| {
             <span class="comment">// Define an operation to stage data from one file.
             </span><span class="kw">let </span>op = || {
-                <span class="kw">let </span>seqs = stage_data_from_one_file(seqs_url, loci)<span class="question-mark">?</span>;
+                <span class="kw">let </span>seqs = stage_data_from_one_file(seqs_url, loci, unmapped)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(seqs)
             };
 
@@ -734,13 +737,14 @@
     output_path: <span class="kw-2">&amp;</span>PathBuf,
     loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
     seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;,
+    unmapped: bool,
     cache_path: <span class="kw-2">&amp;</span>PathBuf
 ) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
     <span class="kw">let </span>current_dir = env::current_dir()<span class="question-mark">?</span>;
     env::set_current_dir(cache_path).unwrap();
 
     <span class="comment">// Stage data from all BAM files.
-    </span><span class="kw">let </span>all_data = <span class="kw">match </span>stage_data_from_all_files(seq_urls, loci) {
+    </span><span class="kw">let </span>all_data = <span class="kw">match </span>stage_data_from_all_files(seq_urls, loci, unmapped) {
         <span class="prelude-val">Ok</span>(all_data) =&gt; all_data,
         <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">panic!</span>(<span class="string">"Error: {}"</span>, e);
@@ -774,7 +778,7 @@
     </span><span class="attr">#[test]
     </span><span class="kw">fn </span>test_open_bam() {
         <span class="kw">let </span>seqs_url = Url::parse(
-            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
+            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
         <span class="kw">let </span>bam = open_bam(<span class="kw-2">&amp;</span>seqs_url);
 
@@ -784,11 +788,11 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_stage_data_from_one_file() {
         <span class="kw">let </span>seqs_url = Url::parse(
-            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
+            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
         <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
 
-        <span class="kw">let </span>result = stage_data_from_one_file(<span class="kw-2">&amp;</span>seqs_url, <span class="kw-2">&amp;</span>loci);
+        <span class="kw">let </span>result = stage_data_from_one_file(<span class="kw-2">&amp;</span>seqs_url, <span class="kw-2">&amp;</span>loci, <span class="bool-val">false</span>);
 
         <span class="macro">assert!</span>(result.is_ok(), <span class="string">"Failed to stage data from one file"</span>);
     }
@@ -800,11 +804,11 @@
 
         <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
         <span class="kw">let </span>seqs_url = Url::parse(
-            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
+            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
         <span class="kw">let </span>seq_urls = HashSet::from([seqs_url]);
 
-        <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="kw-2">&amp;</span>cache_path);
+        <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
 
         <span class="macro">assert!</span>(result.is_ok(), <span class="string">"Failed to stage data from file"</span>);
 
@@ -817,15 +821,15 @@
         <span class="kw">let </span>output_path = cache_path.join(<span class="string">"test.bam"</span>);
 
         <span class="kw">let </span>seqs_url_1 = Url::parse(
-            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/seqs/ccs/aligned/m84060_230907_210011_s2.bam"
+            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
         <span class="kw">let </span>seqs_url_2 = Url::parse(
-            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/seqs/ccs/aligned/m84043_230901_211947_s1.bam"
+            <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         </span>).unwrap();
         <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
         <span class="kw">let </span>seq_urls = HashSet::from([ seqs_url_1, seqs_url_2 ]);
 
-        <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="kw-2">&amp;</span>cache_path);
+        <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
 
         <span class="macro">println!</span>(<span class="string">"{:?}"</span>, result);
 

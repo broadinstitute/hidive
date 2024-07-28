@@ -63,7 +63,7 @@
 /// # Panics
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
-</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) {
+</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, unmapped: bool, seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) {
     <span class="kw">let </span>loci = skydive::parse::parse_loci(loci_list);
     <span class="kw">let </span>seq_urls = skydive::parse::parse_file_names(seq_paths);
 
@@ -73,7 +73,7 @@
 
     <span class="comment">// Call the stage_data function from the skydive module to process and stage the data
     </span><span class="macro">skydive::elog!</span>(<span class="string">"Fetching data..."</span>);
-    <span class="kw">let </span>r = skydive::stage::stage_data(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="kw-2">&amp;</span>cache_path);
+    <span class="kw">let </span>r = skydive::stage::stage_data(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, unmapped, <span class="kw-2">&amp;</span>cache_path);
 
     <span class="kw">match </span>r {
         <span class="prelude-val">Ok</span>(n) =&gt; {
