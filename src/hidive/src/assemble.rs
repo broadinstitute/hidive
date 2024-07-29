@@ -4,13 +4,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
-use path_absolutize::Absolutize;
+use bio::io::fasta::{Reader, Record};
 
 extern crate ndarray;
 
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
-use linfa::traits::Transformer;
 use std::f64::NAN;
 
 // Import the Url type to work with URLs
@@ -132,7 +131,7 @@ fn count_non_equal_elements(a: &Array1<f64>, b: &Array1<f64>) -> usize {
 
 
 
-pub fn start(output: &PathBuf, graph_path: &PathBuf, k_nearest_neighbor: usize) {
+pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize) {
     let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
     let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
     // println!("The answer is {:?} {:?}!", output, sorted_read_names);
@@ -181,6 +180,13 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, k_nearest_neighbor: usize) 
         Ok(graph) => println!("Single sample Graph:\n{:?}", graph.incoming),
         Err(e) => println!("Error extracting single sample graph: {:?}", e),
     }
+
+    // import read files
+    let reader = Reader::from_file(read_path).unwrap();
+    let all_reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
+    
+
+    
 
     
 }
