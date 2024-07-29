@@ -193,7 +193,7 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "11")]
+        #[clap(short, long, value_parser, default_value = "15")]
         kmer_size: usize,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
