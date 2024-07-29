@@ -154,6 +154,22 @@
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
 <a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, path::PathBuf};
 
 <span class="kw">use </span><span class="kw">crate</span>::ldbg::LdBG;
@@ -175,6 +191,22 @@
             kmer_size,
             clean,
             build_links
+        }
+    }
+
+    <span class="doccomment">/// Create an MLdBG from a vector of LdBGs.
+    </span><span class="kw">pub fn </span>from_ldbgs(ldbgs: Vec&lt;LdBG&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>kmer_size = ldbgs[<span class="number">0</span>].kmer_size;
+
+        <span class="kw">for </span>ldbg <span class="kw">in </span><span class="kw-2">&amp;</span>ldbgs {
+            <span class="macro">assert!</span>(ldbg.kmer_size == kmer_size, <span class="string">"The k-mer size of the LdBG does not match the k-mer size of the MLdBG."</span>);
+        }
+
+        MLdBG {
+            ldbgs,
+            kmer_size,
+            clean: <span class="bool-val">false</span>,
+            build_links: <span class="bool-val">false</span>,
         }
     }
 
@@ -241,7 +273,7 @@
     }
 
     <span class="doccomment">/// Get the union of kmers from all LdBGs in the MLdBG.
-    </span><span class="kw">fn </span>union_of_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashSet&lt;Vec&lt;u8&gt;&gt; {
+    </span><span class="kw">pub fn </span>union_of_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashSet&lt;Vec&lt;u8&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>kmer_union = HashSet::new();
 
         <span class="kw">for </span>ldbg <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.ldbgs {
