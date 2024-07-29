@@ -22,6 +22,22 @@ impl MLdBG {
         }
     }
 
+    /// Create an MLdBG from a vector of LdBGs.
+    pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
+        let kmer_size = ldbgs[0].kmer_size;
+
+        for ldbg in &ldbgs {
+            assert!(ldbg.kmer_size == kmer_size, "The k-mer size of the LdBG does not match the k-mer size of the MLdBG.");
+        }
+
+        MLdBG {
+            ldbgs,
+            kmer_size,
+            clean: false,
+            build_links: false,
+        }
+    }
+
     /// Add a LdBG to the MLdBG.
     pub fn push(&mut self, ldbg: LdBG) {
         assert!(ldbg.kmer_size == self.kmer_size, "The k-mer size of the LdBG does not match the k-mer size of the MLdBG.");
@@ -85,7 +101,7 @@ impl MLdBG {
     }
 
     /// Get the union of kmers from all LdBGs in the MLdBG.
-    fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
+    pub fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
         let mut kmer_union = HashSet::new();
 
         for ldbg in &self.ldbgs {
