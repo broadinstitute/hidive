@@ -137,3 +137,12 @@ dmypy.json
 
 # Misc
 scratch/
+*.bam
+*.bai
+*.fai
+*.fasta
+*.cram
+*.crai
+*.xml
+*.dict
+*.ipynb

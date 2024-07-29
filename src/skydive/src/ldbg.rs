@@ -242,6 +242,39 @@ impl LdBG {
         cleaned_graph
     }
 
+    pub fn remove(&mut self, kmer: &[u8]) -> Option<Record> {
+        let cn_kmer = LdBG::canonicalize_kmer(kmer);
+        self.kmers.remove(&cn_kmer)
+    }
+
+    pub fn infer_edges(&mut self) {
+        let mut kmers = self.kmers.clone();
+
+        kmers.iter_mut().for_each(|(cn_kmer, record)| {
+            let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
+
+            for e in record.incoming_edges() {
+                let prev_kmer = std::iter::once(e).chain(cn_kmer[0..cn_kmer.len()-1].iter().cloned()).collect::<Vec<u8>>();
+
+                if self.kmers.contains_key(&LdBG::canonicalize_kmer(&prev_kmer)) {
+                    new_record.set_incoming_edge(e);
+                }
+            }
+
+            for e in record.outgoing_edges() {
+                let next_kmer = cn_kmer[1..].iter().cloned().chain(std::iter::once(e)).collect::<Vec<u8>>();
+
+                if self.kmers.contains_key(&LdBG::canonicalize_kmer(&next_kmer)) {
+                    new_record.set_outgoing_edge(e);
+                }
+            }
+
+            self.kmers.insert(cn_kmer.clone(), new_record);
+        });
+
+        self.kmers = kmers;
+    }
+
     /// Find an anchor k-mer in a sequence.
     ///
     /// # Arguments
