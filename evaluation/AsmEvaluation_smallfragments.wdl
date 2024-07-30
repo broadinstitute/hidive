@@ -240,7 +240,7 @@ task ReplaceSequences {
     }
 
     command <<<
-        python add_sequences_in_ref.py -i ~{input_fasta} -r ~{reference_fasta} -o ~{output_file}.fa -g ~{gene_locus} -l ~{locus}
+        python /agg/add_sequences_in_ref.py -i ~{input_fasta} -r ~{reference_fasta} -o ~{output_file}.fa -g ~{gene_locus} -l ~{locus}
     >>>
 
     runtime {
