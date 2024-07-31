@@ -6,22 +6,18 @@ use std::path::PathBuf;
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
-<<<<<<< HEAD
 
 use minimap2::{Aligner, Preset};
-=======
->>>>>>> ba3cfee (add read files)
 
 extern crate ndarray;
+extern crate gurobi;
+use gurobi::*;
 
 use rust_wfa2;
 
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
-<<<<<<< HEAD
 use skydive::agg::GraphicalGenome;
-=======
->>>>>>> ba3cfee (add read files)
 use std::f64::NAN;
 
 // Import the Url type to work with URLs
@@ -191,13 +187,6 @@ pub fn find_targetseq_in_reads(read_seq: &str, source_kmer:&str, sink_kmer: &str
 //     score
 // }
 
-// pub fn wfa(pattern:&str, text:&str) -> i32 {
-//     let mut aligner = rust_wfa2::aligner::WFAligner();
-//     let status = aligner.align_end_to_end(pattern, text);
-//     let score = aligner.alignment_score();
-//     score
-// }
-
 pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_graph: GraphicalGenome, source_node_name:&str, source: &String, sink_node_name: &str, sink:&String) -> HashMap<usize, HashMap<String, String>>{
         // import read files
     let reader = Reader::from_file(read_path).unwrap();
@@ -206,7 +195,7 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
 
     // pairwise alignment
     let single_sample_readsets = find_all_read(&single_sample_graph);
-    let path_list = skydive::agg::FindAllPathBetweenAnchors::new(&single_sample_graph, source_node_name, sink_node_name, single_sample_readsets);
+    let path_list = skydive::agg::FindAllPathBetweenAnchors::new(&single_sample_graph, source_node_name, sink_node_name, single_sample_readsets.clone());
     println!( " candidate path number : {:?}", path_list.subpath.len());
 
     let mut data_info: HashMap<usize, HashMap<String, String>> = HashMap::new();
@@ -220,43 +209,45 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
         
         for record in all_reads.clone() {
             let h = String::from_utf8_lossy(record.id().as_bytes()).to_string();
-            let read_seq_upper = String::from_utf8(record.seq().to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
+            if single_sample_readsets.contains(&h) {
+                let read_seq_upper = String::from_utf8(record.seq().to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
 
-            let target = find_targetseq_in_reads(&read_seq_upper, source, sink);
-            // println!("target lenth:{:?}", target.len());
+                let target = find_targetseq_in_reads(&read_seq_upper, source, sink);
+                // println!("target lenth:{:?}", target.len());
 
-            
-            if !target.is_empty() {
-                // minimap2 let hits =aligner.map(target.as_bytes(), false, false, None, None);
-                // minimap2 let score = hits.unwrap(); 
+                
+                if !target.is_empty() {
+                    // minimap2 let hits =aligner.map(target.as_bytes(), false, false, None, None);
+                    // minimap2 let score = hits.unwrap(); 
 
-                // rust_wfa2
-                let alignment_scope = rust_wfa2::aligner::AlignmentScope::Alignment;
-                let memory_model = rust_wfa2::aligner::MemoryModel::MemoryUltraLow;
-                let mut aligner = rust_wfa2::aligner::WFAlignerGapAffine::new(1, 5, 2, alignment_scope, memory_model);
-                let status = aligner.align_end_to_end(target.as_bytes(), pseq.as_bytes());
-                let score = aligner.score();
+                    // rust_wfa2
+                    let alignment_scope = rust_wfa2::aligner::AlignmentScope::Alignment;
+                    let memory_model = rust_wfa2::aligner::MemoryModel::MemoryUltraLow;
+                    let mut aligner = rust_wfa2::aligner::WFAlignerGapAffine::new(1, 5, 2, alignment_scope, memory_model);
+                    let status = aligner.align_end_to_end(target.as_bytes(), pseq.as_bytes());
+                    let score = aligner.score();
 
-                // bio::alignment too slow
-                // let score = alignment(&target, &pseq);
+                    // bio::alignment too slow
+                    // let score = alignment(&target, &pseq);
 
 
-<<<<<<< HEAD
-                data_info.insert(index, {
-                    let mut sub_map = HashMap::new();
-                    sub_map.insert("sample".to_string(), sample.to_string());
-                    sub_map.insert("read".to_string(), h.to_string());
-                    sub_map.insert("path".to_string(), p.join(">"));
-                    sub_map.insert("cost".to_string(), (-score).to_string());
-                    sub_map
-                });
+                    data_info.insert(index, {
+                        let mut sub_map = HashMap::new();
+                        sub_map.insert("sample".to_string(), sample.to_string());
+                        sub_map.insert("read".to_string(), h.to_string());
+                        sub_map.insert("path".to_string(), p.join(">"));
+                        sub_map.insert("cost".to_string(), (-score).to_string());
+                        sub_map
+                    });
 
-                index += 1;
+                    index += 1;
 
-                // println!("{:?}, {:?}", h, score);
-            }else {
-                continue;
+                    // println!("{:?}, {:?}", h, score);
+                }else {
+                    continue;
+                }
             }
+
         }
 
     };
@@ -264,8 +255,6 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
     data_info
 }
 
-=======
->>>>>>> ba3cfee (add read files)
 pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize) {
     let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
     let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
@@ -334,7 +323,6 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     };
     let sink_rev = skydive::agg::reverse_complement(&sink);
 
-<<<<<<< HEAD
     // Extract single sample graph
     let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();
     println!("Single sample Graph:\n{:?}", graph.incoming);
@@ -342,24 +330,35 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     // pairwise alignment between reads and candidate paths from single_sample graph, 
     // construct HashMap for Ryan's optimizer
     let data_info = calculate_edit_distance(read_path, sample, single_sample_graph, source_node_name, source, sink_node_name, sink);
-=======
-    let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist, read_sets, sample);
-    match single_sample_graph {
-        Ok(graph) => println!("Single sample Graph:\n{:?}", graph.incoming),
-        Err(e) => println!("Error extracting single sample graph: {:?}", e),
+    
+    //  Ryan's optimizer translated using gurobi
+    let mut unique_samples = HashSet::new();
+    let mut unique_paths = HashSet::new();
+    let mut unique_reads = HashSet::new();
+
+    for sub_map in data_info.values() {
+        if let Some(sample_name) = sub_map.get("sample") {
+            unique_samples.insert(sample_name.clone());
+        }
+        if let Some(path_name) = sub_map.get("path") {
+            unique_paths.insert(path_name.clone());
+        }
+        if let Some(read_name) = sub_map.get("read") {
+            unique_reads.insert(read_name.clone());
+        }
+
     }
 
-    // import read files
-    let reader = Reader::from_file(read_path).unwrap();
-    let all_reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
+    let env = Env::new("logfile.log").unwrap();
+    let mut model = env.new_model("hap").unwrap();
+    
+    
     
 
-    
 
->>>>>>> ba3cfee (add read files)
-    
 
-    //  Ryan's optimizer translated using gurobi
+
+
     
 
 }

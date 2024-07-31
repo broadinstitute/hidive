@@ -38,4 +38,9 @@ url = "2.5.2"
 ndarray = "0.15"
 linfa = "0.5"
 minimap2 = "0.1.20+minimap2.2.28"
+<<<<<<< HEAD
 rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
+=======
+rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git" }
+gurobi = "0.3.4"
+>>>>>>> 4d70542 (fds)
