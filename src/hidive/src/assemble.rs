@@ -352,6 +352,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     let env = Env::new("logfile.log").unwrap();
     let mut model = env.new_model("hap").unwrap();
     
+
     
     
 
