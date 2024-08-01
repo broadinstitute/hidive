@@ -46,7 +46,7 @@ FROM python:3.9-slim
 
 # Copy necessary files from builder stage
 COPY --from=builder /usr/local/bin/hidive /usr/local/bin/hidive
-COPY --from=builder /root/.cargo /root/.cargo
+#COPY --from=builder /root/.cargo /root/.cargo
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Set environment variables
