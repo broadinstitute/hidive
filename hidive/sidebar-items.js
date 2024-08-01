@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Commands"],"fn":["elapsed_time","main"],"mod":["assemble","build","cluster","coassemble","fetch","impute","sift","train","trim"],"struct":["Cli"]};
+window.SIDEBAR_ITEMS = {"enum":["Commands"],"fn":["elapsed_time","main"],"mod":["assemble","build","cluster","coassemble","fetch","impute","rescue","train","trim"],"struct":["Cli"]};

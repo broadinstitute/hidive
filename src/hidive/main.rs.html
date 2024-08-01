@@ -392,7 +392,7 @@
 <span class="kw">mod </span>coassemble;
 <span class="kw">mod </span>fetch;
 <span class="kw">mod </span>impute;
-<span class="kw">mod </span>sift;
+<span class="kw">mod </span>rescue;
 <span class="kw">mod </span>train;
 <span class="kw">mod </span>trim;
 
@@ -453,7 +453,7 @@
 
     <span class="doccomment">/// Find more sequences (aligned or unaligned) overlapping previously fetched reads.
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
-    </span>Sift {
+    </span>Rescue {
         <span class="doccomment">/// Output path for FASTA file with reads spanning locus of interest.
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
@@ -596,12 +596,12 @@
         } =&gt; {
             fetch::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, unmapped, <span class="kw-2">&amp;</span>seq_paths);
         }
-        Commands::Sift {
+        Commands::Rescue {
             output,
             fasta_paths,
             seq_paths,
         } =&gt; {
-            sift::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
+            rescue::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
         }
         Commands::Cluster {
             output,
