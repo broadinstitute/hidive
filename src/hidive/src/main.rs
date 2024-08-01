@@ -61,6 +61,7 @@ mod fetch;
 mod sift;
 mod impute;
 mod trim;
+mod evaluation;
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[clap(name = "hidive")]
@@ -107,6 +108,21 @@ enum Commands {
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
+    },
+
+    #[clap(arg_required_else_help = true)]
+    Evaluation {
+        /// Output path for FASTA file with reads spanning locus of interest.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Series-parallel graph.
+        #[clap(required = true, value_parser)]
+        graph: PathBuf,
+
+        /// Truth fasta files for evaluation.
+        #[clap(required = true, value_parser)]
+        seq_paths: PathBuf,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -230,6 +246,15 @@ fn main() {
         } => {
             sift::start(&output, &fasta_paths, &seq_paths);
         }
+
+        Commands::Evaluation{
+            output,
+            graph,
+            seq_paths,
+        } => {
+            evaluation::start(&output, &graph, &seq_paths);
+        }
+
         Commands::Cluster {
             output,
             kmer_size,

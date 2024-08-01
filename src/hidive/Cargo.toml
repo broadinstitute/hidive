@@ -31,3 +31,6 @@ serde = "1.0.204"
 serde_json = "1.0.120"
 skydive = { path = "../skydive" }
 url = "2.5.2"
+gfa = "0.8.0"
+handlegraph = "0.5.0"
+recgraph = { git = "https://github.com/AlgoLab/RecGraph" }
