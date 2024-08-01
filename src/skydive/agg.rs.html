@@ -116,14 +116,39 @@
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
 <a href="#118" id="118">118</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::collections::HashSet;
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>flate2::read::GzDecoder;
 <span class="kw">use </span>serde_json::Value;
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::collections::HashSet;
+<span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::{<span class="self">self</span>, BufRead, BufReader, Write};
 <span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>std::sync::Mutex;
-<span class="kw">use </span>std::fs::File;
-<span class="kw">use </span>flate2::read::GzDecoder;
 
 <span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>GraphicalGenome {
@@ -190,7 +215,12 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         df_single_sample: <span class="kw-2">&amp;</span>HashMap&lt;String, HashMap&lt;String, usize&gt;&gt;, <span class="comment">// Assuming df_single_sample is a HashMap with anchor as key and another HashMap of readset and edge index as value
         </span>sample: <span class="kw-2">&amp;</span>str,
-    ) -&gt; (HashMap&lt;String, Value&gt;, HashMap&lt;String, Value&gt;, HashMap&lt;String, Vec&lt;String&gt;&gt;, HashMap&lt;String, Vec&lt;String&gt;&gt;) {
+    ) -&gt; (
+        HashMap&lt;String, Value&gt;,
+        HashMap&lt;String, Value&gt;,
+        HashMap&lt;String, Vec&lt;String&gt;&gt;,
+        HashMap&lt;String, Vec&lt;String&gt;&gt;,
+    ) {
         <span class="kw">let </span><span class="kw-2">mut </span>new_edges = HashMap::new();
         <span class="kw">let </span><span class="kw-2">mut </span>new_incoming = HashMap::new();
         <span class="kw">let </span><span class="kw-2">mut </span>new_outgoing = HashMap::new();
@@ -209,22 +239,42 @@
                         <span class="comment">// Update reads and strain
                         </span><span class="kw">let </span>edge_object = edge_value.as_object_mut().unwrap();
                         {
-                            <span class="kw">let </span>reads = edge_object.entry(<span class="string">"reads"</span>).or_insert_with(|| <span class="macro">serde_json::json!</span>([]));
+                            <span class="kw">let </span>reads = edge_object
+                                .entry(<span class="string">"reads"</span>)
+                                .or_insert_with(|| <span class="macro">serde_json::json!</span>([]));
                             reads.as_array_mut().unwrap().push(<span class="macro">serde_json::json!</span>(read));
                         }
                         {
-                            <span class="kw">let </span>strain = edge_object.entry(<span class="string">"strain"</span>).or_insert_with(|| <span class="macro">serde_json::json!</span>(HashSet::&lt;String&gt;::new()));
-                            strain.as_array_mut().unwrap().push(<span class="macro">serde_json::json!</span>(sample));
+                            <span class="kw">let </span>strain = edge_object
+                                .entry(<span class="string">"strain"</span>)
+                                .or_insert_with(|| <span class="macro">serde_json::json!</span>(HashSet::&lt;String&gt;::new()));
+                            strain
+                                .as_array_mut()
+                                .unwrap()
+                                .push(<span class="macro">serde_json::json!</span>(sample));
                         }
-                        
+
                         new_edges.insert(edgename.to_string(), edge_value);
 
                         <span class="comment">// Update incoming and outgoing
-                        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(dst) = outgoinglist.get(<span class="number">0</span>) { <span class="comment">// Assuming the first element is the destination
-                            </span>new_incoming.entry(edgename.to_string()).or_insert_with(Vec::new).push(anchor.to_string());
-                            new_incoming.entry(dst.to_string()).or_insert_with(Vec::new).push(edgename.to_string());
-                            new_outgoing.entry(anchor.to_string()).or_insert_with(Vec::new).push(edgename.to_string());
-                            new_outgoing.entry(edgename.to_string()).or_insert_with(Vec::new).push(dst.to_string());
+                        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(dst) = outgoinglist.get(<span class="number">0</span>) {
+                            <span class="comment">// Assuming the first element is the destination
+                            </span>new_incoming
+                                .entry(edgename.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(anchor.to_string());
+                            new_incoming
+                                .entry(dst.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(edgename.to_string());
+                            new_outgoing
+                                .entry(anchor.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(edgename.to_string());
+                            new_outgoing
+                                .entry(edgename.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(dst.to_string());
                         }
                     }
                 }

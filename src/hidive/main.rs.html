@@ -288,6 +288,50 @@
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -338,7 +382,6 @@
 //!  export GCS_REQUESTER_PAYS_PROJECT=&lt;Google Project ID&gt;
 //! ```
 
-
 </span><span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">use </span>clap::{Parser, Subcommand};
@@ -348,8 +391,9 @@
 <span class="kw">mod </span>cluster;
 <span class="kw">mod </span>coassemble;
 <span class="kw">mod </span>fetch;
-<span class="kw">mod </span>sift;
 <span class="kw">mod </span>impute;
+<span class="kw">mod </span>sift;
+<span class="kw">mod </span>train;
 <span class="kw">mod </span>trim;
 
 <span class="attr">#[derive(Debug, Parser)] </span><span class="comment">// requires `derive` feature
@@ -363,6 +407,30 @@
 
 <span class="attr">#[derive(Debug, Subcommand)]
 </span><span class="kw">enum </span>Commands {
+    <span class="doccomment">/// Train a graph-cleaning model using short- and long-read data with ground truth assemblies.
+    </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
+    </span>Train {
+        <span class="doccomment">/// Output path for trained model.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
+        </span>output: PathBuf,
+
+        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span>long_read_seq_paths: Vec&lt;PathBuf&gt;,
+
+        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span>short_read_seq_paths: Vec&lt;PathBuf&gt;,
+
+        <span class="doccomment">/// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        </span><span class="attr">#[clap(value_parser, required = <span class="bool-val">true</span>)]
+        </span>truth_seq_paths: Vec&lt;PathBuf&gt;,
+
+        <span class="doccomment">/// Turn on debug mode.
+        </span><span class="attr">#[clap(short, long, value_parser)]
+        </span>debug: bool,
+    },
+
     <span class="doccomment">/// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
     </span>Fetch {
@@ -505,6 +573,21 @@
     <span class="kw">let </span>start_time = std::time::Instant::now();
 
     <span class="kw">match </span>args.command {
+        Commands::Train {
+            output,
+            long_read_seq_paths,
+            short_read_seq_paths,
+            truth_seq_paths,
+            debug,
+        } =&gt; {
+            train::start(
+                <span class="kw-2">&amp;</span>output,
+                <span class="kw-2">&amp;</span>long_read_seq_paths,
+                <span class="kw-2">&amp;</span>short_read_seq_paths,
+                <span class="kw-2">&amp;</span>truth_seq_paths,
+                debug,
+            );
+        }
         Commands::Fetch {
             output,
             loci,
@@ -513,7 +596,7 @@
         } =&gt; {
             fetch::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, unmapped, <span class="kw-2">&amp;</span>seq_paths);
         }
-        Commands::Sift{
+        Commands::Sift {
             output,
             fasta_paths,
             seq_paths,
@@ -554,7 +637,12 @@
             long_read_fasta_paths,
             short_read_fasta_paths,
         } =&gt; {
-            coassemble::start(<span class="kw-2">&amp;</span>output, kmer_size, <span class="kw-2">&amp;</span>long_read_fasta_paths, <span class="kw-2">&amp;</span>short_read_fasta_paths);
+            coassemble::start(
+                <span class="kw-2">&amp;</span>output,
+                kmer_size,
+                <span class="kw-2">&amp;</span>long_read_fasta_paths,
+                <span class="kw-2">&amp;</span>short_read_fasta_paths,
+            );
         }
     }
 
@@ -564,7 +652,7 @@
 <span class="kw">fn </span>elapsed_time(start_time: std::time::Instant) -&gt; String {
     <span class="kw">let </span>end_time = std::time::Instant::now();
     <span class="kw">let </span>elapsed_time = end_time.duration_since(start_time);
-    
+
     <span class="kw">let </span>elapsed_secs = elapsed_time.as_secs_f64();
     <span class="kw">let </span>elapsed_str = <span class="kw">if </span>elapsed_secs &lt; <span class="number">60.0 </span>{
         <span class="macro">format!</span>(<span class="string">"{:.2} seconds"</span>, elapsed_secs)

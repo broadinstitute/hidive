@@ -65,10 +65,18 @@
 <a href="#65" id="65">65</a>
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
 
-<span class="kw">use </span>cloud_storage::{ sync::<span class="kw-2">*</span>, ListRequest, object::ObjectList };
-<span class="kw">use </span>chrono::{ DateTime, Utc };
+<span class="kw">use </span>chrono::{DateTime, Utc};
+<span class="kw">use </span>cloud_storage::{object::ObjectList, sync::<span class="kw-2">*</span>, ListRequest};
 
 <span class="kw">pub fn </span>gcs_split_path(path: <span class="kw-2">&amp;</span>str) -&gt; (String, String) {
     <span class="kw">let </span>re = regex::Regex::new(<span class="string">r"^gs://"</span>).unwrap();
@@ -85,9 +93,13 @@
     <span class="kw">let </span>(bucket_name, prefix) = gcs_split_path(path);
 
     <span class="kw">let </span>client = Client::new()<span class="question-mark">?</span>;
-    <span class="kw">let </span>file_list = client
-        .object()
-        .list(<span class="kw-2">&amp;</span>bucket_name, ListRequest { prefix: <span class="prelude-val">Some</span>(prefix), ..Default::default() })<span class="question-mark">?</span>;
+    <span class="kw">let </span>file_list = client.object().list(
+        <span class="kw-2">&amp;</span>bucket_name,
+        ListRequest {
+            prefix: <span class="prelude-val">Some</span>(prefix),
+            ..Default::default()
+        },
+    )<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(file_list)
 }
@@ -124,7 +136,11 @@
             fs.items
                 .iter()
                 .filter_map(|f| {
-                    <span class="kw">if </span>f.name.ends_with(suffix) { <span class="prelude-val">Some</span>(f.name.clone()) } <span class="kw">else </span>{ <span class="prelude-val">None </span>}
+                    <span class="kw">if </span>f.name.ends_with(suffix) {
+                        <span class="prelude-val">Some</span>(f.name.clone())
+                    } <span class="kw">else </span>{
+                        <span class="prelude-val">None
+                    </span>}
                 })
                 .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
         })

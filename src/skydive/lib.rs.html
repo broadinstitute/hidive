@@ -28,13 +28,13 @@
 //! of long-read data and a linked de Bruijn graph representation of short-read data.
 //!
 
-</span><span class="kw">pub mod </span>ldbg;
+</span><span class="kw">pub mod </span>edges;
+<span class="kw">pub mod </span>ldbg;
 <span class="kw">pub mod </span>link;
-<span class="kw">pub mod </span>edges;
 <span class="kw">pub mod </span>record;
 
-<span class="kw">pub mod </span>mldbg;
 <span class="kw">pub mod </span>agg;
+<span class="kw">pub mod </span>mldbg;
 
 <span class="kw">pub mod </span>env;
 <span class="kw">pub mod </span>parse;
@@ -49,4 +49,5 @@
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; {
         <span class="macro">eprintln!</span>(<span class="string">"[{}] {}"</span>, chrono::Local::now().format(<span class="string">"%Y-%m-%d %H:%M:%S"</span>), <span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     };
-}</code></pre></div></section></main></body></html>
+}
+</code></pre></div></section></main></body></html>

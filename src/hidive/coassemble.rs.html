@@ -98,9 +98,38 @@
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::path::PathBuf;
-<span class="kw">use </span>std::{fs::File, io::{BufWriter, Write}};
+<span class="kw">use </span>std::{
+    fs::File,
+    io::{BufWriter, Write},
+};
 
 <span class="kw">use </span>skydive::ldbg::LdBG;
 
@@ -116,7 +145,10 @@
     <span class="comment">// Read all long reads.
     </span><span class="kw">let </span><span class="kw-2">mut </span>all_lr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>long_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>long_read_seq_urls {
-        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(<span class="kw-2">&amp;</span>long_read_seq_url, <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>]);
+        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
+            <span class="kw-2">&amp;</span>long_read_seq_url,
+            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
+        );
         <span class="kw">let </span>fasta_path = long_read_seq_url.to_file_path().unwrap();
 
         <span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read sample {}..."</span>, basename);
@@ -124,10 +156,12 @@
         <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
         <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
 
-        all_lr_seqs.extend(all_reads
-            .iter()
-            .map(|r| r.seq().to_vec())
-            .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;());
+        all_lr_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
+        );
     }
 
     <span class="kw">let </span>l1 = LdBG::from_sequences(String::from(<span class="string">"l1"</span>), kmer_size, <span class="kw-2">&amp;</span>all_lr_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
@@ -135,7 +169,10 @@
     <span class="comment">// Read all short reads.
     </span><span class="kw">let </span><span class="kw-2">mut </span>all_sr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>short_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>short_read_seq_urls {
-        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(<span class="kw-2">&amp;</span>short_read_seq_url, <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>]);
+        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
+            <span class="kw-2">&amp;</span>short_read_seq_url,
+            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
+        );
         <span class="kw">let </span>fasta_path = short_read_seq_url.to_file_path().unwrap();
 
         <span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read sample {}..."</span>, basename);
@@ -143,10 +180,12 @@
         <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
         <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
 
-        all_sr_seqs.extend(all_reads
-            .iter()
-            .map(|r| r.seq().to_vec())
-            .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;());
+        all_sr_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
+        );
     }
 
     <span class="kw">let </span><span class="kw-2">mut </span>s1 = LdBG::from_sequences(String::from(<span class="string">"s1"</span>), kmer_size, <span class="kw-2">&amp;</span>all_sr_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
@@ -169,8 +208,12 @@
         .iter()
         .cloned()
         .filter(|read| {
-            <span class="kw">let </span>num_contained = read.windows(kmer_size)
-                .filter(|kmer| s1.kmers.contains_key(<span class="kw-2">&amp;</span>skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
+            <span class="kw">let </span>num_contained = read
+                .windows(kmer_size)
+                .filter(|kmer| {
+                    s1.kmers
+                        .contains_key(<span class="kw-2">&amp;</span>skydive::ldbg::LdBG::canonicalize_kmer(kmer))
+                })
                 .count();
 
             num_contained == read.len() - kmer_size + <span class="number">1
@@ -182,7 +225,10 @@
     <span class="macro">skydive::elog!</span>(<span class="string">"Short reads (before filtering): {}"</span>, <span class="kw-2">&amp;</span>all_sr_seqs.len());
     <span class="macro">skydive::elog!</span>(<span class="string">"Short reads (after filtering): {}"</span>, <span class="kw-2">&amp;</span>filtered_sr_seqs.len());
 
-    <span class="kw">let </span>all_seqs = all_lr_seqs.into_iter().chain(filtered_sr_seqs.iter().cloned()).collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+    <span class="kw">let </span>all_seqs = all_lr_seqs
+        .into_iter()
+        .chain(filtered_sr_seqs.iter().cloned())
+        .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
     <span class="macro">skydive::elog!</span>(<span class="string">"Combined reads: {}"</span>, <span class="kw-2">&amp;</span>all_seqs.len());
 
     <span class="comment">// Assemble contigs.
@@ -195,7 +241,13 @@
 
     <span class="macro">skydive::elog!</span>(<span class="string">"Writing {} contigs to disk..."</span>, <span class="kw-2">&amp;</span>contigs.len());
     <span class="kw">for </span>(i, contig) <span class="kw">in </span>contigs.iter().enumerate() {
-        <span class="macro">writeln!</span>(writer, <span class="string">"&gt;unitig_{}\n{}"</span>, i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+        <span class="macro">writeln!</span>(
+            writer,
+            <span class="string">"&gt;unitig_{}\n{}"</span>,
+            i,
+            String::from_utf8(contig.clone()).unwrap()
+        )
+        .unwrap();
     }
 }
 </code></pre></div></section></main></body></html>

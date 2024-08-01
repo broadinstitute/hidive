@@ -84,8 +84,10 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt;
-<span class="kw">use </span>std::collections::VecDeque;
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::VecDeque;
+<span class="kw">use </span>std::fmt;
 
 <span class="kw">use </span>needletail::sequence::complement;
 
@@ -95,7 +97,7 @@
 </span><span class="attr">#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 </span><span class="kw">pub struct </span>Link {
     <span class="kw">pub </span>is_forward: bool,
-    <span class="kw">pub </span>junctions: VecDeque&lt;u8&gt;
+    <span class="kw">pub </span>junctions: VecDeque&lt;u8&gt;,
 }
 
 <span class="kw">impl </span>Link {
@@ -103,7 +105,7 @@
     </span><span class="kw">pub fn </span>new(is_forward: bool) -&gt; <span class="self">Self </span>{
         Link {
             is_forward,
-            junctions: VecDeque::new()
+            junctions: VecDeque::new(),
         }
     }
 
@@ -111,7 +113,7 @@
     </span><span class="kw">pub fn </span>from_junctions(is_forward: bool, seq: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="self">Self </span>{
         Link {
             is_forward,
-            junctions: VecDeque::from(seq.to_vec())
+            junctions: VecDeque::from(seq.to_vec()),
         }
     }
 
@@ -163,10 +165,13 @@
         <span class="kw">for </span>junction <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.junctions {
             jvec.push(<span class="kw-2">*</span>junction);
         }
-        
-        <span class="macro">write!</span>(f, <span class="string">"{} {:?}"</span>,
+
+        <span class="macro">write!</span>(
+            f,
+            <span class="string">"{} {:?}"</span>,
             <span class="kw">if </span><span class="self">self</span>.is_forward { <span class="string">"F" </span>} <span class="kw">else </span>{ <span class="string">"R" </span>},
             std::str::from_utf8(jvec.as_bytes())
         )
     }
-}</code></pre></div></section></main></body></html>
+}
+</code></pre></div></section></main></body></html>

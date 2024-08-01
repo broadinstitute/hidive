@@ -170,6 +170,18 @@
 <a href="#170" id="170">170</a>
 <a href="#171" id="171">171</a>
 <a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, path::PathBuf};
 
 <span class="kw">use </span><span class="kw">crate</span>::ldbg::LdBG;
@@ -180,7 +192,7 @@
     <span class="kw">pub </span>ldbgs: Vec&lt;LdBG&gt;,
     <span class="kw">pub </span>kmer_size: usize,
     <span class="kw">pub </span>clean: bool,
-    <span class="kw">pub </span>build_links: bool
+    <span class="kw">pub </span>build_links: bool,
 }
 
 <span class="kw">impl </span>MLdBG {
@@ -190,7 +202,7 @@
             ldbgs: Vec::new(),
             kmer_size,
             clean,
-            build_links
+            build_links,
         }
     }
 
@@ -199,7 +211,10 @@
         <span class="kw">let </span>kmer_size = ldbgs[<span class="number">0</span>].kmer_size;
 
         <span class="kw">for </span>ldbg <span class="kw">in </span><span class="kw-2">&amp;</span>ldbgs {
-            <span class="macro">assert!</span>(ldbg.kmer_size == kmer_size, <span class="string">"The k-mer size of the LdBG does not match the k-mer size of the MLdBG."</span>);
+            <span class="macro">assert!</span>(
+                ldbg.kmer_size == kmer_size,
+                <span class="string">"The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+            </span>);
         }
 
         MLdBG {
@@ -212,7 +227,10 @@
 
     <span class="doccomment">/// Add a LdBG to the MLdBG.
     </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ldbg: LdBG) {
-        <span class="macro">assert!</span>(ldbg.kmer_size == <span class="self">self</span>.kmer_size, <span class="string">"The k-mer size of the LdBG does not match the k-mer size of the MLdBG."</span>);
+        <span class="macro">assert!</span>(
+            ldbg.kmer_size == <span class="self">self</span>.kmer_size,
+            <span class="string">"The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+        </span>);
 
         <span class="self">self</span>.ldbgs.push(ldbg);
     }
@@ -250,7 +268,13 @@
             .map(|r| r.seq().to_vec())
             .collect();
 
-        <span class="kw">let </span>l = LdBG::from_sequences(name, <span class="self">self</span>.kmer_size, <span class="kw-2">&amp;</span>filtered_reads, <span class="self">self</span>.clean, <span class="self">self</span>.build_links);
+        <span class="kw">let </span>l = LdBG::from_sequences(
+            name,
+            <span class="self">self</span>.kmer_size,
+            <span class="kw-2">&amp;</span>filtered_reads,
+            <span class="self">self</span>.clean,
+            <span class="self">self</span>.build_links,
+        );
         <span class="self">self</span>.ldbgs.push(l);
     }
 
@@ -341,4 +365,5 @@
             <span class="prelude-val">None
         </span>}
     }
-}</code></pre></div></section></main></body></html>
+}
+</code></pre></div></section></main></body></html>

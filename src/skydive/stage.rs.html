@@ -417,6 +417,29 @@
 <a href="#417" id="417">417</a>
 <a href="#418" id="418">418</a>
 <a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import the Result type from the anyhow crate for error handling.
 </span><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -426,8 +449,8 @@
 </span><span class="kw">use </span>std::collections::{HashMap, HashSet};
 <span class="kw">use </span>std::env;
 <span class="kw">use </span>std::fs::File;
-<span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>std::io::BufWriter;
+<span class="kw">use </span>std::path::PathBuf;
 
 <span class="comment">// Import the Url type to work with URLs.
 </span><span class="kw">use </span>url::Url;
@@ -437,15 +460,15 @@
 
 <span class="comment">// Import rayon's parallel iterator traits.
 // use rayon::prelude::*;
-</span><span class="kw">use </span>rayon::iter::{ParallelIterator, IntoParallelRefIterator};
+</span><span class="kw">use </span>rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 <span class="comment">// Import types from rust_htslib for working with BAM files.
-</span><span class="kw">use </span>rust_htslib::bam::{ <span class="self">self</span>, FetchDefinition, IndexedReader, Read };
+</span><span class="kw">use </span>bio::io::fasta;
+<span class="kw">use </span>rust_htslib::bam::{<span class="self">self</span>, FetchDefinition, IndexedReader, Read};
 <span class="kw">use </span>rust_htslib::faidx::Reader;
-<span class="kw">use </span>bio::io::fasta;
 
 <span class="comment">// Import functions for authorizing access to Google Cloud Storage.
-</span><span class="kw">use </span><span class="kw">crate</span>::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
+</span><span class="kw">use </span><span class="kw">crate</span>::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 
 <span class="comment">// Function to open a BAM/CRAM file from a URL and cache its contents locally.
 </span><span class="kw">pub fn </span>open_bam(seqs_url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="prelude-ty">Result</span>&lt;IndexedReader&gt; {
@@ -537,7 +560,10 @@
         <span class="kw">if let </span><span class="prelude-val">Some</span>(sm) = rg_sm_map.get(v) {
             <span class="prelude-val">Ok</span>(sm.to_owned())
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Sample name not found for read group: {}"</span>, v))
+            <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(
+                <span class="string">"Sample name not found for read group: {}"</span>,
+                v
+            ))
         }
     } <span class="kw">else </span>{
         <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Read group is not a string"</span>))
@@ -545,7 +571,13 @@
 }
 
 <span class="comment">// Function to extract seqs from a BAM file within a specified genomic region.
-</span><span class="kw">fn </span>extract_aligned_bam_reads(_basename: <span class="kw-2">&amp;</span>str, bam: <span class="kw-2">&amp;mut </span>IndexedReader, chr: <span class="kw-2">&amp;</span>str, start: <span class="kw-2">&amp;</span>u64, stop: <span class="kw-2">&amp;</span>u64) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
+</span><span class="kw">fn </span>extract_aligned_bam_reads(
+    _basename: <span class="kw-2">&amp;</span>str,
+    bam: <span class="kw-2">&amp;mut </span>IndexedReader,
+    chr: <span class="kw-2">&amp;</span>str,
+    start: <span class="kw-2">&amp;</span>u64,
+    stop: <span class="kw-2">&amp;</span>u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(bam);
 
     <span class="kw">let </span><span class="kw-2">mut </span>bmap = HashMap::new();
@@ -559,7 +591,7 @@
                 <span class="kw">let </span>qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 <span class="kw">let </span>sm = <span class="kw">match </span>get_sm_name_from_rg(<span class="kw-2">&amp;</span>alignment.record(), <span class="kw-2">&amp;</span>rg_sm_map) {
                     <span class="prelude-val">Ok</span>(a) =&gt; a,
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>)
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>),
                 };
 
                 <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{}|{}"</span>, qname, sm);
@@ -596,7 +628,10 @@
 }
 
 <span class="comment">// Function to extract unaligned seqs from a BAM file
-</span><span class="kw">fn </span>extract_unaligned_bam_reads(_basename: <span class="kw-2">&amp;</span>str, bam: <span class="kw-2">&amp;mut </span>IndexedReader) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
+</span><span class="kw">fn </span>extract_unaligned_bam_reads(
+    _basename: <span class="kw-2">&amp;</span>str,
+    bam: <span class="kw-2">&amp;mut </span>IndexedReader,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(bam);
 
     <span class="kw">let _ </span>= bam.fetch(FetchDefinition::Unmapped);
@@ -612,11 +647,7 @@
             <span class="kw">let </span>vseq = read.seq().as_bytes();
             <span class="kw">let </span>bseq = vseq.as_bytes();
 
-            <span class="kw">let </span>seq = fasta::Record::with_attrs(
-                seq_name.as_str(),
-                <span class="prelude-val">Some</span>(<span class="string">""</span>),
-                bseq
-            );
+            <span class="kw">let </span>seq = fasta::Record::with_attrs(seq_name.as_str(), <span class="prelude-val">Some</span>(<span class="string">""</span>), bseq);
 
             seq
         })
@@ -626,9 +657,17 @@
 }
 
 <span class="comment">// Function to extract seqs from a FASTA file within a specified genomic region.
-</span><span class="kw">fn </span>extract_fasta_seqs(basename: <span class="kw-2">&amp;</span>String, fasta: <span class="kw-2">&amp;mut </span>Reader, chr: <span class="kw-2">&amp;</span>String, start: <span class="kw-2">&amp;</span>u64, stop: <span class="kw-2">&amp;</span>u64) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
+</span><span class="kw">fn </span>extract_fasta_seqs(
+    basename: <span class="kw-2">&amp;</span>String,
+    fasta: <span class="kw-2">&amp;mut </span>Reader,
+    chr: <span class="kw-2">&amp;</span>String,
+    start: <span class="kw-2">&amp;</span>u64,
+    stop: <span class="kw-2">&amp;</span>u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span>id = <span class="macro">format!</span>(<span class="string">"{}:{}-{}|{}"</span>, chr, start, stop, basename);
-    <span class="kw">let </span>seq = fasta.fetch_seq_string(chr, <span class="kw-2">*</span>start <span class="kw">as </span>usize, (<span class="kw-2">*</span>stop - <span class="number">1</span>) <span class="kw">as </span>usize).unwrap();
+    <span class="kw">let </span>seq = fasta
+        .fetch_seq_string(chr, <span class="kw-2">*</span>start <span class="kw">as </span>usize, (<span class="kw-2">*</span>stop - <span class="number">1</span>) <span class="kw">as </span>usize)
+        .unwrap();
 
     <span class="kw">let </span>records = <span class="macro">vec!</span>[fasta::Record::with_attrs(id.as_str(), <span class="prelude-val">None</span>, seq.as_bytes())];
 
@@ -639,11 +678,17 @@
 </span><span class="kw">fn </span>stage_data_from_one_file(
     seqs_url: <span class="kw-2">&amp;</span>Url,
     loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
-    unmapped: bool
+    unmapped: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>all_seqs = Vec::new();
 
-    <span class="kw">let </span>basename = seqs_url.path_segments().map(|c| c.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()).unwrap().last().unwrap().to_string();
+    <span class="kw">let </span>basename = seqs_url
+        .path_segments()
+        .map(|c| c.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;())
+        .unwrap()
+        .last()
+        .unwrap()
+        .to_string();
 
     <span class="kw">let </span>seqs_str = seqs_url.as_str();
     <span class="kw">if </span>seqs_str.ends_with(<span class="string">".bam"</span>) || seqs_str.ends_with(<span class="string">".cram"</span>) {
@@ -656,7 +701,8 @@
 
         <span class="comment">// Extract seqs for the current locus.
         </span><span class="kw">for </span>(chr, start, stop) <span class="kw">in </span>loci.iter() {
-            <span class="kw">let </span>aligned_seqs = extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop).unwrap();
+            <span class="kw">let </span>aligned_seqs =
+                extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop).unwrap();
             all_seqs.extend(aligned_seqs);
         }
 
@@ -665,7 +711,11 @@
             <span class="kw">let </span>unaligned_seqs = extract_unaligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam).unwrap();
             all_seqs.extend(unaligned_seqs);
         }
-    } <span class="kw">else if </span>seqs_str.ends_with(<span class="string">".fa"</span>) || seqs_str.ends_with(<span class="string">".fasta"</span>) || seqs_str.ends_with(<span class="string">".fa.gz"</span>) || seqs_str.ends_with(<span class="string">".fasta.gz"</span>) {
+    } <span class="kw">else if </span>seqs_str.ends_with(<span class="string">".fa"</span>)
+        || seqs_str.ends_with(<span class="string">".fasta"</span>)
+        || seqs_str.ends_with(<span class="string">".fa.gz"</span>)
+        || seqs_str.ends_with(<span class="string">".fasta.gz"</span>)
+    {
         <span class="comment">// Handle FASTA file processing
         </span><span class="kw">let </span>basename = basename
             .trim_end_matches(<span class="string">".fasta.gz"</span>)
@@ -696,7 +746,6 @@
     loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
     unmapped: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
-
     <span class="comment">// Use a parallel iterator to process multiple BAM files concurrently.
     </span><span class="kw">let </span>all_data: Vec&lt;<span class="kw">_</span>&gt; = seq_urls
         .par_iter()
@@ -709,7 +758,7 @@
 
             <span class="comment">// Retry the operation with exponential backoff in case of failure.
             </span><span class="kw">match </span>backoff::retry(ExponentialBackoff::default(), op) {
-                <span class="prelude-val">Ok</span>(seqs) =&gt; { seqs }
+                <span class="prelude-val">Ok</span>(seqs) =&gt; seqs,
                 <span class="prelude-val">Err</span>(e) =&gt; {
                     <span class="comment">// If all retries fail, panic with an error message.
                     </span><span class="macro">panic!</span>(<span class="string">"Error: {}"</span>, e);
@@ -724,12 +773,9 @@
     </span><span class="prelude-val">Ok</span>(flattened_data)
 }
 
-<span class="kw">pub fn </span>read_spans_locus(
-    start: i64,
-    end: i64,
-    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
-) -&gt; bool {
-    loci.iter().any(|e| start &lt;= e.<span class="number">1 </span><span class="kw">as </span>i64 &amp;&amp; end &gt;= e.<span class="number">2 </span><span class="kw">as </span>i64)
+<span class="kw">pub fn </span>read_spans_locus(start: i64, end: i64, loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;) -&gt; bool {
+    loci.iter()
+        .any(|e| start &lt;= e.<span class="number">1 </span><span class="kw">as </span>i64 &amp;&amp; end &gt;= e.<span class="number">2 </span><span class="kw">as </span>i64)
 }
 
 <span class="comment">// Public function to stage data from multiple BAM files and write to an output file.
@@ -738,7 +784,7 @@
     loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
     seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;,
     unmapped: bool,
-    cache_path: <span class="kw-2">&amp;</span>PathBuf
+    cache_path: <span class="kw-2">&amp;</span>PathBuf,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
     <span class="kw">let </span>current_dir = env::current_dir()<span class="question-mark">?</span>;
     env::set_current_dir(cache_path).unwrap();
@@ -769,8 +815,8 @@
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use </span>url::Url;
     <span class="kw">use </span>std::collections::HashSet;
+    <span class="kw">use </span>url::Url;
 
     <span class="comment">// This test may pass, but still print a message to stderr regarding its failure to access data. This is because
     // open_bam() tries a couple of authorization methods before accessing data, and the initial failures print a
@@ -827,7 +873,7 @@
             <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         </span>).unwrap();
         <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
-        <span class="kw">let </span>seq_urls = HashSet::from([ seqs_url_1, seqs_url_2 ]);
+        <span class="kw">let </span>seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
 

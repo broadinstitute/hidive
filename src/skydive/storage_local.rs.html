@@ -11,10 +11,10 @@
 <a href="#11" id="11">11</a>
 <a href="#12" id="12">12</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
-<span class="kw">use </span>chrono::{ DateTime, Utc };
+<span class="kw">use </span>chrono::{DateTime, Utc};
 
-<span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>std::fs::metadata;
+<span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">pub fn </span>local_get_file_update_time(path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="prelude-ty">Result</span>&lt;DateTime&lt;Utc&gt;&gt; {
     <span class="kw">let </span>metadata = metadata(path)<span class="question-mark">?</span>;

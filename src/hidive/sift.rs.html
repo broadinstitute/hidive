@@ -113,18 +113,38 @@
 <a href="#113" id="113">113</a>
 <a href="#114" id="114">114</a>
 <a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fs::File;
-<span class="kw">use </span>std::{collections::HashSet, path::PathBuf};
+<span class="kw">use </span>std::io::Write;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::Arc;
-<span class="kw">use </span>std::io::Write;
+<span class="kw">use </span>std::{collections::HashSet, path::PathBuf};
 
 <span class="kw">use </span>bio::io::fasta::Reader;
 <span class="kw">use </span>num_format::{Locale, ToFormattedString};
 
-<span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>rayon::iter::ParallelBridge;
 <span class="kw">use </span>rayon::iter::ParallelIterator;
+<span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>rust_htslib::bam::{FetchDefinition, Read};
 
@@ -141,7 +161,7 @@
     <span class="comment">// Get the system's temporary directory path
     </span><span class="kw">let </span>cache_path = std::env::temp_dir();
     <span class="macro">skydive::elog!</span>(<span class="string">"Intermediate data will be stored at {:?}."</span>, cache_path);
-    
+
     <span class="comment">// Read the FASTA files and prepare a hashmap of k-mers to search for in the other files.
     </span><span class="kw">let </span><span class="kw-2">mut </span>kmer_set = HashSet::new();
     <span class="kw">for </span>fasta_url <span class="kw">in </span>fasta_urls {
@@ -164,17 +184,20 @@
     <span class="kw">for </span>seq_url <span class="kw">in </span>seq_urls {
         <span class="kw">let </span><span class="kw-2">mut </span>reader = skydive::stage::open_bam(<span class="kw-2">&amp;</span>seq_url).unwrap();
 
-        <span class="kw">let </span>progress_bar = skydive::utils::default_unbounded_progress_bar(<span class="string">"Searching for similar reads (0 found)"</span>);
+        <span class="kw">let </span>progress_bar =
+            skydive::utils::default_unbounded_progress_bar(<span class="string">"Searching for similar reads (0 found)"</span>);
 
         <span class="comment">// Create some thread-safe counters.
         </span><span class="kw">let </span>found_items = Arc::new(AtomicUsize::new(<span class="number">0</span>));
         <span class="kw">let </span>processed_items = Arc::new(AtomicUsize::new(<span class="number">0</span>));
         <span class="kw">let </span>progress_bar = Arc::new(progress_bar);
-        
+
         <span class="kw">const </span>UPDATE_FREQUENCY: usize = <span class="number">1_000_000</span>;
-        
+
         <span class="comment">// Iterate over the records in parallel.
-        </span>reader.fetch(FetchDefinition::All).expect(<span class="string">"Failed to fetch reads"</span>);
+        </span>reader
+            .fetch(FetchDefinition::All)
+            .expect(<span class="string">"Failed to fetch reads"</span>);
         <span class="kw">let </span>records: Vec&lt;<span class="kw">_</span>&gt; = reader
             .records()
             .par_bridge()
@@ -183,10 +206,13 @@
                 <span class="comment">// Increment progress counters and update the progress bar every once in a while.
                 </span><span class="kw">let </span>current_processed = processed_items.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
                 <span class="kw">if </span>current_processed % UPDATE_FREQUENCY == <span class="number">0 </span>{
-                    progress_bar.set_message(<span class="macro">format!</span>(<span class="string">"Searching for similar reads ({} found)"</span>, found_items.load(Ordering::Relaxed)));
+                    progress_bar.set_message(<span class="macro">format!</span>(
+                        <span class="string">"Searching for similar reads ({} found)"</span>,
+                        found_items.load(Ordering::Relaxed)
+                    ));
                     progress_bar.inc(UPDATE_FREQUENCY <span class="kw">as </span>u64);
                 }
-        
+
                 <span class="comment">// Count the number of k-mers found in our hashset from the long reads.
                 </span><span class="kw">let </span>seq = read.seq().as_bytes();
                 <span class="kw">let </span>num_kmers = seq
@@ -194,12 +220,15 @@
                     .map(|kmer| kmer_set.contains(<span class="kw-2">&amp;</span>skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
                     .filter(|<span class="kw-2">&amp;</span>contains| contains)
                     .count();
-        
+
                 <span class="comment">// If the number of k-mers found is greater than the threshold, add the read to the list of similar reads.
                 </span><span class="kw">if </span>num_kmers &gt; num_threshold {
                     <span class="kw">let </span>current_found = found_items.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
                     <span class="kw">if </span>current_found % UPDATE_FREQUENCY == <span class="number">0 </span>{
-                        progress_bar.set_message(<span class="macro">format!</span>(<span class="string">"Searching for similar reads ({} found)"</span>, (current_found + <span class="number">1</span>).to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)));
+                        progress_bar.set_message(<span class="macro">format!</span>(
+                            <span class="string">"Searching for similar reads ({} found)"</span>,
+                            (current_found + <span class="number">1</span>).to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)
+                        ));
                     }
                     <span class="prelude-val">Some</span>(read)
                 } <span class="kw">else </span>{
@@ -207,15 +236,17 @@
                 </span>}
             })
             .collect();
-        
+
         <span class="comment">// Final update to ensure the last counts are displayed
         </span><span class="kw">let </span>final_found = found_items.load(Ordering::Relaxed);
         <span class="kw">let </span>final_processed = processed_items.load(Ordering::Relaxed);
-        progress_bar.set_message(<span class="macro">format!</span>(<span class="string">"Found {} reads in {} reads total."</span>,
+        progress_bar.set_message(<span class="macro">format!</span>(
+            <span class="string">"Found {} reads in {} reads total."</span>,
             final_found.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
-            final_processed.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)));
+            final_processed.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)
+        ));
         progress_bar.finish();
-        
+
         <span class="comment">// Add the reads to the list of all records.
         </span>all_records.extend(records);
     }
@@ -223,9 +254,18 @@
     <span class="kw">let </span><span class="kw-2">mut </span>file = File::create(output).expect(<span class="string">"Could not open file for writing."</span>);
     <span class="kw">for </span>(i, record) <span class="kw">in </span>all_records.iter().enumerate() {
         <span class="macro">writeln!</span>(file, <span class="string">"&gt;read_{}"</span>, i).expect(<span class="string">"Could not write to file"</span>);
-        <span class="macro">writeln!</span>(file, <span class="string">"{}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>record.seq().as_bytes())).expect(<span class="string">"Could not write to file"</span>);
+        <span class="macro">writeln!</span>(
+            file,
+            <span class="string">"{}"</span>,
+            String::from_utf8_lossy(<span class="kw-2">&amp;</span>record.seq().as_bytes())
+        )
+        .expect(<span class="string">"Could not write to file"</span>);
     }
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"Wrote {} reads to {}."</span>, all_records.len(), output.to_str().unwrap());
+    <span class="macro">skydive::elog!</span>(
+        <span class="string">"Wrote {} reads to {}."</span>,
+        all_records.len(),
+        output.to_str().unwrap()
+    );
 }
 </code></pre></div></section></main></body></html>

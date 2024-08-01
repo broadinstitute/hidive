@@ -117,6 +117,8 @@
 <a href="#117" id="117">117</a>
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, io::BufRead, path::PathBuf};
 
 <span class="kw">use </span>anyhow::Result;
@@ -127,7 +129,7 @@
 <span class="kw">pub fn </span>parse_loci(loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;) -&gt; HashSet&lt;(String, u64, u64)&gt; {
     <span class="comment">// Initialize a HashSet to store unique loci after parsing
     </span><span class="kw">let </span><span class="kw-2">mut </span>loci = HashSet::new();
-    
+
     <span class="comment">// Iterate over each locus in the provided list
     </span><span class="kw">for </span>locus <span class="kw">in </span>loci_list {
         <span class="comment">// Attempt to parse the locus using a function from the skydive module
@@ -179,7 +181,10 @@
 
         <span class="prelude-val">Ok</span>((chr, start, stop))
     } <span class="kw">else </span>{
-        <span class="macro">anyhow::bail!</span>(<span class="string">"Locus format for '{}' is incorrect. It should be 'chr:start[-stop]'."</span>, locus);
+        <span class="macro">anyhow::bail!</span>(
+            <span class="string">"Locus format for '{}' is incorrect. It should be 'chr:start[-stop]'."</span>,
+            locus
+        );
     }
 }
 
@@ -197,7 +202,7 @@
             }
         })
         .collect();
-    
+
     <span class="comment">// If any of the files are a local file ending in .txt, assume it's a file of filenames.
     </span><span class="kw">let </span><span class="kw-2">mut </span>local_file_contents = HashSet::new();
     <span class="kw">let </span><span class="kw-2">mut </span>to_remove = HashSet::new();
@@ -219,20 +224,19 @@
     }
 
     <span class="comment">// Remove FOFN files from the set of BAM/CRAM files.
-    </span>to_remove.iter().for_each(|url| { <span class="kw">let _ </span>= reads_urls.remove(url); });
+    </span>to_remove.iter().for_each(|url| {
+        <span class="kw">let _ </span>= reads_urls.remove(url);
+    });
 
     <span class="comment">// Add the files from the file of filenames to the full list of files.
-    </span>reads_urls.extend(local_file_contents
-        .into_iter()
-        .filter_map(|path| {
-            <span class="kw">let </span>path_str = path.to_string_lossy();
-            <span class="kw">if </span>path_str.starts_with(<span class="string">"gs://"</span>) {
-                Url::parse(<span class="kw-2">&amp;</span>path_str).ok()
-            } <span class="kw">else </span>{
-                Url::from_file_path(path.absolutize().unwrap()).ok()
-            }
-        })
-    );
+    </span>reads_urls.extend(local_file_contents.into_iter().filter_map(|path| {
+        <span class="kw">let </span>path_str = path.to_string_lossy();
+        <span class="kw">if </span>path_str.starts_with(<span class="string">"gs://"</span>) {
+            Url::parse(<span class="kw-2">&amp;</span>path_str).ok()
+        } <span class="kw">else </span>{
+            Url::from_file_path(path.absolutize().unwrap()).ok()
+        }
+    }));
 
     reads_urls
 }
