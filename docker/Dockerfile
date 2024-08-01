@@ -24,24 +24,24 @@ RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 RUN mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
 RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-# Install vim so we can edit files later:
-RUN apt-get install -y vim
-
-# install samtools
-RUN wget https://github.com/samtools/samtools/releases/download/1.20/samtools-1.20.tar.bz2 \
-    && tar xjf samtools-1.20.tar.bz2 \
-    && rm samtools-1.20.tar.bz2 \
-    && cd samtools-1.20 \
-    && ./configure \
-    && make \
-    && make install
-
-# install abpoa
-RUN wget https://github.com/yangao07/abPOA/releases/download/v1.5.1/abPOA-v1.5.1.tar.gz \
-    && tar -zxvf abPOA-v1.5.1.tar.gz \
-    && cd abPOA-v1.5.1 \
-    && make \
-    && cp bin/abpoa /usr/local/bin/
+## Install vim so we can edit files later:
+#RUN apt-get install -y vim
+#
+## install samtools
+#RUN wget https://github.com/samtools/samtools/releases/download/1.20/samtools-1.20.tar.bz2 \
+#    && tar xjf samtools-1.20.tar.bz2 \
+#    && rm samtools-1.20.tar.bz2 \
+#    && cd samtools-1.20 \
+#    && ./configure \
+#    && make \
+#    && make install
+#
+## install abpoa
+#RUN wget https://github.com/yangao07/abPOA/releases/download/v1.5.1/abPOA-v1.5.1.tar.gz \
+#    && tar -zxvf abPOA-v1.5.1.tar.gz \
+#    && cd abPOA-v1.5.1 \
+#    && make \
+#    && cp bin/abpoa /usr/local/bin/
 
 # install cargo
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -51,8 +51,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN git clone https://github.com/broadinstitute/hidive.git
 RUN cd hidive \
     && git checkout $branch \
-    && cargo build --release --verbose \
+    && cargo build --release \
     && cp target/release/hidive /usr/local/bin/
+RUN rm -rf hidive
 
 # We want this to be interactive:
 CMD ["/bin/bash"]

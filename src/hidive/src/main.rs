@@ -58,7 +58,7 @@ mod cluster;
 mod coassemble;
 mod fetch;
 mod impute;
-mod sift;
+mod rescue;
 mod train;
 mod trim;
 
@@ -119,7 +119,7 @@ enum Commands {
 
     /// Find more sequences (aligned or unaligned) overlapping previously fetched reads.
     #[clap(arg_required_else_help = true)]
-    Sift {
+    Rescue {
         /// Output path for FASTA file with reads spanning locus of interest.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -262,12 +262,12 @@ fn main() {
         } => {
             fetch::start(&output, &loci, unmapped, &seq_paths);
         }
-        Commands::Sift {
+        Commands::Rescue {
             output,
             fasta_paths,
             seq_paths,
         } => {
-            sift::start(&output, &fasta_paths, &seq_paths);
+            rescue::start(&output, &fasta_paths, &seq_paths);
         }
         Commands::Cluster {
             output,
