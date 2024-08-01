@@ -9,7 +9,7 @@ RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
     curl keychain git-lfs time datamash wget bzip2 make gcc cmake \
     zlib1g-dev libssl-dev lbzip2 libbz2-dev libncurses5-dev \
-    libncursesw5-dev liblzma-dev clang libclang-dev
+    libncursesw5-dev liblzma-dev clang libclang-dev \
     libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
