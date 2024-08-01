@@ -1,5 +1,5 @@
-use std::fmt;
 use std::collections::VecDeque;
+use std::fmt;
 
 use needletail::sequence::complement;
 
@@ -9,7 +9,7 @@ use parquet::data_type::AsBytes;
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Link {
     pub is_forward: bool,
-    pub junctions: VecDeque<u8>
+    pub junctions: VecDeque<u8>,
 }
 
 impl Link {
@@ -17,7 +17,7 @@ impl Link {
     pub fn new(is_forward: bool) -> Self {
         Link {
             is_forward,
-            junctions: VecDeque::new()
+            junctions: VecDeque::new(),
         }
     }
 
@@ -25,7 +25,7 @@ impl Link {
     pub fn from_junctions(is_forward: bool, seq: &[u8]) -> Self {
         Link {
             is_forward,
-            junctions: VecDeque::from(seq.to_vec())
+            junctions: VecDeque::from(seq.to_vec()),
         }
     }
 
@@ -77,8 +77,10 @@ impl fmt::Display for Link {
         for junction in &self.junctions {
             jvec.push(*junction);
         }
-        
-        write!(f, "{} {:?}",
+
+        write!(
+            f,
+            "{} {:?}",
             if self.is_forward { "F" } else { "R" },
             std::str::from_utf8(jvec.as_bytes())
         )

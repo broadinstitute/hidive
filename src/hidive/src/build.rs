@@ -73,10 +73,13 @@ pub fn find_sequences_between_sanchor_eanchor(
 }
 
 pub fn map_reference_unique_kmers_to_seq(
-    unique_kmerlist: Vec<String>, 
-    hla_seq: &HashMap<String, String>, 
-    k: usize
-) -> (HashMap<String, HashSet<String>>, HashMap<String, HashMap<String, Vec<usize>>>) {
+    unique_kmerlist: Vec<String>,
+    hla_seq: &HashMap<String, String>,
+    k: usize,
+) -> (
+    HashMap<String, HashSet<String>>,
+    HashMap<String, HashMap<String, Vec<usize>>>,
+) {
     let mut sample_dict: HashMap<String, HashSet<String>> = HashMap::new();
     let mut position_dict: HashMap<String, HashMap<String, Vec<usize>>> = HashMap::new();
 
@@ -96,7 +99,12 @@ pub fn map_reference_unique_kmers_to_seq(
                 if sample_dict.contains_key(&kmer) {
                     let sample = read.split('|').last().unwrap_or_default().to_string();
                     sample_dict.entry(kmer.clone()).or_default().insert(sample);
-                    position_dict.entry(kmer.clone()).or_default().entry(read.clone()).or_default().push(i);
+                    position_dict
+                        .entry(kmer.clone())
+                        .or_default()
+                        .entry(read.clone())
+                        .or_default()
+                        .push(i);
                 }
             }
         }
@@ -182,15 +190,13 @@ pub fn get_final_anchor(
     let mut anchor_unadjacent_list = Vec::new();
     let mut last_position = 0;
 
-    for anchor in anchornames{
+    for anchor in anchornames {
         let mut position = anchor_info[anchor].pos;
-        if position > last_position + k{
+        if position > last_position + k {
             anchor_unadjacent_list.push(anchor.to_string());
             last_position = position;
         }
-
     }
-
 
     for anchor_name in &anchor_unadjacent_list {
         if let Some(anchor) = anchor_info.get(anchor_name) {
@@ -572,7 +578,12 @@ pub struct FindAllPathBetweenAnchors {
 }
 
 impl FindAllPathBetweenAnchors {
-    pub fn new(graph: &GraphicalGenome, start: &str, end: &str, read_sets: HashSet<String>) -> Self {
+    pub fn new(
+        graph: &GraphicalGenome,
+        start: &str,
+        end: &str,
+        read_sets: HashSet<String>,
+    ) -> Self {
         let mut finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
         };
@@ -580,7 +591,15 @@ impl FindAllPathBetweenAnchors {
         finder
     }
 
-    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, mut sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
+    pub fn find_path(
+        &mut self,
+        g: &GraphicalGenome,
+        start: &str,
+        end: &str,
+        mut sofar: Vec<String>,
+        depth: usize,
+        readset: HashSet<String>,
+    ) {
         if start == end {
             let mut sofar1 = sofar.clone();
             sofar1.push(end.to_string());
@@ -601,7 +620,6 @@ impl FindAllPathBetweenAnchors {
         let depth1 = depth + 1;
 
         if let Some(outgoing) = g.outgoing.get(start) {
-            
             for dst in outgoing {
                 let mut readset1 = readset.clone();
                 if dst.starts_with("E") {
@@ -611,10 +629,13 @@ impl FindAllPathBetweenAnchors {
                     //                                         .unwrap_or_default();
 
                     // let readset1: HashSet<String> = readset.intersection(&edge_reads).cloned().collect();
-                    if let Some(edge_reads) = g.edges.get(dst).and_then(|e| e.get("reads").and_then(|r| r.as_array())) {
+                    if let Some(edge_reads) = g
+                        .edges
+                        .get(dst)
+                        .and_then(|e| e.get("reads").and_then(|r| r.as_array()))
+                    {
                         readset1.retain(|read| edge_reads.iter().any(|r| r.as_str() == Some(read)));
                     }
-                    
                 }
                 let mut sofar1 = sofar.clone();
                 sofar1.push(start.to_string());
@@ -631,7 +652,7 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
         if item.starts_with('A') {
             if let Some(anchor) = graph.anchor.get(item) {
                 seq += &anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
-                // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
+                                                                    // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             }
         } else if item.starts_with("E") {
             if let Some(edge) = graph.edges.get(item) {
@@ -658,7 +679,7 @@ pub fn find_all_reads(graph: &GraphicalGenome) -> HashSet<String> {
 pub struct GetSeriesParallelGraph {
     pub nodelist: Vec<String>,
     pub anchor: HashMap<String, Value>, // Assuming Value is a struct or type that represents the anchor data
-    pub edges: HashMap<String, Value>,  // Assuming Value is a struct or type that represents the edge data
+    pub edges: HashMap<String, Value>, // Assuming Value is a struct or type that represents the edge data
     pub outgoing: HashMap<String, Vec<String>>,
     pub incoming: HashMap<String, Vec<String>>,
 }
@@ -677,12 +698,19 @@ impl GetSeriesParallelGraph {
         }
     }
 
-    fn find_furthest_node(node_candidate: &[String], subgraph: &GraphicalGenome, start_node: &str) -> String {
+    fn find_furthest_node(
+        node_candidate: &[String],
+        subgraph: &GraphicalGenome,
+        start_node: &str,
+    ) -> String {
         let mut max_distance = -1;
         let mut node = "".to_string();
         for n in node_candidate {
-            if let (Some(pos_n), Some(pos_start)) = (subgraph.anchor[n]["pos"].as_i64(), subgraph.anchor[start_node]["pos"].as_i64()) {
-                let d = (pos_n - pos_start).abs(); 
+            if let (Some(pos_n), Some(pos_start)) = (
+                subgraph.anchor[n]["pos"].as_i64(),
+                subgraph.anchor[start_node]["pos"].as_i64(),
+            ) {
+                let d = (pos_n - pos_start).abs();
                 if d > max_distance {
                     node = n.clone();
                     max_distance = d;
@@ -692,7 +720,7 @@ impl GetSeriesParallelGraph {
         node
     }
 
-    fn series_parallel_graph_nodelist( subgraph: &GraphicalGenome) -> Vec<String> {
+    fn series_parallel_graph_nodelist(subgraph: &GraphicalGenome) -> Vec<String> {
         let mut keys: Vec<_> = subgraph.anchor.keys().cloned().collect();
         keys.sort();
         let start_node = keys[0].clone();
@@ -718,7 +746,10 @@ impl GetSeriesParallelGraph {
                 if nodelist.contains(&"SINK".to_string()) {
                     continue;
                 }
-                if nodelist[0] != "" && subgraph.anchor.contains_key(&nodelist[0]) && subgraph.outgoing.contains_key(&nodelist[0]) {
+                if nodelist[0] != ""
+                    && subgraph.anchor.contains_key(&nodelist[0])
+                    && subgraph.outgoing.contains_key(&nodelist[0])
+                {
                     node_candidate.extend(nodelist.iter().cloned());
                 }
             }
@@ -734,24 +765,39 @@ impl GetSeriesParallelGraph {
         nodelist
     }
 
-
-    fn series_parallel_graph(nodelist: &[String], subgraph: &GraphicalGenome) -> (HashMap<String, Value>, HashMap<String, Value>, HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    fn series_parallel_graph(
+        nodelist: &[String],
+        subgraph: &GraphicalGenome,
+    ) -> (
+        HashMap<String, Value>,
+        HashMap<String, Value>,
+        HashMap<String, Vec<String>>,
+        HashMap<String, Vec<String>>,
+    ) {
         let mut node_dict = HashMap::new();
-        let mut edge_dict: HashMap<String, serde_json::Value>  = HashMap::new();
-        let mut outgoing_dict:HashMap<String, Vec<String>> = HashMap::new();
-        let mut incoming_dict:HashMap<String, Vec<String>> = HashMap::new();
+        let mut edge_dict: HashMap<String, serde_json::Value> = HashMap::new();
+        let mut outgoing_dict: HashMap<String, Vec<String>> = HashMap::new();
+        let mut incoming_dict: HashMap<String, Vec<String>> = HashMap::new();
 
         for (i, node) in nodelist.iter().enumerate().take(nodelist.len() - 1) {
             let start_node = node;
             let end_node = &nodelist[i + 1];
             node_dict.insert(start_node.clone(), subgraph.anchor[start_node].clone());
             let initial_set = find_all_reads(subgraph);
-            let path = FindAllPathBetweenAnchors::new(subgraph, start_node, end_node, initial_set.clone());
+            let path =
+                FindAllPathBetweenAnchors::new(subgraph, start_node, end_node, initial_set.clone());
             let mut index = 0;
             for (p, rs) in path.subpath.iter() {
-                let edgename = format!("E{:05}.{:04}", start_node[1..].parse::<usize>().unwrap(), index);
+                let edgename = format!(
+                    "E{:05}.{:04}",
+                    start_node[1..].parse::<usize>().unwrap(),
+                    index
+                );
                 let seq = reconstruct_path_seq(subgraph, &p[1..p.len() - 1]);
-                let edgelist = outgoing_dict.get(start_node).cloned().unwrap_or_else(Vec::new);
+                let edgelist = outgoing_dict
+                    .get(start_node)
+                    .cloned()
+                    .unwrap_or_else(Vec::new);
                 let mut found = false;
 
                 for edge in edgelist {
@@ -760,27 +806,58 @@ impl GetSeriesParallelGraph {
                     }
                     if edge_dict[&edge]["seq"] == seq {
                         let reads: HashSet<_> = rs.iter().cloned().collect();
-                        let existing_reads: HashSet<_> = edge_dict.get_mut(&edge).unwrap()["reads"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect();
-                        let updated_reads: HashSet<_> = existing_reads.union(&reads).cloned().collect();
-                        edge_dict.get_mut(&edge).unwrap()["reads"] = serde_json::to_value(updated_reads.iter().cloned().collect::<Vec<_>>()).unwrap();
-                        edge_dict.get_mut(&edge).unwrap()["samples"] = serde_json::to_value(rs.iter().map(|item| item.split('|').last().unwrap().to_string()).collect::<HashSet<_>>()).unwrap();
+                        let existing_reads: HashSet<_> = edge_dict.get_mut(&edge).unwrap()["reads"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|v| v.as_str().unwrap().to_string())
+                            .collect();
+                        let updated_reads: HashSet<_> =
+                            existing_reads.union(&reads).cloned().collect();
+                        edge_dict.get_mut(&edge).unwrap()["reads"] =
+                            serde_json::to_value(updated_reads.iter().cloned().collect::<Vec<_>>())
+                                .unwrap();
+                        edge_dict.get_mut(&edge).unwrap()["samples"] = serde_json::to_value(
+                            rs.iter()
+                                .map(|item| item.split('|').last().unwrap().to_string())
+                                .collect::<HashSet<_>>(),
+                        )
+                        .unwrap();
                         found = true;
                         break;
                     }
                 }
                 if !found {
-                    let edgename = format!("E{:05}.{:04}", start_node[1..].parse::<usize>().unwrap(), index);
+                    let edgename = format!(
+                        "E{:05}.{:04}",
+                        start_node[1..].parse::<usize>().unwrap(),
+                        index
+                    );
                     let mut edge_info = serde_json::Map::new();
                     edge_info.insert("seq".to_string(), serde_json::to_value(&seq).unwrap());
                     edge_info.insert("src".to_string(), serde_json::to_value(start_node).unwrap());
                     edge_info.insert("dst".to_string(), serde_json::to_value(end_node).unwrap());
                     edge_info.insert("reads".to_string(), serde_json::to_value(rs).unwrap());
-                    edge_info.insert("samples".to_string(), serde_json::to_value(rs.iter().map(|item| item.split('|').last().unwrap().to_string()).collect::<HashSet<_>>()).unwrap());
+                    edge_info.insert(
+                        "samples".to_string(),
+                        serde_json::to_value(
+                            rs.iter()
+                                .map(|item| item.split('|').last().unwrap().to_string())
+                                .collect::<HashSet<_>>(),
+                        )
+                        .unwrap(),
+                    );
 
                     edge_dict.insert(edgename.clone(), serde_json::Value::Object(edge_info));
-                    outgoing_dict.entry(start_node.clone()).or_default().push(edgename.clone());
+                    outgoing_dict
+                        .entry(start_node.clone())
+                        .or_default()
+                        .push(edgename.clone());
                     outgoing_dict.insert(edgename.clone(), vec![end_node.clone()]);
-                    incoming_dict.entry(end_node.clone()).or_default().push(edgename.clone());
+                    incoming_dict
+                        .entry(end_node.clone())
+                        .or_default()
+                        .push(edgename.clone());
                     incoming_dict.insert(edgename.clone(), vec![start_node.clone()]);
                     index += 1;
                 }
@@ -789,13 +866,13 @@ impl GetSeriesParallelGraph {
 
         (node_dict, edge_dict, outgoing_dict, incoming_dict)
     }
-}  
+}
 
 pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::io::Result<()> {
     let mut file = File::create(filename)?;
 
     writeln!(file, "H\tVN:Z:1.0")?;
-    
+
     let mut keys: Vec<_> = graph.anchor.keys().collect();
     keys.sort();
     for anchor in keys.iter() {
@@ -818,9 +895,23 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
         let dst = graph.outgoing[*edge][0].clone();
         let mut edge_data_clone = edge_data.clone();
         edge_data_clone.as_object_mut().unwrap().remove("seq");
-        let json_string = serde_json::to_string(&edge_data_clone).unwrap_or_else(|_| "{}".to_string());
-        let formatted_string = if edge_data.get("reads").and_then(|r| r.as_array()).map_or(false, |arr| !arr.is_empty()) {
-            format!("S\t{}\t{}\tPG:J:{}\tRC:i:{}", edge, seq, json_string, edge_data.get("reads").and_then(|r| r.as_array()).map_or(0, |arr| arr.len()))
+        let json_string =
+            serde_json::to_string(&edge_data_clone).unwrap_or_else(|_| "{}".to_string());
+        let formatted_string = if edge_data
+            .get("reads")
+            .and_then(|r| r.as_array())
+            .map_or(false, |arr| !arr.is_empty())
+        {
+            format!(
+                "S\t{}\t{}\tPG:J:{}\tRC:i:{}",
+                edge,
+                seq,
+                json_string,
+                edge_data
+                    .get("reads")
+                    .and_then(|r| r.as_array())
+                    .map_or(0, |arr| arr.len())
+            )
         } else {
             format!("S\t{}\t{}", edge, seq)
         };
@@ -838,13 +929,7 @@ pub fn write_graph_from_graph(filename: &str, graph: &GraphicalGenome) -> std::i
     Ok(())
 }
 
-
-pub fn start(
-    output: &PathBuf,
-    k: usize,
-    fasta_path: &PathBuf,
-    reference_name: String
-) {
+pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: String) {
     // Use the basename of the reads fasta to be the reference sequence name in the graph.
     let stem = fasta_path
         .file_stem()
@@ -872,18 +957,12 @@ pub fn start(
 
     // Create the k-mer profile.
     let unique_kmer_list = get_reference_kmer_profile(&reference, k);
-    let (hla_samples, hla_seq) =
-        find_sequences_between_sanchor_eanchor(reads, reference, &stem);
+    let (hla_samples, hla_seq) = find_sequences_between_sanchor_eanchor(reads, reference, &stem);
     let (sample_dict, position_dict) =
         map_reference_unique_kmers_to_seq(unique_kmer_list, &hla_seq, k);
 
     // Compute anchors.
-    let anchorlist = get_anchor_information(
-        &sample_dict,
-        &hla_samples,
-        &position_dict,
-        &stem,
-    );
+    let anchorlist = get_anchor_information(&sample_dict, &hla_samples, &position_dict, &stem);
     let anchors = get_anchors(&anchorlist, &position_dict, k, &stem);
 
     let final_anchor = get_final_anchor(&anchors, k);
@@ -898,7 +977,11 @@ pub fn start(
     let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
 
     // Write final graph to disk.
-    write_gfa(&dereferenced_final_anchor, &filtered_edges, output.to_str().unwrap());
+    write_gfa(
+        &dereferenced_final_anchor,
+        &filtered_edges,
+        output.to_str().unwrap(),
+    );
 
     let graph = GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
     // println!("{:?}", graph.anchor)
@@ -906,8 +989,7 @@ pub fn start(
     let mut sp_graph = GetSeriesParallelGraph::new(&graph);
     let outputfilename_str = output.with_extension("sp.gfa");
     // println!("{:?}", outputfilename_str);
-    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);    
+    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);
     println!("{:?}", outputfilename_str);
     // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
-
 }

@@ -2,13 +2,13 @@
 //! of long-read data and a linked de Bruijn graph representation of short-read data.
 //!
 
+pub mod edges;
 pub mod ldbg;
 pub mod link;
-pub mod edges;
 pub mod record;
 
-pub mod mldbg;
 pub mod agg;
+pub mod mldbg;
 
 pub mod env;
 pub mod parse;

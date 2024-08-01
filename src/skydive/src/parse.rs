@@ -8,7 +8,7 @@ use path_absolutize::Absolutize;
 pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();
-    
+
     // Iterate over each locus in the provided list
     for locus in loci_list {
         // Attempt to parse the locus using a function from the skydive module
@@ -60,7 +60,10 @@ pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
 
         Ok((chr, start, stop))
     } else {
-        anyhow::bail!("Locus format for '{}' is incorrect. It should be 'chr:start[-stop]'.", locus);
+        anyhow::bail!(
+            "Locus format for '{}' is incorrect. It should be 'chr:start[-stop]'.",
+            locus
+        );
     }
 }
 
@@ -78,7 +81,7 @@ pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
             }
         })
         .collect();
-    
+
     // If any of the files are a local file ending in .txt, assume it's a file of filenames.
     let mut local_file_contents = HashSet::new();
     let mut to_remove = HashSet::new();
@@ -100,20 +103,19 @@ pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     }
 
     // Remove FOFN files from the set of BAM/CRAM files.
-    to_remove.iter().for_each(|url| { let _ = reads_urls.remove(url); });
+    to_remove.iter().for_each(|url| {
+        let _ = reads_urls.remove(url);
+    });
 
     // Add the files from the file of filenames to the full list of files.
-    reads_urls.extend(local_file_contents
-        .into_iter()
-        .filter_map(|path| {
-            let path_str = path.to_string_lossy();
-            if path_str.starts_with("gs://") {
-                Url::parse(&path_str).ok()
-            } else {
-                Url::from_file_path(path.absolutize().unwrap()).ok()
-            }
-        })
-    );
+    reads_urls.extend(local_file_contents.into_iter().filter_map(|path| {
+        let path_str = path.to_string_lossy();
+        if path_str.starts_with("gs://") {
+            Url::parse(&path_str).ok()
+        } else {
+            Url::from_file_path(path.absolutize().unwrap()).ok()
+        }
+    }));
 
     reads_urls
 }

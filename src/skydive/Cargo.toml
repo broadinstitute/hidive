@@ -60,8 +60,8 @@ md5 = "0.7.0"
 unsafe_code = "forbid"
 
 # come at me, clippy
-# [lints.clippy]
-# enum_glob_use = "deny"
-# pedantic = { level = "deny", priority = -1 }
+[lints.clippy]
+enum_glob_use = "deny"
+pedantic = { level = "deny", priority = -1 }
 # nursery = { level = "deny", priority = -1 }
 # unwrap_used = "deny"

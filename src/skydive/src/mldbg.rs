@@ -8,7 +8,7 @@ pub struct MLdBG {
     pub ldbgs: Vec<LdBG>,
     pub kmer_size: usize,
     pub clean: bool,
-    pub build_links: bool
+    pub build_links: bool,
 }
 
 impl MLdBG {
@@ -18,7 +18,7 @@ impl MLdBG {
             ldbgs: Vec::new(),
             kmer_size,
             clean,
-            build_links
+            build_links,
         }
     }
 
@@ -27,7 +27,10 @@ impl MLdBG {
         let kmer_size = ldbgs[0].kmer_size;
 
         for ldbg in &ldbgs {
-            assert!(ldbg.kmer_size == kmer_size, "The k-mer size of the LdBG does not match the k-mer size of the MLdBG.");
+            assert!(
+                ldbg.kmer_size == kmer_size,
+                "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+            );
         }
 
         MLdBG {
@@ -40,7 +43,10 @@ impl MLdBG {
 
     /// Add a LdBG to the MLdBG.
     pub fn push(&mut self, ldbg: LdBG) {
-        assert!(ldbg.kmer_size == self.kmer_size, "The k-mer size of the LdBG does not match the k-mer size of the MLdBG.");
+        assert!(
+            ldbg.kmer_size == self.kmer_size,
+            "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+        );
 
         self.ldbgs.push(ldbg);
     }
@@ -78,7 +84,13 @@ impl MLdBG {
             .map(|r| r.seq().to_vec())
             .collect();
 
-        let l = LdBG::from_sequences(name, self.kmer_size, &filtered_reads, self.clean, self.build_links);
+        let l = LdBG::from_sequences(
+            name,
+            self.kmer_size,
+            &filtered_reads,
+            self.clean,
+            self.build_links,
+        );
         self.ldbgs.push(l);
     }
 

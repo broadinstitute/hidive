@@ -40,9 +40,14 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     basename
 }
 
-pub fn default_bounded_progress_bar(msg: impl Into<Cow<'static, str>>, len: u64) -> indicatif::ProgressBar {
+pub fn default_bounded_progress_bar(
+    msg: impl Into<Cow<'static, str>>,
+    len: u64,
+) -> indicatif::ProgressBar {
     let progress_bar_style = indicatif::ProgressStyle::default_bar()
-        .template("{msg} ... [{elapsed_precise}] [{bar:40.white/white}] {human_pos}/{human_len} ({eta})")
+        .template(
+            "{msg} ... [{elapsed_precise}] [{bar:40.white/white}] {human_pos}/{human_len} ({eta})",
+        )
         .unwrap()
         .progress_chars("#>-");
 

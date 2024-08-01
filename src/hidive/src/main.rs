@@ -48,7 +48,6 @@
 //!  export GCS_REQUESTER_PAYS_PROJECT=<Google Project ID>
 //! ```
 
-
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -58,8 +57,9 @@ mod build;
 mod cluster;
 mod coassemble;
 mod fetch;
-mod sift;
 mod impute;
+mod sift;
+mod train;
 mod trim;
 
 #[derive(Debug, Parser)] // requires `derive` feature
@@ -73,6 +73,30 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Train a graph-cleaning model using short- and long-read data with ground truth assemblies.
+    #[clap(arg_required_else_help = true)]
+    Train {
+        /// Output path for trained model.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = true)]
+        long_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = true)]
+        short_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        #[clap(value_parser, required = true)]
+        truth_seq_paths: Vec<PathBuf>,
+
+        /// Turn on debug mode.
+        #[clap(short, long, value_parser)]
+        debug: bool,
+    },
+
     /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
@@ -215,6 +239,21 @@ fn main() {
     let start_time = std::time::Instant::now();
 
     match args.command {
+        Commands::Train {
+            output,
+            long_read_seq_paths,
+            short_read_seq_paths,
+            truth_seq_paths,
+            debug,
+        } => {
+            train::start(
+                &output,
+                &long_read_seq_paths,
+                &short_read_seq_paths,
+                &truth_seq_paths,
+                debug,
+            );
+        }
         Commands::Fetch {
             output,
             loci,
@@ -223,7 +262,7 @@ fn main() {
         } => {
             fetch::start(&output, &loci, unmapped, &seq_paths);
         }
-        Commands::Sift{
+        Commands::Sift {
             output,
             fasta_paths,
             seq_paths,
@@ -264,7 +303,12 @@ fn main() {
             long_read_fasta_paths,
             short_read_fasta_paths,
         } => {
-            coassemble::start(&output, kmer_size, &long_read_fasta_paths, &short_read_fasta_paths);
+            coassemble::start(
+                &output,
+                kmer_size,
+                &long_read_fasta_paths,
+                &short_read_fasta_paths,
+            );
         }
     }
 
@@ -274,7 +318,7 @@ fn main() {
 fn elapsed_time(start_time: std::time::Instant) -> String {
     let end_time = std::time::Instant::now();
     let elapsed_time = end_time.duration_since(start_time);
-    
+
     let elapsed_secs = elapsed_time.as_secs_f64();
     let elapsed_str = if elapsed_secs < 60.0 {
         format!("{:.2} seconds", elapsed_secs)

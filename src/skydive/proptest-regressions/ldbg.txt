@@ -1,0 +1,16 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c7a45ad2fcb9bd4a2bef7277d48f57cb62349870f53fa802a190c6239025f8ee # shrinks to length = 2100, k = 19
+cc a148704d6c47ede21e0c1e3c3df20fc88c0c2499b98b3d14fd50467bc77a8f41 # shrinks to length = 2900, k = 17
+cc fe014cb3709e6393b1016ad403752f25bb8090468cc86abf0a1765c6ca615c7e # shrinks to length = 500, k = 17
+cc 10e92ee0666818afa40637406e06f1725d38360e7c64ebcc5ffadf634bb064d6 # shrinks to flank_length = 1500, repeat_length = 27, num_repeats = 2, k = 17
+cc 4c408fabf9990fdc97c5e5a95820a974f148952366b421c11bbfa10d35d5b459 # shrinks to flank_length = 1700, repeat_length = 6, num_repeats = 1, k = 11
+cc eb1e50de7e62bdae58efea5166a0a341bf7f971ab37504ebd1176b5387b37412 # shrinks to length = 500, k = 13
+cc 67ffcc16d06c70fd44f72ab8041addd65593b76e7a0f79f152974bf9f0993e0e # shrinks to flank_length = 1900, repeat_length = 21, num_repeats = 2, k = 13
+cc 5b1b0c0d90a11924f6aeb58074d1a9c756025f305ef6805cb110fa8d671a0146 # shrinks to flank_length = 1500, repeat_length = 15, num_repeats = 2, k = 11
+cc d01c126b6206a9827139bd55a1a290d87e0d401110f6b1b2b62534eee6212291 # shrinks to flank_length = 800, repeat_length = 15, num_repeats = 2, k = 11
+cc a682791a65bd95e775057e522894dfdd599719d24b056718f11dc0fee0253609 # shrinks to repeat_length = 12, num_repeats = 3, k = 17

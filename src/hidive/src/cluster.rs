@@ -1,7 +1,7 @@
 // Import necessary standard library modules
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::io::Write;
+use std::path::PathBuf;
 
 use bio::io::fasta::{Reader, Record};
 // Import the skydive module, which contains the necessary functions for building graphs

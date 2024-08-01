@@ -3,17 +3,17 @@ use std::collections::{HashMap, HashSet};
 use indicatif::ProgressIterator;
 use parquet::data_type::AsBytes;
 
-use std::path::PathBuf;
-use needletail::Sequence;
 use needletail::sequence::complement;
+use needletail::Sequence;
+use std::path::PathBuf;
 
+use indicatif::ParallelProgressIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use indicatif::ParallelProgressIterator;
 
 use crate::edges::Edges;
-use crate::record::Record;
 use crate::link::Link;
+use crate::record::Record;
 
 type KmerGraph = HashMap<Vec<u8>, Record>;
 type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
@@ -40,7 +40,13 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_file(name: String, kmer_size: usize, seq_path: &PathBuf, clean: bool, build_links: bool) -> Self {
+    pub fn from_file(
+        name: String,
+        kmer_size: usize,
+        seq_path: &PathBuf,
+        clean: bool,
+        build_links: bool,
+    ) -> Self {
         let reader = bio::io::fasta::Reader::from_file(seq_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
@@ -57,7 +63,7 @@ impl LdBG {
 
         let links = match build_links {
             true => Self::build_links(kmer_size, &fwd_seqs, &kmers),
-            false => Links::new()
+            false => Links::new(),
         };
 
         LdBG {
@@ -67,6 +73,24 @@ impl LdBG {
             links,
         }
     }
+
+    // pub fn from_files(name: String, kmer_size: usize, seq_paths: &Vec<PathBuf>, clean: bool, build_links: bool) -> Self {
+    //     let mut all_seqs: Vec<Vec<u8>> = Vec::new();
+    //     for seq_url in &seq_urls {
+    //         let basename = skydive::utils::basename_without_extension(&seq_url, &[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
+    //         let fasta_path = seq_url.to_file_path().unwrap();
+
+    //         let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
+    //         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
+
+    //         all_seqs.extend(all_reads
+    //             .iter()
+    //             .map(|r| r.seq().to_vec())
+    //             .collect::<Vec<Vec<u8>>>());
+    //     }
+
+    //     LdBG::from_sequences(name, kmer_size, &all_seqs, false, false)
+    // }
 
     /// Create a de Bruijn graph (and optional links) from a list of sequences.
     ///
@@ -80,7 +104,13 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
-    pub fn from_sequences(name: String, kmer_size: usize, fwd_seqs: &Vec<Vec<u8>>, clean: bool, build_links: bool) -> Self {
+    pub fn from_sequences(
+        name: String,
+        kmer_size: usize,
+        fwd_seqs: &Vec<Vec<u8>>,
+        clean: bool,
+        build_links: bool,
+    ) -> Self {
         let mut kmers = Self::build_graph(kmer_size, fwd_seqs);
 
         if clean {
@@ -89,7 +119,7 @@ impl LdBG {
 
         let links = match build_links {
             true => Self::build_links(kmer_size, fwd_seqs, &kmers),
-            false => Links::new()
+            false => Links::new(),
         };
 
         LdBG {
@@ -117,16 +147,20 @@ impl LdBG {
     /// * `fw_kmer` - A slice representing the forward k-mer.
     /// * `fw_prev_base` - The preceding base of the forward k-mer.
     /// * `fw_next_base` - The following base of the forward k-mer.
-    fn add_record_to_graph(graph: &mut KmerGraph, fw_kmer: &[u8], fw_prev_base: u8, fw_next_base: u8) {
+    fn add_record_to_graph(
+        graph: &mut KmerGraph,
+        fw_kmer: &[u8],
+        fw_prev_base: u8,
+        fw_next_base: u8,
+    ) {
         let rc_kmer_vec = fw_kmer.reverse_complement();
         let rc_kmer = rc_kmer_vec.as_bytes();
 
-        let (cn_kmer, can_prev_base, can_next_base) = 
-            if fw_kmer < rc_kmer {
-                (fw_kmer, fw_prev_base, fw_next_base)
-            } else {
-                (rc_kmer, complement(fw_next_base), complement(fw_prev_base))
-            };
+        let (cn_kmer, can_prev_base, can_next_base) = if fw_kmer < rc_kmer {
+            (fw_kmer, fw_prev_base, fw_next_base)
+        } else {
+            (rc_kmer, complement(fw_next_base), complement(fw_prev_base))
+        };
 
         // If it's not already there, insert k-mer and empty record into k-mer map.
         if !graph.contains_key(cn_kmer) {
@@ -137,10 +171,16 @@ impl LdBG {
         graph.get_mut(cn_kmer).unwrap().increment_coverage();
 
         // Set incoming edge for canonical k-mer.
-        graph.get_mut(cn_kmer).unwrap().set_incoming_edge(can_prev_base);
+        graph
+            .get_mut(cn_kmer)
+            .unwrap()
+            .set_incoming_edge(can_prev_base);
 
         // Set outgoing edge for canonical k-mer.
-        graph.get_mut(cn_kmer).unwrap().set_outgoing_edge(can_next_base);
+        graph
+            .get_mut(cn_kmer)
+            .unwrap()
+            .set_outgoing_edge(can_next_base);
     }
 
     /// Build a de Bruijn graph from a vector of sequences.
@@ -159,13 +199,13 @@ impl LdBG {
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
             // Iterate over k-mers
-            for i in 0..fwd_seq.len()-k+1 {
-                let fw_kmer = &fwd_seq[i..i+k];
-        
+            for i in 0..fwd_seq.len() - k + 1 {
+                let fw_kmer = &fwd_seq[i..i + k];
+
                 let prev = fwd_seq.get(i.wrapping_sub(1));
                 let fw_prev_base = *prev.unwrap_or(&b'.');
 
-                let next = fwd_seq.get(i+k);
+                let next = fwd_seq.get(i + k);
                 let fw_next_base = *next.unwrap_or(&b'.');
 
                 Self::add_record_to_graph(&mut graph, fw_kmer, fw_prev_base, fw_next_base);
@@ -220,7 +260,9 @@ impl LdBG {
                 let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
 
                 for e in record.incoming_edges() {
-                    let prev_kmer = std::iter::once(e).chain(cn_kmer[0..cn_kmer.len()-1].iter().cloned()).collect::<Vec<u8>>();
+                    let prev_kmer = std::iter::once(e)
+                        .chain(cn_kmer[0..cn_kmer.len() - 1].iter().cloned())
+                        .collect::<Vec<u8>>();
 
                     if cleaned_graph.contains_key(&LdBG::canonicalize_kmer(&prev_kmer)) {
                         new_record.set_incoming_edge(e);
@@ -228,7 +270,11 @@ impl LdBG {
                 }
 
                 for e in record.outgoing_edges() {
-                    let next_kmer = cn_kmer[1..].iter().cloned().chain(std::iter::once(e)).collect::<Vec<u8>>();
+                    let next_kmer = cn_kmer[1..]
+                        .iter()
+                        .cloned()
+                        .chain(std::iter::once(e))
+                        .collect::<Vec<u8>>();
 
                     if cleaned_graph.contains_key(&LdBG::canonicalize_kmer(&next_kmer)) {
                         new_record.set_outgoing_edge(e);
@@ -254,17 +300,29 @@ impl LdBG {
             let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
 
             for e in record.incoming_edges() {
-                let prev_kmer = std::iter::once(e).chain(cn_kmer[0..cn_kmer.len()-1].iter().cloned()).collect::<Vec<u8>>();
+                let prev_kmer = std::iter::once(e)
+                    .chain(cn_kmer[0..cn_kmer.len() - 1].iter().cloned())
+                    .collect::<Vec<u8>>();
 
-                if self.kmers.contains_key(&LdBG::canonicalize_kmer(&prev_kmer)) {
+                if self
+                    .kmers
+                    .contains_key(&LdBG::canonicalize_kmer(&prev_kmer))
+                {
                     new_record.set_incoming_edge(e);
                 }
             }
 
             for e in record.outgoing_edges() {
-                let next_kmer = cn_kmer[1..].iter().cloned().chain(std::iter::once(e)).collect::<Vec<u8>>();
+                let next_kmer = cn_kmer[1..]
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(e))
+                    .collect::<Vec<u8>>();
 
-                if self.kmers.contains_key(&LdBG::canonicalize_kmer(&next_kmer)) {
+                if self
+                    .kmers
+                    .contains_key(&LdBG::canonicalize_kmer(&next_kmer))
+                {
                     new_record.set_outgoing_edge(e);
                 }
             }
@@ -288,15 +346,25 @@ impl LdBG {
     /// # Returns
     ///
     /// An optional tuple containing the anchor k-mer and its index.
-    fn find_anchor_kmer(index: usize, seq: &[u8], k: usize, graph: &KmerGraph, reverse: bool) -> Option<(Vec<u8>, usize)> {
+    fn find_anchor_kmer(
+        index: usize,
+        seq: &[u8],
+        k: usize,
+        graph: &KmerGraph,
+        reverse: bool,
+    ) -> Option<(Vec<u8>, usize)> {
         if index > 0 {
             let mut index = index - 1;
             loop {
-                if index == 0 { break; }
+                if index == 0 {
+                    break;
+                }
 
-                let anchor_kmer = &seq[index..index+k];
+                let anchor_kmer = &seq[index..index + k];
 
-                if !LdBG::has_junction(graph, anchor_kmer, !reverse) || LdBG::has_junction(graph, anchor_kmer, reverse) {
+                if !LdBG::has_junction(graph, anchor_kmer, !reverse)
+                    || LdBG::has_junction(graph, anchor_kmer, reverse)
+                {
                     return Some((anchor_kmer.to_vec(), index));
                 }
 
@@ -318,14 +386,16 @@ impl LdBG {
     /// * `reverse` - A boolean indicating whether to search in reverse.
     /// * `fw` - A boolean indicating whether the sequence is forward.
     fn add_record_to_links(links: &mut Links, seq: &[u8], k: usize, graph: &KmerGraph) {
-        let range = (0..seq.len()-k+1).collect::<Vec<_>>();
+        let range = (0..seq.len() - k + 1).collect::<Vec<_>>();
 
         // Iterate over k-mers to find junctions.
         for i in range {
-            let fw_kmer = &seq[i..i+k];
+            let fw_kmer = &seq[i..i + k];
 
             if LdBG::has_junction(graph, fw_kmer, true) {
-                if let Some((anchor_kmer_vec, index)) = Self::find_anchor_kmer(i, seq, k, graph, true) {
+                if let Some((anchor_kmer_vec, index)) =
+                    Self::find_anchor_kmer(i, seq, k, graph, true)
+                {
                     let anchor_kmer = anchor_kmer_vec.as_bytes();
 
                     let cn_anchor_kmer_vec = LdBG::canonicalize_kmer(anchor_kmer);
@@ -334,14 +404,14 @@ impl LdBG {
                     // Populate link.
                     let mut link = Link::new(anchor_kmer == cn_anchor_kmer);
 
-                    let sub_range = (index..seq.len()-k).collect::<Vec<_>>();
+                    let sub_range = (index..seq.len() - k).collect::<Vec<_>>();
 
                     for j in sub_range {
-                        let next_kmer = &seq[j..j+k];
+                        let next_kmer = &seq[j..j + k];
 
                         let has_junction = LdBG::has_junction(graph, next_kmer, false);
                         if has_junction {
-                            let choice = seq[j+k];
+                            let choice = seq[j + k];
                             link.push_back(choice);
                         }
                     }
@@ -353,13 +423,13 @@ impl LdBG {
                         }
 
                         if !links.get(cn_anchor_kmer).unwrap().contains_key(&link) {
-                            links.get_mut(cn_anchor_kmer)
-                                .unwrap()
-                                .insert(link, 1);
+                            links.get_mut(cn_anchor_kmer).unwrap().insert(link, 1);
                         } else {
-                            let linkcov = *links.get_mut(cn_anchor_kmer).unwrap().get(&link).unwrap();
+                            let linkcov =
+                                *links.get_mut(cn_anchor_kmer).unwrap().get(&link).unwrap();
 
-                            links.get_mut(cn_anchor_kmer)
+                            links
+                                .get_mut(cn_anchor_kmer)
                                 .unwrap()
                                 .insert(link, linkcov.saturating_add(1));
                         }
@@ -381,23 +451,28 @@ impl LdBG {
     ///
     /// A map of links.
     fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
-        let progress_bar= crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
+        let progress_bar =
+            crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
 
-        let links: Links = fwd_seqs.par_iter().progress_with(progress_bar).map(|fwd_seq| {
-            let mut local_links = Links::new();
-            let fw_seq = fwd_seq.clone();
-            let rc_seq = fw_seq.reverse_complement();
+        let links: Links = fwd_seqs
+            .par_iter()
+            .progress_with(progress_bar)
+            .map(|fwd_seq| {
+                let mut local_links = Links::new();
+                let fw_seq = fwd_seq.clone();
+                let rc_seq = fw_seq.reverse_complement();
 
-            LdBG::add_record_to_links(&mut local_links, &fw_seq, k, graph);
-            LdBG::add_record_to_links(&mut local_links, &rc_seq, k, graph);
+                LdBG::add_record_to_links(&mut local_links, &fw_seq, k, graph);
+                LdBG::add_record_to_links(&mut local_links, &rc_seq, k, graph);
 
-            local_links
-        }).reduce(Links::new, |mut acc, local_links| {
-            for (k, v) in local_links {
-                acc.entry(k).or_default().extend(v);
-            }
-            acc
-        });
+                local_links
+            })
+            .reduce(Links::new, |mut acc, local_links| {
+                for (k, v) in local_links {
+                    acc.entry(k).or_default().extend(v);
+                }
+                acc
+            });
 
         links
     }
@@ -440,8 +515,16 @@ impl LdBG {
             let (in_degree, out_degree) = (r.in_degree(), r.out_degree());
 
             return if is_canonical {
-                if !reverse { out_degree > 1 } else { in_degree > 1 }
-            } else if !reverse { in_degree > 1 } else { out_degree > 1 };
+                if !reverse {
+                    out_degree > 1
+                } else {
+                    in_degree > 1
+                }
+            } else if !reverse {
+                in_degree > 1
+            } else {
+                out_degree > 1
+            };
         }
 
         false
@@ -480,7 +563,9 @@ impl LdBG {
                     let consensus_junction_choice = *links_in_scope.first()?.front().unwrap();
 
                     if r.outgoing_edges().contains(&consensus_junction_choice) {
-                        links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
+                        links_in_scope.iter_mut().for_each(|link| {
+                            link.pop_front();
+                        });
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -503,8 +588,12 @@ impl LdBG {
 
                     let consensus_junction_choice = *links_in_scope.first()?.front().unwrap();
 
-                    if r.incoming_edges().contains(&complement(consensus_junction_choice)) {
-                        links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
+                    if r.incoming_edges()
+                        .contains(&complement(consensus_junction_choice))
+                    {
+                        links_in_scope.iter_mut().for_each(|link| {
+                            link.pop_front();
+                        });
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -555,7 +644,9 @@ impl LdBG {
                     };
 
                     if r.incoming_edges().contains(&consensus_junction_choice) {
-                        links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
+                        links_in_scope.iter_mut().for_each(|link| {
+                            link.pop_front();
+                        });
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -581,8 +672,12 @@ impl LdBG {
                         None => return None,
                     };
 
-                    if r.outgoing_edges().contains(&complement(consensus_junction_choice)) {
-                        links_in_scope.iter_mut().for_each(|link| { link.pop_front(); });
+                    if r.outgoing_edges()
+                        .contains(&complement(consensus_junction_choice))
+                    {
+                        links_in_scope.iter_mut().for_each(|link| {
+                            link.pop_front();
+                        });
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -592,7 +687,7 @@ impl LdBG {
             }
         };
 
-        let prev_kmer = [&[prev_base], &kmer[0..kmer.len()-1]].concat();
+        let prev_kmer = [&[prev_base], &kmer[0..kmer.len() - 1]].concat();
 
         Some(prev_kmer)
     }
@@ -608,7 +703,10 @@ impl LdBG {
         let mut used_kmers = HashSet::new();
         let k = self.kmer_size;
 
-        let progress_bar = crate::utils::default_bounded_progress_bar("Assembling contigs", self.kmers.len() as u64);
+        let progress_bar = crate::utils::default_bounded_progress_bar(
+            "Assembling contigs",
+            self.kmers.len() as u64,
+        );
 
         for cn_kmer in self.kmers.keys().progress_with(progress_bar) {
             if !used_kmers.contains(cn_kmer) {
@@ -674,7 +772,7 @@ impl LdBG {
                 Some(this_kmer) => {
                     contig.push(this_kmer[this_kmer.len() - 1]);
                     last_kmer = this_kmer;
-                },
+                }
                 None => {
                     break;
                 }
@@ -699,7 +797,7 @@ impl LdBG {
                 Some(this_kmer) => {
                     contig.insert(0, this_kmer[0]);
                     last_kmer = this_kmer;
-                },
+                }
                 None => {
                     break;
                 }
@@ -715,7 +813,13 @@ impl LdBG {
     /// * `last_kmer` - A reference to the last k-mer.
     /// * `used_links` - A mutable reference to the set of used links.
     /// * `forward` - A boolean indicating whether to update forward links.
-    fn update_links(&self, links_in_scope: &mut Vec<Link>, last_kmer: &Vec<u8>, used_links: &mut HashSet<Link>, forward: bool) {
+    fn update_links(
+        &self,
+        links_in_scope: &mut Vec<Link>,
+        last_kmer: &Vec<u8>,
+        used_links: &mut HashSet<Link>,
+        forward: bool,
+    ) {
         let cn_kmer_vec = LdBG::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
@@ -726,7 +830,11 @@ impl LdBG {
 
             for jv in available_links {
                 let link_goes_forward = record_orientation_matches_kmer == jv.0.is_forward();
-                let new_link = if link_goes_forward { jv.0.clone() } else { jv.0.complement() };
+                let new_link = if link_goes_forward {
+                    jv.0.clone()
+                } else {
+                    jv.0.complement()
+                };
 
                 if forward == link_goes_forward && !used_links.contains(&new_link) {
                     used_links.insert(new_link.clone());
@@ -753,11 +861,11 @@ mod tests {
 
     use rand::{Rng, SeedableRng};
 
-    use std::process::{Command, Stdio};
+    use std::collections::BTreeMap;
     use std::env;
     use std::fs::File;
-    use std::io::{Write, BufRead, BufReader};
-    use std::collections::BTreeMap;
+    use std::io::{BufRead, BufReader, Write};
+    use std::process::{Command, Stdio};
 
     use flate2::read::GzDecoder;
 
@@ -785,7 +893,12 @@ mod tests {
     /// # Returns
     ///
     /// A vector containing the genome sequence with tandem repeats.
-    fn generate_genome_with_tandem_repeats(flank_length: usize, repeat_length: usize, num_repeats: usize, seed: u64) -> Vec<u8> {
+    fn generate_genome_with_tandem_repeats(
+        flank_length: usize,
+        repeat_length: usize,
+        num_repeats: usize,
+        seed: u64,
+    ) -> Vec<u8> {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let alphabet = b"ACGT";
 
@@ -818,7 +931,12 @@ mod tests {
     }
 
     /// Assemble using the reference implementation, McCortex.
-    fn assemble_with_mccortex(k: usize, input_genome: &Vec<u8>, build_links: bool, use_cache: bool) -> (BTreeMap<String, String>, Links) {
+    fn assemble_with_mccortex(
+        k: usize,
+        input_genome: &Vec<u8>,
+        build_links: bool,
+        use_cache: bool,
+    ) -> (BTreeMap<String, String>, Links) {
         let current_dir = env::current_dir().unwrap();
         let test_dir = current_dir.join("tests/test_data");
         let test_dir_str = test_dir.to_str().unwrap();
@@ -827,20 +945,38 @@ mod tests {
         let md5_hash = format!("{:x}", md5::compute(&copied_genome));
 
         let genome_path = test_dir.join(format!("test.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
-        let links_path = test_dir.join(format!("links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links));
-        let contigs_path = test_dir.join(format!("contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
+        let links_path = test_dir.join(format!(
+            "links.{}.k_{}.l_{}.ctp.gz",
+            md5_hash, k, build_links
+        ));
+        let contigs_path =
+            test_dir.join(format!("contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links));
 
         if !use_cache || !contigs_path.exists() || !links_path.exists() {
             let mut genome_file = File::create(genome_path).expect("Unable to create file");
 
             writeln!(genome_file, ">genome").expect("Unable to write to file");
-            writeln!(genome_file, "{}", String::from_utf8(copied_genome).unwrap()).expect("Unable to write to file");
-        
+            writeln!(genome_file, "{}", String::from_utf8(copied_genome).unwrap())
+                .expect("Unable to write to file");
+
             Command::new("docker")
                 .args(&[
-                    "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                    "mccortex31", "build", "-f", "-m", "1g", "-k", &format!("{}", k), "-s", "test",
-                    "-1", &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                    "run",
+                    "-v",
+                    &format!("{}:/data", test_dir_str),
+                    "-it",
+                    "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                    "mccortex31",
+                    "build",
+                    "-f",
+                    "-m",
+                    "1g",
+                    "-k",
+                    &format!("{}", k),
+                    "-s",
+                    "test",
+                    "-1",
+                    &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                     &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                 ])
                 .stdout(Stdio::null())
@@ -851,23 +987,43 @@ mod tests {
             if build_links {
                 Command::new("docker")
                     .args(&[
-                        "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31", "thread", "-f", "-m 1g", "-w",
-                        "-o", &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
-                        "-1", &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                        "run",
+                        "-v",
+                        &format!("{}:/data", test_dir_str),
+                        "-it",
+                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                        "mccortex31",
+                        "thread",
+                        "-f",
+                        "-m 1g",
+                        "-w",
+                        "-o",
+                        &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
+                        "-1",
+                        &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
                     .expect("failed to execute process");
-        
+
                 Command::new("docker")
                     .args(&[
-                        "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31", "contigs", "-f", "-m", "1g",
-                        "-p", &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
-                        "-o", &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                        "run",
+                        "-v",
+                        &format!("{}:/data", test_dir_str),
+                        "-it",
+                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                        "mccortex31",
+                        "contigs",
+                        "-f",
+                        "-m",
+                        "1g",
+                        "-p",
+                        &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
+                        "-o",
+                        &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -877,9 +1033,18 @@ mod tests {
             } else {
                 Command::new("docker")
                     .args(&[
-                        "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31", "contigs", "-f", "-m", "1g",
-                        "-o", &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                        "run",
+                        "-v",
+                        &format!("{}:/data", test_dir_str),
+                        "-it",
+                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
+                        "mccortex31",
+                        "contigs",
+                        "-f",
+                        "-m",
+                        "1g",
+                        "-o",
+                        &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -898,80 +1063,91 @@ mod tests {
     /// Parse the McCortex contigs file, grabbing both the assembly seed and assembled sequence.
     fn parse_mccortex_fasta(contigs_path: PathBuf) -> BTreeMap<String, String> {
         let contigs = bio::io::fasta::Reader::from_file(contigs_path).unwrap();
-        let contig_map: BTreeMap<_, _> = contigs.records().into_iter()
+        let contig_map: BTreeMap<_, _> = contigs
+            .records()
+            .into_iter()
             .filter_map(Result::ok)
             .map(|r| {
-                let pieces = r.desc().unwrap().split_whitespace()
+                let pieces = r
+                    .desc()
+                    .unwrap()
+                    .split_whitespace()
                     .flat_map(|s| s.split("=").collect::<Vec<&str>>())
                     .collect::<Vec<&str>>();
-    
-                let seed = pieces
-                    .chunks(2)
-                    .find(|pair| pair[0] == "seed")
-                    .unwrap()[1]
-                    .to_string();
-    
+
+                let seed = pieces.chunks(2).find(|pair| pair[0] == "seed").unwrap()[1].to_string();
+
                 let seq = String::from_utf8_lossy(r.seq()).to_string();
-        
+
                 (seed, seq)
             })
             .collect();
 
         contig_map
     }
-    
+
     /// Parse the McCortex links file.
     fn parse_mccortex_ctp_file(links_path: PathBuf) -> Links {
         let mut links = Links::new();
-    
+
         let file = File::open(links_path).expect("Unable to open file");
         let decoder = GzDecoder::new(file);
         let reader = BufReader::new(decoder);
-    
-        let lines: Vec<Vec<String>> = reader.lines().map(|line| {
-            line.unwrap().split_whitespace().map(|s| s.to_string()).collect()
-        }).collect();
-    
-        for i in 0..lines.len()-1 {
+
+        let lines: Vec<Vec<String>> = reader
+            .lines()
+            .map(|line| {
+                line.unwrap()
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .collect();
+
+        for i in 0..lines.len() - 1 {
             let pieces1 = &lines[i];
 
-            if pieces1.len() < 1 { continue; }
-    
+            if pieces1.len() < 1 {
+                continue;
+            }
+
             if let Some(first_char_1) = pieces1.get(0).unwrap().chars().next() {
                 if "ACGT".contains(first_char_1) {
                     let anchor_kmer = pieces1.get(0).unwrap().as_bytes();
                     let cn_anchor_vec = LdBG::canonicalize_kmer(anchor_kmer);
                     let cn_anchor_kmer = cn_anchor_vec.as_bytes();
-    
-                    for j in i+1..lines.len() {
+
+                    for j in i + 1..lines.len() {
                         let pieces2 = &lines[j];
 
-                        if pieces2.len() < 1 { continue; }
-    
+                        if pieces2.len() < 1 {
+                            continue;
+                        }
+
                         if let Some(first_char_2) = pieces2.get(0).unwrap().chars().next() {
                             if "ACGT".contains(first_char_2) {
                                 break;
                             } else if "FR".contains(first_char_2) {
                                 let mut link = Link::new(pieces2.get(0).unwrap() == "F");
-    
+
                                 let junctions = pieces2.get(3).unwrap();
                                 for junction in junctions.chars() {
                                     link.push_back(junction as u8);
                                 }
-    
+
                                 // Add link to links map.
                                 if !links.contains_key(cn_anchor_kmer) {
                                     links.insert(cn_anchor_kmer.to_owned(), HashMap::new());
                                 }
-    
+
                                 if !links.get(cn_anchor_kmer).unwrap().contains_key(&link) {
-                                    links.get_mut(cn_anchor_kmer)
-                                        .unwrap()
-                                        .insert(link, 1);
+                                    links.get_mut(cn_anchor_kmer).unwrap().insert(link, 1);
                                 } else {
-                                    let linkcov = *links.get_mut(cn_anchor_kmer).unwrap().get(&link).unwrap();
-    
-                                    links.get_mut(cn_anchor_kmer)
+                                    let linkcov =
+                                        *links.get_mut(cn_anchor_kmer).unwrap().get(&link).unwrap();
+
+                                    links
+                                        .get_mut(cn_anchor_kmer)
                                         .unwrap()
                                         .insert(link, linkcov.saturating_add(1));
                                 }
@@ -1000,48 +1176,123 @@ mod tests {
         assert_eq!(LdBG::canonicalize_kmer(kmer3), b"AAAA".to_vec());
         assert_eq!(LdBG::canonicalize_kmer(kmer4), b"AAAA".to_vec());
     }
-    
+
     #[test]
     fn test_from_sequences() {
         let genome = get_test_genome();
-        let fwd_seqs = vec!(genome);
+        let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, true);
 
         let mut exp_graph = KmerGraph::new();
-        exp_graph.insert(b"AAATC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
-        exp_graph.insert(b"AATCA".to_vec(), Record::new(1, Some(Edges::from_string("a.....G.".to_string()))));
-        exp_graph.insert(b"ACCGT".to_vec(), Record::new(1, Some(Edges::from_string(".c....G.".to_string()))));
-        exp_graph.insert(b"ACTGA".to_vec(), Record::new(1, Some(Edges::from_string(".......T".to_string()))));
-        exp_graph.insert(b"ATCAG".to_vec(), Record::new(1, Some(Edges::from_string("a......T".to_string()))));
-        exp_graph.insert(b"ATCGA".to_vec(), Record::new(1, Some(Edges::from_string(".c..A...".to_string()))));
-        exp_graph.insert(b"ATCGC".to_vec(), Record::new(2, Some(Edges::from_string(".c..A...".to_string()))));
-        exp_graph.insert(b"ATGCC".to_vec(), Record::new(1, Some(Edges::from_string("..g.A...".to_string()))));
-        exp_graph.insert(b"ATGCG".to_vec(), Record::new(2, Some(Edges::from_string("..g.A...".to_string()))));
-        exp_graph.insert(b"ATTTC".to_vec(), Record::new(1, Some(Edges::from_string("..g...G.".to_string()))));
-        exp_graph.insert(b"CACCG".to_vec(), Record::new(1, Some(Edges::from_string(".c.....T".to_string()))));
-        exp_graph.insert(b"CACGG".to_vec(), Record::new(1, Some(Edges::from_string(".c.....T".to_string()))));
-        exp_graph.insert(b"CATCG".to_vec(), Record::new(3, Some(Edges::from_string("..g.AC..".to_string()))));
-        exp_graph.insert(b"CCACC".to_vec(), Record::new(1, Some(Edges::from_string("......G.".to_string()))));
-        exp_graph.insert(b"CCACG".to_vec(), Record::new(1, Some(Edges::from_string("..g...G.".to_string()))));
-        exp_graph.insert(b"CGAAA".to_vec(), Record::new(1, Some(Edges::from_string("...t...T".to_string()))));
-        exp_graph.insert(b"GATGC".to_vec(), Record::new(3, Some(Edges::from_string(".c...CG.".to_string()))));
-        exp_graph.insert(b"GCCAC".to_vec(), Record::new(1, Some(Edges::from_string("...t..G.".to_string()))));
-        exp_graph.insert(b"TCGAA".to_vec(), Record::new(1, Some(Edges::from_string("a...A...".to_string()))));
-        exp_graph.insert(b"TCGCA".to_vec(), Record::new(2, Some(Edges::from_string("a......T".to_string()))));
-        exp_graph.insert(b"TGCCA".to_vec(), Record::new(1, Some(Edges::from_string("a....C..".to_string()))));
+        exp_graph.insert(
+            b"AAATC".to_vec(),
+            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"AATCA".to_vec(),
+            Record::new(1, Some(Edges::from_string("a.....G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"ACCGT".to_vec(),
+            Record::new(1, Some(Edges::from_string(".c....G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"ACTGA".to_vec(),
+            Record::new(1, Some(Edges::from_string(".......T".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATCAG".to_vec(),
+            Record::new(1, Some(Edges::from_string("a......T".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATCGA".to_vec(),
+            Record::new(1, Some(Edges::from_string(".c..A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATCGC".to_vec(),
+            Record::new(2, Some(Edges::from_string(".c..A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATGCC".to_vec(),
+            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATGCG".to_vec(),
+            Record::new(2, Some(Edges::from_string("..g.A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"ATTTC".to_vec(),
+            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"CACCG".to_vec(),
+            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+        );
+        exp_graph.insert(
+            b"CACGG".to_vec(),
+            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+        );
+        exp_graph.insert(
+            b"CATCG".to_vec(),
+            Record::new(3, Some(Edges::from_string("..g.AC..".to_string()))),
+        );
+        exp_graph.insert(
+            b"CCACC".to_vec(),
+            Record::new(1, Some(Edges::from_string("......G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"CCACG".to_vec(),
+            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"CGAAA".to_vec(),
+            Record::new(1, Some(Edges::from_string("...t...T".to_string()))),
+        );
+        exp_graph.insert(
+            b"GATGC".to_vec(),
+            Record::new(3, Some(Edges::from_string(".c...CG.".to_string()))),
+        );
+        exp_graph.insert(
+            b"GCCAC".to_vec(),
+            Record::new(1, Some(Edges::from_string("...t..G.".to_string()))),
+        );
+        exp_graph.insert(
+            b"TCGAA".to_vec(),
+            Record::new(1, Some(Edges::from_string("a...A...".to_string()))),
+        );
+        exp_graph.insert(
+            b"TCGCA".to_vec(),
+            Record::new(2, Some(Edges::from_string("a......T".to_string()))),
+        );
+        exp_graph.insert(
+            b"TGCCA".to_vec(),
+            Record::new(1, Some(Edges::from_string("a....C..".to_string()))),
+        );
 
         let mut exp_links = Links::new();
-        exp_links.insert(b"ATGCC".to_vec(), HashMap::from([(Link::from_junctions(false, b"CCA"), 1)]));
-        exp_links.insert(b"ATCGC".to_vec(), HashMap::from([
-            (Link::from_junctions(false, b"GC"), 1),
-            (Link::from_junctions(false, b"C"), 1),
-        ]));
-        exp_links.insert(b"ATGCG".to_vec(), HashMap::from([
-            (Link::from_junctions(false, b"CA"), 1),
-            (Link::from_junctions(false, b"A"), 1),
-        ]));
-        exp_links.insert(b"ATCGA".to_vec(), HashMap::from([(Link::from_junctions(false, b"GGC"), 1)]));
+        exp_links.insert(
+            b"ATGCC".to_vec(),
+            HashMap::from([(Link::from_junctions(false, b"CCA"), 1)]),
+        );
+        exp_links.insert(
+            b"ATCGC".to_vec(),
+            HashMap::from([
+                (Link::from_junctions(false, b"GC"), 1),
+                (Link::from_junctions(false, b"C"), 1),
+            ]),
+        );
+        exp_links.insert(
+            b"ATGCG".to_vec(),
+            HashMap::from([
+                (Link::from_junctions(false, b"CA"), 1),
+                (Link::from_junctions(false, b"A"), 1),
+            ]),
+        );
+        exp_links.insert(
+            b"ATCGA".to_vec(),
+            HashMap::from([(Link::from_junctions(false, b"GGC"), 1)]),
+        );
 
         for (kmer, record) in g.kmers {
             assert!(exp_graph.contains_key(kmer.as_bytes()));
@@ -1067,7 +1318,7 @@ mod tests {
         let fw_genome = get_test_genome();
         let rc_genome = fw_genome.reverse_complement();
 
-        let fwd_seqs = vec!(fw_genome.clone());
+        let fwd_seqs = vec![fw_genome.clone()];
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, true);
 
         // assembly outside cycle should recapitulate entire genome

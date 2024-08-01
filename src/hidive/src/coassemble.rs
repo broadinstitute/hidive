@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::{fs::File, io::{BufWriter, Write}};
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+};
 
 use skydive::ldbg::LdBG;
 
@@ -16,7 +19,10 @@ pub fn start(
     // Read all long reads.
     let mut all_lr_seqs: Vec<Vec<u8>> = Vec::new();
     for long_read_seq_url in &long_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(&long_read_seq_url, &[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
+        let basename = skydive::utils::basename_without_extension(
+            &long_read_seq_url,
+            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
+        );
         let fasta_path = long_read_seq_url.to_file_path().unwrap();
 
         skydive::elog!("Processing long-read sample {}...", basename);
@@ -24,10 +30,12 @@ pub fn start(
         let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
-        all_lr_seqs.extend(all_reads
-            .iter()
-            .map(|r| r.seq().to_vec())
-            .collect::<Vec<Vec<u8>>>());
+        all_lr_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>(),
+        );
     }
 
     let l1 = LdBG::from_sequences(String::from("l1"), kmer_size, &all_lr_seqs, false, false);
@@ -35,7 +43,10 @@ pub fn start(
     // Read all short reads.
     let mut all_sr_seqs: Vec<Vec<u8>> = Vec::new();
     for short_read_seq_url in &short_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(&short_read_seq_url, &[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
+        let basename = skydive::utils::basename_without_extension(
+            &short_read_seq_url,
+            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
+        );
         let fasta_path = short_read_seq_url.to_file_path().unwrap();
 
         skydive::elog!("Processing short-read sample {}...", basename);
@@ -43,10 +54,12 @@ pub fn start(
         let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
-        all_sr_seqs.extend(all_reads
-            .iter()
-            .map(|r| r.seq().to_vec())
-            .collect::<Vec<Vec<u8>>>());
+        all_sr_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>(),
+        );
     }
 
     let mut s1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_sr_seqs, false, false);
@@ -69,8 +82,12 @@ pub fn start(
         .iter()
         .cloned()
         .filter(|read| {
-            let num_contained = read.windows(kmer_size)
-                .filter(|kmer| s1.kmers.contains_key(&skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
+            let num_contained = read
+                .windows(kmer_size)
+                .filter(|kmer| {
+                    s1.kmers
+                        .contains_key(&skydive::ldbg::LdBG::canonicalize_kmer(kmer))
+                })
                 .count();
 
             num_contained == read.len() - kmer_size + 1
@@ -82,7 +99,10 @@ pub fn start(
     skydive::elog!("Short reads (before filtering): {}", &all_sr_seqs.len());
     skydive::elog!("Short reads (after filtering): {}", &filtered_sr_seqs.len());
 
-    let all_seqs = all_lr_seqs.into_iter().chain(filtered_sr_seqs.iter().cloned()).collect::<Vec<Vec<u8>>>();
+    let all_seqs = all_lr_seqs
+        .into_iter()
+        .chain(filtered_sr_seqs.iter().cloned())
+        .collect::<Vec<Vec<u8>>>();
     skydive::elog!("Combined reads: {}", &all_seqs.len());
 
     // Assemble contigs.
@@ -95,6 +115,12 @@ pub fn start(
 
     skydive::elog!("Writing {} contigs to disk...", &contigs.len());
     for (i, contig) in contigs.iter().enumerate() {
-        writeln!(writer, ">unitig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+        writeln!(
+            writer,
+            ">unitig_{}\n{}",
+            i,
+            String::from_utf8(contig.clone()).unwrap()
+        )
+        .unwrap();
     }
 }

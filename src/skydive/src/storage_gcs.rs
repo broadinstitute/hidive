@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use cloud_storage::{ sync::*, ListRequest, object::ObjectList };
-use chrono::{ DateTime, Utc };
+use chrono::{DateTime, Utc};
+use cloud_storage::{object::ObjectList, sync::*, ListRequest};
 
 pub fn gcs_split_path(path: &str) -> (String, String) {
     let re = regex::Regex::new(r"^gs://").unwrap();
@@ -18,9 +18,13 @@ pub fn gcs_list_files(path: &str) -> Result<Vec<ObjectList>> {
     let (bucket_name, prefix) = gcs_split_path(path);
 
     let client = Client::new()?;
-    let file_list = client
-        .object()
-        .list(&bucket_name, ListRequest { prefix: Some(prefix), ..Default::default() })?;
+    let file_list = client.object().list(
+        &bucket_name,
+        ListRequest {
+            prefix: Some(prefix),
+            ..Default::default()
+        },
+    )?;
 
     Ok(file_list)
 }
@@ -57,7 +61,11 @@ pub fn gcs_list_files_of_type(path: String, suffix: &str) -> Result<Vec<String>>
             fs.items
                 .iter()
                 .filter_map(|f| {
-                    if f.name.ends_with(suffix) { Some(f.name.clone()) } else { None }
+                    if f.name.ends_with(suffix) {
+                        Some(f.name.clone())
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<_>>()
         })

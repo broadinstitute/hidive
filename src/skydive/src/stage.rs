@@ -7,8 +7,8 @@ use rust_htslib::bam::record::Aux;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::File;
-use std::path::PathBuf;
 use std::io::BufWriter;
+use std::path::PathBuf;
 
 // Import the Url type to work with URLs.
 use url::Url;
@@ -18,15 +18,15 @@ use backoff::ExponentialBackoff;
 
 // Import rayon's parallel iterator traits.
 // use rayon::prelude::*;
-use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 // Import types from rust_htslib for working with BAM files.
-use rust_htslib::bam::{ self, FetchDefinition, IndexedReader, Read };
-use rust_htslib::faidx::Reader;
 use bio::io::fasta;
+use rust_htslib::bam::{self, FetchDefinition, IndexedReader, Read};
+use rust_htslib::faidx::Reader;
 
 // Import functions for authorizing access to Google Cloud Storage.
-use crate::env::{ gcs_authorize_data_access, local_guess_curl_ca_bundle };
+use crate::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 
 // Function to open a BAM/CRAM file from a URL and cache its contents locally.
 pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
@@ -118,7 +118,10 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
         if let Some(sm) = rg_sm_map.get(v) {
             Ok(sm.to_owned())
         } else {
-            Err(anyhow::anyhow!("Sample name not found for read group: {}", v))
+            Err(anyhow::anyhow!(
+                "Sample name not found for read group: {}",
+                v
+            ))
         }
     } else {
         Err(anyhow::anyhow!("Read group is not a string"))
@@ -126,7 +129,13 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
 }
 
 // Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_aligned_bam_reads(_basename: &str, bam: &mut IndexedReader, chr: &str, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+fn extract_aligned_bam_reads(
+    _basename: &str,
+    bam: &mut IndexedReader,
+    chr: &str,
+    start: &u64,
+    stop: &u64,
+) -> Result<Vec<fasta::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let mut bmap = HashMap::new();
@@ -140,7 +149,7 @@ fn extract_aligned_bam_reads(_basename: &str, bam: &mut IndexedReader, chr: &str
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
-                    Err(_) => String::from("unknown")
+                    Err(_) => String::from("unknown"),
                 };
 
                 let seq_name = format!("{}|{}", qname, sm);
@@ -177,7 +186,10 @@ fn extract_aligned_bam_reads(_basename: &str, bam: &mut IndexedReader, chr: &str
 }
 
 // Function to extract unaligned seqs from a BAM file
-fn extract_unaligned_bam_reads(_basename: &str, bam: &mut IndexedReader) -> Result<Vec<fasta::Record>> {
+fn extract_unaligned_bam_reads(
+    _basename: &str,
+    bam: &mut IndexedReader,
+) -> Result<Vec<fasta::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let _ = bam.fetch(FetchDefinition::Unmapped);
@@ -193,11 +205,7 @@ fn extract_unaligned_bam_reads(_basename: &str, bam: &mut IndexedReader) -> Resu
             let vseq = read.seq().as_bytes();
             let bseq = vseq.as_bytes();
 
-            let seq = fasta::Record::with_attrs(
-                seq_name.as_str(),
-                Some(""),
-                bseq
-            );
+            let seq = fasta::Record::with_attrs(seq_name.as_str(), Some(""), bseq);
 
             seq
         })
@@ -207,9 +215,17 @@ fn extract_unaligned_bam_reads(_basename: &str, bam: &mut IndexedReader) -> Resu
 }
 
 // Function to extract seqs from a FASTA file within a specified genomic region.
-fn extract_fasta_seqs(basename: &String, fasta: &mut Reader, chr: &String, start: &u64, stop: &u64) -> Result<Vec<fasta::Record>> {
+fn extract_fasta_seqs(
+    basename: &String,
+    fasta: &mut Reader,
+    chr: &String,
+    start: &u64,
+    stop: &u64,
+) -> Result<Vec<fasta::Record>> {
     let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
-    let seq = fasta.fetch_seq_string(chr, *start as usize, (*stop - 1) as usize).unwrap();
+    let seq = fasta
+        .fetch_seq_string(chr, *start as usize, (*stop - 1) as usize)
+        .unwrap();
 
     let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
@@ -220,11 +236,17 @@ fn extract_fasta_seqs(basename: &String, fasta: &mut Reader, chr: &String, start
 fn stage_data_from_one_file(
     seqs_url: &Url,
     loci: &HashSet<(String, u64, u64)>,
-    unmapped: bool
+    unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
     let mut all_seqs = Vec::new();
 
-    let basename = seqs_url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap().last().unwrap().to_string();
+    let basename = seqs_url
+        .path_segments()
+        .map(|c| c.collect::<Vec<_>>())
+        .unwrap()
+        .last()
+        .unwrap()
+        .to_string();
 
     let seqs_str = seqs_url.as_str();
     if seqs_str.ends_with(".bam") || seqs_str.ends_with(".cram") {
@@ -237,7 +259,8 @@ fn stage_data_from_one_file(
 
         // Extract seqs for the current locus.
         for (chr, start, stop) in loci.iter() {
-            let aligned_seqs = extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop).unwrap();
+            let aligned_seqs =
+                extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop).unwrap();
             all_seqs.extend(aligned_seqs);
         }
 
@@ -246,7 +269,11 @@ fn stage_data_from_one_file(
             let unaligned_seqs = extract_unaligned_bam_reads(&basename, &mut bam).unwrap();
             all_seqs.extend(unaligned_seqs);
         }
-    } else if seqs_str.ends_with(".fa") || seqs_str.ends_with(".fasta") || seqs_str.ends_with(".fa.gz") || seqs_str.ends_with(".fasta.gz") {
+    } else if seqs_str.ends_with(".fa")
+        || seqs_str.ends_with(".fasta")
+        || seqs_str.ends_with(".fa.gz")
+        || seqs_str.ends_with(".fasta.gz")
+    {
         // Handle FASTA file processing
         let basename = basename
             .trim_end_matches(".fasta.gz")
@@ -277,7 +304,6 @@ fn stage_data_from_all_files(
     loci: &HashSet<(String, u64, u64)>,
     unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
-
     // Use a parallel iterator to process multiple BAM files concurrently.
     let all_data: Vec<_> = seq_urls
         .par_iter()
@@ -290,7 +316,7 @@ fn stage_data_from_all_files(
 
             // Retry the operation with exponential backoff in case of failure.
             match backoff::retry(ExponentialBackoff::default(), op) {
-                Ok(seqs) => { seqs }
+                Ok(seqs) => seqs,
                 Err(e) => {
                     // If all retries fail, panic with an error message.
                     panic!("Error: {}", e);
@@ -305,12 +331,9 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
-pub fn read_spans_locus(
-    start: i64,
-    end: i64,
-    loci: &HashSet<(String, u64, u64)>,
-) -> bool {
-    loci.iter().any(|e| start <= e.1 as i64 && end >= e.2 as i64)
+pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>) -> bool {
+    loci.iter()
+        .any(|e| start <= e.1 as i64 && end >= e.2 as i64)
 }
 
 // Public function to stage data from multiple BAM files and write to an output file.
@@ -319,7 +342,7 @@ pub fn stage_data(
     loci: &HashSet<(String, u64, u64)>,
     seq_urls: &HashSet<Url>,
     unmapped: bool,
-    cache_path: &PathBuf
+    cache_path: &PathBuf,
 ) -> Result<usize> {
     let current_dir = env::current_dir()?;
     env::set_current_dir(cache_path).unwrap();
@@ -350,8 +373,8 @@ pub fn stage_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use url::Url;
     use std::collections::HashSet;
+    use url::Url;
 
     // This test may pass, but still print a message to stderr regarding its failure to access data. This is because
     // open_bam() tries a couple of authorization methods before accessing data, and the initial failures print a
@@ -408,7 +431,7 @@ mod tests {
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         ).unwrap();
         let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
-        let seq_urls = HashSet::from([ seqs_url_1, seqs_url_2 ]);
+        let seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         let result = stage_data(&output_path, &loci, &seq_urls, false, &cache_path);
 

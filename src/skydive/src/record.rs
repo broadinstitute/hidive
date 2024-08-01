@@ -6,7 +6,7 @@ use crate::edges::Edges;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     coverage: u16,
-    edges: Edges
+    edges: Edges,
 }
 
 impl Record {
@@ -27,10 +27,18 @@ impl Record {
     pub fn incoming_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
-        if self.edges.contains(Edges::FLAG_EDGE_IN_A) { edges.push(b'A'); }
-        if self.edges.contains(Edges::FLAG_EDGE_IN_C) { edges.push(b'C'); }
-        if self.edges.contains(Edges::FLAG_EDGE_IN_G) { edges.push(b'G'); }
-        if self.edges.contains(Edges::FLAG_EDGE_IN_T) { edges.push(b'T'); }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
+            edges.push(b'A');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_C) {
+            edges.push(b'C');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_G) {
+            edges.push(b'G');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_IN_T) {
+            edges.push(b'T');
+        }
 
         edges
     }
@@ -39,10 +47,18 @@ impl Record {
     pub fn outgoing_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
-        if self.edges.contains(Edges::FLAG_EDGE_OUT_A) { edges.push(b'A'); }
-        if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { edges.push(b'C'); }
-        if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { edges.push(b'G'); }
-        if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { edges.push(b'T'); }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
+            edges.push(b'A');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_C) {
+            edges.push(b'C');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_G) {
+            edges.push(b'G');
+        }
+        if self.edges.contains(Edges::FLAG_EDGE_OUT_T) {
+            edges.push(b'T');
+        }
 
         edges
     }
@@ -64,7 +80,7 @@ impl Record {
             b'C' => self.edges.insert(Edges::FLAG_EDGE_IN_C),
             b'G' => self.edges.insert(Edges::FLAG_EDGE_IN_G),
             b'T' => self.edges.insert(Edges::FLAG_EDGE_IN_T),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -75,17 +91,33 @@ impl Record {
             b'C' => self.edges.insert(Edges::FLAG_EDGE_OUT_C),
             b'G' => self.edges.insert(Edges::FLAG_EDGE_OUT_G),
             b'T' => self.edges.insert(Edges::FLAG_EDGE_OUT_T),
-            _ => ()
+            _ => (),
         }
     }
 
     /// The in-degree of a particular k-mer.
     pub fn in_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_C) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_G) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_T) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_C) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_G) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_T) {
+            1
+        } else {
+            0
+        };
 
         degree
     }
@@ -93,10 +125,26 @@ impl Record {
     /// The out-degree of a particular k-mer.
     pub fn out_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { 1 } else { 0 };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { 1 } else { 0 };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_C) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_G) {
+            1
+        } else {
+            0
+        };
+        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_T) {
+            1
+        } else {
+            0
+        };
 
         degree
     }
@@ -109,18 +157,50 @@ impl Record {
 
 impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}{}{}{}{}{}{}{}",
+        write!(
+            f,
+            "{} {}{}{}{}{}{}{}{}",
             self.coverage,
-
-            if self.edges.contains(Edges::FLAG_EDGE_IN_A)  { 'a' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_IN_C)  { 'c' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_IN_G)  { 'g' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_IN_T)  { 't' } else { '.' },
-
-            if self.edges.contains(Edges::FLAG_EDGE_OUT_A) { 'A' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_OUT_C) { 'C' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_OUT_G) { 'G' } else { '.' },
-            if self.edges.contains(Edges::FLAG_EDGE_OUT_T) { 'T' } else { '.' },
+            if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
+                'a'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_IN_C) {
+                'c'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_IN_G) {
+                'g'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_IN_T) {
+                't'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
+                'A'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_OUT_C) {
+                'C'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_OUT_G) {
+                'G'
+            } else {
+                '.'
+            },
+            if self.edges.contains(Edges::FLAG_EDGE_OUT_T) {
+                'T'
+            } else {
+                '.'
+            },
         )
     }
 }
