@@ -11,10 +11,8 @@ use minimap2::{Aligner, Preset};
 
 extern crate ndarray;
 
-use good_lp::{constraint, default_solver, Solution, SolverModel, variables};
-
-
 use rust_wfa2;
+use russcip::prelude::*;
 
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
@@ -380,6 +378,46 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     //     model.add_constr(&index.to_string(), var_flow.get(&r_p_identifier).unwrap() - var_sample_hap.get(&s_p_identifier).unwrap(), Less, 0.0);
     // }
 
+     let mut model = Model::new()
+        .hide_output()
+        .include_default_plugins()
+        .create_prob("test")
+        .set_obj_sense(ObjSense::Maximize);
+
+    // Add variables
+    let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+    let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+
+    // Add constraints
+    model.add_cons(
+        vec![x1.clone(), x2.clone()],
+        &[2., 1.],
+        -f64::INFINITY,
+        100.,
+        "c1",
+    );
+    model.add_cons(
+        vec![x1.clone(), x2.clone()],
+        &[1., 2.],
+        -f64::INFINITY,
+        80.,
+        "c2",
+    );
+
+    let solved_model = model.solve();
+
+    let status = solved_model.status();
+    println!("Solved with status {:?}", status);
+
+    let obj_val = solved_model.obj_val();
+    println!("Objective value: {}", obj_val);
+
+    let sol = solved_model.best_sol().unwrap();
+    let vars = solved_model.vars();
+
+    for var in vars {
+        println!("{} = {}", &var.name(), sol.val(var));
+    }
 
 }
    

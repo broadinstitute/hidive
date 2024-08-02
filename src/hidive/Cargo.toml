@@ -43,8 +43,12 @@ rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
 =======
 rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git" }
 <<<<<<< HEAD
+<<<<<<< HEAD
 gurobi = "0.3.4"
 >>>>>>> 4d70542 (fds)
 =======
+=======
+russcip = { version = "0.3.4", features = ["bundled"] }
+>>>>>>> 2f6dabd (try russcip)
 
 >>>>>>> 4e561c0 (could not compile)
