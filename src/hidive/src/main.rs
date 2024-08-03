@@ -62,7 +62,7 @@ mod rescue;
 mod train;
 mod trim;
 
-#[derive(Debug, Parser)] // requires `derive` feature
+#[derive(Debug, Parser)]
 #[clap(name = "hidive")]
 #[clap(about = "Analysis of high-diversity loci through genome co-assembly of long/short reads.", long_about = None)]
 // #[clap(author = "Kiran V Garimella (kiran@broadinstitute.org)")]
@@ -70,6 +70,8 @@ struct Cli {
     #[clap(subcommand)]
     command: Commands,
 }
+
+const DEFAULT_KMER_SIZE: usize = 17;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -124,6 +126,14 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum number of k-mers to require before examining a read more carefully.
+        #[clap(short, long, value_parser, default_value_t = 10)]
+        min_kmers: usize,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -141,7 +151,7 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "11")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
@@ -173,7 +183,7 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "11")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
         /// Name of sequence to use as reference.
@@ -217,8 +227,12 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "15")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(short, long, required = false, value_parser)]
@@ -264,10 +278,12 @@ fn main() {
         }
         Commands::Rescue {
             output,
+            kmer_size,
+            min_kmers,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
         }
         Commands::Cluster {
             output,
@@ -299,6 +315,7 @@ fn main() {
         }
         Commands::Coassemble {
             output,
+            model_path,
             kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
@@ -306,6 +323,7 @@ fn main() {
             coassemble::start(
                 &output,
                 kmer_size,
+                &model_path,
                 &long_read_fasta_paths,
                 &short_read_fasta_paths,
             );

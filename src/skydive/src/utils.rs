@@ -70,3 +70,17 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
 
     progress_bar
 }
+
+pub fn run_length_encoded(seq: &[u8]) -> Vec<u8> {
+    let mut compressed = Vec::new();
+    let mut prev = None;
+
+    for &base in seq {
+        if Some(base) != prev {
+            compressed.push(base);
+        }
+        prev = Some(base);
+    }
+
+    compressed
+}

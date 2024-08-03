@@ -11,6 +11,10 @@ use indicatif::ParallelProgressIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
+use gbdt::config::{loss2string, Config, Loss};
+use gbdt::decision_tree::{Data, DataVec};
+use gbdt::gradient_boost::GBDT;
+
 use crate::edges::Edges;
 use crate::link::Link;
 use crate::record::Record;
@@ -214,34 +218,6 @@ impl LdBG {
 
         graph
     }
-
-    // fn get_cleaning_threshold(graph: &HashMap<Vec<u8>, Record>) -> u16 {
-    //     let mut coverages = Vec::new();
-
-    //     for record in graph.values() {
-    //         if record.coverage() > 0 {
-    //             coverages.push(record.coverage() as u32);
-    //         }
-    //     }
-
-    //     let sum: u32 = coverages.iter().sum();
-    //     let mean = sum as f64 / coverages.len() as f64;
-
-    //     let variance: f64 = coverages.iter().map(|&x| {
-    //         let diff = x as f64 - mean;
-    //         diff * diff
-    //     }).sum::<f64>() / coverages.len() as f64;
-
-    //     let std_dev = variance.sqrt();
-
-    //     let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
-
-    //     println!("Mean coverage: {}", mean);
-    //     println!("Standard deviation: {}", std_dev);
-    //     println!("Cleaning threshold: {}", cleaning_threshold);
-
-    //     cleaning_threshold
-    // }
 
     fn clean_graph(graph: &KmerGraph) -> KmerGraph {
         // let threshold = Self::get_cleaning_threshold(graph);
@@ -450,7 +426,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A map of links.
-    fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
+    pub fn build_links(k: usize, fwd_seqs: &Vec<Vec<u8>>, graph: &KmerGraph) -> Links {
         let progress_bar =
             crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
 

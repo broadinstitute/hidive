@@ -128,7 +128,7 @@ pub fn start(
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
     for kmer in kmers {
-        let compressed_len = homopolymer_compressed_len(kmer);
+        let compressed_len = skydive::utils::run_length_encoded(kmer).len();
 
         let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
         let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());

@@ -5,11 +5,16 @@ use std::{
     io::{BufWriter, Write},
 };
 
+use gbdt::config::{loss2string, Config, Loss};
+use gbdt::decision_tree::{Data, DataVec};
+use gbdt::gradient_boost::GBDT;
+
 use skydive::ldbg::LdBG;
 
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
+    model_path: &PathBuf,
     long_read_fasta_paths: &Vec<PathBuf>,
     short_read_fasta_paths: &Vec<PathBuf>,
 ) {
@@ -106,7 +111,57 @@ pub fn start(
     skydive::elog!("Combined reads: {}", &all_seqs.len());
 
     // Assemble contigs.
-    let l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, true, true);
+    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, true, true);
+
+    // Filter k-mers.
+    let mut eval_data: DataVec = Vec::new();
+    let graph_kmers = &l3.kmers.keys().cloned().collect::<Vec<_>>();
+    for kmer in graph_kmers {
+        let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
+        let scov = s1.kmers.get(kmer).map_or(0, |record| record.coverage());
+        let compressed_len = skydive::utils::run_length_encoded(kmer).len();
+
+        let data = Data::new_training_data(
+            vec![
+                lcov as f32,
+                scov as f32,
+                (kmer.len() - compressed_len) as f32,
+            ],
+            1.0,
+            0.0,
+            None,
+        );
+
+        eval_data.push(data);
+
+        if lcov + scov < 10 {
+            // l3.remove(kmer);
+        }
+    }
+
+    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
+    let predictions = gbdt.predict(&eval_data);
+    let mut num_below_threshold = 0;
+    let mut num_total = 0;
+
+    for (p, data) in predictions.iter().zip(eval_data.iter()) {
+        // println!("pred={:.2} data={:?}", p, data);
+
+        if *p < 0.5 {
+            num_below_threshold += 1;
+            // l3.remove(&graph_kmers[i]);
+        }
+        num_total += 1;
+    }
+
+    skydive::elog!(
+        "Number of data points with p < 0.5: {} / {}",
+        num_below_threshold,
+        num_total
+    );
+
+    // l3.infer_edges();
+    // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
 
     // Write contigs to disk.
     let contigs = l3.assemble_all();
