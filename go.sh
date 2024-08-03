@@ -49,8 +49,18 @@ minimap2 -ayYL --MD --eqx -x map-hifi -R '@RG\tID:lr\tSM:lr' $OUTPUT/HG00438.mat
 	-f $OUTPUT/HG00438.LR.$NAME.fasta \
 	gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/HG00438/raw_data/Illumina/child/HG00438.final.cram
 
-minimap2 -ayYL --MD --eqx -x sr -R '@RG\tID:lr\tSM:lr' $OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta $OUTPUT/HG00438.SR.$NAME.fasta | \
+minimap2 -ayYL --MD --eqx -x sr -R '@RG\tID:sr\tSM:sr' $OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta $OUTPUT/HG00438.SR.$NAME.fasta | \
 	samtools sort -O BAM --write-index -o $OUTPUT/HG00438.SR.$NAME.bam
+
+# filter
+
+./target/release/hidive filter \
+	-o $OUTPUT/HG00438.SR.$NAME.filtered.fasta \
+	-l $OUTPUT/HG00438.LR.$NAME.fasta \
+	$OUTPUT/HG00438.SR.$NAME.fasta
+
+minimap2 -ayYL --MD --eqx -x sr -R '@RG\tID:sr-filt\tSM:sr-filt' $OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta $OUTPUT/HG00438.SR.$NAME.filtered.fasta | \
+	samtools sort -O BAM --write-index -o $OUTPUT/HG00438.SR.$NAME.filtered.bam
 
 # co-assemble
 

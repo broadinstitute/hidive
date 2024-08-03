@@ -57,6 +57,7 @@ mod build;
 mod cluster;
 mod coassemble;
 mod fetch;
+mod filter;
 mod impute;
 mod rescue;
 mod train;
@@ -141,6 +142,30 @@ enum Commands {
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
+    },
+
+    /// Filter rescued reads to those most closely matching the long-read data.
+    #[clap(arg_required_else_help = true)]
+    Filter {
+        /// Output path for filtered short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
+        #[clap(short, long, value_parser, default_value_t = 90)]
+        min_score_pct: usize,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(short, long, required = true, value_parser)]
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -284,6 +309,21 @@ fn main() {
             seq_paths,
         } => {
             rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+        }
+        Commands::Filter {
+            output,
+            kmer_size,
+            min_score_pct,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            filter::start(
+                &output,
+                kmer_size,
+                min_score_pct,
+                &long_read_fasta_paths,
+                &short_read_fasta_paths,
+            );
         }
         Commands::Cluster {
             output,
