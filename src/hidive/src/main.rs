@@ -83,6 +83,14 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Number of training iterations.
+        #[clap(short, long, value_parser, default_value_t = 50)]
+        iterations: usize,
+
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(short, long, value_parser, required = true)]
         long_read_seq_paths: Vec<PathBuf>,
@@ -280,6 +288,8 @@ fn main() {
     match args.command {
         Commands::Train {
             output,
+            kmer_size,
+            iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
@@ -287,6 +297,8 @@ fn main() {
         } => {
             train::start(
                 &output,
+                kmer_size,
+                iterations,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,

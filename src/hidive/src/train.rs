@@ -1,22 +1,24 @@
 use std::path::PathBuf;
+use num_format::{Locale, ToFormattedString};
 use rand::SeedableRng;
 
 use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
+use rayon::iter;
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive::ldbg::LdBG;
 
 pub fn start(
     output: &PathBuf,
+    kmer_size: usize,
+    iterations: usize,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
     debug: bool,
 ) {
-    let kmer_size = 17;
-
     let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
     let truth_seq_urls = skydive::parse::parse_file_names(&truth_seq_paths);
@@ -100,7 +102,7 @@ pub fn start(
     cfg.set_min_leaf_size(1);
     cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
     cfg.set_shrinkage(0.1);
-    cfg.set_iterations(1000);
+    cfg.set_iterations(iterations);
     cfg.set_debug(debug);
 
     let test_split = 0.2;
@@ -128,7 +130,7 @@ pub fn start(
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
     for kmer in kmers {
-        let compressed_len = skydive::utils::run_length_encoded(kmer).len();
+        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
         let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
         let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
@@ -154,9 +156,11 @@ pub fn start(
     }
 
     // Train the decision trees.
+    skydive::elog!("Training GBDT model with {} training points...", training_data.len().to_formatted_string(&Locale::en));
     gbdt.fit(&mut training_data);
 
     // Predict the test data.
+    skydive::elog!("Computing accuracy on test data...");
     let p = gbdt.predict(&test_data);
 
     // Evaluate accuracy of the model on the test data.
@@ -173,23 +177,13 @@ pub fn start(
 
     skydive::elog!(
         "Predicted accuracy: {}/{} ({:.2}%)",
-        num_correct,
-        num_total,
+        num_correct.to_formatted_string(&Locale::en),
+        num_total.to_formatted_string(&Locale::en),
         100.0 * num_correct as f32 / num_total as f32
     );
 
     gbdt.save_model(output.to_str().unwrap())
         .expect("Unable to save model");
-}
 
-fn homopolymer_compressed_len(seq: &[u8]) -> usize {
-    let mut compressed = Vec::new();
-    let mut prev = None;
-    for &base in seq {
-        if Some(base) != prev {
-            compressed.push(base);
-        }
-        prev = Some(base);
-    }
-    compressed.len()
+    skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }

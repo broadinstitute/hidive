@@ -165,12 +165,13 @@ fn extract_aligned_bam_reads(
                 }
 
                 if let bam::pileup::Indel::Ins(len) = alignment.indel() {
-                    let pos1 = alignment.qpos().unwrap();
-                    let pos2 = pos1 + (len as usize);
-                    for pos in pos1..pos2 {
-                        let a = alignment.record().seq()[pos];
+                    if let Some(pos1) = alignment.qpos() {
+                        let pos2 = pos1 + (len as usize);
+                        for pos in pos1..pos2 {
+                            let a = alignment.record().seq()[pos];
 
-                        bmap.get_mut(&seq_name).unwrap().push(a as char);
+                            bmap.get_mut(&seq_name).unwrap().push(a as char);
+                        }
                     }
                 }
             }

@@ -31,7 +31,7 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
 
         for record in reader.records().flatten() {
             let fw_seq = record.seq();
-            let rl_seq = skydive::utils::run_length_encoded(fw_seq);
+            let rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
 
             let kmers = rl_seq
                 .windows(kmer_size)
@@ -78,7 +78,7 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
 
                 // Count the number of k-mers found in our hashset from the long reads.
                 let fw_seq = read.seq().as_bytes();
-                let rl_seq = skydive::utils::run_length_encoded(&fw_seq);
+                let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
 
                 let num_kmers = rl_seq
                     .par_windows(kmer_size)

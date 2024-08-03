@@ -119,7 +119,7 @@ pub fn start(
     for kmer in graph_kmers {
         let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
         let scov = s1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let compressed_len = skydive::utils::run_length_encoded(kmer).len();
+        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
         let data = Data::new_training_data(
             vec![
