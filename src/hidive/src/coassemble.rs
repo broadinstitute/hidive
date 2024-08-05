@@ -9,6 +9,8 @@ use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
+use petgraph::dot::Dot;
+
 use skydive::ldbg::LdBG;
 
 pub fn start(
@@ -113,6 +115,17 @@ pub fn start(
     // Assemble contigs.
     let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, true, true);
 
+    l3.mark_tips(10*l3.kmer_size);
+
+    let mut num_below_threshold = 0;
+    for cn_kmer in l3.scores.keys() {
+        if l3.scores.get(cn_kmer).unwrap() < &0.5 {
+            num_below_threshold += 1;
+        }
+    }
+
+    skydive::elog!("{} {}", num_below_threshold, l3.scores.len());
+
     // Filter k-mers.
     let mut eval_data: DataVec = Vec::new();
     let graph_kmers = &l3.kmers.keys().cloned().collect::<Vec<_>>();
@@ -169,13 +182,23 @@ pub fn start(
     let mut writer = BufWriter::new(output_file);
 
     skydive::elog!("Writing {} contigs to disk...", &contigs.len());
-    for (i, contig) in contigs.iter().enumerate() {
-        writeln!(
-            writer,
-            ">unitig_{}\n{}",
-            i,
-            String::from_utf8(contig.clone()).unwrap()
-        )
-        .unwrap();
-    }
+    // for (i, contig) in contigs.iter().enumerate() {
+    //     writeln!(
+    //         writer,
+    //         ">unitig_{}\n{}",
+    //         i,
+    //         String::from_utf8(contig.clone()).unwrap()
+    //     )
+    //     .unwrap();
+    // }
+
+    // let gfa = l3.assemble_gfa();
+    // writeln!(writer, "{}", gfa).unwrap();
+
+    // let dot = l3.assemble_dot();
+    // writeln!(writer, "{}", dot).unwrap();
+
+    let graph = l3.traverse();
+    // writeln!(writer, "{}", Dot::with_config(&graph, &[Dot::Config::EdgeNoLabel])).unwrap();
+    writeln!(writer, "{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel])).unwrap();
 }
