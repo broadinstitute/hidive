@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::io::{self, Write};
 
 use indicatif::ProgressIterator;
 use itertools::Itertools;
@@ -971,65 +972,76 @@ impl LdBG {
         let mut graph = DiGraph::new();
 
         for cn_kmer in cn_kmers.iter().sorted() {
-            println!("cn_kmer: {}", String::from_utf8_lossy(cn_kmer));
-        }
+            println!("cn_kmer: {} {}", String::from_utf8_lossy(cn_kmer), visited.contains(cn_kmer));
 
-        for cn_kmer in cn_kmers.iter().sorted() {
             if !visited.contains(cn_kmer) {
                 let first_contig = self.assemble(&cn_kmer);
-
                 let first_node = graph.add_node(String::from_utf8_lossy(&first_contig).to_string());
 
+                // Explore forward
                 let mut fwd_queue = std::collections::VecDeque::new();
                 fwd_queue.push_back(first_node);
 
                 while let Some(node) = fwd_queue.pop_front() {
                     let contig = graph.node_weight(node).unwrap().as_bytes();
-                    println!("\ncontig: {}", String::from_utf8_lossy(&contig));
 
                     if let Some(last_kmer) = self.last_kmer(contig) {
-                        println!("last_kmer: {}", String::from_utf8_lossy(&last_kmer));
-
                         for next_kmer in self.next_kmers(&last_kmer) {
-                            println!("next_kmer: {}", String::from_utf8_lossy(&next_kmer));
+                            if !visited.contains(&LdBG::canonicalize_kmer(&next_kmer)) {
+                                let mut next_contig: Vec<u8> = next_kmer.to_vec();
+                                self.assemble_forward(&mut next_contig, next_kmer);
 
-                            // let mut next_contig: Vec<u8> = next_kmer.to_vec();
-                            let mut next_contig = vec![next_kmer[next_kmer.len() - 1]];
-                            self.assemble_forward(&mut next_contig, next_kmer);
-                            println!("next_contig: {}", String::from_utf8_lossy(&next_contig));
+                                for kmer in next_contig.kmers(self.kmer_size as u8) {
+                                    visited.insert(LdBG::canonicalize_kmer(kmer));
+                                }
 
-                            // if next_contig.len() > 0 {
-                                let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
-                                graph.add_edge(node, next_node, 0);
+                                if next_contig.len() > 0 {
+                                    let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
+                                    graph.add_edge(node, next_node, 0);
 
-                                fwd_queue.push_back(next_node);
-                            // }
+                                    fwd_queue.push_back(next_node);
+                                }
+                            }
                         }
                     }
                 }
 
-                /*
+                // Explore reverse
                 let mut rev_queue = std::collections::VecDeque::new();
                 rev_queue.push_back(first_node);
 
                 while let Some(node) = rev_queue.pop_front() {
                     let contig = graph.node_weight(node).unwrap().as_bytes();
 
+                    println!("contig: {}", String::from_utf8_lossy(contig));
+
                     if let Some(first_kmer) = self.first_kmer(contig) {
+                        println!("first_kmer: {}", String::from_utf8_lossy(&first_kmer));
+
                         for prev_kmer in self.prev_kmers(&first_kmer) {
-                            let mut prev_contig: Vec<u8> = prev_kmer.to_vec();
-                            self.assemble_backward(&mut prev_contig, prev_kmer);
+                            println!("prev_kmer: {}", String::from_utf8_lossy(&first_kmer));
 
-                            if prev_contig.len() > 0 {
-                                let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
-                                graph.add_edge(prev_node, node, 0);
+                            // if !visited.contains(&LdBG::canonicalize_kmer(&prev_kmer)) {
+                                let mut prev_contig: Vec<u8> = prev_kmer.to_vec();
+                                self.assemble_backward(&mut prev_contig, prev_kmer);
 
-                                rev_queue.push_back(prev_node);
-                            }
+                                for kmer in prev_contig.kmers(self.kmer_size as u8) {
+                                    visited.insert(LdBG::canonicalize_kmer(kmer));
+                                }
+
+                                if prev_contig.len() > 0 {
+                                    let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
+                                    graph.add_edge(prev_node, node, 0);
+
+                                    rev_queue.push_back(prev_node);
+                                }
+                            // }
                         }
                     }
                 }
-                */
+
+                // Mark first contig k-mers as processed
+                first_contig.kmers(self.kmer_size as u8).for_each(|kmer| { visited.insert(LdBG::canonicalize_kmer(kmer)); });
             }
 
             for node in graph.node_weights() {
