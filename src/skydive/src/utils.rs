@@ -1,5 +1,8 @@
 use std::borrow::Cow;
 
+use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+
 /// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
 /// without any of the provided extensions. It does this by first extracting the last segment of the URL path,
 /// and then iteratively removing any of the specified extensions from the end of the base name.
@@ -83,4 +86,22 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     }
 
     compressed
+}
+
+pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
+    // Write header
+    writeln!(writer, "H\tVN:Z:1.0")?;
+
+    // Write segments
+    for (node_index, node_label) in graph.node_indices().zip(graph.node_weights()) {
+        writeln!(writer, "S\t{}\t{}", node_index.index(), node_label)?;
+    }
+
+    // Write links
+    for edge in graph.edge_references() {
+        let (from, to) = (edge.source().index(), edge.target().index());
+        writeln!(writer, "L\t{}\t+\t{}\t+\t0M", from, to)?;
+    }
+
+    Ok(())
 }

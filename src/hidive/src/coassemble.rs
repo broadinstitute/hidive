@@ -182,23 +182,8 @@ pub fn start(
     let mut writer = BufWriter::new(output_file);
 
     skydive::elog!("Writing {} contigs to disk...", &contigs.len());
-    // for (i, contig) in contigs.iter().enumerate() {
-    //     writeln!(
-    //         writer,
-    //         ">unitig_{}\n{}",
-    //         i,
-    //         String::from_utf8(contig.clone()).unwrap()
-    //     )
-    //     .unwrap();
-    // }
 
-    // let gfa = l3.assemble_gfa();
-    // writeln!(writer, "{}", gfa).unwrap();
-
-    // let dot = l3.assemble_dot();
-    // writeln!(writer, "{}", dot).unwrap();
-
-    let graph = l3.traverse();
+    let graph = l3.traverse_contigs(b"CCACG".to_vec());
     // writeln!(writer, "{}", Dot::with_config(&graph, &[Dot::Config::EdgeNoLabel])).unwrap();
     writeln!(writer, "{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel])).unwrap();
 }

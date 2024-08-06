@@ -7,7 +7,6 @@ use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
 use needletail::Sequence;
-use petgraph::graphmap::GraphMap;
 use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -931,7 +930,7 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
-    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, u32> {
+    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -944,7 +943,7 @@ impl LdBG {
 
             for next_kmer in self.next_kmers(this_kmer) {
                 let next_node = graph.add_node(String::from_utf8_lossy(&next_kmer).to_string());
-                graph.add_edge(node, next_node, 0);
+                graph.add_edge(node, next_node, 1.0);
 
                 if !visited.contains_key(&next_kmer) {
                     visited.insert(next_kmer.clone(), next_node);
@@ -953,7 +952,7 @@ impl LdBG {
                 } else {
                     for end_kmer in self.next_kmers(&next_kmer) {
                         let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(next_node, *end_node, 0);
+                        graph.add_edge(next_node, *end_node, 1.0);
                     }
                 }
             }
@@ -966,7 +965,7 @@ impl LdBG {
 
             for prev_kmer in self.prev_kmers(this_kmer) {
                 let prev_node = graph.add_node(String::from_utf8_lossy(&prev_kmer).to_string());
-                graph.add_edge(prev_node, node, 0);
+                graph.add_edge(prev_node, node, 1.0);
 
                 if !visited.contains_key(&prev_kmer) {
                     visited.insert(prev_kmer.clone(), prev_node);
@@ -975,7 +974,7 @@ impl LdBG {
                 } else {
                     for end_kmer in self.prev_kmers(&prev_kmer) {
                         let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(*end_node, prev_node, 0);
+                        graph.add_edge(*end_node, prev_node, 1.0);
                     }
                 }
             }
@@ -984,7 +983,7 @@ impl LdBG {
         graph
     }
 
-    pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, u32> {
+    pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -1003,14 +1002,14 @@ impl LdBG {
                         self.assemble_forward(&mut next_contig, next_kmer.clone());
 
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
-                        graph.add_edge(node, next_node, 0);
+                        graph.add_edge(node, next_node, 1.0);
 
                         visited.insert(LdBG::canonicalize_kmer(&next_kmer), next_node);
 
                         fwd_stack.push(next_node);
                     } else {
                         let next_node = visited.get(&LdBG::canonicalize_kmer(&next_kmer)).unwrap();
-                        graph.add_edge(node, *next_node, 0);
+                        graph.add_edge(node, *next_node, 1.0);
                     }
                 }
             }
@@ -1028,15 +1027,108 @@ impl LdBG {
                         self.assemble_backward(&mut prev_contig, prev_kmer.clone());
 
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
-                        graph.add_edge(node, prev_node, 0);
+                        graph.add_edge(node, prev_node, 1.0);
 
                         visited.insert(LdBG::canonicalize_kmer(&prev_kmer), prev_node);
 
                         rev_stack.push(prev_node);
                     } else {
                         let prev_node = visited.get(&LdBG::canonicalize_kmer(&prev_kmer)).unwrap();
-                        graph.add_edge(node, *prev_node, 0);
+                        graph.add_edge(node, *prev_node, 1.0);
                     }
+                }
+            }
+        }
+
+        graph
+    }
+
+    pub fn traverse_all_kmers(&self) -> DiGraph<String, f32> {
+        let cn_kmers = self.kmers
+            .iter()
+            .filter(|(_, record)| record.in_degree() <= 1 && record.out_degree() <= 1)
+            .map(|(cn_kmer, _)| cn_kmer.clone())
+            .collect::<Vec<Vec<u8>>>();
+
+        let mut visited = HashSet::new();
+        let mut graph = DiGraph::new();
+
+        for cn_kmer in cn_kmers {
+            if !visited.contains(&cn_kmer) {
+                let g = self.traverse_kmers(cn_kmer);
+
+                g.node_weights().for_each(|node| {
+                    let cn_kmer = LdBG::canonicalize_kmer(node.as_bytes());
+                    visited.insert(cn_kmer);
+                });
+
+                // Add all nodes from g to graph
+                for node_index in g.node_indices() {
+                    let node_weight = g.node_weight(node_index).unwrap();
+                    graph.add_node(node_weight.clone());
+                }
+
+                // Add all edges from g to graph
+                for edge in g.edge_references() {
+                    let (source, target) = (edge.source(), edge.target());
+                    let source_weight = g.node_weight(source).unwrap();
+                    let target_weight = g.node_weight(target).unwrap();
+                    
+                    let new_source = graph.node_indices()
+                        .find(|&i| graph[i] == *source_weight)
+                        .unwrap();
+                    let new_target = graph.node_indices()
+                        .find(|&i| graph[i] == *target_weight)
+                        .unwrap();
+                    
+                    graph.add_edge(new_source, new_target, *edge.weight());
+                }
+            }
+        }
+
+        graph
+    }
+
+    pub fn traverse_all_contigs(&self) -> DiGraph<String, f32> {
+        let cn_kmers = self.kmers
+            .iter()
+            .filter(|(_, record)| record.in_degree() <= 1 && record.out_degree() <= 1)
+            .map(|(cn_kmer, _)| cn_kmer.clone())
+            .collect::<Vec<Vec<u8>>>();
+
+        let mut visited = HashSet::new();
+        let mut graph = DiGraph::new();
+
+        for cn_kmer in cn_kmers {
+            if !visited.contains(&cn_kmer) {
+                let g = self.traverse_contigs(cn_kmer);
+
+                g.node_weights().for_each(|node| {
+                    for kmer in node.as_bytes().kmers(self.kmer_size as u8) {
+                        visited.insert(LdBG::canonicalize_kmer(&kmer));
+                    }
+                });
+
+                // Add all nodes from g to graph
+                for node_index in g.node_indices() {
+                    let node_weight = g.node_weight(node_index).unwrap();
+                    graph.add_node(node_weight.clone());
+                }
+
+                // Add all edges from g to graph
+                for edge in g.edge_references() {
+                    let (source, target) = (edge.source(), edge.target());
+                    let source_weight = g.node_weight(source).unwrap();
+                    let target_weight = g.node_weight(target).unwrap();
+                    
+                    let new_source = graph.node_indices()
+                        .find(|&i| graph[i] == *source_weight)
+                        .unwrap();
+                    let new_target = graph.node_indices()
+                        .find(|&i| graph[i] == *target_weight)
+                        .unwrap();
+                    
+                    graph.add_edge(new_source, new_target, *edge.weight());
                 }
             }
         }
@@ -1050,7 +1142,6 @@ mod tests {
     use super::*;
     use crate::edges::Edges;
 
-    use petgraph::dot::Dot;
     use rand::{Rng, SeedableRng};
 
     use std::collections::BTreeMap;
@@ -1152,23 +1243,9 @@ mod tests {
                 .expect("Unable to write to file");
 
             Command::new("docker")
-                .args(&[
-                    "run",
-                    "-v",
-                    &format!("{}:/data", test_dir_str),
-                    "-it",
-                    "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                    "mccortex31",
-                    "build",
-                    "-f",
-                    "-m",
-                    "1g",
-                    "-k",
-                    &format!("{}", k),
-                    "-s",
-                    "test",
-                    "-1",
-                    &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                .args(&[ "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0", "mccortex31",
+                    "build", "-f", "-m", "1g", "-k", &format!("{}", k), "-s", "test",
+                    "-1", &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                     &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                 ])
                 .stdout(Stdio::null())
@@ -1178,21 +1255,9 @@ mod tests {
 
             if build_links {
                 Command::new("docker")
-                    .args(&[
-                        "run",
-                        "-v",
-                        &format!("{}:/data", test_dir_str),
-                        "-it",
-                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31",
-                        "thread",
-                        "-f",
-                        "-m 1g",
-                        "-w",
-                        "-o",
-                        &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
-                        "-1",
-                        &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                    .args(&[ "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0", "mccortex31",
+                        "thread", "-f", "-m", "1g", "-w", "-o", &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
+                        "-1", &format!("/data/test.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -1201,21 +1266,10 @@ mod tests {
                     .expect("failed to execute process");
 
                 Command::new("docker")
-                    .args(&[
-                        "run",
-                        "-v",
-                        &format!("{}:/data", test_dir_str),
-                        "-it",
-                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31",
-                        "contigs",
-                        "-f",
-                        "-m",
-                        "1g",
-                        "-p",
-                        &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
-                        "-o",
-                        &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                    .args(&[ "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0", "mccortex31",
+                        "contigs", "-f", "-m", "1g",
+                        "-p", &format!("/data/links.{}.k_{}.l_{}.ctp.gz", md5_hash, k, build_links),
+                        "-o", &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -1224,19 +1278,9 @@ mod tests {
                     .expect("failed to execute process");
             } else {
                 Command::new("docker")
-                    .args(&[
-                        "run",
-                        "-v",
-                        &format!("{}:/data", test_dir_str),
-                        "-it",
-                        "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0",
-                        "mccortex31",
-                        "contigs",
-                        "-f",
-                        "-m",
-                        "1g",
-                        "-o",
-                        &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
+                    .args(&[ "run", "-v", &format!("{}:/data", test_dir_str), "-it", "us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0", "mccortex31",
+                        "contigs", "-f", "-m", "1g",
+                        "-o", &format!("/data/contigs.{}.k_{}.l_{}.fa", md5_hash, k, build_links),
                         &format!("/data/test.{}.k_{}.l_{}.ctx", md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -1406,6 +1450,40 @@ mod tests {
         assert!(graph.contains_edge(find_node("CGATG"), find_node("GATGC")));
         assert!(graph.contains_edge(find_node("GCCAC"), find_node("CCACG")));
         assert!(graph.contains_edge(find_node("ACTGA"), find_node("CTGAT")));
+    }
+
+    #[test]
+    fn test_traverse_all_kmers() {
+        let genome = get_test_genome();
+        let fwd_seqs = vec![genome];
+
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
+        let graph = g.traverse_all_kmers();
+
+        // Write graph as GFA to a string
+        let mut gfa_output = Vec::new();
+        crate::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+
+        // Print GFA string (commented out for test)
+        let gfa_string = String::from_utf8(gfa_output).unwrap();
+        println!("{}", gfa_string);
+    }
+
+    #[test]
+    fn test_traverse_all_contigs() {
+        let genome = get_test_genome();
+        let fwd_seqs = vec![genome];
+
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
+        let graph = g.traverse_all_contigs();
+
+        // Write graph as GFA to a string
+        let mut gfa_output = Vec::new();
+        crate::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+
+        // Print GFA string (commented out for test)
+        let gfa_string = String::from_utf8(gfa_output).unwrap();
+        println!("{}", gfa_string);
     }
 
     #[test]
