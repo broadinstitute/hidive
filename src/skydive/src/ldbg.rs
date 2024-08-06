@@ -257,86 +257,12 @@ impl LdBG {
         cleaned_graph
     }
 
-    pub fn mark_tips(&mut self, max_tip_length: usize) {
-        for cn_kmer in self.kmers.keys() {
-            if self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
-                let next_kmers = self.next_kmers(cn_kmer);
-
-                for cur_kmer in next_kmers {
-                    let mut fw_contig = Vec::new();
-
-                    self.assemble_forward(&mut fw_contig, cur_kmer);
-
-                    if fw_contig.len() < max_tip_length {
-                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
-                            self.scores.insert(LdBG::canonicalize_kmer(&kmer), 0.0);
-                        };
-                    }
-                }
-            }
-
-            if self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
-                let prev_kmers = self.prev_kmers(cn_kmer);
-
-                for cur_kmer in prev_kmers {
-                    let mut rv_contig = Vec::new();
-
-                    self.assemble_backward(&mut rv_contig, cur_kmer);
-
-                    if rv_contig.len() < max_tip_length {
-                        for kmer in rv_contig.kmers(self.kmer_size as u8) {
-                            self.scores.insert(LdBG::canonicalize_kmer(&kmer), 0.0);
-                        };
-                    }
-                }
-            }
-        }
-    }
-
     pub fn remove(&mut self, kmer: &[u8]) -> Option<Record> {
         let cn_kmer = LdBG::canonicalize_kmer(kmer);
         self.kmers.remove(&cn_kmer)
     }
 
     pub fn infer_edges(&mut self) {
-        /*
-        let mut kmers = self.kmers.clone();
-
-        kmers.iter_mut().for_each(|(cn_kmer, record)| {
-            let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
-
-            for e in record.incoming_edges() {
-                let prev_kmer = std::iter::once(e)
-                    .chain(cn_kmer[0..cn_kmer.len() - 1].iter().cloned())
-                    .collect::<Vec<u8>>();
-
-                if self
-                    .kmers
-                    .contains_key(&LdBG::canonicalize_kmer(&prev_kmer))
-                {
-                    new_record.set_incoming_edge(e);
-                }
-            }
-
-            for e in record.outgoing_edges() {
-                let next_kmer = cn_kmer[1..]
-                    .iter()
-                    .cloned()
-                    .chain(std::iter::once(e))
-                    .collect::<Vec<u8>>();
-
-                if self
-                    .kmers
-                    .contains_key(&LdBG::canonicalize_kmer(&next_kmer))
-                {
-                    new_record.set_outgoing_edge(e);
-                }
-            }
-
-            self.kmers.insert(cn_kmer.clone(), new_record);
-        });
-        */
-
         let mut kmers = KmerGraph::new();
 
         self.kmers.iter().for_each(|(cn_kmer, record)| {
@@ -357,11 +283,6 @@ impl LdBG {
                     new_record.set_incoming_edge(prev_kmer[0]);
                 }
             }
-
-            // if record.in_degree() + record.out_degree() != new_record.in_degree() + new_record.out_degree() {
-            //     println!("{} {}", String::from_utf8_lossy(cn_kmer), record);
-            //     println!("{} {}", String::from_utf8_lossy(cn_kmer), new_record);
-            // }
 
             kmers.insert(cn_kmer.clone(), new_record);
         });
@@ -422,6 +343,8 @@ impl LdBG {
     /// * `reverse` - A boolean indicating whether to search in reverse.
     /// * `fw` - A boolean indicating whether the sequence is forward.
     fn add_record_to_links(links: &mut Links, seq: &[u8], k: usize, graph: &KmerGraph) {
+        if seq.len() < k + 1 { return; }
+
         let range = (0..seq.len() - k + 1).collect::<Vec<_>>();
 
         // Iterate over k-mers to find junctions.
@@ -514,9 +437,7 @@ impl LdBG {
         links
     }
 
-    pub fn correct_seq(&self, seq: &[u8]) -> Vec<u8> {
-        let mut corrected_seq = seq.to_owned();
-
+    pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
         let mut uncorrected_regions = Vec::new();
         let mut start = 0;
         let mut in_uncorrected = false;
@@ -539,34 +460,83 @@ impl LdBG {
             uncorrected_regions.push((start, seq.len()));
         }
 
-        for (start, end) in uncorrected_regions.iter().rev() {
-            println!("Read {}, uncorrected region: {} to {}", seq.len(), start, end);
+        let mut all_corrected_seq_pieces = Vec::new();
+        let mut corrected_seq_pieces = Vec::new();
+
+        let mut last_end = 0;
+        for (start, end) in uncorrected_regions.iter() {
+            // Add the sequence between the last corrected region and this uncorrected region
+            if *start > last_end {
+                corrected_seq_pieces.push(seq[last_end..*start].to_vec());
+            }
 
             // Print the uncorrected region of the read, padded by the k-mer size
             let pad_start = start.saturating_sub(self.kmer_size);
             let pad_end = (end + self.kmer_size).min(seq.len());
 
             let padded_region = &seq[pad_start..pad_end];
-            println!("Uncorrected region (padded): {}", String::from_utf8_lossy(padded_region));
 
             let start_kmer = padded_region.kmers(self.kmer_size as u8).next().unwrap();
             let end_kmer = padded_region.kmers(self.kmer_size as u8).last().unwrap();
 
-            println!("Start k-mer: {}", String::from_utf8_lossy(start_kmer));
-            println!("End k-mer: {}", String::from_utf8_lossy(end_kmer));
-
             let mut fw_contig = start_kmer.to_vec();
             self.assemble_forward(&mut fw_contig, start_kmer.to_vec());
-
-            println!("Fw contig: {}", String::from_utf8_lossy(&fw_contig));
 
             let mut rv_contig = start_kmer.to_vec();
             self.assemble_backward(&mut rv_contig, end_kmer.to_vec());
 
-            println!("Rc contig: {}", String::from_utf8_lossy(&rv_contig));
+            let replacement_contig = if let (Some(fw_start), Some(fw_end)) = (
+                fw_contig.windows(self.kmer_size).position(|window| window == start_kmer),
+                fw_contig.windows(self.kmer_size).rposition(|window| window == end_kmer)
+            ) {
+                if fw_start <= fw_end {
+                    fw_contig[fw_start..fw_end + self.kmer_size].to_vec()
+                } else {
+                    Vec::new()
+                }
+            } else if let (Some(rv_start), Some(rv_end)) = (
+                rv_contig.windows(self.kmer_size).position(|window| window == start_kmer),
+                rv_contig.windows(self.kmer_size).rposition(|window| window == end_kmer)
+            ) {
+                if rv_start <= rv_end {
+                    rv_contig[rv_start..rv_end + self.kmer_size].to_vec()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+
+            crate::elog!("Read {}, uncorrected region: {} to {}", seq.len(), start, end);
+            if !replacement_contig.is_empty() {
+                crate::elog!(" -- Uncorrected    seq: {}", String::from_utf8_lossy(padded_region));
+                crate::elog!(" -- Replacement contig: {}", String::from_utf8_lossy(&replacement_contig));
+
+                corrected_seq_pieces.push(replacement_contig);
+            } else {
+                crate::elog!(" -- No replacement contig found");
+
+                let corrected_seq: Vec<u8> = corrected_seq_pieces.into_iter().flatten().collect();
+
+                all_corrected_seq_pieces.push(corrected_seq);
+
+                corrected_seq_pieces = Vec::new();
+                corrected_seq_pieces.push(padded_region.to_vec());
+            }
+
+            last_end = *end;
         }
 
-        corrected_seq
+        // Add the remaining sequence after the last uncorrected region
+        if last_end < seq.len() {
+            corrected_seq_pieces.push(seq[last_end..].to_vec());
+        }
+
+        // Join corrected_seq_pieces into a single sequence
+        let corrected_seq: Vec<u8> = corrected_seq_pieces.into_iter().flatten().collect();
+        all_corrected_seq_pieces.push(corrected_seq);
+
+        all_corrected_seq_pieces.into_iter().filter(|seq| !seq.is_empty()).collect()
     }
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
@@ -1017,11 +987,11 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
-    pub fn clean_paths(&mut self) -> (usize, usize) {
+    pub fn clean_paths(&mut self, min_score: f32) -> (usize, usize) {
         let bad_cn_kmers = self.kmers
             .keys()
             .cloned()
-            .filter(|cn_kmer| self.scores.get(cn_kmer).unwrap_or(&1.0) < &0.5)
+            .filter(|cn_kmer| self.scores.get(cn_kmer).unwrap_or(&1.0) < &min_score)
             .filter(|cn_kmer| self.kmers.get(cn_kmer).unwrap().in_degree() == 1 && self.kmers.get(cn_kmer).unwrap().out_degree() == 1)
             .collect::<Vec<Vec<u8>>>();
 
@@ -1073,7 +1043,7 @@ impl LdBG {
 
                 let weight = score_sum / seen_kmers.len() as f32;
 
-                if weight < 0.5 {
+                if weight < min_score {
                     // crate::elog!("score {} {} {} {} {}", String::from_utf8_lossy(&bad_cn_kmer), String::from_utf8_lossy(&bad_cn_kmer.reverse_complement()), seen_kmers.len(), score_sum, weight);
 
                     to_remove.extend(seen_kmers);
@@ -1096,9 +1066,6 @@ impl LdBG {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
 
-        // let my_kmer = b"AAATTCGTATCTGTCAA".to_vec();
-        // let my_cn_kmer = LdBG::canonicalize_kmer(&my_kmer);
-
         for cn_kmer in self.kmers.keys() {
             if self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
                 let next_kmers = self.next_kmers(cn_kmer);
@@ -1111,8 +1078,6 @@ impl LdBG {
                     let num_next = self.next_kmers(last_kmer).len();
 
                     if fw_contig.len() <= max_tip_length && num_next == 0 {
-                        // crate::elog!("fw {} {} {}", String::from_utf8_lossy(&cur_kmer), String::from_utf8_lossy(&fw_contig), fw_contig.len());
-
                         for kmer in fw_contig.kmers(self.kmer_size as u8) {
                             to_remove.insert(LdBG::canonicalize_kmer(&kmer));
                         }
@@ -1133,8 +1098,6 @@ impl LdBG {
                     let num_prev = self.prev_kmers(first_kmer).len();
 
                     if rv_contig.len() <= max_tip_length && num_prev == 0 {
-                        // crate::elog!("rv {} {} {}", String::from_utf8_lossy(&cur_kmer), String::from_utf8_lossy(&rv_contig), rv_contig.len());
-
                         for kmer in rv_contig.kmers(self.kmer_size as u8) {
                             to_remove.insert(LdBG::canonicalize_kmer(&kmer));
                         }

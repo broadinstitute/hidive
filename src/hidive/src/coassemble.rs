@@ -173,20 +173,26 @@ pub fn start(
         num_total += 1;
     }
 
-    let (cleaned_kmers, cleaned_paths) = l3.clean_paths();
+    let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
     let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2*kmer_size);
 
     skydive::elog!("K-mers with p < 0.5: {} / {} ({:.2}%)", num_below_threshold, num_total, num_below_threshold as f32 / num_total as f32 * 100.0);
     skydive::elog!("Removed {} k-mers in {} paths", cleaned_kmers, cleaned_paths);
     skydive::elog!("Removed {} k-mers in {} tips", cleaned_tips_kmers, cleaned_tips_paths);
 
-    // for lr_seq in &all_lr_seqs2 {
-    //     l3.correct_seq(lr_seq);
-    // }
+    let mut all_corrected_seqs = Vec::new();
+    for lr_seq in all_seqs {
+        let corrected_seqs = l3.correct_seq(lr_seq);
+
+        all_corrected_seqs.extend(corrected_seqs);
+    }
+
+    skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
 
     // Assemble contigs.
     // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
-    l3.links = LdBG::build_links(kmer_size, &all_lr_seqs2, &l3.kmers);
+    // l3.links = LdBG::build_links(kmer_size, &all_lr_seqs2, &l3.kmers);
+    l3.links = LdBG::build_links(kmer_size, &all_corrected_seqs, &l3.kmers);
     let contigs = l3.assemble_all();
 
     // Write contigs to disk.
@@ -195,15 +201,15 @@ pub fn start(
     let output_file = File::create(output).unwrap();
     let mut writer = BufWriter::new(output_file);
 
-    // for (i, contig) in contigs.iter().enumerate() {
-    //     writeln!(writer, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
-    // }
+    for (i, contig) in contigs.iter().enumerate() {
+        writeln!(writer, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+    }
 
-    let graph = l3.traverse_all_kmers();
+    // let graph = l3.traverse_all_kmers();
     // let graph = l3.traverse_all_contigs();
 
-    let mut gfa_output = Vec::new();
-    skydive::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
-    let gfa_string = String::from_utf8(gfa_output).unwrap();
-    writeln!(writer, "{}", gfa_string).unwrap();
+    // let mut gfa_output = Vec::new();
+    // skydive::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+    // let gfa_string = String::from_utf8(gfa_output).unwrap();
+    // writeln!(writer, "{}", gfa_string).unwrap();
 }
