@@ -27,6 +27,8 @@ pub fn start(
 
     // Read all long reads.
     let mut all_lr_seqs: Vec<Vec<u8>> = Vec::new();
+    let mut all_lr_seqs2: Vec<Vec<u8>> = Vec::new();
+
     for long_read_seq_url in &long_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
             &long_read_seq_url,
@@ -40,6 +42,13 @@ pub fn start(
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
 
         all_lr_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>(),
+        );
+
+        all_lr_seqs2.extend(
             all_reads
                 .iter()
                 .map(|r| r.seq().to_vec())
@@ -108,7 +117,7 @@ pub fn start(
     skydive::elog!("Short reads (before filtering): {}", &all_sr_seqs.len());
     skydive::elog!("Short reads (after filtering): {}", &filtered_sr_seqs.len());
 
-    let all_seqs = all_lr_seqs
+    let all_seqs = &all_lr_seqs
         .into_iter()
         .chain(filtered_sr_seqs.iter().cloned())
         .collect::<Vec<Vec<u8>>>();
@@ -117,16 +126,16 @@ pub fn start(
     // Assemble contigs.
     let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, false, false);
 
-    l3.mark_tips(10*l3.kmer_size);
+    // l3.mark_tips(10*l3.kmer_size);
 
-    let mut num_below_threshold = 0;
-    for cn_kmer in l3.scores.keys() {
-        if l3.scores.get(cn_kmer).unwrap() < &0.5 {
-            num_below_threshold += 1;
-        }
-    }
+    // let mut num_below_threshold = 0;
+    // for cn_kmer in l3.scores.keys() {
+    //     if l3.scores.get(cn_kmer).unwrap() < &0.5 {
+    //         num_below_threshold += 1;
+    //     }
+    // }
 
-    skydive::elog!("{} {}", num_below_threshold, l3.scores.len());
+    // skydive::elog!("{} {}", num_below_threshold, l3.scores.len());
 
     // Filter k-mers.
     let mut eval_data: DataVec = Vec::new();
@@ -165,12 +174,19 @@ pub fn start(
     }
 
     let (cleaned_kmers, cleaned_paths) = l3.clean_paths();
+    let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2*kmer_size);
 
     skydive::elog!("K-mers with p < 0.5: {} / {} ({:.2}%)", num_below_threshold, num_total, num_below_threshold as f32 / num_total as f32 * 100.0);
     skydive::elog!("Removed {} k-mers in {} paths", cleaned_kmers, cleaned_paths);
+    skydive::elog!("Removed {} k-mers in {} tips", cleaned_tips_kmers, cleaned_tips_paths);
+
+    // for lr_seq in &all_lr_seqs2 {
+    //     l3.correct_seq(lr_seq);
+    // }
 
     // Assemble contigs.
-    l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
+    // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
+    l3.links = LdBG::build_links(kmer_size, &all_lr_seqs2, &l3.kmers);
     let contigs = l3.assemble_all();
 
     // Write contigs to disk.
@@ -178,16 +194,16 @@ pub fn start(
 
     let output_file = File::create(output).unwrap();
     let mut writer = BufWriter::new(output_file);
-    for (i, contig) in contigs.iter().enumerate() {
-        writeln!(writer, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
-    }
 
-    // let graph = l3.traverse_all_kmers();
+    // for (i, contig) in contigs.iter().enumerate() {
+    //     writeln!(writer, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+    // }
+
+    let graph = l3.traverse_all_kmers();
     // let graph = l3.traverse_all_contigs();
 
-    // let mut gfa_output = Vec::new();
-    // skydive::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
-    // let gfa_string = String::from_utf8(gfa_output).unwrap();
-    // writeln!(writer, "{}", gfa_string).unwrap();
-    // println!("{}", gfa_string);
+    let mut gfa_output = Vec::new();
+    skydive::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+    let gfa_string = String::from_utf8(gfa_output).unwrap();
+    writeln!(writer, "{}", gfa_string).unwrap();
 }

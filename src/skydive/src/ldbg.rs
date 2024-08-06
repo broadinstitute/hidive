@@ -299,6 +299,7 @@ impl LdBG {
     }
 
     pub fn infer_edges(&mut self) {
+        /*
         let mut kmers = self.kmers.clone();
 
         kmers.iter_mut().for_each(|(cn_kmer, record)| {
@@ -333,6 +334,36 @@ impl LdBG {
             }
 
             self.kmers.insert(cn_kmer.clone(), new_record);
+        });
+        */
+
+        let mut kmers = KmerGraph::new();
+
+        self.kmers.iter().for_each(|(cn_kmer, record)| {
+            let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
+
+            for next_kmer in self.next_kmers(cn_kmer) {
+                let next_cn_kmer = LdBG::canonicalize_kmer(&next_kmer);
+
+                if self.kmers.contains_key(&next_cn_kmer) {
+                    new_record.set_outgoing_edge(next_kmer[next_kmer.len() - 1]);
+                }
+            }
+
+            for prev_kmer in self.prev_kmers(cn_kmer) {
+                let prev_cn_kmer = LdBG::canonicalize_kmer(&prev_kmer);
+
+                if self.kmers.contains_key(&prev_cn_kmer) {
+                    new_record.set_incoming_edge(prev_kmer[0]);
+                }
+            }
+
+            // if record.in_degree() + record.out_degree() != new_record.in_degree() + new_record.out_degree() {
+            //     println!("{} {}", String::from_utf8_lossy(cn_kmer), record);
+            //     println!("{} {}", String::from_utf8_lossy(cn_kmer), new_record);
+            // }
+
+            kmers.insert(cn_kmer.clone(), new_record);
         });
 
         self.kmers = kmers;
@@ -464,6 +495,7 @@ impl LdBG {
             .progress_with(progress_bar)
             .map(|fwd_seq| {
                 let mut local_links = Links::new();
+
                 let fw_seq = fwd_seq.clone();
                 let rc_seq = fw_seq.reverse_complement();
 
@@ -480,6 +512,61 @@ impl LdBG {
             });
 
         links
+    }
+
+    pub fn correct_seq(&self, seq: &[u8]) -> Vec<u8> {
+        let mut corrected_seq = seq.to_owned();
+
+        let mut uncorrected_regions = Vec::new();
+        let mut start = 0;
+        let mut in_uncorrected = false;
+
+        for (i, kmer) in seq.windows(self.kmer_size).enumerate() {
+            let cn_kmer = Self::canonicalize_kmer(kmer);
+
+            if !self.kmers.contains_key(&cn_kmer) {
+                if !in_uncorrected {
+                    start = i;
+                    in_uncorrected = true;
+                }
+            } else if in_uncorrected {
+                uncorrected_regions.push((start, i + self.kmer_size - 1));
+                in_uncorrected = false;
+            }
+        }
+
+        if in_uncorrected {
+            uncorrected_regions.push((start, seq.len()));
+        }
+
+        for (start, end) in uncorrected_regions.iter().rev() {
+            println!("Read {}, uncorrected region: {} to {}", seq.len(), start, end);
+
+            // Print the uncorrected region of the read, padded by the k-mer size
+            let pad_start = start.saturating_sub(self.kmer_size);
+            let pad_end = (end + self.kmer_size).min(seq.len());
+
+            let padded_region = &seq[pad_start..pad_end];
+            println!("Uncorrected region (padded): {}", String::from_utf8_lossy(padded_region));
+
+            let start_kmer = padded_region.kmers(self.kmer_size as u8).next().unwrap();
+            let end_kmer = padded_region.kmers(self.kmer_size as u8).last().unwrap();
+
+            println!("Start k-mer: {}", String::from_utf8_lossy(start_kmer));
+            println!("End k-mer: {}", String::from_utf8_lossy(end_kmer));
+
+            let mut fw_contig = start_kmer.to_vec();
+            self.assemble_forward(&mut fw_contig, start_kmer.to_vec());
+
+            println!("Fw contig: {}", String::from_utf8_lossy(&fw_contig));
+
+            let mut rv_contig = start_kmer.to_vec();
+            self.assemble_backward(&mut rv_contig, end_kmer.to_vec());
+
+            println!("Rc contig: {}", String::from_utf8_lossy(&rv_contig));
+        }
+
+        corrected_seq
     }
 
     /// Get the canonical (lexicographically-lowest) version of a k-mer.
@@ -991,6 +1078,69 @@ impl LdBG {
 
                     to_remove.extend(seen_kmers);
                     bad_paths += 1;
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        self.infer_edges();
+
+        (to_remove.len(), bad_paths)
+    }
+
+    pub fn clean_tips(&mut self, max_tip_length: usize) -> (usize, usize) {
+        let mut to_remove = HashSet::new();
+        let mut bad_paths: usize = 0;
+
+        // let my_kmer = b"AAATTCGTATCTGTCAA".to_vec();
+        // let my_cn_kmer = LdBG::canonicalize_kmer(&my_kmer);
+
+        for cn_kmer in self.kmers.keys() {
+            if self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
+                let next_kmers = self.next_kmers(cn_kmer);
+
+                for cur_kmer in next_kmers {
+                    let mut fw_contig = cur_kmer.to_vec();
+                    self.assemble_forward(&mut fw_contig, cur_kmer.clone());
+
+                    let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
+                    let num_next = self.next_kmers(last_kmer).len();
+
+                    if fw_contig.len() <= max_tip_length && num_next == 0 {
+                        // crate::elog!("fw {} {} {}", String::from_utf8_lossy(&cur_kmer), String::from_utf8_lossy(&fw_contig), fw_contig.len());
+
+                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
+                            to_remove.insert(LdBG::canonicalize_kmer(&kmer));
+                        }
+
+                        bad_paths += 1;
+                    }
+                }
+            }
+
+            if self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
+                let prev_kmers = self.prev_kmers(cn_kmer);
+
+                for cur_kmer in prev_kmers {
+                    let mut rv_contig = cur_kmer.to_vec();
+                    self.assemble_backward(&mut rv_contig, cur_kmer.clone());
+
+                    let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
+                    let num_prev = self.prev_kmers(first_kmer).len();
+
+                    if rv_contig.len() <= max_tip_length && num_prev == 0 {
+                        // crate::elog!("rv {} {} {}", String::from_utf8_lossy(&cur_kmer), String::from_utf8_lossy(&rv_contig), rv_contig.len());
+
+                        for kmer in rv_contig.kmers(self.kmer_size as u8) {
+                            to_remove.insert(LdBG::canonicalize_kmer(&kmer));
+                        }
+
+                        bad_paths += 1;
+                    }
                 }
             }
         }
