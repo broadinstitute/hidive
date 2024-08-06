@@ -1063,30 +1063,6 @@ mod tests {
 
     use proptest::prelude::*;
 
-    #[test]
-    fn test_traverse_kmers() {
-        let genome = get_test_genome();
-        let fwd_seqs = vec![genome];
-
-        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
-        let graph = g.traverse_kmers(b"ATTTC".to_vec());
-
-        // crate::elog!("graph: {}", graph.node_count());
-        println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
-    }
-
-    #[test]
-    fn test_traverse_contigs() {
-        let genome = get_test_genome();
-        let fwd_seqs = vec![genome];
-
-        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
-        let graph = g.traverse_contigs(b"CCACG".to_vec());
-
-        // crate::elog!("graph: {}", graph.node_count());
-        println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
-    }
-
     /// Canonical example genome from https://academic.oup.com/bioinformatics/article/34/15/2556/4938484
     fn get_test_genome() -> Vec<u8> {
         "ACTGATTTCGATGCGATGCGATGCCACGGTGG".as_bytes().to_vec()
@@ -1375,6 +1351,95 @@ mod tests {
         }
 
         links
+    }
+
+    #[test]
+    fn test_traverse_kmers() {
+        let genome = get_test_genome();
+        let fwd_seqs = vec![genome];
+
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
+        let graph = g.traverse_kmers(b"ATTTC".to_vec());
+
+        // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
+
+        // Check if the graph is consistent with the expected structure
+        assert_eq!(graph.node_count(), 22);
+        assert_eq!(graph.edge_count(), 22);
+
+        // Check specific nodes and their labels
+        let node_labels: Vec<_> = graph.node_weights().cloned().collect();
+        assert!(node_labels.contains(&"ATTTC".to_string()));
+        assert!(node_labels.contains(&"TTTCG".to_string()));
+        assert!(node_labels.contains(&"TTCGA".to_string()));
+        assert!(node_labels.contains(&"TCGAT".to_string()));
+        assert!(node_labels.contains(&"CGATG".to_string()));
+        assert!(node_labels.contains(&"GATGC".to_string()));
+        assert!(node_labels.contains(&"ATGCC".to_string()));
+        assert!(node_labels.contains(&"ATGCG".to_string()));
+        assert!(node_labels.contains(&"TGCGA".to_string()));
+        assert!(node_labels.contains(&"GCGAT".to_string()));
+        assert!(node_labels.contains(&"TGCCA".to_string()));
+        assert!(node_labels.contains(&"GCCAC".to_string()));
+        assert!(node_labels.contains(&"CCACG".to_string()));
+        assert!(node_labels.contains(&"CACGG".to_string()));
+        assert!(node_labels.contains(&"ACGGT".to_string()));
+        assert!(node_labels.contains(&"CGGTG".to_string()));
+        assert!(node_labels.contains(&"GGTGG".to_string()));
+        assert!(node_labels.contains(&"GATTT".to_string()));
+        assert!(node_labels.contains(&"TGATT".to_string()));
+        assert!(node_labels.contains(&"CTGAT".to_string()));
+        assert!(node_labels.contains(&"ACTGA".to_string()));
+
+        // Check specific edges
+        let edges = graph.edge_indices().collect::<Vec<_>>();
+        assert_eq!(edges.len(), 22);
+
+        // Helper function to find node index by label
+        let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
+
+        // Check some specific edges
+        assert!(graph.contains_edge(find_node("ATTTC"), find_node("TTTCG")));
+        assert!(graph.contains_edge(find_node("TTTCG"), find_node("TTCGA")));
+        assert!(graph.contains_edge(find_node("GATGC"), find_node("ATGCC")));
+        assert!(graph.contains_edge(find_node("GATGC"), find_node("ATGCG")));
+        assert!(graph.contains_edge(find_node("CGATG"), find_node("GATGC")));
+        assert!(graph.contains_edge(find_node("GCCAC"), find_node("CCACG")));
+        assert!(graph.contains_edge(find_node("ACTGA"), find_node("CTGAT")));
+    }
+
+    #[test]
+    fn test_traverse_contigs() {
+        let genome = get_test_genome();
+        let fwd_seqs = vec![genome];
+
+        let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs, false, false);
+        let graph = g.traverse_contigs(b"CCACG".to_vec());
+
+        // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
+
+        // Check if the graph is consistent with the expected structure
+        assert_eq!(graph.node_count(), 3);
+        assert_eq!(graph.edge_count(), 4);
+
+        // Check specific nodes and their labels
+        let node_labels: Vec<_> = graph.node_weights().cloned().collect();
+        assert!(node_labels.contains(&"CGATGCCACGGTGG".to_string()));
+        assert!(node_labels.contains(&"ACTGATTTCGAT".to_string()));
+        assert!(node_labels.contains(&"CGATGCGAT".to_string()));
+
+        // Check specific edges
+        let edges = graph.edge_indices().collect::<Vec<_>>();
+        assert_eq!(edges.len(), 4);
+
+        // Helper function to find node index by label
+        let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
+
+        // Check some specific edges
+        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("ACTGATTTCGAT")));
+        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("CGATGCGAT")));
+        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("ACTGATTTCGAT")));
+        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("CGATGCGAT")));
     }
 
     #[test]
