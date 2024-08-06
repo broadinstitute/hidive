@@ -9,6 +9,8 @@ use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
+use needletail::Sequence;
+use parquet::data_type::AsBytes;
 use petgraph::dot::Dot;
 
 use skydive::ldbg::LdBG;
@@ -113,7 +115,7 @@ pub fn start(
     skydive::elog!("Combined reads: {}", &all_seqs.len());
 
     // Assemble contigs.
-    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, true, true);
+    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs, false, false);
 
     l3.mark_tips(10*l3.kmer_size);
 
@@ -146,10 +148,6 @@ pub fn start(
         );
 
         eval_data.push(data);
-
-        if lcov + scov < 10 {
-            // l3.remove(kmer);
-        }
     }
 
     let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
@@ -157,33 +155,39 @@ pub fn start(
     let mut num_below_threshold = 0;
     let mut num_total = 0;
 
-    for (p, data) in predictions.iter().zip(eval_data.iter()) {
-        // println!("pred={:.2} data={:?}", p, data);
+    for (p, cn_kmer) in predictions.iter().zip(graph_kmers.iter()) {
+        l3.scores.insert(cn_kmer.clone(), p.clamp(0.0, 1.0));
 
         if *p < 0.5 {
             num_below_threshold += 1;
-            // l3.remove(&graph_kmers[i]);
         }
         num_total += 1;
     }
 
-    skydive::elog!(
-        "Number of data points with p < 0.5: {} / {}",
-        num_below_threshold,
-        num_total
-    );
+    let (cleaned_kmers, cleaned_paths) = l3.clean_paths();
 
-    // l3.infer_edges();
-    // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
+    skydive::elog!("K-mers with p < 0.5: {} / {} ({:.2}%)", num_below_threshold, num_total, num_below_threshold as f32 / num_total as f32 * 100.0);
+    skydive::elog!("Removed {} k-mers in {} paths", cleaned_kmers, cleaned_paths);
+
+    // Assemble contigs.
+    l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
+    let contigs = l3.assemble_all();
 
     // Write contigs to disk.
-    let contigs = l3.assemble_all();
-    let output_file = File::create(output).unwrap();
-    let mut writer = BufWriter::new(output_file);
-
     skydive::elog!("Writing {} contigs to disk...", &contigs.len());
 
-    let graph = l3.traverse_contigs(b"CCACG".to_vec());
-    // writeln!(writer, "{}", Dot::with_config(&graph, &[Dot::Config::EdgeNoLabel])).unwrap();
-    writeln!(writer, "{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel])).unwrap();
+    let output_file = File::create(output).unwrap();
+    let mut writer = BufWriter::new(output_file);
+    for (i, contig) in contigs.iter().enumerate() {
+        writeln!(writer, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+    }
+
+    // let graph = l3.traverse_all_kmers();
+    // let graph = l3.traverse_all_contigs();
+
+    // let mut gfa_output = Vec::new();
+    // skydive::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+    // let gfa_string = String::from_utf8(gfa_output).unwrap();
+    // writeln!(writer, "{}", gfa_string).unwrap();
+    // println!("{}", gfa_string);
 }

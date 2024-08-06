@@ -930,6 +930,81 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    pub fn clean_paths(&mut self) -> (usize, usize) {
+        let bad_cn_kmers = self.kmers
+            .keys()
+            .cloned()
+            .filter(|cn_kmer| self.scores.get(cn_kmer).unwrap_or(&1.0) < &0.5)
+            .filter(|cn_kmer| self.kmers.get(cn_kmer).unwrap().in_degree() == 1 && self.kmers.get(cn_kmer).unwrap().out_degree() == 1)
+            .collect::<Vec<Vec<u8>>>();
+
+        // let bad_cn_kmers = vec![b"CTGAGCCGGCCATGTCC".to_vec()];
+
+        let mut to_remove = HashSet::new();
+        let mut bad_paths: usize = 0;
+
+        for bad_cn_kmer in bad_cn_kmers {
+            if !to_remove.contains(&bad_cn_kmer) {
+                let mut seen_kmers = HashSet::new();
+                let mut score_sum = 0.0;
+
+                let mut fw_contig = bad_cn_kmer.clone();
+                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+
+                for kmer in fw_contig.windows(self.kmer_size) {
+                    let cn_kmer = LdBG::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        // crate::elog!("fw {} {} {}", String::from_utf8_lossy(&kmer), String::from_utf8_lossy(&cn_kmer), r);
+
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let mut rc_contig = bad_cn_kmer.clone();
+                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+
+                for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
+                    let cn_kmer = LdBG::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        // crate::elog!("rv {} {} {}", String::from_utf8_lossy(&kmer), String::from_utf8_lossy(&cn_kmer), r);
+
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let weight = score_sum / seen_kmers.len() as f32;
+
+                if weight < 0.5 {
+                    // crate::elog!("score {} {} {} {} {}", String::from_utf8_lossy(&bad_cn_kmer), String::from_utf8_lossy(&bad_cn_kmer.reverse_complement()), seen_kmers.len(), score_sum, weight);
+
+                    to_remove.extend(seen_kmers);
+                    bad_paths += 1;
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        self.infer_edges();
+
+        (to_remove.len(), bad_paths)
+    }
+
     pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
@@ -943,7 +1018,8 @@ impl LdBG {
 
             for next_kmer in self.next_kmers(this_kmer) {
                 let next_node = graph.add_node(String::from_utf8_lossy(&next_kmer).to_string());
-                graph.add_edge(node, next_node, 1.0);
+                // graph.add_edge(node, next_node, 1.0);
+                graph.add_edge(node, next_node, *self.scores.get(&LdBG::canonicalize_kmer(&next_kmer)).unwrap_or(&1.0));
 
                 if !visited.contains_key(&next_kmer) {
                     visited.insert(next_kmer.clone(), next_node);
@@ -952,7 +1028,8 @@ impl LdBG {
                 } else {
                     for end_kmer in self.next_kmers(&next_kmer) {
                         let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(next_node, *end_node, 1.0);
+                        // graph.add_edge(next_node, *end_node, 1.0);
+                        graph.add_edge(next_node, *end_node, *self.scores.get(&LdBG::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
                     }
                 }
             }
@@ -965,7 +1042,8 @@ impl LdBG {
 
             for prev_kmer in self.prev_kmers(this_kmer) {
                 let prev_node = graph.add_node(String::from_utf8_lossy(&prev_kmer).to_string());
-                graph.add_edge(prev_node, node, 1.0);
+                // graph.add_edge(prev_node, node, 1.0);
+                graph.add_edge(prev_node, node, *self.scores.get(&LdBG::canonicalize_kmer(&prev_kmer)).unwrap_or(&1.0));
 
                 if !visited.contains_key(&prev_kmer) {
                     visited.insert(prev_kmer.clone(), prev_node);
@@ -974,7 +1052,8 @@ impl LdBG {
                 } else {
                     for end_kmer in self.prev_kmers(&prev_kmer) {
                         let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(*end_node, prev_node, 1.0);
+                        // graph.add_edge(*end_node, prev_node, 1.0);
+                        graph.add_edge(*end_node, prev_node, *self.scores.get(&LdBG::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
                     }
                 }
             }
@@ -1001,8 +1080,10 @@ impl LdBG {
                         let mut next_contig = next_kmer.clone();
                         self.assemble_forward(&mut next_contig, next_kmer.clone());
 
+                        let weight = next_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
-                        graph.add_edge(node, next_node, 1.0);
+                        graph.add_edge(node, next_node, weight);
 
                         visited.insert(LdBG::canonicalize_kmer(&next_kmer), next_node);
 
@@ -1026,8 +1107,10 @@ impl LdBG {
                         let mut prev_contig = prev_kmer.clone();
                         self.assemble_backward(&mut prev_contig, prev_kmer.clone());
 
+                        let weight = prev_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
-                        graph.add_edge(node, prev_node, 1.0);
+                        graph.add_edge(node, prev_node, weight);
 
                         visited.insert(LdBG::canonicalize_kmer(&prev_kmer), prev_node);
 

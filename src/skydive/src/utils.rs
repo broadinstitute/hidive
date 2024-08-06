@@ -100,7 +100,8 @@ pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<Str
     // Write links
     for edge in graph.edge_references() {
         let (from, to) = (edge.source().index(), edge.target().index());
-        writeln!(writer, "L\t{}\t+\t{}\t+\t0M", from, to)?;
+        let weight = edge.weight();
+        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, (100.0*weight).round() as u8)?;
     }
 
     Ok(())
