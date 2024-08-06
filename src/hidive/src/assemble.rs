@@ -2,8 +2,11 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::hash::Hash;
+
 use std::path::PathBuf;
 use rayon::string;
+
+
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
@@ -14,8 +17,12 @@ use bio::io::fasta::{Reader, Record};
 extern crate ndarray;
 
 use rust_wfa2;
-use russcip::prelude::*;
+// use russcip::prelude::*;
 
+// use good_lp::{variables, variable, scip, constraint, SolverModel, Solution};
+
+
+use grb::prelude::*;
 
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
@@ -296,7 +303,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
         .collect();
     println!("Read_sets {:?}", read_sets);
     let vector_single_sample = imputed_data.select(Axis(0), &row_index);
-    println!("Single sample Matrix:\n{:?}", vector_single_sample);
+    // println!("Single sample Matrix:\n{:?}", vector_single_sample);
     
     // get anchorlist and start end anchor sequences
     let mut anchorlist: Vec<String> = graph.anchor.keys().cloned().collect();
@@ -327,7 +334,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
     // Extract single sample graph
     let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();
-    println!("Single sample Graph:\n{:?}", graph.incoming);
+    // println!("Single sample Graph:\n{:?}", graph.incoming);
  
     // pairwise alignment between reads and candidate paths from single_sample graph, 
     // construct HashMap for Ryan's optimizer
@@ -335,15 +342,16 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     
     //  Ryan's optimizer translated using gurobi
     let mut unique_samples = HashSet::new();
-    let mut unique_paths = HashSet::new();
+    let mut unique_paths = HashMap::new();
     let mut unique_reads = HashSet::new();
-
+    let mut ind = 0;
     for sub_map in data_info.values() {
         if let Some(sample_name) = sub_map.get("sample") {
             unique_samples.insert(sample_name.clone());
         }
         if let Some(path_name) = sub_map.get("path") {
-            unique_paths.insert(path_name.clone());
+            unique_paths.insert(path_name.clone(), ind);
+            ind += 1;
         }
         if let Some(read_name) = sub_map.get("read") {
             unique_reads.insert(read_name.clone());
@@ -351,21 +359,18 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
     }
 
-    // Create model
-    let mut model = Model::new()
-        .hide_output()
-        .include_default_plugins()
-        .create_prob("haplotype")
-        .set_obj_sense(ObjSense::Minimize);
-
+    // create model
+    let mut model = Model::new("haplotype").unwrap();
+    
     let mut var_haps = HashMap::new();
     let mut var_sample_hap = HashMap::new();
     let mut var_flow = HashMap::new();
 
-    for hap in unique_paths.iter(){
-        var_haps.insert(hap.clone(), model.add_var(0.0, 1.0, 0.0, &hap, VarType::Binary));
+    for (hap_name, hap) in unique_paths.iter(){
+        var_haps.insert(hap.clone(), add_binvar!(model, name:&hap.to_string()).unwrap());
     }
-    let mut total_cost = 0;
+
+    let mut total_cost_expr = grb::expr::LinExpr::new();
     let mut flow_out = HashMap::new();
     let mut connected_haps_per_sample = HashMap::new();
 
@@ -373,76 +378,67 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
         let s = submap.get("sample").unwrap();
         let r = submap.get("read").unwrap();
         let p = submap.get("path").unwrap();
-        let c:i32 = submap.get("cost").unwrap().parse().expect("Not a valid integer for cost");
+        let c:f64 = submap.get("cost").unwrap().parse().expect("Not a valid integer for cost");
 
-        let r_p_identifier = format!("{}_{}", r, p);
-        let s_p_identifier = format!("{}_{}", s, p);
-        var_flow.insert(r_p_identifier, model.add_var(0.0, 1.0, 0.0, &r_p_identifier, VarType::Continuous));
+        let r_p_identifier = format!("{}_{}", r, unique_paths.get(p).unwrap());
+        let s_p_identifier = format!("{}_{}", s, unique_paths.get(p).unwrap());
+        var_flow.insert(r_p_identifier.clone(), add_var!(model, Continuous, name: &r_p_identifier, obj: 0.0, bounds: 0..1).unwrap());
+
+
         if !var_sample_hap.contains_key(&s_p_identifier){
-            var_sample_hap.insert(s_p_identifier, model.add_var(0.0, 1.0, 0.0, &s_p_identifier, VarType::Binary));
-            connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(var_sample_hap.get(&s_p_identifier));
+            let inserted_value = add_binvar!(model, name:&s_p_identifier).unwrap();
+            var_sample_hap.insert(s_p_identifier.clone(), inserted_value);
+            connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(inserted_value);
         }
-        let x1 = var_flow.get(&r_p_identifier).unwrap();
-        let x2 = var_sample_hap.get(&s_p_identifier).unwrap();
-        let x3 = var_haps.get(p).unwrap();
-        model.add_cons(
-            vec![x1.clone(), x2.clone()],
-            &[1.,1.],
-            -f64::INFINITY,
-            0.,
-            &(2*index).to_string()
-        );
-        model.add_cons(
-            vec![x2.clone(), x3.clone()],
-            &[1.,1.],
-            -f64::INFINITY,
-            0.,
-            &(2*index + 1).to_string()
-        );
-        total_cost += var_flow.get(&r_p_identifier).unwrap() * c as f64;
-        let flow_out_value = flow_out.entry(r.clone()).or_insert(0.0);
-        let var_flow_value = var_flow.get(&r_p_identifier).unwrap(); // Safely get the value from var_flow
-        *flow_out_value += var_flow_value;
 
+
+
+        // total flows:
+        let flow_var = var_flow.get(&r_p_identifier).unwrap();
+        let sample_hap_var = var_sample_hap.get(&s_p_identifier).unwrap();
+        let hap_index = unique_paths.get(p).unwrap();
+        let hap_var = var_haps.get(hap_index).unwrap();
+        total_cost_expr.add_term( c, *flow_var);
+        flow_out.entry(r).or_insert(grb::expr::LinExpr::new()).add_term(1.0, *flow_var) ;  
+
+        // add constraints
+        let name1 = (2*index).to_string();
+        model.add_constr(&name1, c!(*flow_var - *sample_hap_var <= 0)).unwrap();
+        let name2 = (2*index + 1).to_string();
+        model.add_constr(&name2, c!( *sample_hap_var - *hap_var <= 0)).unwrap();      
     }
 
+    for read in unique_reads.iter(){
+        let mut flow_out_var = flow_out.get(read).unwrap();
+        model.add_constr(read, c!(flow_out_var.clone() == 1));
+    }
+
+    for sample in unique_samples.iter() {
+        let sample_haps = connected_haps_per_sample.get(sample).unwrap();
+        let mut sum_expr: grb::expr::LinExpr = grb::expr::LinExpr::new();
+        for sh in sample_haps.iter(){
+            sum_expr.add_term(1.0, *sh);
+        }
+        model.add_constr(&format!("constraint_for_{}", sample), c!(sum_expr <= 2)).unwrap();
+    }
+
+    let mut var_num_haps = add_var!(model, Continuous, name: "var_num_haps", obj: 0.0).unwrap();
+    let mut var_num_haps_expr = grb::expr::LinExpr::new();
+    for (path_index, var) in var_haps.iter(){
+        var_num_haps_expr.add_term(1.0, *var);
+    }
+    var_num_haps_expr.add_term(-1.0, var_num_haps);
+    model.add_constr("constraints_of_var_num_haps", c!(var_num_haps_expr == 0));
+
+    let mut var_total_cost = add_var!(model, Continuous, name: "var_total_cost", obj: 0.0).unwrap();
+    total_cost_expr.add_term(-1.0, var_total_cost);
+    model.add_constr("total_cost", c!(total_cost_expr == 0));
+
+
+    // solving models
 
     
 
-    // Add variables
-    let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-    let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-
-    // Add constraints
-    model.add_cons(
-        vec![x1.clone(), x2.clone()],
-        &[2., 1.],
-        -f64::INFINITY,
-        100.,
-        "c1",
-    );
-    model.add_cons(
-        vec![x1.clone(), x2.clone()],
-        &[1., 2.],
-        -f64::INFINITY,
-        80.,
-        "c2",
-    );
-
-    let solved_model = model.solve();
-
-    let status = solved_model.status();
-    println!("Solved with status {:?}", status);
-
-    let obj_val = solved_model.obj_val();
-    println!("Objective value: {}", obj_val);
-
-    let sol = solved_model.best_sol().unwrap();
-    let vars = solved_model.vars();
-
-    for var in vars {
-        println!("{} = {}", &var.name(), sol.val(var));
-    }
-
 }
+
    

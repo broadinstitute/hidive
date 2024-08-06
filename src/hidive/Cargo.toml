@@ -47,6 +47,7 @@ rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
 rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git" }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 gurobi = "0.3.4"
 >>>>>>> 4d70542 (fds)
 =======
@@ -57,5 +58,17 @@ russcip = { version = "0.3.4", features = ["bundled"] }
 =======
 coin_cbc = "0.1.8"
 >>>>>>> bf75baf (run russcip)
+=======
+# russcip = { version = "0.3.4", features = ["bundled"] }
+# good_lp = { version = "*", features = ["scip"], default-features = false }
+
+grb = "2.0.1"
+
+
+
+[env]
+GUROBI_HOME = "/Library/gurobi1103/macos_universal2"
+GUROBI_LIBNAME = "gurobi110"
+>>>>>>> 4fa1811 (finally got grb working)
 
 >>>>>>> 4e561c0 (could not compile)
