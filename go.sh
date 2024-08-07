@@ -5,10 +5,16 @@ set -euxo pipefail
 #LOCUS="chr6:25,726,063-33,410,226"
 #NAME="MHC"
 
-LOCUS="chr6:29,941,260-29,949,572"
-NAME="HLA-A"
+#LOCUS="chr6:29,941,260-29,949,572"
+#NAME="HLA-A"
 
-OUTPUT="scratch/HLA-A"
+#LOCUS="chr6:31,352,872-31,368,067"
+#NAME="HLA-B"
+
+LOCUS="chr6:32,438,878-32,446,046"
+NAME="HLA-DRA"
+
+OUTPUT="scratch/$NAME"
 
 cargo build --release
 
@@ -64,7 +70,10 @@ minimap2 -ayYL --MD --eqx -x sr -R '@RG\tID:sr-filt\tSM:sr-filt' $OUTPUT/HG00438
 
 # co-assemble
 
-./target/release/hidive coassemble -m training.json -s $OUTPUT/HG00438.SR.$NAME.fasta $OUTPUT/HG00438.LR.$NAME.fasta | \
+./target/release/hidive coassemble -m training.json -s $OUTPUT/HG00438.SR.$NAME.filtered.fasta -o $OUTPUT/coassemble.fasta $OUTPUT/HG00438.LR.$NAME.fasta
+
+# align
+cat $OUTPUT/coassemble.fasta | \
 	minimap2 -ayYL --MD --eqx -x map-hifi -R '@RG\tID:asm\tSM:asm' $OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta - | \
 	samtools sort -O BAM --write-index -o $OUTPUT/coassemble.bam
 

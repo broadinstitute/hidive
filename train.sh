@@ -5,12 +5,15 @@ set -euxo pipefail
 #LOCUS="chr6:25,726,063-33,410,226"
 #NAME="MHC"
 
-LOCUS="chr20:40,000,000-60,000,000"
-NAME="chr20"
+#LOCUS="chr20:40,000,000-60,000,000"
+#NAME="chr20"
 
-OUTPUT="scratch/chr20"
+LOCUS="chr6:29,941,260-29,949,572"
+NAME="HLA-A"
 
-cargo build --release
+OUTPUT="scratch/training/$NAME"
+
+#cargo build --release
 
 mkdir -p $OUTPUT
 

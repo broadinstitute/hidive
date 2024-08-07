@@ -514,13 +514,6 @@ impl LdBG {
 
                 corrected_seq_pieces.push(replacement_contig);
             } else {
-                crate::elog!(" -- No replacement contig found");
-
-                let corrected_seq: Vec<u8> = corrected_seq_pieces.into_iter().flatten().collect();
-
-                all_corrected_seq_pieces.push(corrected_seq);
-
-                corrected_seq_pieces = Vec::new();
                 corrected_seq_pieces.push(padded_region.to_vec());
             }
 
