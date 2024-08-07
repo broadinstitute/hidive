@@ -13,7 +13,7 @@ base64 = "0.22.1"
 bio = "2.0.1"
 chrono = "0.4.38"
 clap = { version = "4.5.1", features = ["derive"] }
-env_logger = "0.11.4"
+env_logger = "*"
 eyre = "0.6.8"
 flate2 = "1.0.30"
 gbdt = "0.1.3"
@@ -22,8 +22,8 @@ needletail = "0.5.1"
 noodles = "0.78.0"
 num-format = "0.4.4"
 path-absolutize = "3.1.1"
-parquet = "52.1.0"
-petgraph = "0.6.5"
+parquet = "*"
+petgraph = "*"
 #poasta = { path = "/Users/kiran/repositories/poasta" }
 #polars = "*"
 rand = "0.8.5"
@@ -35,3 +35,40 @@ serde_json = "1.0.120"
 skydive = { path = "../skydive" }
 url = "2.5.2"
 #xgboost = "0.1.4"
+ndarray = "0.15"
+linfa = "0.5"
+<<<<<<< HEAD
+minimap2 = "0.1.20+minimap2.2.28"
+<<<<<<< HEAD
+rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
+=======
+=======
+>>>>>>> bf75baf (run russcip)
+rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git" }
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+gurobi = "0.3.4"
+>>>>>>> 4d70542 (fds)
+=======
+=======
+russcip = { version = "0.3.4", features = ["bundled"] }
+<<<<<<< HEAD
+>>>>>>> 2f6dabd (try russcip)
+=======
+coin_cbc = "0.1.8"
+>>>>>>> bf75baf (run russcip)
+=======
+# russcip = { version = "0.3.4", features = ["bundled"] }
+# good_lp = { version = "*", features = ["scip"], default-features = false }
+
+grb = "2.0.1"
+
+
+
+[env]
+GUROBI_HOME = "/Library/gurobi1103/macos_universal2"
+GUROBI_LIBNAME = "gurobi110"
+>>>>>>> 4fa1811 (finally got grb working)
+
+>>>>>>> 4e561c0 (could not compile)
