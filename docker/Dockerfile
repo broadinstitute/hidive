@@ -7,9 +7,9 @@ ARG branch
 # Install dependencies
 RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-    curl keychain git-lfs time datamash wget bzip2 make gcc cmake \
-    zlib1g-dev libssl-dev lbzip2 libbz2-dev libncurses5-dev \
-    libncursesw5-dev liblzma-dev clang libclang-dev \
+    curl keychain git-lfs time datamash wget bzip2 make gcc-9 cmake g++-9 build-essential\
+    zlib1g-dev libssl-dev lbzip2 libbz2-dev libncurses5-dev libstdc++6\
+    libncursesw5-dev liblzma-dev clang libclang-dev pkg-config \
     libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
