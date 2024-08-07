@@ -35,3 +35,7 @@ serde_json = "1.0.120"
 skydive = { path = "../skydive" }
 url = "2.5.2"
 #xgboost = "0.1.4"
+ndarray = "0.15"
+linfa = "0.5"
+minimap2 = "0.1.20+minimap2.2.28"
+rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}

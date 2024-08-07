@@ -251,6 +251,9 @@ enum Commands {
         #[clap(required = true, value_parser)]
         graph: PathBuf,
 
+        #[clap(required = true, value_parser)]
+        reads: PathBuf,
+
         ///K nearest _neighbor
         #[clap(required = true, value_parser, default_value_t = 3)]
         k_nearest_neighbor: usize
@@ -364,8 +367,8 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph, k_nearest_neighbor } => {
-            assemble::start(&output, &graph, k_nearest_neighbor);
+        Commands::Assemble { output, graph, reads, k_nearest_neighbor } => {
+            assemble::start(&output, &graph, &reads, k_nearest_neighbor);
         }
         Commands::Coassemble {
             output,

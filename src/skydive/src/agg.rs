@@ -20,6 +20,7 @@ use std::fs::File;
 use flate2::read::GzDecoder;
 >>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
 
+
 #[derive(Debug)]
 pub struct GraphicalGenome {
     pub anchor: HashMap<String, Value>,
@@ -34,6 +35,19 @@ pub fn add_unique(vec: &mut Vec<String>, item: String) {
     if !vec.contains(&item) {
         vec.push(item);
     }
+}
+pub fn reverse_complement(kmer: &str) -> String {
+    kmer.chars()
+        .rev()
+        .map(|c| match c {
+            'A' => 'T',
+            'T' => 'A',
+            'C' => 'G',
+            'G' => 'C',
+            'N' => 'N',
+            _ => panic!("Unexpected character: {}", c),
+        })
+        .collect()
 }
 
 >>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
@@ -254,4 +268,83 @@ impl GraphicalGenome {
     Ok(new_graph) 
     }
 }
+<<<<<<< HEAD
 >>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
+=======
+
+pub struct FindAllPathBetweenAnchors {
+    pub subpath: Vec<(Vec<String>, HashSet<String>)>,
+}
+
+impl FindAllPathBetweenAnchors {
+    pub fn new(graph: &GraphicalGenome, start: &str, end: &str, read_sets: HashSet<String>) -> Self {
+        let mut finder = FindAllPathBetweenAnchors {
+            subpath: Vec::new(),
+        };
+        finder.find_path(graph, start, end, Vec::new(), 0, read_sets);
+        finder
+    }
+
+    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, mut sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
+        if start == end {
+            let mut sofar1 = sofar.clone();
+            sofar1.push(end.to_string());
+            if !readset.is_empty() {
+                self.subpath.push((sofar1, readset));
+            }
+            return;
+        }
+
+        if readset.is_empty() || start == "SINK" {
+            return;
+        }
+
+        if !g.outgoing.contains_key(start) {
+            return;
+        }
+
+        let depth1 = depth + 1;
+
+        if let Some(outgoing) = g.outgoing.get(start) {
+            
+            for dst in outgoing {
+                let mut readset1 = readset.clone();
+                if dst.starts_with("E") {
+                    // let edge_reads: HashSet<String> = g.edges.get(dst)
+                    //                                         .and_then(|edge| edge.get("reads").and_then(|r| r.as_array()))
+                    //                                         .map(|reads| reads.iter().filter_map(|read| read.as_str().map(String::from)).collect())
+                    //                                         .unwrap_or_default();
+
+                    // let readset1: HashSet<String> = readset.intersection(&edge_reads).cloned().collect();
+                    if let Some(edge_reads) = g.edges.get(dst).and_then(|e| e.get("reads").and_then(|r| r.as_array())) {
+                        readset1.retain(|read| edge_reads.iter().any(|r| r.as_str() == Some(read)));
+                    }
+                    
+                }
+                let mut sofar1 = sofar.clone();
+                sofar1.push(start.to_string());
+                self.find_path(g, dst, end, sofar1, depth1, readset1);
+            }
+        }
+    }
+}
+
+// Series parallele graph
+pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String {
+    let mut seq = String::new();
+    for item in path {
+        if item.starts_with('A') {
+            if let Some(anchor) = graph.anchor.get(item) {
+                seq += &anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
+                // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
+            }
+        } else if item.starts_with("E") {
+            if let Some(edge) = graph.edges.get(item) {
+                seq += &edge["seq"].as_str().unwrap_or_default(); // Assuming `edges` is a HashMap and "seq" is a key
+            }
+        }
+    }
+    seq
+}
+
+>>>>>>> 5a0bd5b (add read files)

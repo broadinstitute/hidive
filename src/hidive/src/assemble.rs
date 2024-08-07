@@ -1,15 +1,27 @@
 // Import necessary standard library modules
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::path::PathBuf;
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
+<<<<<<< HEAD
+
+use minimap2::{Aligner, Preset};
+=======
+>>>>>>> ba3cfee (add read files)
 
 extern crate ndarray;
 
+use rust_wfa2;
+
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
+<<<<<<< HEAD
+use skydive::agg::GraphicalGenome;
+=======
+>>>>>>> ba3cfee (add read files)
 use std::f64::NAN;
 
 // Import the Url type to work with URLs
@@ -19,11 +31,15 @@ use url::Url;
 use skydive;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 pub fn start(output: &PathBuf, graph: &PathBuf) {
     let graph = skydive::agg::GraphicalGenome::load_graph(output.to_str().unwrap()).unwrap();
 
     println!("The answer is {:?} {:?}!", output, graph);
 =======
+=======
+
+>>>>>>> 5a0bd5b (add read files)
 pub fn find_all_read (graph: &skydive::agg::GraphicalGenome) -> HashSet<String> {
     let mut read_sets = HashSet::new();
     let edgelist = graph.edges.keys();
@@ -129,8 +145,127 @@ fn count_non_equal_elements(a: &Array1<f64>, b: &Array1<f64>) -> usize {
      .count()
 }
 
+pub fn find_targetseq_in_reads(read_seq: &str, source_kmer:&str, sink_kmer: &str) -> String{
+    let source_rev = skydive::agg::reverse_complement(source_kmer);
+    let sink_rev = skydive::agg::reverse_complement(sink_kmer);
+
+    let spos = read_seq.find(&source_kmer);
+    let epos = read_seq.find(&sink_kmer);
+    let rspos = read_seq.find(&source_rev);
+    let repos = read_seq.find(&sink_rev);
+
+    match (spos, epos, rspos, repos) {
+        (Some(spos), Some(epos), _, _) => {
+            let end_index = epos + sink_kmer.chars().count();
+            read_seq[spos..end_index].to_string()
+        },
+        (_, _, Some(rspos), Some(repos)) => {
+            let end_index = rspos + sink_kmer.chars().count();
+            skydive::agg::reverse_complement(&read_seq[repos..end_index])
+        },
+        (Some(spos), None, _, _) => {
+            read_seq[spos..].to_string()
+        },
+        (None, Some(epos), _, _) => {
+            read_seq[..epos].to_string()
+        },
+        (None, None, Some(rspos), None) => {
+            skydive::agg::reverse_complement(&read_seq[..rspos])
+        },
+        (None, None, None, Some(repos)) => {
+            skydive::agg::reverse_complement(&read_seq[repos..])
+        },
+        _ => "".to_string(),
+    }
+
+}
+
+// pub fn alignment(pattern:&str, text:&str) -> i32 {
+//     let score = |a: u8, b: u8| if a == b { 1i32 } else { -1i32 };
+//     let pat_len = pattern.as_bytes().len();
+//     let text_len = text.as_bytes().len();
+//     let mut aligner = Aligner::with_capacity(pattern.len(), text.len(), -5, -1, &score);
+//     let alignment = aligner.global(pattern.as_bytes(), text.as_bytes());
+
+//     let score = alignment.score;
+//     score
+// }
+
+// pub fn wfa(pattern:&str, text:&str) -> i32 {
+//     let mut aligner = rust_wfa2::aligner::WFAligner();
+//     let status = aligner.align_end_to_end(pattern, text);
+//     let score = aligner.alignment_score();
+//     score
+// }
+
+pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_graph: GraphicalGenome, source_node_name:&str, source: &String, sink_node_name: &str, sink:&String) -> HashMap<usize, HashMap<String, String>>{
+        // import read files
+    let reader = Reader::from_file(read_path).unwrap();
+    let all_reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
+    
+
+    // pairwise alignment
+    let single_sample_readsets = find_all_read(&single_sample_graph);
+    let path_list = skydive::agg::FindAllPathBetweenAnchors::new(&single_sample_graph, source_node_name, sink_node_name, single_sample_readsets);
+    println!( " candidate path number : {:?}", path_list.subpath.len());
+
+    let mut data_info: HashMap<usize, HashMap<String, String>> = HashMap::new();
+    let mut index:usize = 0;
+
+    for (p, r) in path_list.subpath.iter() {
+        let pseq = skydive::agg::reconstruct_path_seq(&single_sample_graph, p);
+        // println!("path lenth:{:?}", pseq.len());
+        // minimap2 let aligner = Aligner::builder().asm5().with_seq(pseq.as_bytes()).expect("Unable to build index");
+        
+        
+        for record in all_reads.clone() {
+            let h = String::from_utf8_lossy(record.id().as_bytes()).to_string();
+            let read_seq_upper = String::from_utf8(record.seq().to_ascii_uppercase()).expect("Invalid UTF-8 sequence");
+
+            let target = find_targetseq_in_reads(&read_seq_upper, source, sink);
+            // println!("target lenth:{:?}", target.len());
+
+            
+            if !target.is_empty() {
+                // minimap2 let hits =aligner.map(target.as_bytes(), false, false, None, None);
+                // minimap2 let score = hits.unwrap(); 
+
+                // rust_wfa2
+                let alignment_scope = rust_wfa2::aligner::AlignmentScope::Alignment;
+                let memory_model = rust_wfa2::aligner::MemoryModel::MemoryUltraLow;
+                let mut aligner = rust_wfa2::aligner::WFAlignerGapAffine::new(1, 5, 2, alignment_scope, memory_model);
+                let status = aligner.align_end_to_end(target.as_bytes(), pseq.as_bytes());
+                let score = aligner.score();
+
+                // bio::alignment too slow
+                // let score = alignment(&target, &pseq);
 
 
+<<<<<<< HEAD
+                data_info.insert(index, {
+                    let mut sub_map = HashMap::new();
+                    sub_map.insert("sample".to_string(), sample.to_string());
+                    sub_map.insert("read".to_string(), h.to_string());
+                    sub_map.insert("path".to_string(), p.join(">"));
+                    sub_map.insert("cost".to_string(), (-score).to_string());
+                    sub_map
+                });
+
+                index += 1;
+
+                // println!("{:?}, {:?}", h, score);
+            }else {
+                continue;
+            }
+        }
+
+    };
+
+    data_info
+}
+
+=======
+>>>>>>> ba3cfee (add read files)
 pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize) {
     let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
     let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
@@ -171,10 +306,43 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     println!("Read_sets {:?}", read_sets);
     let vector_single_sample = imputed_data.select(Axis(0), &row_index);
     println!("Single sample Matrix:\n{:?}", vector_single_sample);
-
+    
+    // get anchorlist and start end anchor sequences
     let mut anchorlist: Vec<String> = graph.anchor.keys().cloned().collect();
     anchorlist.sort();
+    println!("{:?}", anchorlist.last());
+    let source_node_name = anchorlist.first().unwrap();
+    let source = if let Some(anchor_data) = graph.anchor.get(source_node_name) {
+        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
+            seq 
+        } else {
+            panic!("there is no sequences")
+        }
+    } else {
+        panic!("source node name not found")
+    };
+    let source_rev = skydive::agg::reverse_complement(&source);
+    let sink_node_name = anchorlist.last().unwrap();
+    let sink = if let Some(anchor_data) = graph.anchor.get(sink_node_name) {
+        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
+            seq
+        } else {
+            panic!("there is no anchor sequences")
+        }
+    }else{
+        panic!("Sink node name not found")
+    };
+    let sink_rev = skydive::agg::reverse_complement(&sink);
 
+<<<<<<< HEAD
+    // Extract single sample graph
+    let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();
+    println!("Single sample Graph:\n{:?}", graph.incoming);
+ 
+    // pairwise alignment between reads and candidate paths from single_sample graph, 
+    // construct HashMap for Ryan's optimizer
+    let data_info = calculate_edit_distance(read_path, sample, single_sample_graph, source_node_name, source, sink_node_name, sink);
+=======
     let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist, read_sets, sample);
     match single_sample_graph {
         Ok(graph) => println!("Single sample Graph:\n{:?}", graph.incoming),
@@ -188,6 +356,11 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
     
 
+>>>>>>> ba3cfee (add read files)
     
+
+    //  Ryan's optimizer translated using gurobi
+    
+
 }
    
