@@ -264,83 +264,7 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
     data_info
 }
 
-pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize) {
-    let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
-    let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
-    // println!("The answer is {:?} {:?}!", output, sorted_read_names);
-    println!("columns:\n{:?}", sorted_read_names.len());
-    let d = vector_matrix.len();
-    println!("The dimensino of vector_matrix is {}", d);
-    let vector_matrix_f64: Vec<Vec<f64>> = vector_matrix.iter()
-        .map(|row| row.iter().map(|&x| x.unwrap_or(f64::NAN)).collect())
-        .collect();
-
-    let flat_data: Vec<f64> = vector_matrix_f64.iter().flatten().map(|&x| x as f64).collect();
-    let rows = vector_matrix_f64.len();
-    let cols = if !vector_matrix_f64.is_empty() { vector_matrix_f64[0].len() } else { 0 };
-    let data = Array2::from_shape_vec((rows, cols), flat_data).unwrap();
-
-    // Create the KNN imputer
-    let data_t = data.t().to_owned();
-    let imputed_data = knn_impute(&data_t, k_nearest_neighbor);
-    println!("Input Data:\n{:?}", data);
-    println!("Imputed Data:\n{:?}", imputed_data);
-
-    //  find single sample matrix from the imputed data
-    let sample = "HG002";
-    let row_index: Vec<usize> = sorted_read_names.iter()
-        .enumerate()
-        .filter_map(|(index, readname)| {
-            if readname.split('|').last().unwrap_or("") == sample{
-                Some(index)
-            }else{
-                None
-            }
-        })
-        .collect();
-    let read_sets: Vec<String> = row_index.iter()
-        .map(|&i| sorted_read_names[i].clone())
-        .collect();
-    println!("Read_sets {:?}", read_sets);
-    let vector_single_sample = imputed_data.select(Axis(0), &row_index);
-    // println!("Single sample Matrix:\n{:?}", vector_single_sample);
-    
-    // get anchorlist and start end anchor sequences
-    let mut anchorlist: Vec<String> = graph.anchor.keys().cloned().collect();
-    anchorlist.sort();
-    println!("{:?}", anchorlist.last());
-    let source_node_name = anchorlist.first().unwrap();
-    let source = if let Some(anchor_data) = graph.anchor.get(source_node_name) {
-        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
-            seq 
-        } else {
-            panic!("there is no sequences")
-        }
-    } else {
-        panic!("source node name not found")
-    };
-    let source_rev = skydive::agg::reverse_complement(&source);
-    let sink_node_name = anchorlist.last().unwrap();
-    let sink = if let Some(anchor_data) = graph.anchor.get(sink_node_name) {
-        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
-            seq
-        } else {
-            panic!("there is no anchor sequences")
-        }
-    }else{
-        panic!("Sink node name not found")
-    };
-    let sink_rev = skydive::agg::reverse_complement(&sink);
-
-    // Extract single sample graph
-    let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();
-    // println!("Single sample Graph:\n{:?}", graph.incoming);
- 
-    // pairwise alignment between reads and candidate paths from single_sample graph, 
-    // construct HashMap for Ryan's optimizer
-    let data_info = calculate_edit_distance(read_path, sample, single_sample_graph, source_node_name, source, sink_node_name, sink);
-    
-    //  Ryan's optimizer translated using gurobi
+pub fn ilp_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> (HashMap<String, f64>, HashMap<String, f64>) {
     let mut unique_samples = HashSet::new();
     let mut unique_paths = HashMap::new();
     let mut unique_reads = HashSet::new();
@@ -436,8 +360,158 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
 
     // solving models
+    // minimize total cost
+    model.set_objective(var_total_cost, Minimize);
+    model.optimize();
+    assert_eq!(model.status().unwrap(), Status::Optimal);
 
+    let least_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
+    println!("least_cost is  {:?}", least_cost);
+
+    // minimize most haplotypes that minimizes total cost
+    let aux = model.add_constr("total_cost_equals_leastcost", c!(var_total_cost == least_cost)).unwrap();
+    model.set_objective(var_num_haps, Minimize);
+    model.optimize();   
+    let most_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
+    println!("most haplotype is {:?}", most_haps);
+
+    // minimize haplotypes
+    model.remove(aux);
+    model.optimize();
+    let least_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
+    println!("least haplotype is {:?}", least_haps);
+
+    // find most_cost that minimizes haplotypes
+    let aux1 = model.add_constr("least_haplotype", c!(var_num_haps == least_haps)).unwrap();
+    model.set_objective(var_total_cost, Minimize);
+    model.optimize();
+    let most_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
+    model.remove(aux1);
+    println!("most_cost = {:?}", most_cost);
+
+    // final solution
+    let range_cost = most_cost - least_cost;
+    let range_haps = most_haps - least_haps;
+
+    if range_cost == 0.0{
+        assert_eq!( range_haps, 0.0);
+        let optimal_value = 0;
+        let optimal_cost = least_cost;
+        let optimal_haps = least_haps;
+    }else{
+        let mut final_expr = grb::expr::QuadExpr::new();
+        let coeff1 = 1.0/range_haps;
+        let coeff2 = 1.0 / range_cost;
+        let mut var1 = add_var!(model, Continuous, name: "var_num_hap_minus_leasthap", obj: 0.0).unwrap();
+        model.add_constr("var1", c!(var_num_haps - least_haps - var1 == 0));
+        // let var1 = var_num_haps - least_haps;
+        let mut var2 = add_var!(model, Continuous, name: "var_total_cost_minus_leastcost", obj: 0.0).unwrap();
+        model.add_constr("var2", c!(var_total_cost - least_cost - var2 == 0));
+        // let var2 = var_total_cost - least_cost;
+        final_expr.add_qterm(coeff1, var1.clone(), var1.clone());
+        final_expr.add_qterm(coeff2, var2.clone(), var2.clone());
+
+        model.set_objective(final_expr, Minimize);
+        model.optimize();
+        let optimal_value = model.get_attr(grb::attr::ObjVal).unwrap();
+        let optimal_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
+        let optimal_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
+    }
+
+    let mut var_sample_hap_values = HashMap::new();
+    for (identifier, var) in var_sample_hap.iter() {
+        let mut var_value = model.get_obj_attr(grb::attr::X, var).unwrap();
+        var_sample_hap_values.insert(identifier.clone(), var_value); 
+    }
+    let mut var_flow_values = HashMap::new();
+    for (ridentifier, var) in var_flow.iter() {
+        let mut v = model.get_obj_attr(grb::attr::X, var).unwrap();
+        var_flow_values.insert(ridentifier.clone(), v);
+    }
+
+    (var_sample_hap_values, var_flow_values)
+}
+
+pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize) {
+    let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
+    let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
+    // println!("The answer is {:?} {:?}!", output, sorted_read_names);
+    println!("columns:\n{:?}", sorted_read_names.len());
+    let d = vector_matrix.len();
+    println!("The dimensino of vector_matrix is {}", d);
+    let vector_matrix_f64: Vec<Vec<f64>> = vector_matrix.iter()
+        .map(|row| row.iter().map(|&x| x.unwrap_or(f64::NAN)).collect())
+        .collect();
+
+    let flat_data: Vec<f64> = vector_matrix_f64.iter().flatten().map(|&x| x as f64).collect();
+    let rows = vector_matrix_f64.len();
+    let cols = if !vector_matrix_f64.is_empty() { vector_matrix_f64[0].len() } else { 0 };
+    let data = Array2::from_shape_vec((rows, cols), flat_data).unwrap();
+
+    // Create the KNN imputer
+    let data_t = data.t().to_owned();
+    let imputed_data = knn_impute(&data_t, k_nearest_neighbor);
+    println!("Input Data:\n{:?}", data);
+    println!("Imputed Data:\n{:?}", imputed_data);
+
+    //  find single sample matrix from the imputed data
+    let sample = "HG002";
+    let row_index: Vec<usize> = sorted_read_names.iter()
+        .enumerate()
+        .filter_map(|(index, readname)| {
+            if readname.split('|').last().unwrap_or("") == sample{
+                Some(index)
+            }else{
+                None
+            }
+        })
+        .collect();
+    let read_sets: Vec<String> = row_index.iter()
+        .map(|&i| sorted_read_names[i].clone())
+        .collect();
+    println!("Read_sets {:?}", read_sets);
+    let vector_single_sample = imputed_data.select(Axis(0), &row_index);
+    // println!("Single sample Matrix:\n{:?}", vector_single_sample);
     
+    // get anchorlist and start end anchor sequences
+    let mut anchorlist: Vec<String> = graph.anchor.keys().cloned().collect();
+    anchorlist.sort();
+    println!("{:?}", anchorlist.last());
+    let source_node_name = anchorlist.first().unwrap();
+    let source = if let Some(anchor_data) = graph.anchor.get(source_node_name) {
+        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
+            seq 
+        } else {
+            panic!("there is no sequences")
+        }
+    } else {
+        panic!("source node name not found")
+    };
+    let source_rev = skydive::agg::reverse_complement(&source);
+    let sink_node_name = anchorlist.last().unwrap();
+    let sink = if let Some(anchor_data) = graph.anchor.get(sink_node_name) {
+        if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
+            seq
+        } else {
+            panic!("there is no anchor sequences")
+        }
+    }else{
+        panic!("Sink node name not found")
+    };
+    let sink_rev = skydive::agg::reverse_complement(&sink);
+
+    // Extract single sample graph
+    let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();
+    // println!("Single sample Graph:\n{:?}", graph.incoming);
+ 
+    // pairwise alignment between reads and candidate paths from single_sample graph, 
+    // construct HashMap for Ryan's optimizer
+    let data_info = calculate_edit_distance(read_path, sample, single_sample_graph, source_node_name, source, sink_node_name, sink);
+    
+    //  Ryan's optimizer translated using gurobi
+
+    let (var_sample_hap_values, var_flow_values) = ilp_optimization(data_info);
+    println!("sample_haplotype_values, {:?}", var_sample_hap_values);
 
 }
 
