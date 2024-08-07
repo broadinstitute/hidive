@@ -10,8 +10,9 @@ use bio::io::fasta::{Reader, Record};
 use minimap2::{Aligner, Preset};
 
 extern crate ndarray;
-extern crate gurobi;
-use gurobi::*;
+
+use good_lp::{constraint, default_solver, Solution, SolverModel, variables};
+
 
 use rust_wfa2;
 
@@ -349,18 +350,36 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
     }
 
-    let env = Env::new("logfile.log").unwrap();
-    let mut model = env.new_model("hap").unwrap();
-    
-
-    
-    
 
 
+    // let mut var_haps = HashMap::new();
+    // let mut var_sample_hap = HashMap::new();
+    // let mut var_flow = HashMap::new();
 
+    // for hap in unique_paths.iter(){
+    //     var_haps.insert(hap.clone(), model.add_var(hap, Binary, 0.0, -INFINITY, INFINITY, &[], &[]).unwrap());
+    // }
+    // let mut total_cost = 0;
+    // let mut flow_out = HashMap::new();
+    // let mut connected_haps_per_sample = HashMap::new();
 
+    // for (index, submap) in data_info.iter(){
+    //     let s = submap.get("sample").unwrap();
+    //     let r = submap.get("read").unwrap();
+    //     let p = submap.get("path").unwrap();
+    //     let c = submap.get("cost").unwrap();
 
-    
+    //     let r_p_identifier = format!("{}_{}", r, p);
+    //     let s_p_identifier = format!("{}_{}", s, p);
+    //     var_flow.insert(r_p_identifier, model.add_var(&r_p_identifier, Continuous, 0.0, 0.0, 1.0, &[], &[]).unwrap());
+    //     if !var_sample_hap.contains_key(&s_p_identifier){
+    //         var_sample_hap.insert(s_p_identifier, model.add_var(&s_p_identifier, Binary, 0.0, -INFINITY, INFINITY, &[], &[]).unwrap());
+    //         connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(var_sample_hap.get(&s_p_identifier));
+    //     }
+
+    //     model.add_constr(&index.to_string(), var_flow.get(&r_p_identifier).unwrap() - var_sample_hap.get(&s_p_identifier).unwrap(), Less, 0.0);
+    // }
+
 
 }
    
