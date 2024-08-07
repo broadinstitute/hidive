@@ -1389,24 +1389,623 @@
 <a href="#1389" id="1389">1389</a>
 <a href="#1390" id="1390">1390</a>
 <a href="#1391" id="1391">1391</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet};
+<a href="#1392" id="1392">1392</a>
+<a href="#1393" id="1393">1393</a>
+<a href="#1394" id="1394">1394</a>
+<a href="#1395" id="1395">1395</a>
+<a href="#1396" id="1396">1396</a>
+<a href="#1397" id="1397">1397</a>
+<a href="#1398" id="1398">1398</a>
+<a href="#1399" id="1399">1399</a>
+<a href="#1400" id="1400">1400</a>
+<a href="#1401" id="1401">1401</a>
+<a href="#1402" id="1402">1402</a>
+<a href="#1403" id="1403">1403</a>
+<a href="#1404" id="1404">1404</a>
+<a href="#1405" id="1405">1405</a>
+<a href="#1406" id="1406">1406</a>
+<a href="#1407" id="1407">1407</a>
+<a href="#1408" id="1408">1408</a>
+<a href="#1409" id="1409">1409</a>
+<a href="#1410" id="1410">1410</a>
+<a href="#1411" id="1411">1411</a>
+<a href="#1412" id="1412">1412</a>
+<a href="#1413" id="1413">1413</a>
+<a href="#1414" id="1414">1414</a>
+<a href="#1415" id="1415">1415</a>
+<a href="#1416" id="1416">1416</a>
+<a href="#1417" id="1417">1417</a>
+<a href="#1418" id="1418">1418</a>
+<a href="#1419" id="1419">1419</a>
+<a href="#1420" id="1420">1420</a>
+<a href="#1421" id="1421">1421</a>
+<a href="#1422" id="1422">1422</a>
+<a href="#1423" id="1423">1423</a>
+<a href="#1424" id="1424">1424</a>
+<a href="#1425" id="1425">1425</a>
+<a href="#1426" id="1426">1426</a>
+<a href="#1427" id="1427">1427</a>
+<a href="#1428" id="1428">1428</a>
+<a href="#1429" id="1429">1429</a>
+<a href="#1430" id="1430">1430</a>
+<a href="#1431" id="1431">1431</a>
+<a href="#1432" id="1432">1432</a>
+<a href="#1433" id="1433">1433</a>
+<a href="#1434" id="1434">1434</a>
+<a href="#1435" id="1435">1435</a>
+<a href="#1436" id="1436">1436</a>
+<a href="#1437" id="1437">1437</a>
+<a href="#1438" id="1438">1438</a>
+<a href="#1439" id="1439">1439</a>
+<a href="#1440" id="1440">1440</a>
+<a href="#1441" id="1441">1441</a>
+<a href="#1442" id="1442">1442</a>
+<a href="#1443" id="1443">1443</a>
+<a href="#1444" id="1444">1444</a>
+<a href="#1445" id="1445">1445</a>
+<a href="#1446" id="1446">1446</a>
+<a href="#1447" id="1447">1447</a>
+<a href="#1448" id="1448">1448</a>
+<a href="#1449" id="1449">1449</a>
+<a href="#1450" id="1450">1450</a>
+<a href="#1451" id="1451">1451</a>
+<a href="#1452" id="1452">1452</a>
+<a href="#1453" id="1453">1453</a>
+<a href="#1454" id="1454">1454</a>
+<a href="#1455" id="1455">1455</a>
+<a href="#1456" id="1456">1456</a>
+<a href="#1457" id="1457">1457</a>
+<a href="#1458" id="1458">1458</a>
+<a href="#1459" id="1459">1459</a>
+<a href="#1460" id="1460">1460</a>
+<a href="#1461" id="1461">1461</a>
+<a href="#1462" id="1462">1462</a>
+<a href="#1463" id="1463">1463</a>
+<a href="#1464" id="1464">1464</a>
+<a href="#1465" id="1465">1465</a>
+<a href="#1466" id="1466">1466</a>
+<a href="#1467" id="1467">1467</a>
+<a href="#1468" id="1468">1468</a>
+<a href="#1469" id="1469">1469</a>
+<a href="#1470" id="1470">1470</a>
+<a href="#1471" id="1471">1471</a>
+<a href="#1472" id="1472">1472</a>
+<a href="#1473" id="1473">1473</a>
+<a href="#1474" id="1474">1474</a>
+<a href="#1475" id="1475">1475</a>
+<a href="#1476" id="1476">1476</a>
+<a href="#1477" id="1477">1477</a>
+<a href="#1478" id="1478">1478</a>
+<a href="#1479" id="1479">1479</a>
+<a href="#1480" id="1480">1480</a>
+<a href="#1481" id="1481">1481</a>
+<a href="#1482" id="1482">1482</a>
+<a href="#1483" id="1483">1483</a>
+<a href="#1484" id="1484">1484</a>
+<a href="#1485" id="1485">1485</a>
+<a href="#1486" id="1486">1486</a>
+<a href="#1487" id="1487">1487</a>
+<a href="#1488" id="1488">1488</a>
+<a href="#1489" id="1489">1489</a>
+<a href="#1490" id="1490">1490</a>
+<a href="#1491" id="1491">1491</a>
+<a href="#1492" id="1492">1492</a>
+<a href="#1493" id="1493">1493</a>
+<a href="#1494" id="1494">1494</a>
+<a href="#1495" id="1495">1495</a>
+<a href="#1496" id="1496">1496</a>
+<a href="#1497" id="1497">1497</a>
+<a href="#1498" id="1498">1498</a>
+<a href="#1499" id="1499">1499</a>
+<a href="#1500" id="1500">1500</a>
+<a href="#1501" id="1501">1501</a>
+<a href="#1502" id="1502">1502</a>
+<a href="#1503" id="1503">1503</a>
+<a href="#1504" id="1504">1504</a>
+<a href="#1505" id="1505">1505</a>
+<a href="#1506" id="1506">1506</a>
+<a href="#1507" id="1507">1507</a>
+<a href="#1508" id="1508">1508</a>
+<a href="#1509" id="1509">1509</a>
+<a href="#1510" id="1510">1510</a>
+<a href="#1511" id="1511">1511</a>
+<a href="#1512" id="1512">1512</a>
+<a href="#1513" id="1513">1513</a>
+<a href="#1514" id="1514">1514</a>
+<a href="#1515" id="1515">1515</a>
+<a href="#1516" id="1516">1516</a>
+<a href="#1517" id="1517">1517</a>
+<a href="#1518" id="1518">1518</a>
+<a href="#1519" id="1519">1519</a>
+<a href="#1520" id="1520">1520</a>
+<a href="#1521" id="1521">1521</a>
+<a href="#1522" id="1522">1522</a>
+<a href="#1523" id="1523">1523</a>
+<a href="#1524" id="1524">1524</a>
+<a href="#1525" id="1525">1525</a>
+<a href="#1526" id="1526">1526</a>
+<a href="#1527" id="1527">1527</a>
+<a href="#1528" id="1528">1528</a>
+<a href="#1529" id="1529">1529</a>
+<a href="#1530" id="1530">1530</a>
+<a href="#1531" id="1531">1531</a>
+<a href="#1532" id="1532">1532</a>
+<a href="#1533" id="1533">1533</a>
+<a href="#1534" id="1534">1534</a>
+<a href="#1535" id="1535">1535</a>
+<a href="#1536" id="1536">1536</a>
+<a href="#1537" id="1537">1537</a>
+<a href="#1538" id="1538">1538</a>
+<a href="#1539" id="1539">1539</a>
+<a href="#1540" id="1540">1540</a>
+<a href="#1541" id="1541">1541</a>
+<a href="#1542" id="1542">1542</a>
+<a href="#1543" id="1543">1543</a>
+<a href="#1544" id="1544">1544</a>
+<a href="#1545" id="1545">1545</a>
+<a href="#1546" id="1546">1546</a>
+<a href="#1547" id="1547">1547</a>
+<a href="#1548" id="1548">1548</a>
+<a href="#1549" id="1549">1549</a>
+<a href="#1550" id="1550">1550</a>
+<a href="#1551" id="1551">1551</a>
+<a href="#1552" id="1552">1552</a>
+<a href="#1553" id="1553">1553</a>
+<a href="#1554" id="1554">1554</a>
+<a href="#1555" id="1555">1555</a>
+<a href="#1556" id="1556">1556</a>
+<a href="#1557" id="1557">1557</a>
+<a href="#1558" id="1558">1558</a>
+<a href="#1559" id="1559">1559</a>
+<a href="#1560" id="1560">1560</a>
+<a href="#1561" id="1561">1561</a>
+<a href="#1562" id="1562">1562</a>
+<a href="#1563" id="1563">1563</a>
+<a href="#1564" id="1564">1564</a>
+<a href="#1565" id="1565">1565</a>
+<a href="#1566" id="1566">1566</a>
+<a href="#1567" id="1567">1567</a>
+<a href="#1568" id="1568">1568</a>
+<a href="#1569" id="1569">1569</a>
+<a href="#1570" id="1570">1570</a>
+<a href="#1571" id="1571">1571</a>
+<a href="#1572" id="1572">1572</a>
+<a href="#1573" id="1573">1573</a>
+<a href="#1574" id="1574">1574</a>
+<a href="#1575" id="1575">1575</a>
+<a href="#1576" id="1576">1576</a>
+<a href="#1577" id="1577">1577</a>
+<a href="#1578" id="1578">1578</a>
+<a href="#1579" id="1579">1579</a>
+<a href="#1580" id="1580">1580</a>
+<a href="#1581" id="1581">1581</a>
+<a href="#1582" id="1582">1582</a>
+<a href="#1583" id="1583">1583</a>
+<a href="#1584" id="1584">1584</a>
+<a href="#1585" id="1585">1585</a>
+<a href="#1586" id="1586">1586</a>
+<a href="#1587" id="1587">1587</a>
+<a href="#1588" id="1588">1588</a>
+<a href="#1589" id="1589">1589</a>
+<a href="#1590" id="1590">1590</a>
+<a href="#1591" id="1591">1591</a>
+<a href="#1592" id="1592">1592</a>
+<a href="#1593" id="1593">1593</a>
+<a href="#1594" id="1594">1594</a>
+<a href="#1595" id="1595">1595</a>
+<a href="#1596" id="1596">1596</a>
+<a href="#1597" id="1597">1597</a>
+<a href="#1598" id="1598">1598</a>
+<a href="#1599" id="1599">1599</a>
+<a href="#1600" id="1600">1600</a>
+<a href="#1601" id="1601">1601</a>
+<a href="#1602" id="1602">1602</a>
+<a href="#1603" id="1603">1603</a>
+<a href="#1604" id="1604">1604</a>
+<a href="#1605" id="1605">1605</a>
+<a href="#1606" id="1606">1606</a>
+<a href="#1607" id="1607">1607</a>
+<a href="#1608" id="1608">1608</a>
+<a href="#1609" id="1609">1609</a>
+<a href="#1610" id="1610">1610</a>
+<a href="#1611" id="1611">1611</a>
+<a href="#1612" id="1612">1612</a>
+<a href="#1613" id="1613">1613</a>
+<a href="#1614" id="1614">1614</a>
+<a href="#1615" id="1615">1615</a>
+<a href="#1616" id="1616">1616</a>
+<a href="#1617" id="1617">1617</a>
+<a href="#1618" id="1618">1618</a>
+<a href="#1619" id="1619">1619</a>
+<a href="#1620" id="1620">1620</a>
+<a href="#1621" id="1621">1621</a>
+<a href="#1622" id="1622">1622</a>
+<a href="#1623" id="1623">1623</a>
+<a href="#1624" id="1624">1624</a>
+<a href="#1625" id="1625">1625</a>
+<a href="#1626" id="1626">1626</a>
+<a href="#1627" id="1627">1627</a>
+<a href="#1628" id="1628">1628</a>
+<a href="#1629" id="1629">1629</a>
+<a href="#1630" id="1630">1630</a>
+<a href="#1631" id="1631">1631</a>
+<a href="#1632" id="1632">1632</a>
+<a href="#1633" id="1633">1633</a>
+<a href="#1634" id="1634">1634</a>
+<a href="#1635" id="1635">1635</a>
+<a href="#1636" id="1636">1636</a>
+<a href="#1637" id="1637">1637</a>
+<a href="#1638" id="1638">1638</a>
+<a href="#1639" id="1639">1639</a>
+<a href="#1640" id="1640">1640</a>
+<a href="#1641" id="1641">1641</a>
+<a href="#1642" id="1642">1642</a>
+<a href="#1643" id="1643">1643</a>
+<a href="#1644" id="1644">1644</a>
+<a href="#1645" id="1645">1645</a>
+<a href="#1646" id="1646">1646</a>
+<a href="#1647" id="1647">1647</a>
+<a href="#1648" id="1648">1648</a>
+<a href="#1649" id="1649">1649</a>
+<a href="#1650" id="1650">1650</a>
+<a href="#1651" id="1651">1651</a>
+<a href="#1652" id="1652">1652</a>
+<a href="#1653" id="1653">1653</a>
+<a href="#1654" id="1654">1654</a>
+<a href="#1655" id="1655">1655</a>
+<a href="#1656" id="1656">1656</a>
+<a href="#1657" id="1657">1657</a>
+<a href="#1658" id="1658">1658</a>
+<a href="#1659" id="1659">1659</a>
+<a href="#1660" id="1660">1660</a>
+<a href="#1661" id="1661">1661</a>
+<a href="#1662" id="1662">1662</a>
+<a href="#1663" id="1663">1663</a>
+<a href="#1664" id="1664">1664</a>
+<a href="#1665" id="1665">1665</a>
+<a href="#1666" id="1666">1666</a>
+<a href="#1667" id="1667">1667</a>
+<a href="#1668" id="1668">1668</a>
+<a href="#1669" id="1669">1669</a>
+<a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
+<a href="#1675" id="1675">1675</a>
+<a href="#1676" id="1676">1676</a>
+<a href="#1677" id="1677">1677</a>
+<a href="#1678" id="1678">1678</a>
+<a href="#1679" id="1679">1679</a>
+<a href="#1680" id="1680">1680</a>
+<a href="#1681" id="1681">1681</a>
+<a href="#1682" id="1682">1682</a>
+<a href="#1683" id="1683">1683</a>
+<a href="#1684" id="1684">1684</a>
+<a href="#1685" id="1685">1685</a>
+<a href="#1686" id="1686">1686</a>
+<a href="#1687" id="1687">1687</a>
+<a href="#1688" id="1688">1688</a>
+<a href="#1689" id="1689">1689</a>
+<a href="#1690" id="1690">1690</a>
+<a href="#1691" id="1691">1691</a>
+<a href="#1692" id="1692">1692</a>
+<a href="#1693" id="1693">1693</a>
+<a href="#1694" id="1694">1694</a>
+<a href="#1695" id="1695">1695</a>
+<a href="#1696" id="1696">1696</a>
+<a href="#1697" id="1697">1697</a>
+<a href="#1698" id="1698">1698</a>
+<a href="#1699" id="1699">1699</a>
+<a href="#1700" id="1700">1700</a>
+<a href="#1701" id="1701">1701</a>
+<a href="#1702" id="1702">1702</a>
+<a href="#1703" id="1703">1703</a>
+<a href="#1704" id="1704">1704</a>
+<a href="#1705" id="1705">1705</a>
+<a href="#1706" id="1706">1706</a>
+<a href="#1707" id="1707">1707</a>
+<a href="#1708" id="1708">1708</a>
+<a href="#1709" id="1709">1709</a>
+<a href="#1710" id="1710">1710</a>
+<a href="#1711" id="1711">1711</a>
+<a href="#1712" id="1712">1712</a>
+<a href="#1713" id="1713">1713</a>
+<a href="#1714" id="1714">1714</a>
+<a href="#1715" id="1715">1715</a>
+<a href="#1716" id="1716">1716</a>
+<a href="#1717" id="1717">1717</a>
+<a href="#1718" id="1718">1718</a>
+<a href="#1719" id="1719">1719</a>
+<a href="#1720" id="1720">1720</a>
+<a href="#1721" id="1721">1721</a>
+<a href="#1722" id="1722">1722</a>
+<a href="#1723" id="1723">1723</a>
+<a href="#1724" id="1724">1724</a>
+<a href="#1725" id="1725">1725</a>
+<a href="#1726" id="1726">1726</a>
+<a href="#1727" id="1727">1727</a>
+<a href="#1728" id="1728">1728</a>
+<a href="#1729" id="1729">1729</a>
+<a href="#1730" id="1730">1730</a>
+<a href="#1731" id="1731">1731</a>
+<a href="#1732" id="1732">1732</a>
+<a href="#1733" id="1733">1733</a>
+<a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
+<a href="#1737" id="1737">1737</a>
+<a href="#1738" id="1738">1738</a>
+<a href="#1739" id="1739">1739</a>
+<a href="#1740" id="1740">1740</a>
+<a href="#1741" id="1741">1741</a>
+<a href="#1742" id="1742">1742</a>
+<a href="#1743" id="1743">1743</a>
+<a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
+<a href="#1746" id="1746">1746</a>
+<a href="#1747" id="1747">1747</a>
+<a href="#1748" id="1748">1748</a>
+<a href="#1749" id="1749">1749</a>
+<a href="#1750" id="1750">1750</a>
+<a href="#1751" id="1751">1751</a>
+<a href="#1752" id="1752">1752</a>
+<a href="#1753" id="1753">1753</a>
+<a href="#1754" id="1754">1754</a>
+<a href="#1755" id="1755">1755</a>
+<a href="#1756" id="1756">1756</a>
+<a href="#1757" id="1757">1757</a>
+<a href="#1758" id="1758">1758</a>
+<a href="#1759" id="1759">1759</a>
+<a href="#1760" id="1760">1760</a>
+<a href="#1761" id="1761">1761</a>
+<a href="#1762" id="1762">1762</a>
+<a href="#1763" id="1763">1763</a>
+<a href="#1764" id="1764">1764</a>
+<a href="#1765" id="1765">1765</a>
+<a href="#1766" id="1766">1766</a>
+<a href="#1767" id="1767">1767</a>
+<a href="#1768" id="1768">1768</a>
+<a href="#1769" id="1769">1769</a>
+<a href="#1770" id="1770">1770</a>
+<a href="#1771" id="1771">1771</a>
+<a href="#1772" id="1772">1772</a>
+<a href="#1773" id="1773">1773</a>
+<a href="#1774" id="1774">1774</a>
+<a href="#1775" id="1775">1775</a>
+<a href="#1776" id="1776">1776</a>
+<a href="#1777" id="1777">1777</a>
+<a href="#1778" id="1778">1778</a>
+<a href="#1779" id="1779">1779</a>
+<a href="#1780" id="1780">1780</a>
+<a href="#1781" id="1781">1781</a>
+<a href="#1782" id="1782">1782</a>
+<a href="#1783" id="1783">1783</a>
+<a href="#1784" id="1784">1784</a>
+<a href="#1785" id="1785">1785</a>
+<a href="#1786" id="1786">1786</a>
+<a href="#1787" id="1787">1787</a>
+<a href="#1788" id="1788">1788</a>
+<a href="#1789" id="1789">1789</a>
+<a href="#1790" id="1790">1790</a>
+<a href="#1791" id="1791">1791</a>
+<a href="#1792" id="1792">1792</a>
+<a href="#1793" id="1793">1793</a>
+<a href="#1794" id="1794">1794</a>
+<a href="#1795" id="1795">1795</a>
+<a href="#1796" id="1796">1796</a>
+<a href="#1797" id="1797">1797</a>
+<a href="#1798" id="1798">1798</a>
+<a href="#1799" id="1799">1799</a>
+<a href="#1800" id="1800">1800</a>
+<a href="#1801" id="1801">1801</a>
+<a href="#1802" id="1802">1802</a>
+<a href="#1803" id="1803">1803</a>
+<a href="#1804" id="1804">1804</a>
+<a href="#1805" id="1805">1805</a>
+<a href="#1806" id="1806">1806</a>
+<a href="#1807" id="1807">1807</a>
+<a href="#1808" id="1808">1808</a>
+<a href="#1809" id="1809">1809</a>
+<a href="#1810" id="1810">1810</a>
+<a href="#1811" id="1811">1811</a>
+<a href="#1812" id="1812">1812</a>
+<a href="#1813" id="1813">1813</a>
+<a href="#1814" id="1814">1814</a>
+<a href="#1815" id="1815">1815</a>
+<a href="#1816" id="1816">1816</a>
+<a href="#1817" id="1817">1817</a>
+<a href="#1818" id="1818">1818</a>
+<a href="#1819" id="1819">1819</a>
+<a href="#1820" id="1820">1820</a>
+<a href="#1821" id="1821">1821</a>
+<a href="#1822" id="1822">1822</a>
+<a href="#1823" id="1823">1823</a>
+<a href="#1824" id="1824">1824</a>
+<a href="#1825" id="1825">1825</a>
+<a href="#1826" id="1826">1826</a>
+<a href="#1827" id="1827">1827</a>
+<a href="#1828" id="1828">1828</a>
+<a href="#1829" id="1829">1829</a>
+<a href="#1830" id="1830">1830</a>
+<a href="#1831" id="1831">1831</a>
+<a href="#1832" id="1832">1832</a>
+<a href="#1833" id="1833">1833</a>
+<a href="#1834" id="1834">1834</a>
+<a href="#1835" id="1835">1835</a>
+<a href="#1836" id="1836">1836</a>
+<a href="#1837" id="1837">1837</a>
+<a href="#1838" id="1838">1838</a>
+<a href="#1839" id="1839">1839</a>
+<a href="#1840" id="1840">1840</a>
+<a href="#1841" id="1841">1841</a>
+<a href="#1842" id="1842">1842</a>
+<a href="#1843" id="1843">1843</a>
+<a href="#1844" id="1844">1844</a>
+<a href="#1845" id="1845">1845</a>
+<a href="#1846" id="1846">1846</a>
+<a href="#1847" id="1847">1847</a>
+<a href="#1848" id="1848">1848</a>
+<a href="#1849" id="1849">1849</a>
+<a href="#1850" id="1850">1850</a>
+<a href="#1851" id="1851">1851</a>
+<a href="#1852" id="1852">1852</a>
+<a href="#1853" id="1853">1853</a>
+<a href="#1854" id="1854">1854</a>
+<a href="#1855" id="1855">1855</a>
+<a href="#1856" id="1856">1856</a>
+<a href="#1857" id="1857">1857</a>
+<a href="#1858" id="1858">1858</a>
+<a href="#1859" id="1859">1859</a>
+<a href="#1860" id="1860">1860</a>
+<a href="#1861" id="1861">1861</a>
+<a href="#1862" id="1862">1862</a>
+<a href="#1863" id="1863">1863</a>
+<a href="#1864" id="1864">1864</a>
+<a href="#1865" id="1865">1865</a>
+<a href="#1866" id="1866">1866</a>
+<a href="#1867" id="1867">1867</a>
+<a href="#1868" id="1868">1868</a>
+<a href="#1869" id="1869">1869</a>
+<a href="#1870" id="1870">1870</a>
+<a href="#1871" id="1871">1871</a>
+<a href="#1872" id="1872">1872</a>
+<a href="#1873" id="1873">1873</a>
+<a href="#1874" id="1874">1874</a>
+<a href="#1875" id="1875">1875</a>
+<a href="#1876" id="1876">1876</a>
+<a href="#1877" id="1877">1877</a>
+<a href="#1878" id="1878">1878</a>
+<a href="#1879" id="1879">1879</a>
+<a href="#1880" id="1880">1880</a>
+<a href="#1881" id="1881">1881</a>
+<a href="#1882" id="1882">1882</a>
+<a href="#1883" id="1883">1883</a>
+<a href="#1884" id="1884">1884</a>
+<a href="#1885" id="1885">1885</a>
+<a href="#1886" id="1886">1886</a>
+<a href="#1887" id="1887">1887</a>
+<a href="#1888" id="1888">1888</a>
+<a href="#1889" id="1889">1889</a>
+<a href="#1890" id="1890">1890</a>
+<a href="#1891" id="1891">1891</a>
+<a href="#1892" id="1892">1892</a>
+<a href="#1893" id="1893">1893</a>
+<a href="#1894" id="1894">1894</a>
+<a href="#1895" id="1895">1895</a>
+<a href="#1896" id="1896">1896</a>
+<a href="#1897" id="1897">1897</a>
+<a href="#1898" id="1898">1898</a>
+<a href="#1899" id="1899">1899</a>
+<a href="#1900" id="1900">1900</a>
+<a href="#1901" id="1901">1901</a>
+<a href="#1902" id="1902">1902</a>
+<a href="#1903" id="1903">1903</a>
+<a href="#1904" id="1904">1904</a>
+<a href="#1905" id="1905">1905</a>
+<a href="#1906" id="1906">1906</a>
+<a href="#1907" id="1907">1907</a>
+<a href="#1908" id="1908">1908</a>
+<a href="#1909" id="1909">1909</a>
+<a href="#1910" id="1910">1910</a>
+<a href="#1911" id="1911">1911</a>
+<a href="#1912" id="1912">1912</a>
+<a href="#1913" id="1913">1913</a>
+<a href="#1914" id="1914">1914</a>
+<a href="#1915" id="1915">1915</a>
+<a href="#1916" id="1916">1916</a>
+<a href="#1917" id="1917">1917</a>
+<a href="#1918" id="1918">1918</a>
+<a href="#1919" id="1919">1919</a>
+<a href="#1920" id="1920">1920</a>
+<a href="#1921" id="1921">1921</a>
+<a href="#1922" id="1922">1922</a>
+<a href="#1923" id="1923">1923</a>
+<a href="#1924" id="1924">1924</a>
+<a href="#1925" id="1925">1925</a>
+<a href="#1926" id="1926">1926</a>
+<a href="#1927" id="1927">1927</a>
+<a href="#1928" id="1928">1928</a>
+<a href="#1929" id="1929">1929</a>
+<a href="#1930" id="1930">1930</a>
+<a href="#1931" id="1931">1931</a>
+<a href="#1932" id="1932">1932</a>
+<a href="#1933" id="1933">1933</a>
+<a href="#1934" id="1934">1934</a>
+<a href="#1935" id="1935">1935</a>
+<a href="#1936" id="1936">1936</a>
+<a href="#1937" id="1937">1937</a>
+<a href="#1938" id="1938">1938</a>
+<a href="#1939" id="1939">1939</a>
+<a href="#1940" id="1940">1940</a>
+<a href="#1941" id="1941">1941</a>
+<a href="#1942" id="1942">1942</a>
+<a href="#1943" id="1943">1943</a>
+<a href="#1944" id="1944">1944</a>
+<a href="#1945" id="1945">1945</a>
+<a href="#1946" id="1946">1946</a>
+<a href="#1947" id="1947">1947</a>
+<a href="#1948" id="1948">1948</a>
+<a href="#1949" id="1949">1949</a>
+<a href="#1950" id="1950">1950</a>
+<a href="#1951" id="1951">1951</a>
+<a href="#1952" id="1952">1952</a>
+<a href="#1953" id="1953">1953</a>
+<a href="#1954" id="1954">1954</a>
+<a href="#1955" id="1955">1955</a>
+<a href="#1956" id="1956">1956</a>
+<a href="#1957" id="1957">1957</a>
+<a href="#1958" id="1958">1958</a>
+<a href="#1959" id="1959">1959</a>
+<a href="#1960" id="1960">1960</a>
+<a href="#1961" id="1961">1961</a>
+<a href="#1962" id="1962">1962</a>
+<a href="#1963" id="1963">1963</a>
+<a href="#1964" id="1964">1964</a>
+<a href="#1965" id="1965">1965</a>
+<a href="#1966" id="1966">1966</a>
+<a href="#1967" id="1967">1967</a>
+<a href="#1968" id="1968">1968</a>
+<a href="#1969" id="1969">1969</a>
+<a href="#1970" id="1970">1970</a>
+<a href="#1971" id="1971">1971</a>
+<a href="#1972" id="1972">1972</a>
+<a href="#1973" id="1973">1973</a>
+<a href="#1974" id="1974">1974</a>
+<a href="#1975" id="1975">1975</a>
+<a href="#1976" id="1976">1976</a>
+<a href="#1977" id="1977">1977</a>
+<a href="#1978" id="1978">1978</a>
+<a href="#1979" id="1979">1979</a>
+<a href="#1980" id="1980">1980</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet, VecDeque};
+<span class="kw">use </span>std::io::{<span class="self">self</span>, Write};
 
 <span class="kw">use </span>indicatif::ProgressIterator;
+<span class="kw">use </span>itertools::Itertools;
 <span class="kw">use </span>parquet::data_type::AsBytes;
 
 <span class="kw">use </span>needletail::sequence::complement;
 <span class="kw">use </span>needletail::Sequence;
 <span class="kw">use </span>std::path::PathBuf;
 
+<span class="kw">use </span>petgraph::graph::{DiGraph, NodeIndex};
+<span class="kw">use </span>petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+
 <span class="kw">use </span>indicatif::ParallelProgressIterator;
 <span class="kw">use </span>rayon::iter::IntoParallelRefIterator;
 <span class="kw">use </span>rayon::iter::ParallelIterator;
+
+<span class="kw">use </span>gbdt::config::{loss2string, Config, Loss};
+<span class="kw">use </span>gbdt::decision_tree::{Data, DataVec};
+<span class="kw">use </span>gbdt::gradient_boost::GBDT;
 
 <span class="kw">use </span><span class="kw">crate</span>::edges::Edges;
 <span class="kw">use </span><span class="kw">crate</span>::link::Link;
 <span class="kw">use </span><span class="kw">crate</span>::record::Record;
 
 <span class="kw">type </span>KmerGraph = HashMap&lt;Vec&lt;u8&gt;, Record&gt;;
+<span class="kw">type </span>KmerScores = HashMap&lt;Vec&lt;u8&gt;, f32&gt;;
 <span class="kw">type </span>Links = HashMap&lt;Vec&lt;u8&gt;, HashMap&lt;Link, u16&gt;&gt;;
 
 <span class="doccomment">/// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
@@ -1415,6 +2014,7 @@
     <span class="kw">pub </span>name: String,
     <span class="kw">pub </span>kmer_size: usize,
     <span class="kw">pub </span>kmers: KmerGraph,
+    <span class="kw">pub </span>scores: KmerScores,
     <span class="kw">pub </span>links: Links,
 }
 
@@ -1448,8 +2048,10 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>kmers = <span class="self">Self</span>::build_graph(kmer_size, <span class="kw-2">&amp;</span>fwd_seqs);
 
+        <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
+
         <span class="kw">if </span>clean {
-            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers);
+            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers, <span class="kw-2">&amp;</span>scores);
         }
 
         <span class="kw">let </span>links = <span class="kw">match </span>build_links {
@@ -1461,29 +2063,12 @@
             name,
             kmer_size,
             kmers,
+            scores,
             links,
         }
     }
 
-    <span class="comment">// pub fn from_files(name: String, kmer_size: usize, seq_paths: &amp;Vec&lt;PathBuf&gt;, clean: bool, build_links: bool) -&gt; Self {
-    //     let mut all_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
-    //     for seq_url in &amp;seq_urls {
-    //         let basename = skydive::utils::basename_without_extension(&amp;seq_url, &amp;[".fasta.gz", ".fa.gz", ".fasta", ".fa"]);
-    //         let fasta_path = seq_url.to_file_path().unwrap();
-
-    //         let reader = bio::io::fasta::Reader::from_file(&amp;fasta_path).unwrap();
-    //         let all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
-
-    //         all_seqs.extend(all_reads
-    //             .iter()
-    //             .map(|r| r.seq().to_vec())
-    //             .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;());
-    //     }
-
-    //     LdBG::from_sequences(name, kmer_size, &amp;all_seqs, false, false)
-    // }
-
-    </span><span class="doccomment">/// Create a de Bruijn graph (and optional links) from a list of sequences.
+    <span class="doccomment">/// Create a de Bruijn graph (and optional links) from a list of sequences.
     ///
     /// # Arguments
     ///
@@ -1504,8 +2089,10 @@
     ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>kmers = <span class="self">Self</span>::build_graph(kmer_size, fwd_seqs);
 
+        <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
+
         <span class="kw">if </span>clean {
-            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers);
+            kmers = <span class="self">Self</span>::clean_graph(<span class="kw-2">&amp;</span>kmers, <span class="kw-2">&amp;</span>scores);
         }
 
         <span class="kw">let </span>links = <span class="kw">match </span>build_links {
@@ -1517,6 +2104,7 @@
             name,
             kmer_size,
             kmers,
+            scores,
             links,
         }
     }
@@ -1606,43 +2194,13 @@
         graph
     }
 
-    <span class="comment">// fn get_cleaning_threshold(graph: &amp;HashMap&lt;Vec&lt;u8&gt;, Record&gt;) -&gt; u16 {
-    //     let mut coverages = Vec::new();
-
-    //     for record in graph.values() {
-    //         if record.coverage() &gt; 0 {
-    //             coverages.push(record.coverage() as u32);
-    //         }
-    //     }
-
-    //     let sum: u32 = coverages.iter().sum();
-    //     let mean = sum as f64 / coverages.len() as f64;
-
-    //     let variance: f64 = coverages.iter().map(|&amp;x| {
-    //         let diff = x as f64 - mean;
-    //         diff * diff
-    //     }).sum::&lt;f64&gt;() / coverages.len() as f64;
-
-    //     let std_dev = variance.sqrt();
-
-    //     let cleaning_threshold = ((mean - std_dev).floor() as u16).max(1);
-
-    //     println!("Mean coverage: {}", mean);
-    //     println!("Standard deviation: {}", std_dev);
-    //     println!("Cleaning threshold: {}", cleaning_threshold);
-
-    //     cleaning_threshold
-    // }
-
-    </span><span class="kw">fn </span>clean_graph(graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; KmerGraph {
-        <span class="comment">// let threshold = Self::get_cleaning_threshold(graph);
-        </span><span class="kw">let </span>threshold = <span class="number">10</span>;
-
+    <span class="kw">fn </span>clean_graph(graph: <span class="kw-2">&amp;</span>KmerGraph, scores: <span class="kw-2">&amp;</span>KmerScores) -&gt; KmerGraph {
+        <span class="kw">let </span>threshold = <span class="number">0.2</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>cleaned_graph = KmerGraph::new();
 
-        <span class="kw">for </span>(kmer, record) <span class="kw">in </span>graph {
-            <span class="kw">if </span>record.coverage() &gt; threshold {
-                cleaned_graph.insert(kmer.clone(), record.clone());
+        <span class="kw">for </span>(cn_kmer, record) <span class="kw">in </span>graph {
+            <span class="kw">if </span>scores.get(cn_kmer).unwrap() &gt; <span class="kw-2">&amp;</span>threshold {
+                cleaned_graph.insert(cn_kmer.clone(), record.clone());
             }
         }
 
@@ -1685,40 +2243,28 @@
     }
 
     <span class="kw">pub fn </span>infer_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">let </span><span class="kw-2">mut </span>kmers = <span class="self">self</span>.kmers.clone();
+        <span class="kw">let </span><span class="kw-2">mut </span>kmers = KmerGraph::new();
 
-        kmers.iter_mut().for_each(|(cn_kmer, record)| {
+        <span class="self">self</span>.kmers.iter().for_each(|(cn_kmer, record)| {
             <span class="kw">let </span><span class="kw-2">mut </span>new_record = Record::new(record.coverage(), <span class="prelude-val">Some</span>(Edges::empty()));
 
-            <span class="kw">for </span>e <span class="kw">in </span>record.incoming_edges() {
-                <span class="kw">let </span>prev_kmer = std::iter::once(e)
-                    .chain(cn_kmer[<span class="number">0</span>..cn_kmer.len() - <span class="number">1</span>].iter().cloned())
-                    .collect::&lt;Vec&lt;u8&gt;&gt;();
+            <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(cn_kmer) {
+                <span class="kw">let </span>next_cn_kmer = LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer);
 
-                <span class="kw">if </span><span class="self">self
-                    </span>.kmers
-                    .contains_key(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer))
-                {
-                    new_record.set_incoming_edge(e);
+                <span class="kw">if </span><span class="self">self</span>.kmers.contains_key(<span class="kw-2">&amp;</span>next_cn_kmer) {
+                    new_record.set_outgoing_edge(next_kmer[next_kmer.len() - <span class="number">1</span>]);
                 }
             }
 
-            <span class="kw">for </span>e <span class="kw">in </span>record.outgoing_edges() {
-                <span class="kw">let </span>next_kmer = cn_kmer[<span class="number">1</span>..]
-                    .iter()
-                    .cloned()
-                    .chain(std::iter::once(e))
-                    .collect::&lt;Vec&lt;u8&gt;&gt;();
+            <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(cn_kmer) {
+                <span class="kw">let </span>prev_cn_kmer = LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer);
 
-                <span class="kw">if </span><span class="self">self
-                    </span>.kmers
-                    .contains_key(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer))
-                {
-                    new_record.set_outgoing_edge(e);
+                <span class="kw">if </span><span class="self">self</span>.kmers.contains_key(<span class="kw-2">&amp;</span>prev_cn_kmer) {
+                    new_record.set_incoming_edge(prev_kmer[<span class="number">0</span>]);
                 }
             }
 
-            <span class="self">self</span>.kmers.insert(cn_kmer.clone(), new_record);
+            kmers.insert(cn_kmer.clone(), new_record);
         });
 
         <span class="self">self</span>.kmers = kmers;
@@ -1777,6 +2323,8 @@
     /// * `reverse` - A boolean indicating whether to search in reverse.
     /// * `fw` - A boolean indicating whether the sequence is forward.
     </span><span class="kw">fn </span>add_record_to_links(links: <span class="kw-2">&amp;mut </span>Links, seq: <span class="kw-2">&amp;</span>[u8], k: usize, graph: <span class="kw-2">&amp;</span>KmerGraph) {
+        <span class="kw">if </span>seq.len() &lt; k + <span class="number">1 </span>{ <span class="kw">return</span>; }
+
         <span class="kw">let </span>range = (<span class="number">0</span>..seq.len() - k + <span class="number">1</span>).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="comment">// Iterate over k-mers to find junctions.
@@ -1841,7 +2389,7 @@
     /// # Returns
     ///
     /// A map of links.
-    </span><span class="kw">fn </span>build_links(k: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; Links {
+    </span><span class="kw">pub fn </span>build_links(k: usize, fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, graph: <span class="kw-2">&amp;</span>KmerGraph) -&gt; Links {
         <span class="kw">let </span>progress_bar =
             <span class="kw">crate</span>::utils::default_bounded_progress_bar(<span class="string">"Building links"</span>, fwd_seqs.len() <span class="kw">as </span>u64);
 
@@ -1850,6 +2398,7 @@
             .progress_with(progress_bar)
             .map(|fwd_seq| {
                 <span class="kw">let </span><span class="kw-2">mut </span>local_links = Links::new();
+
                 <span class="kw">let </span>fw_seq = fwd_seq.clone();
                 <span class="kw">let </span>rc_seq = fw_seq.reverse_complement();
 
@@ -1866,6 +2415,101 @@
             });
 
         links
+    }
+
+    <span class="kw">pub fn </span>correct_seq(<span class="kw-2">&amp;</span><span class="self">self</span>, seq: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>uncorrected_regions = Vec::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>start = <span class="number">0</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>in_uncorrected = <span class="bool-val">false</span>;
+
+        <span class="kw">for </span>(i, kmer) <span class="kw">in </span>seq.windows(<span class="self">self</span>.kmer_size).enumerate() {
+            <span class="kw">let </span>cn_kmer = <span class="self">Self</span>::canonicalize_kmer(kmer);
+
+            <span class="kw">if </span>!<span class="self">self</span>.kmers.contains_key(<span class="kw-2">&amp;</span>cn_kmer) {
+                <span class="kw">if </span>!in_uncorrected {
+                    start = i;
+                    in_uncorrected = <span class="bool-val">true</span>;
+                }
+            } <span class="kw">else if </span>in_uncorrected {
+                uncorrected_regions.push((start, i + <span class="self">self</span>.kmer_size - <span class="number">1</span>));
+                in_uncorrected = <span class="bool-val">false</span>;
+            }
+        }
+
+        <span class="kw">if </span>in_uncorrected {
+            uncorrected_regions.push((start, seq.len()));
+        }
+
+        <span class="kw">let </span><span class="kw-2">mut </span>all_corrected_seq_pieces = Vec::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>corrected_seq_pieces = Vec::new();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>last_end = <span class="number">0</span>;
+        <span class="kw">for </span>(start, end) <span class="kw">in </span>uncorrected_regions.iter() {
+            <span class="comment">// Add the sequence between the last corrected region and this uncorrected region
+            </span><span class="kw">if </span><span class="kw-2">*</span>start &gt; last_end {
+                corrected_seq_pieces.push(seq[last_end..<span class="kw-2">*</span>start].to_vec());
+            }
+
+            <span class="comment">// Print the uncorrected region of the read, padded by the k-mer size
+            </span><span class="kw">let </span>pad_start = start.saturating_sub(<span class="self">self</span>.kmer_size);
+            <span class="kw">let </span>pad_end = (end + <span class="self">self</span>.kmer_size).min(seq.len());
+
+            <span class="kw">let </span>padded_region = <span class="kw-2">&amp;</span>seq[pad_start..pad_end];
+
+            <span class="kw">let </span>start_kmer = padded_region.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).next().unwrap();
+            <span class="kw">let </span>end_kmer = padded_region.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).last().unwrap();
+
+            <span class="kw">let </span><span class="kw-2">mut </span>fw_contig = start_kmer.to_vec();
+            <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>fw_contig, start_kmer.to_vec());
+
+            <span class="kw">let </span><span class="kw-2">mut </span>rv_contig = start_kmer.to_vec();
+            <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>rv_contig, end_kmer.to_vec());
+
+            <span class="kw">let </span>replacement_contig = <span class="kw">if let </span>(<span class="prelude-val">Some</span>(fw_start), <span class="prelude-val">Some</span>(fw_end)) = (
+                fw_contig.windows(<span class="self">self</span>.kmer_size).position(|window| window == start_kmer),
+                fw_contig.windows(<span class="self">self</span>.kmer_size).rposition(|window| window == end_kmer)
+            ) {
+                <span class="kw">if </span>fw_start &lt;= fw_end {
+                    fw_contig[fw_start..fw_end + <span class="self">self</span>.kmer_size].to_vec()
+                } <span class="kw">else </span>{
+                    Vec::new()
+                }
+            } <span class="kw">else if let </span>(<span class="prelude-val">Some</span>(rv_start), <span class="prelude-val">Some</span>(rv_end)) = (
+                rv_contig.windows(<span class="self">self</span>.kmer_size).position(|window| window == start_kmer),
+                rv_contig.windows(<span class="self">self</span>.kmer_size).rposition(|window| window == end_kmer)
+            ) {
+                <span class="kw">if </span>rv_start &lt;= rv_end {
+                    rv_contig[rv_start..rv_end + <span class="self">self</span>.kmer_size].to_vec()
+                } <span class="kw">else </span>{
+                    Vec::new()
+                }
+            } <span class="kw">else </span>{
+                Vec::new()
+            };
+
+            <span class="macro">crate::elog!</span>(<span class="string">"Read {}, uncorrected region: {} to {}"</span>, seq.len(), start, end);
+            <span class="kw">if </span>!replacement_contig.is_empty() {
+                <span class="macro">crate::elog!</span>(<span class="string">" -- Uncorrected    seq: {}"</span>, String::from_utf8_lossy(padded_region));
+                <span class="macro">crate::elog!</span>(<span class="string">" -- Replacement contig: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>replacement_contig));
+
+                corrected_seq_pieces.push(replacement_contig);
+            } <span class="kw">else </span>{
+                corrected_seq_pieces.push(padded_region.to_vec());
+            }
+
+            last_end = <span class="kw-2">*</span>end;
+        }
+
+        <span class="comment">// Add the remaining sequence after the last uncorrected region
+        </span><span class="kw">if </span>last_end &lt; seq.len() {
+            corrected_seq_pieces.push(seq[last_end..].to_vec());
+        }
+
+        <span class="comment">// Join corrected_seq_pieces into a single sequence
+        </span><span class="kw">let </span>corrected_seq: Vec&lt;u8&gt; = corrected_seq_pieces.into_iter().flatten().collect();
+        all_corrected_seq_pieces.push(corrected_seq);
+
+        all_corrected_seq_pieces.into_iter().filter(|seq| !seq.is_empty()).collect()
     }
 
     <span class="doccomment">/// Get the canonical (lexicographically-lowest) version of a k-mer.
@@ -1920,6 +2564,62 @@
 
         <span class="bool-val">false
     </span>}
+
+    <span class="kw">fn </span>next_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>, kmer: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">let </span>cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        <span class="kw">let </span>cn_kmer = cn_kmer_vec.as_bytes();
+
+        <span class="kw">let </span>ru = <span class="self">self</span>.kmers.get(cn_kmer);
+        <span class="kw">if </span>ru.is_none() {
+            <span class="kw">return </span><span class="macro">vec!</span>[];
+        }
+
+        <span class="kw">let </span>r = ru.unwrap();
+
+        <span class="kw">let </span>next_kmers = <span class="kw">if </span>cn_kmer == kmer {
+            r.outgoing_edges().iter().map(|<span class="kw-2">&amp;</span>e| {
+                <span class="kw">let </span><span class="kw-2">mut </span>next_kmer = kmer[<span class="number">1</span>..].to_owned();
+                next_kmer.push(e);
+                next_kmer
+            }).collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;()
+        } <span class="kw">else </span>{
+            r.incoming_edges().iter().map(|<span class="kw-2">&amp;</span>e| {
+                <span class="kw">let </span><span class="kw-2">mut </span>next_kmer = kmer[<span class="number">1</span>..].to_owned();
+                next_kmer.push(complement(e));
+                next_kmer
+            }).collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;()
+        };
+
+        next_kmers
+    }
+
+    <span class="kw">fn </span>prev_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>, kmer: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">let </span>cn_kmer_vec = LdBG::canonicalize_kmer(kmer).to_owned();
+        <span class="kw">let </span>cn_kmer = cn_kmer_vec.as_bytes();
+
+        <span class="kw">let </span>ru = <span class="self">self</span>.kmers.get(cn_kmer);
+        <span class="kw">if </span>ru.is_none() {
+            <span class="kw">return </span><span class="macro">vec!</span>[];
+        }
+
+        <span class="kw">let </span>r = ru.unwrap();
+
+        <span class="kw">let </span>prev_kmers = <span class="kw">if </span>cn_kmer == kmer {
+            r.incoming_edges().iter().map(|<span class="kw-2">&amp;</span>e| {
+                <span class="kw">let </span><span class="kw-2">mut </span>prev_kmer = kmer[<span class="number">0</span>..kmer.len() - <span class="number">1</span>].to_owned();
+                prev_kmer.insert(<span class="number">0</span>, e);
+                prev_kmer
+            }).collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;()
+        } <span class="kw">else </span>{
+            r.outgoing_edges().iter().map(|<span class="kw-2">&amp;</span>e| {
+                <span class="kw">let </span><span class="kw-2">mut </span>prev_kmer = kmer[<span class="number">0</span>..kmer.len() - <span class="number">1</span>].to_owned();
+                prev_kmer.insert(<span class="number">0</span>, complement(e));
+                prev_kmer
+            }).collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;()
+        };
+
+        prev_kmers
+    }
 
     <span class="doccomment">/// Starting at a given k-mer, get the next k-mer (or return None if there isn't a single outgoing edge).
     ///
@@ -2243,7 +2943,368 @@
     //         record.map_or(String::from(""), |r| format!("{}", r))
     //     );
     // }
-</span>}
+
+    </span><span class="kw">fn </span>first_kmer(<span class="kw-2">&amp;</span><span class="self">self</span>, contig: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">if </span>contig.len() &lt; <span class="self">self</span>.kmer_size <span class="kw">as </span>usize {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
+        }
+
+        <span class="prelude-val">Some</span>(contig[<span class="number">0</span>..<span class="self">self</span>.kmer_size].to_vec())
+    }
+
+    <span class="kw">fn </span>last_kmer(<span class="kw-2">&amp;</span><span class="self">self</span>, contig: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">if </span>contig.len() &lt; <span class="self">self</span>.kmer_size <span class="kw">as </span>usize {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
+        }
+
+        <span class="prelude-val">Some</span>(contig[contig.len() - <span class="self">self</span>.kmer_size <span class="kw">as </span>usize..].to_vec())
+    }
+
+    <span class="kw">pub fn </span>clean_paths(<span class="kw-2">&amp;mut </span><span class="self">self</span>, min_score: f32) -&gt; (usize, usize) {
+        <span class="kw">let </span>bad_cn_kmers = <span class="self">self</span>.kmers
+            .keys()
+            .cloned()
+            .filter(|cn_kmer| <span class="self">self</span>.scores.get(cn_kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>) &lt; <span class="kw-2">&amp;</span>min_score)
+            .filter(|cn_kmer| <span class="self">self</span>.kmers.get(cn_kmer).unwrap().in_degree() == <span class="number">1 </span>&amp;&amp; <span class="self">self</span>.kmers.get(cn_kmer).unwrap().out_degree() == <span class="number">1</span>)
+            .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+
+        <span class="comment">// let bad_cn_kmers = vec![b"CTGAGCCGGCCATGTCC".to_vec()];
+
+        </span><span class="kw">let </span><span class="kw-2">mut </span>to_remove = HashSet::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>bad_paths: usize = <span class="number">0</span>;
+
+        <span class="kw">for </span>bad_cn_kmer <span class="kw">in </span>bad_cn_kmers {
+            <span class="kw">if </span>!to_remove.contains(<span class="kw-2">&amp;</span>bad_cn_kmer) {
+                <span class="kw">let </span><span class="kw-2">mut </span>seen_kmers = HashSet::new();
+                <span class="kw">let </span><span class="kw-2">mut </span>score_sum = <span class="number">0.0</span>;
+
+                <span class="kw">let </span><span class="kw-2">mut </span>fw_contig = bad_cn_kmer.clone();
+                <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>fw_contig, bad_cn_kmer.clone());
+
+                <span class="kw">for </span>kmer <span class="kw">in </span>fw_contig.windows(<span class="self">self</span>.kmer_size) {
+                    <span class="kw">let </span>cn_kmer = LdBG::canonicalize_kmer(kmer);
+
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(r) = <span class="self">self</span>.kmers.get(<span class="kw-2">&amp;</span>cn_kmer) {
+                        <span class="comment">// crate::elog!("fw {} {} {}", String::from_utf8_lossy(&amp;kmer), String::from_utf8_lossy(&amp;cn_kmer), r);
+
+                        </span><span class="kw">if </span>r.in_degree() == <span class="number">1 </span>&amp;&amp; r.out_degree() == <span class="number">1 </span>{
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += <span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>cn_kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>);
+                        } <span class="kw">else </span>{
+                            <span class="kw">break</span>;
+                        }
+                    }
+                }
+
+                <span class="kw">let </span><span class="kw-2">mut </span>rc_contig = bad_cn_kmer.clone();
+                <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>rc_contig, bad_cn_kmer.clone());
+
+                <span class="kw">for </span>kmer <span class="kw">in </span>rc_contig.windows(<span class="self">self</span>.kmer_size).rev().skip(<span class="number">1</span>) {
+                    <span class="kw">let </span>cn_kmer = LdBG::canonicalize_kmer(kmer);
+
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(r) = <span class="self">self</span>.kmers.get(<span class="kw-2">&amp;</span>cn_kmer) {
+                        <span class="comment">// crate::elog!("rv {} {} {}", String::from_utf8_lossy(&amp;kmer), String::from_utf8_lossy(&amp;cn_kmer), r);
+
+                        </span><span class="kw">if </span>r.in_degree() == <span class="number">1 </span>&amp;&amp; r.out_degree() == <span class="number">1 </span>{
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += <span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>cn_kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>);
+                        } <span class="kw">else </span>{
+                            <span class="kw">break</span>;
+                        }
+                    }
+                }
+
+                <span class="kw">let </span>weight = score_sum / seen_kmers.len() <span class="kw">as </span>f32;
+
+                <span class="kw">if </span>weight &lt; min_score {
+                    <span class="comment">// crate::elog!("score {} {} {} {} {}", String::from_utf8_lossy(&amp;bad_cn_kmer), String::from_utf8_lossy(&amp;bad_cn_kmer.reverse_complement()), seen_kmers.len(), score_sum, weight);
+
+                    </span>to_remove.extend(seen_kmers);
+                    bad_paths += <span class="number">1</span>;
+                }
+            }
+        }
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="kw-2">&amp;</span>to_remove {
+            <span class="self">self</span>.kmers.remove(cn_kmer);
+            <span class="self">self</span>.scores.remove(cn_kmer);
+        }
+
+        <span class="self">self</span>.infer_edges();
+
+        (to_remove.len(), bad_paths)
+    }
+
+    <span class="kw">pub fn </span>clean_tips(<span class="kw-2">&amp;mut </span><span class="self">self</span>, max_tip_length: usize) -&gt; (usize, usize) {
+        <span class="kw">let </span><span class="kw-2">mut </span>to_remove = HashSet::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>bad_paths: usize = <span class="number">0</span>;
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="self">self</span>.kmers.keys() {
+            <span class="kw">if </span><span class="self">self</span>.kmers.get(cn_kmer).unwrap().out_degree() &gt; <span class="number">1 </span>{
+                <span class="kw">let </span>next_kmers = <span class="self">self</span>.next_kmers(cn_kmer);
+
+                <span class="kw">for </span>cur_kmer <span class="kw">in </span>next_kmers {
+                    <span class="kw">let </span><span class="kw-2">mut </span>fw_contig = cur_kmer.to_vec();
+                    <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>fw_contig, cur_kmer.clone());
+
+                    <span class="kw">let </span>last_kmer = fw_contig.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).last().unwrap();
+                    <span class="kw">let </span>num_next = <span class="self">self</span>.next_kmers(last_kmer).len();
+
+                    <span class="kw">if </span>fw_contig.len() &lt;= max_tip_length &amp;&amp; num_next == <span class="number">0 </span>{
+                        <span class="kw">for </span>kmer <span class="kw">in </span>fw_contig.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8) {
+                            to_remove.insert(LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>kmer));
+                        }
+
+                        bad_paths += <span class="number">1</span>;
+                    }
+                }
+            }
+
+            <span class="kw">if </span><span class="self">self</span>.kmers.get(cn_kmer).unwrap().in_degree() &gt; <span class="number">1 </span>{
+                <span class="kw">let </span>prev_kmers = <span class="self">self</span>.prev_kmers(cn_kmer);
+
+                <span class="kw">for </span>cur_kmer <span class="kw">in </span>prev_kmers {
+                    <span class="kw">let </span><span class="kw-2">mut </span>rv_contig = cur_kmer.to_vec();
+                    <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>rv_contig, cur_kmer.clone());
+
+                    <span class="kw">let </span>first_kmer = rv_contig.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).next().unwrap();
+                    <span class="kw">let </span>num_prev = <span class="self">self</span>.prev_kmers(first_kmer).len();
+
+                    <span class="kw">if </span>rv_contig.len() &lt;= max_tip_length &amp;&amp; num_prev == <span class="number">0 </span>{
+                        <span class="kw">for </span>kmer <span class="kw">in </span>rv_contig.kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8) {
+                            to_remove.insert(LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>kmer));
+                        }
+
+                        bad_paths += <span class="number">1</span>;
+                    }
+                }
+            }
+        }
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="kw-2">&amp;</span>to_remove {
+            <span class="self">self</span>.kmers.remove(cn_kmer);
+            <span class="self">self</span>.scores.remove(cn_kmer);
+        }
+
+        <span class="self">self</span>.infer_edges();
+
+        (to_remove.len(), bad_paths)
+    }
+
+    <span class="kw">pub fn </span>traverse_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>, start_kmer: Vec&lt;u8&gt;) -&gt; DiGraph&lt;String, f32&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>visited = HashMap::new();
+
+        <span class="kw">let </span>start_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>start_kmer).to_string());
+
+        <span class="comment">// Traverse forward
+        </span><span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[start_node];
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = fwd_stack.pop() {
+            <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
+
+            <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(this_kmer) {
+                <span class="kw">let </span>next_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>next_kmer).to_string());
+                <span class="comment">// graph.add_edge(node, next_node, 1.0);
+                </span>graph.add_edge(node, next_node, <span class="kw-2">*</span><span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>));
+
+                <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span>next_kmer) {
+                    visited.insert(next_kmer.clone(), next_node);
+
+                    fwd_stack.push(next_node);
+                } <span class="kw">else </span>{
+                    <span class="kw">for </span>end_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(<span class="kw-2">&amp;</span>next_kmer) {
+                        <span class="kw">let </span>end_node = visited.get(<span class="kw-2">&amp;</span>end_kmer).unwrap();
+                        <span class="comment">// graph.add_edge(next_node, *end_node, 1.0);
+                        </span>graph.add_edge(next_node, <span class="kw-2">*</span>end_node, <span class="kw-2">*</span><span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>end_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>));
+                    }
+                }
+            }
+        }
+
+        <span class="comment">// Traverse reverse
+        </span><span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[start_node];
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = rev_stack.pop() {
+            <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
+
+            <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(this_kmer) {
+                <span class="kw">let </span>prev_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>prev_kmer).to_string());
+                <span class="comment">// graph.add_edge(prev_node, node, 1.0);
+                </span>graph.add_edge(prev_node, node, <span class="kw-2">*</span><span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>));
+
+                <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span>prev_kmer) {
+                    visited.insert(prev_kmer.clone(), prev_node);
+
+                    rev_stack.push(prev_node);
+                } <span class="kw">else </span>{
+                    <span class="kw">for </span>end_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(<span class="kw-2">&amp;</span>prev_kmer) {
+                        <span class="kw">let </span>end_node = visited.get(<span class="kw-2">&amp;</span>end_kmer).unwrap();
+                        <span class="comment">// graph.add_edge(*end_node, prev_node, 1.0);
+                        </span>graph.add_edge(<span class="kw-2">*</span>end_node, prev_node, <span class="kw-2">*</span><span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>end_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>));
+                    }
+                }
+            }
+        }
+
+        graph
+    }
+
+    <span class="kw">pub fn </span>traverse_contigs(<span class="kw-2">&amp;</span><span class="self">self</span>, start_kmer: Vec&lt;u8&gt;) -&gt; DiGraph&lt;String, f32&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>visited = HashMap::new();
+
+        <span class="kw">let </span>start_contig = <span class="self">self</span>.assemble(<span class="kw-2">&amp;</span>start_kmer);
+        <span class="kw">let </span>start_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>start_contig).to_string());
+
+        <span class="comment">// Traverse forward
+        </span><span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[start_node];
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = fwd_stack.pop() {
+            <span class="kw">let </span>this_contig = graph.node_weight(node).unwrap().as_bytes();
+
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(last_kmer) = <span class="self">self</span>.last_kmer(this_contig) {
+                <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(<span class="kw-2">&amp;</span>last_kmer) {
+                    <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)) {
+                        <span class="kw">let </span><span class="kw-2">mut </span>next_contig = next_kmer.clone();
+                        <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>next_contig, next_kmer.clone());
+
+                        <span class="kw">let </span>weight = next_contig.as_bytes().kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).into_iter().map(|x| <span class="self">self</span>.scores.get(x).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>)).fold(f32::INFINITY, |acc, x| acc.min(<span class="kw-2">*</span>x));
+
+                        <span class="kw">let </span>next_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>next_contig).to_string());
+                        graph.add_edge(node, next_node, weight);
+
+                        visited.insert(LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer), next_node);
+
+                        fwd_stack.push(next_node);
+                    } <span class="kw">else </span>{
+                        <span class="kw">let </span>next_node = visited.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)).unwrap();
+                        graph.add_edge(node, <span class="kw-2">*</span>next_node, <span class="number">1.0</span>);
+                    }
+                }
+            }
+        }
+
+        <span class="comment">// Traverse backward
+        </span><span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[start_node];
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = rev_stack.pop() {
+            <span class="kw">let </span>this_contig = graph.node_weight(node).unwrap().as_bytes();
+
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(first_kmer) = <span class="self">self</span>.first_kmer(this_contig) {
+                <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(<span class="kw-2">&amp;</span>first_kmer) {
+                    <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)) {
+                        <span class="kw">let </span><span class="kw-2">mut </span>prev_contig = prev_kmer.clone();
+                        <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>prev_contig, prev_kmer.clone());
+
+                        <span class="kw">let </span>weight = prev_contig.as_bytes().kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8).into_iter().map(|x| <span class="self">self</span>.scores.get(x).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>)).fold(f32::INFINITY, |acc, x| acc.min(<span class="kw-2">*</span>x));
+
+                        <span class="kw">let </span>prev_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>prev_contig).to_string());
+                        graph.add_edge(node, prev_node, weight);
+
+                        visited.insert(LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer), prev_node);
+
+                        rev_stack.push(prev_node);
+                    } <span class="kw">else </span>{
+                        <span class="kw">let </span>prev_node = visited.get(<span class="kw-2">&amp;</span>LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)).unwrap();
+                        graph.add_edge(node, <span class="kw-2">*</span>prev_node, <span class="number">1.0</span>);
+                    }
+                }
+            }
+        }
+
+        graph
+    }
+
+    <span class="kw">pub fn </span>traverse_all_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DiGraph&lt;String, f32&gt; {
+        <span class="kw">let </span>cn_kmers = <span class="self">self</span>.kmers
+            .iter()
+            .filter(|(<span class="kw">_</span>, record)| record.in_degree() &lt;= <span class="number">1 </span>&amp;&amp; record.out_degree() &lt;= <span class="number">1</span>)
+            .map(|(cn_kmer, <span class="kw">_</span>)| cn_kmer.clone())
+            .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>visited = HashSet::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span>cn_kmers {
+            <span class="kw">if </span>!visited.contains(<span class="kw-2">&amp;</span>cn_kmer) {
+                <span class="kw">let </span>g = <span class="self">self</span>.traverse_kmers(cn_kmer);
+
+                g.node_weights().for_each(|node| {
+                    <span class="kw">let </span>cn_kmer = LdBG::canonicalize_kmer(node.as_bytes());
+                    visited.insert(cn_kmer);
+                });
+
+                <span class="comment">// Add all nodes from g to graph
+                </span><span class="kw">for </span>node_index <span class="kw">in </span>g.node_indices() {
+                    <span class="kw">let </span>node_weight = g.node_weight(node_index).unwrap();
+                    graph.add_node(node_weight.clone());
+                }
+
+                <span class="comment">// Add all edges from g to graph
+                </span><span class="kw">for </span>edge <span class="kw">in </span>g.edge_references() {
+                    <span class="kw">let </span>(source, target) = (edge.source(), edge.target());
+                    <span class="kw">let </span>source_weight = g.node_weight(source).unwrap();
+                    <span class="kw">let </span>target_weight = g.node_weight(target).unwrap();
+                    
+                    <span class="kw">let </span>new_source = graph.node_indices()
+                        .find(|<span class="kw-2">&amp;</span>i| graph[i] == <span class="kw-2">*</span>source_weight)
+                        .unwrap();
+                    <span class="kw">let </span>new_target = graph.node_indices()
+                        .find(|<span class="kw-2">&amp;</span>i| graph[i] == <span class="kw-2">*</span>target_weight)
+                        .unwrap();
+                    
+                    graph.add_edge(new_source, new_target, <span class="kw-2">*</span>edge.weight());
+                }
+            }
+        }
+
+        graph
+    }
+
+    <span class="kw">pub fn </span>traverse_all_contigs(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DiGraph&lt;String, f32&gt; {
+        <span class="kw">let </span>cn_kmers = <span class="self">self</span>.kmers
+            .iter()
+            .filter(|(<span class="kw">_</span>, record)| record.in_degree() &lt;= <span class="number">1 </span>&amp;&amp; record.out_degree() &lt;= <span class="number">1</span>)
+            .map(|(cn_kmer, <span class="kw">_</span>)| cn_kmer.clone())
+            .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>visited = HashSet::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();
+
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span>cn_kmers {
+            <span class="kw">if </span>!visited.contains(<span class="kw-2">&amp;</span>cn_kmer) {
+                <span class="kw">let </span>g = <span class="self">self</span>.traverse_contigs(cn_kmer);
+
+                g.node_weights().for_each(|node| {
+                    <span class="kw">for </span>kmer <span class="kw">in </span>node.as_bytes().kmers(<span class="self">self</span>.kmer_size <span class="kw">as </span>u8) {
+                        visited.insert(LdBG::canonicalize_kmer(<span class="kw-2">&amp;</span>kmer));
+                    }
+                });
+
+                <span class="comment">// Add all nodes from g to graph
+                </span><span class="kw">for </span>node_index <span class="kw">in </span>g.node_indices() {
+                    <span class="kw">let </span>node_weight = g.node_weight(node_index).unwrap();
+                    graph.add_node(node_weight.clone());
+                }
+
+                <span class="comment">// Add all edges from g to graph
+                </span><span class="kw">for </span>edge <span class="kw">in </span>g.edge_references() {
+                    <span class="kw">let </span>(source, target) = (edge.source(), edge.target());
+                    <span class="kw">let </span>source_weight = g.node_weight(source).unwrap();
+                    <span class="kw">let </span>target_weight = g.node_weight(target).unwrap();
+                    
+                    <span class="kw">let </span>new_source = graph.node_indices()
+                        .find(|<span class="kw-2">&amp;</span>i| graph[i] == <span class="kw-2">*</span>source_weight)
+                        .unwrap();
+                    <span class="kw">let </span>new_target = graph.node_indices()
+                        .find(|<span class="kw-2">&amp;</span>i| graph[i] == <span class="kw-2">*</span>target_weight)
+                        .unwrap();
+                    
+                    graph.add_edge(new_source, new_target, <span class="kw-2">*</span>edge.weight());
+                }
+            }
+        }
+
+        graph
+    }
+}
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
@@ -2351,23 +3412,9 @@
                 .expect(<span class="string">"Unable to write to file"</span>);
 
             Command::new(<span class="string">"docker"</span>)
-                .args(<span class="kw-2">&amp;</span>[
-                    <span class="string">"run"</span>,
-                    <span class="string">"-v"</span>,
-                    <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str),
-                    <span class="string">"-it"</span>,
-                    <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>,
-                    <span class="string">"mccortex31"</span>,
-                    <span class="string">"build"</span>,
-                    <span class="string">"-f"</span>,
-                    <span class="string">"-m"</span>,
-                    <span class="string">"1g"</span>,
-                    <span class="string">"-k"</span>,
-                    <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}"</span>, k),
-                    <span class="string">"-s"</span>,
-                    <span class="string">"test"</span>,
-                    <span class="string">"-1"</span>,
-                    <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
+                .args(<span class="kw-2">&amp;</span>[ <span class="string">"run"</span>, <span class="string">"-v"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str), <span class="string">"-it"</span>, <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>, <span class="string">"mccortex31"</span>,
+                    <span class="string">"build"</span>, <span class="string">"-f"</span>, <span class="string">"-m"</span>, <span class="string">"1g"</span>, <span class="string">"-k"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}"</span>, k), <span class="string">"-s"</span>, <span class="string">"test"</span>,
+                    <span class="string">"-1"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
                     <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.ctx"</span>, md5_hash, k, build_links),
                 ])
                 .stdout(Stdio::null())
@@ -2377,21 +3424,9 @@
 
             <span class="kw">if </span>build_links {
                 Command::new(<span class="string">"docker"</span>)
-                    .args(<span class="kw-2">&amp;</span>[
-                        <span class="string">"run"</span>,
-                        <span class="string">"-v"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str),
-                        <span class="string">"-it"</span>,
-                        <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>,
-                        <span class="string">"mccortex31"</span>,
-                        <span class="string">"thread"</span>,
-                        <span class="string">"-f"</span>,
-                        <span class="string">"-m 1g"</span>,
-                        <span class="string">"-w"</span>,
-                        <span class="string">"-o"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/links.{}.k_{}.l_{}.ctp.gz"</span>, md5_hash, k, build_links),
-                        <span class="string">"-1"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
+                    .args(<span class="kw-2">&amp;</span>[ <span class="string">"run"</span>, <span class="string">"-v"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str), <span class="string">"-it"</span>, <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>, <span class="string">"mccortex31"</span>,
+                        <span class="string">"thread"</span>, <span class="string">"-f"</span>, <span class="string">"-m"</span>, <span class="string">"1g"</span>, <span class="string">"-w"</span>, <span class="string">"-o"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/links.{}.k_{}.l_{}.ctp.gz"</span>, md5_hash, k, build_links),
+                        <span class="string">"-1"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
                         <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.ctx"</span>, md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -2400,21 +3435,10 @@
                     .expect(<span class="string">"failed to execute process"</span>);
 
                 Command::new(<span class="string">"docker"</span>)
-                    .args(<span class="kw-2">&amp;</span>[
-                        <span class="string">"run"</span>,
-                        <span class="string">"-v"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str),
-                        <span class="string">"-it"</span>,
-                        <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>,
-                        <span class="string">"mccortex31"</span>,
-                        <span class="string">"contigs"</span>,
-                        <span class="string">"-f"</span>,
-                        <span class="string">"-m"</span>,
-                        <span class="string">"1g"</span>,
-                        <span class="string">"-p"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/links.{}.k_{}.l_{}.ctp.gz"</span>, md5_hash, k, build_links),
-                        <span class="string">"-o"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/contigs.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
+                    .args(<span class="kw-2">&amp;</span>[ <span class="string">"run"</span>, <span class="string">"-v"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str), <span class="string">"-it"</span>, <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>, <span class="string">"mccortex31"</span>,
+                        <span class="string">"contigs"</span>, <span class="string">"-f"</span>, <span class="string">"-m"</span>, <span class="string">"1g"</span>,
+                        <span class="string">"-p"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/links.{}.k_{}.l_{}.ctp.gz"</span>, md5_hash, k, build_links),
+                        <span class="string">"-o"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/contigs.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
                         <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.ctx"</span>, md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -2423,19 +3447,9 @@
                     .expect(<span class="string">"failed to execute process"</span>);
             } <span class="kw">else </span>{
                 Command::new(<span class="string">"docker"</span>)
-                    .args(<span class="kw-2">&amp;</span>[
-                        <span class="string">"run"</span>,
-                        <span class="string">"-v"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str),
-                        <span class="string">"-it"</span>,
-                        <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>,
-                        <span class="string">"mccortex31"</span>,
-                        <span class="string">"contigs"</span>,
-                        <span class="string">"-f"</span>,
-                        <span class="string">"-m"</span>,
-                        <span class="string">"1g"</span>,
-                        <span class="string">"-o"</span>,
-                        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/contigs.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
+                    .args(<span class="kw-2">&amp;</span>[ <span class="string">"run"</span>, <span class="string">"-v"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}:/data"</span>, test_dir_str), <span class="string">"-it"</span>, <span class="string">"us.gcr.io/broad-dsp-lrma/lr-mccortex:1.0.0"</span>, <span class="string">"mccortex31"</span>,
+                        <span class="string">"contigs"</span>, <span class="string">"-f"</span>, <span class="string">"-m"</span>, <span class="string">"1g"</span>,
+                        <span class="string">"-o"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/contigs.{}.k_{}.l_{}.fa"</span>, md5_hash, k, build_links),
                         <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"/data/test.{}.k_{}.l_{}.ctx"</span>, md5_hash, k, build_links),
                     ])
                     .stdout(Stdio::null())
@@ -2553,6 +3567,129 @@
     }
 
     <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_traverse_kmers() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        <span class="kw">let </span>graph = g.traverse_kmers(<span class="string">b"ATTTC"</span>.to_vec());
+
+        <span class="comment">// println!("{}", Dot::with_config(&amp;graph, &amp;[petgraph::dot::Config::EdgeNoLabel]));
+
+        // Check if the graph is consistent with the expected structure
+        </span><span class="macro">assert_eq!</span>(graph.node_count(), <span class="number">22</span>);
+        <span class="macro">assert_eq!</span>(graph.edge_count(), <span class="number">22</span>);
+
+        <span class="comment">// Check specific nodes and their labels
+        </span><span class="kw">let </span>node_labels: Vec&lt;<span class="kw">_</span>&gt; = graph.node_weights().cloned().collect();
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ATTTC"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TTTCG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TTCGA"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TCGAT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CGATG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"GATGC"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ATGCC"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ATGCG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TGCGA"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"GCGAT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TGCCA"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"GCCAC"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CCACG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CACGG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ACGGT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CGGTG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"GGTGG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"GATTT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"TGATT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CTGAT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ACTGA"</span>.to_string()));
+
+        <span class="comment">// Check specific edges
+        </span><span class="kw">let </span>edges = graph.edge_indices().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="macro">assert_eq!</span>(edges.len(), <span class="number">22</span>);
+
+        <span class="comment">// Helper function to find node index by label
+        </span><span class="kw">let </span>find_node = |label: <span class="kw-2">&amp;</span>str| graph.node_indices().find(|<span class="kw-2">&amp;</span>i| graph[i] == label).unwrap();
+
+        <span class="comment">// Check some specific edges
+        </span><span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"ATTTC"</span>), find_node(<span class="string">"TTTCG"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"TTTCG"</span>), find_node(<span class="string">"TTCGA"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"GATGC"</span>), find_node(<span class="string">"ATGCC"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"GATGC"</span>), find_node(<span class="string">"ATGCG"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"CGATG"</span>), find_node(<span class="string">"GATGC"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"GCCAC"</span>), find_node(<span class="string">"CCACG"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"ACTGA"</span>), find_node(<span class="string">"CTGAT"</span>)));
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_traverse_all_kmers() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        <span class="kw">let </span>graph = g.traverse_all_kmers();
+
+        <span class="comment">// Write graph as GFA to a string
+        </span><span class="kw">let </span><span class="kw-2">mut </span>gfa_output = Vec::new();
+        <span class="kw">crate</span>::utils::write_graph_as_gfa(<span class="kw-2">&amp;mut </span>gfa_output, <span class="kw-2">&amp;</span>graph).unwrap();
+
+        <span class="comment">// Print GFA string (commented out for test)
+        </span><span class="kw">let </span>gfa_string = String::from_utf8(gfa_output).unwrap();
+        <span class="macro">println!</span>(<span class="string">"{}"</span>, gfa_string);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_traverse_all_contigs() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        <span class="kw">let </span>graph = g.traverse_all_contigs();
+
+        <span class="comment">// Write graph as GFA to a string
+        </span><span class="kw">let </span><span class="kw-2">mut </span>gfa_output = Vec::new();
+        <span class="kw">crate</span>::utils::write_graph_as_gfa(<span class="kw-2">&amp;mut </span>gfa_output, <span class="kw-2">&amp;</span>graph).unwrap();
+
+        <span class="comment">// Print GFA string (commented out for test)
+        </span><span class="kw">let </span>gfa_string = String::from_utf8(gfa_output).unwrap();
+        <span class="macro">println!</span>(<span class="string">"{}"</span>, gfa_string);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_traverse_contigs() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        <span class="kw">let </span>graph = g.traverse_contigs(<span class="string">b"CCACG"</span>.to_vec());
+
+        <span class="comment">// println!("{}", Dot::with_config(&amp;graph, &amp;[petgraph::dot::Config::EdgeNoLabel]));
+
+        // Check if the graph is consistent with the expected structure
+        </span><span class="macro">assert_eq!</span>(graph.node_count(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(graph.edge_count(), <span class="number">4</span>);
+
+        <span class="comment">// Check specific nodes and their labels
+        </span><span class="kw">let </span>node_labels: Vec&lt;<span class="kw">_</span>&gt; = graph.node_weights().cloned().collect();
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CGATGCCACGGTGG"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"ACTGATTTCGAT"</span>.to_string()));
+        <span class="macro">assert!</span>(node_labels.contains(<span class="kw-2">&amp;</span><span class="string">"CGATGCGAT"</span>.to_string()));
+
+        <span class="comment">// Check specific edges
+        </span><span class="kw">let </span>edges = graph.edge_indices().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="macro">assert_eq!</span>(edges.len(), <span class="number">4</span>);
+
+        <span class="comment">// Helper function to find node index by label
+        </span><span class="kw">let </span>find_node = |label: <span class="kw-2">&amp;</span>str| graph.node_indices().find(|<span class="kw-2">&amp;</span>i| graph[i] == label).unwrap();
+
+        <span class="comment">// Check some specific edges
+        </span><span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"CGATGCCACGGTGG"</span>), find_node(<span class="string">"ACTGATTTCGAT"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"CGATGCCACGGTGG"</span>), find_node(<span class="string">"CGATGCGAT"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"CGATGCGAT"</span>), find_node(<span class="string">"ACTGATTTCGAT"</span>)));
+        <span class="macro">assert!</span>(graph.contains_edge(find_node(<span class="string">"CGATGCGAT"</span>), find_node(<span class="string">"CGATGCGAT"</span>)));
+    }
+
+    <span class="attr">#[test]
     </span><span class="kw">fn </span>test_canonicalize_kmer() {
         <span class="kw">let </span>kmer1 = <span class="string">b"CGTA"</span>;
         <span class="kw">let </span>kmer2 = <span class="string">b"TACG"</span>;
@@ -2567,6 +3704,47 @@
         </span><span class="macro">assert_eq!</span>(LdBG::canonicalize_kmer(kmer3), <span class="string">b"AAAA"</span>.to_vec());
         <span class="macro">assert_eq!</span>(LdBG::canonicalize_kmer(kmer4), <span class="string">b"AAAA"</span>.to_vec());
     }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_prev_kmers() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+
+        <span class="kw">let </span>prev_kmers_1 = g.prev_kmers(<span class="string">b"TTTCG"</span>);
+        <span class="macro">assert_eq!</span>(prev_kmers_1.len(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(prev_kmers_1[<span class="number">0</span>], <span class="string">b"ATTTC"</span>);
+
+        <span class="kw">let </span>prev_kmers_2: HashSet&lt;Vec&lt;u8&gt;&gt; = g.prev_kmers(<span class="string">b"CGATG"</span>).into_iter().collect();
+        <span class="macro">assert_eq!</span>(prev_kmers_2.len(), <span class="number">2</span>);
+        <span class="macro">assert!</span>(prev_kmers_2.contains(<span class="kw-2">&amp;</span><span class="string">b"TCGAT"</span>.to_vec()));
+        <span class="macro">assert!</span>(prev_kmers_2.contains(<span class="kw-2">&amp;</span><span class="string">b"GCGAT"</span>.to_vec()));
+
+        <span class="kw">let </span>prev_kmers_3 = g.prev_kmers(<span class="string">b"ACTGA"</span>);
+        <span class="macro">assert_eq!</span>(prev_kmers_3.len(), <span class="number">0</span>);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_next_kmers() {
+        <span class="kw">let </span>genome = get_test_genome();
+        <span class="kw">let </span>fwd_seqs = <span class="macro">vec!</span>[genome];
+
+        <span class="kw">let </span>g = LdBG::from_sequences(String::from(<span class="string">"test"</span>), <span class="number">5</span>, <span class="kw-2">&amp;</span>fwd_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+
+        <span class="kw">let </span>next_kmers_1 = g.next_kmers(<span class="string">b"TTTCG"</span>);
+        <span class="macro">assert_eq!</span>(next_kmers_1.len(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(next_kmers_1[<span class="number">0</span>], <span class="string">b"TTCGA"</span>);
+
+        <span class="kw">let </span>next_kmers_2: HashSet&lt;Vec&lt;u8&gt;&gt; = g.next_kmers(<span class="string">b"GATGC"</span>).into_iter().collect();
+        <span class="macro">assert_eq!</span>(next_kmers_2.len(), <span class="number">2</span>);
+        <span class="macro">assert!</span>(next_kmers_2.contains(<span class="kw-2">&amp;</span><span class="string">b"ATGCG"</span>.to_vec()));
+        <span class="macro">assert!</span>(next_kmers_2.contains(<span class="kw-2">&amp;</span><span class="string">b"ATGCC"</span>.to_vec()));
+
+        <span class="kw">let </span>next_kmers_3 = g.next_kmers(<span class="string">b"GGTGG"</span>);
+        <span class="macro">assert_eq!</span>(next_kmers_3.len(), <span class="number">0</span>);
+    }
+
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_from_sequences() {

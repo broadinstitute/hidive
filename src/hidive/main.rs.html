@@ -332,6 +332,76 @@
 <a href="#332" id="332">332</a>
 <a href="#333" id="333">333</a>
 <a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -391,19 +461,22 @@
 <span class="kw">mod </span>cluster;
 <span class="kw">mod </span>coassemble;
 <span class="kw">mod </span>fetch;
+<span class="kw">mod </span>filter;
 <span class="kw">mod </span>impute;
 <span class="kw">mod </span>rescue;
 <span class="kw">mod </span>train;
 <span class="kw">mod </span>trim;
 
-<span class="attr">#[derive(Debug, Parser)] </span><span class="comment">// requires `derive` feature
-</span><span class="attr">#[clap(name = <span class="string">"hidive"</span>)]
+<span class="attr">#[derive(Debug, Parser)]
+#[clap(name = <span class="string">"hidive"</span>)]
 #[clap(about = <span class="string">"Analysis of high-diversity loci through genome co-assembly of long/short reads."</span>, long_about = <span class="prelude-val">None</span>)]
 </span><span class="comment">// #[clap(author = "Kiran V Garimella (kiran@broadinstitute.org)")]
 </span><span class="kw">struct </span>Cli {
     <span class="attr">#[clap(subcommand)]
     </span>command: Commands,
 }
+
+<span class="kw">const </span>DEFAULT_KMER_SIZE: usize = <span class="number">17</span>;
 
 <span class="attr">#[derive(Debug, Subcommand)]
 </span><span class="kw">enum </span>Commands {
@@ -413,6 +486,14 @@
         <span class="doccomment">/// Output path for trained model.
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
+
+        <span class="doccomment">/// Kmer-size.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        </span>kmer_size: usize,
+
+        <span class="doccomment">/// Number of training iterations.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">50</span>)]
+        </span>iterations: usize,
 
         <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
@@ -458,6 +539,14 @@
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
 
+        <span class="doccomment">/// Kmer-size.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        </span>kmer_size: usize,
+
+        <span class="doccomment">/// Minimum number of k-mers to require before examining a read more carefully.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">10</span>)]
+        </span>min_kmers: usize,
+
         <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
         </span>fasta_paths: Vec&lt;PathBuf&gt;,
@@ -465,6 +554,30 @@
         <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
         </span>seq_paths: Vec&lt;PathBuf&gt;,
+    },
+
+    <span class="doccomment">/// Filter rescued reads to those most closely matching the long-read data.
+    </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
+    </span>Filter {
+        <span class="doccomment">/// Output path for filtered short-read sequences.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
+        </span>output: PathBuf,
+
+        <span class="doccomment">/// Kmer-size
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        </span>kmer_size: usize,
+
+        <span class="doccomment">/// Minimum percentage of bases in short-read sequences covered by the matched kmers.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">90</span>)]
+        </span>min_score_pct: usize,
+
+        <span class="doccomment">/// FASTA files with short-read sequences (may contain one or more samples).
+        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
+        </span>short_read_fasta_paths: Vec&lt;PathBuf&gt;,
+
+        <span class="doccomment">/// FASTA files with long-read sequences (may contain one or more samples).
+        </span><span class="attr">#[clap(short, long, required = <span class="bool-val">true</span>, value_parser)]
+        </span>long_read_fasta_paths: Vec&lt;PathBuf&gt;,
     },
 
     <span class="doccomment">/// Cluster sequences based on k-mer presence/absence.
@@ -475,7 +588,7 @@
         </span>output: PathBuf,
 
         <span class="doccomment">/// Kmer-size
-        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"11"</span>)]
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         </span>kmer_size: usize,
 
         <span class="doccomment">/// Multi-sample FASTA file with reads spanning locus of interest.
@@ -507,7 +620,7 @@
         </span>output: PathBuf,
 
         <span class="doccomment">/// Kmer-size
-        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"11"</span>)]
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         </span>kmer_size: usize,
 
         <span class="doccomment">/// Name of sequence to use as reference.
@@ -551,8 +664,12 @@
         </span>output: PathBuf,
 
         <span class="doccomment">/// Kmer-size
-        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"15"</span>)]
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         </span>kmer_size: usize,
+
+        <span class="doccomment">/// Trained error-cleaning model.
+        </span><span class="attr">#[clap(short, long, required = <span class="bool-val">true</span>, value_parser)]
+        </span>model_path: PathBuf,
 
         <span class="doccomment">/// FASTA files with short-read sequences (may contain one or more samples).
         </span><span class="attr">#[clap(short, long, required = <span class="bool-val">false</span>, value_parser)]
@@ -575,6 +692,8 @@
     <span class="kw">match </span>args.command {
         Commands::Train {
             output,
+            kmer_size,
+            iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
@@ -582,6 +701,8 @@
         } =&gt; {
             train::start(
                 <span class="kw-2">&amp;</span>output,
+                kmer_size,
+                iterations,
                 <span class="kw-2">&amp;</span>long_read_seq_paths,
                 <span class="kw-2">&amp;</span>short_read_seq_paths,
                 <span class="kw-2">&amp;</span>truth_seq_paths,
@@ -598,10 +719,27 @@
         }
         Commands::Rescue {
             output,
+            kmer_size,
+            min_kmers,
             fasta_paths,
             seq_paths,
         } =&gt; {
-            rescue::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
+            rescue::start(<span class="kw-2">&amp;</span>output, kmer_size, min_kmers, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
+        }
+        Commands::Filter {
+            output,
+            kmer_size,
+            min_score_pct,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } =&gt; {
+            filter::start(
+                <span class="kw-2">&amp;</span>output,
+                kmer_size,
+                min_score_pct,
+                <span class="kw-2">&amp;</span>long_read_fasta_paths,
+                <span class="kw-2">&amp;</span>short_read_fasta_paths,
+            );
         }
         Commands::Cluster {
             output,
@@ -633,6 +771,7 @@
         }
         Commands::Coassemble {
             output,
+            model_path,
             kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
@@ -640,6 +779,7 @@
             coassemble::start(
                 <span class="kw-2">&amp;</span>output,
                 kmer_size,
+                <span class="kw-2">&amp;</span>model_path,
                 <span class="kw-2">&amp;</span>long_read_fasta_paths,
                 <span class="kw-2">&amp;</span>short_read_fasta_paths,
             );

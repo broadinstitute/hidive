@@ -440,6 +440,7 @@
 <a href="#440" id="440">440</a>
 <a href="#441" id="441">441</a>
 <a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import the Result type from the anyhow crate for error handling.
 </span><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -607,12 +608,13 @@
                 }
 
                 <span class="kw">if let </span>bam::pileup::Indel::Ins(len) = alignment.indel() {
-                    <span class="kw">let </span>pos1 = alignment.qpos().unwrap();
-                    <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
-                    <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
-                        <span class="kw">let </span>a = alignment.record().seq()[pos];
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(pos1) = alignment.qpos() {
+                        <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
+                        <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
+                            <span class="kw">let </span>a = alignment.record().seq()[pos];
 
-                        bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
+                            bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
+                        }
                     }
                 }
             }

@@ -151,12 +151,9 @@
 <span class="comment">// Import the skydive module, which contains the necessary functions for staging data
 </span><span class="kw">use </span>skydive;
 
-<span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;, seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) {
+<span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;, seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) {
     <span class="kw">let </span>fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     <span class="kw">let </span>seq_urls = skydive::parse::parse_file_names(seq_paths);
-
-    <span class="kw">let </span>k = <span class="number">15</span>;
-    <span class="kw">let </span>num_threshold = <span class="number">10</span>;
 
     <span class="comment">// Get the system's temporary directory path
     </span><span class="kw">let </span>cache_path = std::env::temp_dir();
@@ -169,9 +166,10 @@
 
         <span class="kw">for </span>record <span class="kw">in </span>reader.records().flatten() {
             <span class="kw">let </span>fw_seq = record.seq();
+            <span class="kw">let </span>rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
 
-            <span class="kw">let </span>kmers = fw_seq
-                .windows(k)
+            <span class="kw">let </span>kmers = rl_seq
+                .windows(kmer_size)
                 .map(skydive::ldbg::LdBG::canonicalize_kmer)
                 .collect::&lt;HashSet&lt;Vec&lt;u8&gt;&gt;&gt;();
 
@@ -214,15 +212,17 @@
                 }
 
                 <span class="comment">// Count the number of k-mers found in our hashset from the long reads.
-                </span><span class="kw">let </span>seq = read.seq().as_bytes();
-                <span class="kw">let </span>num_kmers = seq
-                    .par_windows(k)
+                </span><span class="kw">let </span>fw_seq = read.seq().as_bytes();
+                <span class="kw">let </span>rl_seq = skydive::utils::homopolymer_compressed(<span class="kw-2">&amp;</span>fw_seq);
+
+                <span class="kw">let </span>num_kmers = rl_seq
+                    .par_windows(kmer_size)
                     .map(|kmer| kmer_set.contains(<span class="kw-2">&amp;</span>skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
                     .filter(|<span class="kw-2">&amp;</span>contains| contains)
                     .count();
 
                 <span class="comment">// If the number of k-mers found is greater than the threshold, add the read to the list of similar reads.
-                </span><span class="kw">if </span>num_kmers &gt; num_threshold {
+                </span><span class="kw">if </span>num_kmers &gt; min_kmers {
                     <span class="kw">let </span>current_found = found_items.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
                     <span class="kw">if </span>current_found % UPDATE_FREQUENCY == <span class="number">0 </span>{
                         progress_bar.set_message(<span class="macro">format!</span>(
