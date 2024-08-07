@@ -57,12 +57,13 @@ mod build;
 mod cluster;
 mod coassemble;
 mod fetch;
+mod filter;
 mod impute;
 mod rescue;
 mod train;
 mod trim;
 
-#[derive(Debug, Parser)] // requires `derive` feature
+#[derive(Debug, Parser)]
 #[clap(name = "hidive")]
 #[clap(about = "Analysis of high-diversity loci through genome co-assembly of long/short reads.", long_about = None)]
 // #[clap(author = "Kiran V Garimella (kiran@broadinstitute.org)")]
@@ -70,6 +71,8 @@ struct Cli {
     #[clap(subcommand)]
     command: Commands,
 }
+
+const DEFAULT_KMER_SIZE: usize = 17;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -79,6 +82,14 @@ enum Commands {
         /// Output path for trained model.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
+
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Number of training iterations.
+        #[clap(short, long, value_parser, default_value_t = 50)]
+        iterations: usize,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(short, long, value_parser, required = true)]
@@ -124,6 +135,14 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum number of k-mers to require before examining a read more carefully.
+        #[clap(short, long, value_parser, default_value_t = 10)]
+        min_kmers: usize,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -131,6 +150,30 @@ enum Commands {
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
+    },
+
+    /// Filter rescued reads to those most closely matching the long-read data.
+    #[clap(arg_required_else_help = true)]
+    Filter {
+        /// Output path for filtered short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
+        #[clap(short, long, value_parser, default_value_t = 90)]
+        min_score_pct: usize,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(short, long, required = true, value_parser)]
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -141,7 +184,7 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "11")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
@@ -173,7 +216,7 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "11")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
         /// Name of sequence to use as reference.
@@ -217,8 +260,12 @@ enum Commands {
         output: PathBuf,
 
         /// Kmer-size
-        #[clap(short, long, value_parser, default_value = "15")]
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(short, long, required = false, value_parser)]
@@ -241,6 +288,8 @@ fn main() {
     match args.command {
         Commands::Train {
             output,
+            kmer_size,
+            iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
@@ -248,6 +297,8 @@ fn main() {
         } => {
             train::start(
                 &output,
+                kmer_size,
+                iterations,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,
@@ -264,10 +315,27 @@ fn main() {
         }
         Commands::Rescue {
             output,
+            kmer_size,
+            min_kmers,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+        }
+        Commands::Filter {
+            output,
+            kmer_size,
+            min_score_pct,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            filter::start(
+                &output,
+                kmer_size,
+                min_score_pct,
+                &long_read_fasta_paths,
+                &short_read_fasta_paths,
+            );
         }
         Commands::Cluster {
             output,
@@ -299,6 +367,7 @@ fn main() {
         }
         Commands::Coassemble {
             output,
+            model_path,
             kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
@@ -306,6 +375,7 @@ fn main() {
             coassemble::start(
                 &output,
                 kmer_size,
+                &model_path,
                 &long_read_fasta_paths,
                 &short_read_fasta_paths,
             );

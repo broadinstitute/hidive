@@ -16,12 +16,9 @@ use rust_htslib::bam::{FetchDefinition, Read};
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
-pub fn start(output: &PathBuf, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathBuf>) {
+pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathBuf>) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
-
-    let k = 15;
-    let num_threshold = 10;
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
@@ -34,9 +31,10 @@ pub fn start(output: &PathBuf, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathB
 
         for record in reader.records().flatten() {
             let fw_seq = record.seq();
+            let rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
 
-            let kmers = fw_seq
-                .windows(k)
+            let kmers = rl_seq
+                .windows(kmer_size)
                 .map(skydive::ldbg::LdBG::canonicalize_kmer)
                 .collect::<HashSet<Vec<u8>>>();
 
@@ -79,15 +77,17 @@ pub fn start(output: &PathBuf, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathB
                 }
 
                 // Count the number of k-mers found in our hashset from the long reads.
-                let seq = read.seq().as_bytes();
-                let num_kmers = seq
-                    .par_windows(k)
+                let fw_seq = read.seq().as_bytes();
+                let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
+
+                let num_kmers = rl_seq
+                    .par_windows(kmer_size)
                     .map(|kmer| kmer_set.contains(&skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
                     .filter(|&contains| contains)
                     .count();
 
                 // If the number of k-mers found is greater than the threshold, add the read to the list of similar reads.
-                if num_kmers > num_threshold {
+                if num_kmers > min_kmers {
                     let current_found = found_items.fetch_add(1, Ordering::Relaxed);
                     if current_found % UPDATE_FREQUENCY == 0 {
                         progress_bar.set_message(format!(
