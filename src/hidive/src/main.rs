@@ -250,6 +250,10 @@ enum Commands {
         /// Series-parallel graph.
         #[clap(required = true, value_parser)]
         graph: PathBuf,
+
+        ///K nearest _neighbor
+        #[clap(required = true, value_parser, default_value_t = 3)]
+        k_nearest_neighbor: usize
     },
 
     /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
@@ -282,8 +286,6 @@ fn main() {
 
     skydive::elog!("Hidive version {}", env!("CARGO_PKG_VERSION"));
     skydive::elog!("{:?}", args);
-
-    let start_time = std::time::Instant::now();
 
     match args.command {
         Commands::Train {
@@ -362,8 +364,8 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph } => {
-            assemble::start(&output, &graph);
+        Commands::Assemble { output, graph, k_nearest_neighbor } => {
+            assemble::start(&output, &graph, k_nearest_neighbor);
         }
         Commands::Coassemble {
             output,

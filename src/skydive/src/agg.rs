@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 use flate2::read::GzDecoder;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -6,6 +7,18 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::sync::Mutex;
+=======
+use core::panic;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use ndarray::Array2;
+use serde_json::Value;
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::fs::File;
+use flate2::read::GzDecoder;
+>>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
 
 #[derive(Debug)]
 pub struct GraphicalGenome {
@@ -15,6 +28,15 @@ pub struct GraphicalGenome {
     pub incoming: HashMap<String, Vec<String>>,
 }
 
+<<<<<<< HEAD
+=======
+pub fn add_unique(vec: &mut Vec<String>, item: String) {
+    if !vec.contains(&item) {
+        vec.push(item);
+    }
+}
+
+>>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
 impl GraphicalGenome {
     pub fn load_graph(filename: &str) -> io::Result<GraphicalGenome> {
         let file = File::open(filename)?;
@@ -67,6 +89,7 @@ impl GraphicalGenome {
             incoming: incoming,
         })
     }
+<<<<<<< HEAD
     // Method to extract a single sample graph
     pub fn extract_single_sample_graph(
         &self,
@@ -141,3 +164,94 @@ impl GraphicalGenome {
         (self.anchor.clone(), new_edges, new_outgoing, new_incoming)
     }
 }
+=======
+
+    // Method to extract a single sample graph
+    pub fn extract_single_sample_graph(
+        &self,
+        df_single_sample: &Array2<f64>, 
+        anchorlist: Vec<String>,
+        readset:Vec<String>,
+        sample: &str,
+    ) -> io::Result<GraphicalGenome> {
+
+        let mut new_edges: HashMap<String, serde_json::Value> = HashMap::new();
+        let mut new_incoming = HashMap::new();
+        let mut new_outgoing = HashMap::new();
+
+        // be careful about the anchor and read index, 
+        // make sure it matches with the imputed data matrix
+        for (anchorindex, anchor) in anchorlist.iter().enumerate(){
+            let mut d: HashMap<usize, String> = HashMap::new();
+            if let Some(outgoinglist) = self.outgoing.get(anchor) {
+                // Update the existing `d` variable instead of declaring a new one
+                d = outgoinglist
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| (index, value.to_string()))
+                    .collect();
+            }
+
+            for (read_index, read) in readset.iter().enumerate(){
+                let edgeindex = df_single_sample[[read_index, anchorindex]].round() - 1.0;
+                let usize_index = edgeindex as usize;
+                let edgename = d.get(&usize_index);
+                println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
+                new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
+                if let Some(edge_value) = self.edges.get(&edgename.as_ref().unwrap().to_string()) {
+                    if let Some(seq_value) = edge_value.get("seq") {
+                        let mut new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
+                        new_edge_value["seq"] = seq_value.clone();
+                    }
+                }
+
+                let edgename_str = edgename.as_ref().unwrap().to_string();
+                let mut new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
+                if !new_edge_value.get("reads").is_some() {
+                    new_edge_value["reads"] = serde_json::Value::Array(vec![]);
+                }
+                let reads_vec = new_edge_value.get_mut("reads").unwrap().as_array_mut().unwrap();
+                reads_vec.push(serde_json::Value::String(read.to_string()));
+
+
+                // let mut new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
+                if !new_edge_value.get("strain").is_some() {
+                    new_edge_value["strain"] = serde_json::Value::Array(vec![]);
+                }
+                let strain_vec = new_edge_value.get_mut("strain").unwrap().as_array_mut().unwrap();
+                                if !strain_vec.iter().any(|x| x == &serde_json::Value::String(sample.to_string())) {
+                    strain_vec.push(serde_json::Value::String(sample.to_string()));
+                }
+
+
+                if let Some(outgoing_list) = self.outgoing.get(&edgename.as_ref().unwrap().to_string()) {
+                    if let Some(dst) = outgoing_list.get(0){
+                        let incoming_list = new_incoming.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        add_unique(incoming_list, anchor.to_string());
+
+                        let incoming_dst_list = new_incoming.entry(dst.to_string()).or_default();
+                        add_unique(incoming_dst_list, edgename.as_ref().unwrap().to_string());
+                        let outgoing_list = new_outgoing.entry(anchor.to_string()).or_default();
+                        add_unique(outgoing_list, edgename.as_ref().unwrap().to_string());
+                        let outgoing_edgename_list = new_outgoing.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        add_unique(outgoing_edgename_list, dst.to_string());
+                    }
+                    else{
+                        panic!("edge do not have outgoing anchor")
+                            
+                        }
+
+                }
+            }
+
+        }
+    let new_graph = GraphicalGenome {
+            anchor: self.anchor.clone(), 
+            edges: new_edges,
+            outgoing: new_outgoing,
+            incoming: new_incoming,
+            };
+    Ok(new_graph) 
+    }
+}
+>>>>>>> 7d233e6 (add single sample graph extraction based on knn imputation)
