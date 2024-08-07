@@ -3,16 +3,19 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::path::PathBuf;
+use rayon::string;
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
 
-use minimap2::{Aligner, Preset};
+// use minimap2::{Aligner, Preset};
+
 
 extern crate ndarray;
 
 use rust_wfa2;
 use russcip::prelude::*;
+
 
 use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
@@ -348,41 +351,63 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
 
     }
 
-
-
-    // let mut var_haps = HashMap::new();
-    // let mut var_sample_hap = HashMap::new();
-    // let mut var_flow = HashMap::new();
-
-    // for hap in unique_paths.iter(){
-    //     var_haps.insert(hap.clone(), model.add_var(hap, Binary, 0.0, -INFINITY, INFINITY, &[], &[]).unwrap());
-    // }
-    // let mut total_cost = 0;
-    // let mut flow_out = HashMap::new();
-    // let mut connected_haps_per_sample = HashMap::new();
-
-    // for (index, submap) in data_info.iter(){
-    //     let s = submap.get("sample").unwrap();
-    //     let r = submap.get("read").unwrap();
-    //     let p = submap.get("path").unwrap();
-    //     let c = submap.get("cost").unwrap();
-
-    //     let r_p_identifier = format!("{}_{}", r, p);
-    //     let s_p_identifier = format!("{}_{}", s, p);
-    //     var_flow.insert(r_p_identifier, model.add_var(&r_p_identifier, Continuous, 0.0, 0.0, 1.0, &[], &[]).unwrap());
-    //     if !var_sample_hap.contains_key(&s_p_identifier){
-    //         var_sample_hap.insert(s_p_identifier, model.add_var(&s_p_identifier, Binary, 0.0, -INFINITY, INFINITY, &[], &[]).unwrap());
-    //         connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(var_sample_hap.get(&s_p_identifier));
-    //     }
-
-    //     model.add_constr(&index.to_string(), var_flow.get(&r_p_identifier).unwrap() - var_sample_hap.get(&s_p_identifier).unwrap(), Less, 0.0);
-    // }
-
-     let mut model = Model::new()
+    // Create model
+    let mut model = Model::new()
         .hide_output()
         .include_default_plugins()
-        .create_prob("test")
-        .set_obj_sense(ObjSense::Maximize);
+        .create_prob("haplotype")
+        .set_obj_sense(ObjSense::Minimize);
+
+    let mut var_haps = HashMap::new();
+    let mut var_sample_hap = HashMap::new();
+    let mut var_flow = HashMap::new();
+
+    for hap in unique_paths.iter(){
+        var_haps.insert(hap.clone(), model.add_var(0.0, 1.0, 0.0, &hap, VarType::Binary));
+    }
+    let mut total_cost = 0;
+    let mut flow_out = HashMap::new();
+    let mut connected_haps_per_sample = HashMap::new();
+
+    for (index, submap) in data_info.iter(){
+        let s = submap.get("sample").unwrap();
+        let r = submap.get("read").unwrap();
+        let p = submap.get("path").unwrap();
+        let c:i32 = submap.get("cost").unwrap().parse().expect("Not a valid integer for cost");
+
+        let r_p_identifier = format!("{}_{}", r, p);
+        let s_p_identifier = format!("{}_{}", s, p);
+        var_flow.insert(r_p_identifier, model.add_var(0.0, 1.0, 0.0, &r_p_identifier, VarType::Continuous));
+        if !var_sample_hap.contains_key(&s_p_identifier){
+            var_sample_hap.insert(s_p_identifier, model.add_var(0.0, 1.0, 0.0, &s_p_identifier, VarType::Binary));
+            connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(var_sample_hap.get(&s_p_identifier));
+        }
+        let x1 = var_flow.get(&r_p_identifier).unwrap();
+        let x2 = var_sample_hap.get(&s_p_identifier).unwrap();
+        let x3 = var_haps.get(p).unwrap();
+        model.add_cons(
+            vec![x1.clone(), x2.clone()],
+            &[1.,1.],
+            -f64::INFINITY,
+            0.,
+            &(2*index).to_string()
+        );
+        model.add_cons(
+            vec![x2.clone(), x3.clone()],
+            &[1.,1.],
+            -f64::INFINITY,
+            0.,
+            &(2*index + 1).to_string()
+        );
+        total_cost += var_flow.get(&r_p_identifier).unwrap() * c as f64;
+        let flow_out_value = flow_out.entry(r.clone()).or_insert(0.0);
+        let var_flow_value = var_flow.get(&r_p_identifier).unwrap(); // Safely get the value from var_flow
+        *flow_out_value += var_flow_value;
+
+    }
+
+
+    
 
     // Add variables
     let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
