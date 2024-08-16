@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -5,18 +6,21 @@ use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
 
 use bio::io::fasta::Reader;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use num_format::{Locale, ToFormattedString};
 
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 
+use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, Read};
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
-pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathBuf>) {
+pub fn start(output: &PathBuf, kmer_size: usize, min_kmers_pct: usize, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathBuf>) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
@@ -61,6 +65,16 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
         reader
             .fetch(FetchDefinition::All)
             .expect("Failed to fetch reads");
+
+        // Create an immutable map of tid to chromosome name
+        let tid_to_chrom: HashMap<i32, String> = reader
+            .header()
+            .target_names()
+            .iter()
+            .enumerate()
+            .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
+            .collect();
+
         let records: Vec<_> = reader
             .records()
             .par_bridge()
@@ -70,8 +84,10 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
                 let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
                 if current_processed % UPDATE_FREQUENCY == 0 {
                     progress_bar.set_message(format!(
-                        "Searching for similar reads ({} found)",
-                        found_items.load(Ordering::Relaxed)
+                        "Searching for similar reads ({} found, most recent at {}:{})",
+                        found_items.load(Ordering::Relaxed).to_formatted_string(&Locale::en),
+                        tid_to_chrom.get(&read.tid()).unwrap(),
+                        read.reference_start().to_formatted_string(&Locale::en)
                     ));
                     progress_bar.inc(UPDATE_FREQUENCY as u64);
                 }
@@ -87,12 +103,14 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
                     .count();
 
                 // If the number of k-mers found is greater than the threshold, add the read to the list of similar reads.
-                if num_kmers > min_kmers {
+                if num_kmers as f32 / rl_seq.len() as f32 > min_kmers_pct as f32 / 100.0 {
                     let current_found = found_items.fetch_add(1, Ordering::Relaxed);
                     if current_found % UPDATE_FREQUENCY == 0 {
                         progress_bar.set_message(format!(
-                            "Searching for similar reads ({} found)",
-                            (current_found + 1).to_formatted_string(&Locale::en)
+                            "Searching for similar reads ({} found, most recent at {}:{})",
+                            (current_found + 1).to_formatted_string(&Locale::en),
+                            tid_to_chrom.get(&read.tid()).unwrap(),
+                            read.reference_start().to_formatted_string(&Locale::en)
                         ));
                     }
                     Some(read)
@@ -116,11 +134,17 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
         all_records.extend(records);
     }
 
-    let mut file = File::create(output).expect("Could not open file for writing.");
+    let file = File::create(output).expect("Could not open file for writing.");
+    let mut writer: Box<dyn Write> = if output.to_str().unwrap().ends_with(".gz") {
+        Box::new(GzEncoder::new(file, Compression::default()))
+    } else {
+        Box::new(file)
+    };
+
     for (i, record) in all_records.iter().enumerate() {
-        writeln!(file, ">read_{}", i).expect("Could not write to file");
+        writeln!(writer, ">read_{}", i).expect("Could not write to file");
         writeln!(
-            file,
+            writer,
             "{}",
             String::from_utf8_lossy(&record.seq().as_bytes())
         )
@@ -129,7 +153,7 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers: usize, fasta_paths: 
 
     skydive::elog!(
         "Wrote {} reads to {}.",
-        all_records.len(),
+        all_records.len().to_formatted_string(&Locale::en),
         output.to_str().unwrap()
     );
 }

@@ -14,6 +14,7 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     iterations: usize,
+    test_split: f32,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
@@ -104,8 +105,6 @@ pub fn start(
     cfg.set_shrinkage(0.1);
     cfg.set_iterations(iterations);
     cfg.set_debug(debug);
-
-    let test_split = 0.2;
 
     skydive::elog!("Training GBDT model with:");
     skydive::elog!(" - feature_size={}", cfg.feature_size);
