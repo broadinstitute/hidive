@@ -895,52 +895,45 @@ impl LdBG {
     }
 
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
-        let g = LdBG::from_sequences("read".to_string(), self.kmer_size, &vec![seq.to_vec()])
-            .build_links(self.kmer_size, &vec![seq.to_vec()]);
+        // let g = LdBG::from_sequences("read".to_string(), self.kmer_size, &vec![seq.to_vec()])
+        //     .build_links(self.kmer_size, &vec![seq.to_vec()]);
 
         let mask = seq
             .windows(self.kmer_size)
             .enumerate()
             .map(|(i, kmer)| {
                 let cn_kmer = crate::utils::canonicalize_kmer(kmer);
-
                 let this_record = self.kmers.get(&cn_kmer);
-                let read_record = g.kmers.get(&cn_kmer);
 
                 if this_record.is_none() {
-                    println!("{} {} {} None false", i, String::from_utf8_lossy(kmer), read_record.unwrap());
+                    // println!("{} {} {} None false", i, String::from_utf8_lossy(kmer), read_record.unwrap());
 
                     false
                 } else {
-                    // let this_edges = this_record.unwrap().edges();
-                    // let read_edges = read_record.unwrap().edges();
-
-                    // read_edges.intersects(this_edges)
-
                     let this_prev: HashSet<Vec<u8>> = self.prev_kmers(kmer).iter().cloned().collect();
-                    // let read_prev: HashSet<Vec<u8>> = g.prev_kmers(kmer).iter().cloned().collect();
-                    let read_prev = if i > 0 { seq[i-1..i-1+self.kmer_size].to_vec() } else { Vec::new() };
+                    let read_p = if i > 0 { seq[i-1..i-1+self.kmer_size].to_vec() } else { Vec::new() };
+                    let read_prev = if i > 0 { HashSet::from([read_p.clone()]) } else { HashSet::new() };
 
                     let this_next: HashSet<Vec<u8>> = self.next_kmers(kmer).iter().cloned().collect();
-                    // let read_next: HashSet<Vec<u8>> = g.next_kmers(kmer).iter().cloned().collect();
-                    let read_next = if i < seq.len() - self.kmer_size { seq[i+1..i+1+self.kmer_size].to_vec() } else { Vec::new() };
+                    let read_n = if i < seq.len() - self.kmer_size { seq[i+1..i+1+self.kmer_size].to_vec() } else { Vec::new() };
+                    let read_next = if i < seq.len() - self.kmer_size { HashSet::from([read_n.clone()]) } else { HashSet::new() };
 
                     let _dbg_this_prev: HashSet<String> = self.prev_kmers(kmer).iter().cloned().map(|b| String::from_utf8_lossy(&b).to_string()).collect();
-                    let _dbg_read_prev = String::from_utf8_lossy(&read_prev).to_string();
+                    let _dbg_read_prev = String::from_utf8_lossy(&read_p).to_string();
 
                     let _dbg_this_next: HashSet<String> = self.next_kmers(kmer).iter().cloned().map(|b| String::from_utf8_lossy(&b).to_string()).collect();
-                    let _dbg_read_next = String::from_utf8_lossy(&read_next).to_string();
+                    let _dbg_read_next = String::from_utf8_lossy(&read_n).to_string();
 
-                    println!("{} {} [{:?}] [{}] [{:?}] [{}] {}", i, String::from_utf8_lossy(kmer), _dbg_this_prev, _dbg_read_prev, _dbg_this_next, _dbg_read_next, this_prev.contains(&read_prev) && this_next.contains(&read_next));
+                    // println!("{} {} [{:?}] [{}] [{:?}] [{}] {} {}", i, String::from_utf8_lossy(kmer), _dbg_this_prev, _dbg_read_prev, _dbg_this_next, _dbg_read_next, this_prev.contains(&read_p) && this_next.contains(&read_n), read_prev.is_subset(&this_prev) && read_next.is_subset(&this_next));
 
-                    this_prev.contains(&read_prev) && this_next.contains(&read_next)
+                    read_prev.is_subset(&this_prev) && read_next.is_subset(&this_next)
                 }
             })
             .collect::<Vec<bool>>();
 
-        for (i, &m) in mask.iter().enumerate() {
-            println!("{} {}", i, m);
-        }
+        // for (i, &m) in mask.iter().enumerate() {
+        //     println!("{} {}", i, m);
+        // }
 
         let mut replacements_to_process = BTreeSet::new();
         let mut processed= BTreeSet::new();
@@ -996,18 +989,17 @@ impl LdBG {
         }
 
         // Print replacement_map
-        println!("Replacement Map:");
-        for ((start, end), replacement) in &replacement_map {
-            println!("({}, {}): {}", start, end, String::from_utf8_lossy(replacement));
-        }
+        // println!("Replacement Map:");
+        // for ((start, end), replacement) in &replacement_map {
+        //     println!("({}, {}): {}", start, end, String::from_utf8_lossy(replacement));
+        // }
 
         let mut corrected_seqs = Vec::new();
 
         let mut corrected_seq = seq.to_vec();
         for ((start, end), replacement) in replacement_map.iter().rev() {
-            let original = &seq[*start..*end+self.kmer_size];
-
-            println!("{} {} {} {}", start, end, String::from_utf8_lossy(original), String::from_utf8_lossy(replacement));
+            // let original = &seq[*start..*end+self.kmer_size];
+            // println!("{} {} {} {}", start, end, String::from_utf8_lossy(original), String::from_utf8_lossy(replacement));
 
             if replacement.is_empty() {
                 // Split corrected_seq into two pieces between start and end
@@ -2222,21 +2214,21 @@ mod tests {
         uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCACGGTAG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTAG".to_vec()]);
         uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCATGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
         uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCATCGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
+        uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
+        uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
 
         for (i, (uncorrected_seq, expected_seqs)) in uncorrected_seq_map.iter().enumerate() {
             let corrected_seqs = g.correct_seq(&uncorrected_seq);
 
-            //
-            println!("{} gen {}", i, String::from_utf8_lossy(&genome));
-            println!("{} unc {}", i, String::from_utf8_lossy(&uncorrected_seq));
-            for corrected_seq in &corrected_seqs {
-                println!("{} cor {}", i, String::from_utf8_lossy(corrected_seq));
-            }
+            // println!("{} gen {}", i, String::from_utf8_lossy(&genome));
+            // println!("{} unc {}", i, String::from_utf8_lossy(&uncorrected_seq));
+            // for corrected_seq in &corrected_seqs {
+            //     println!("{} cor {}", i, String::from_utf8_lossy(corrected_seq));
+            // }
 
-            for expected_seq in expected_seqs {
-                println!("{} exp {}", i, String::from_utf8_lossy(expected_seq));
-            }
-            //
+            // for expected_seq in expected_seqs {
+            //     println!("{} exp {}", i, String::from_utf8_lossy(expected_seq));
+            // }
 
             assert_eq!(corrected_seqs.len(), expected_seqs.len());
             for (corrected_seq, expected_seq) in corrected_seqs.iter().zip(expected_seqs) {
