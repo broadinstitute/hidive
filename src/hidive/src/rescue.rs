@@ -20,7 +20,13 @@ use rust_htslib::bam::{FetchDefinition, Read};
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
-pub fn start(output: &PathBuf, kmer_size: usize, min_kmers_pct: usize, fasta_paths: &Vec<PathBuf>, seq_paths: &Vec<PathBuf>) {
+pub fn start(
+    output: &PathBuf,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    fasta_paths: &Vec<PathBuf>,
+    seq_paths: &Vec<PathBuf>,
+) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
@@ -85,7 +91,9 @@ pub fn start(output: &PathBuf, kmer_size: usize, min_kmers_pct: usize, fasta_pat
                 if current_processed % UPDATE_FREQUENCY == 0 {
                     progress_bar.set_message(format!(
                         "Searching for similar reads ({} found, most recent at {}:{})",
-                        found_items.load(Ordering::Relaxed).to_formatted_string(&Locale::en),
+                        found_items
+                            .load(Ordering::Relaxed)
+                            .to_formatted_string(&Locale::en),
                         tid_to_chrom.get(&read.tid()).unwrap(),
                         read.reference_start().to_formatted_string(&Locale::en)
                     ));

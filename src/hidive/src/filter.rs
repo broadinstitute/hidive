@@ -15,7 +15,7 @@ use flate2::read::GzDecoder;
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use num_format::{Locale, ToFormattedString};
-use rayon::iter::{ParallelIterator, IntoParallelRefIterator, ParallelBridge};
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use skydive::ldbg::LdBG;
 
 pub fn start(
@@ -52,50 +52,20 @@ pub fn start(
     }
 
     // Assemble contigs.
-    let mut l1 = LdBG::from_sequences(String::from("l1"), kmer_size, &all_lr_seqs, false, false);
+    let l1 = LdBG::from_sequences("l1".to_string(), kmer_size, &all_lr_seqs)
+        .score_kmers(model_path)
+        .clean_paths(0.5)
+        .clean_tips(2*kmer_size);
 
-    // Filter k-mers.
-    let mut eval_data: DataVec = Vec::new();
-    let graph_kmers = &l1.kmers.keys().cloned().collect::<Vec<_>>();
-    for kmer in graph_kmers {
-        let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let scov = 0;
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+    // skydive::elog!(
+    //     "K-mers with p < 0.5: {} / {} ({:.2}%)",
+    //     num_below_threshold,
+    //     num_total,
+    //     num_below_threshold as f32 / num_total as f32 * 100.0
+    // );
 
-        let data = Data::new_training_data(
-            vec![
-                lcov as f32,
-                scov as f32,
-                (kmer.len() - compressed_len) as f32,
-            ],
-            1.0,
-            0.0,
-            None,
-        );
-
-        eval_data.push(data);
-    }
-
-    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
-    let predictions = gbdt.predict(&eval_data);
-    let mut num_below_threshold = 0;
-    let mut num_total = 0;
-
-    for (p, cn_kmer) in predictions.iter().zip(graph_kmers.iter()) {
-        l1.scores.insert(cn_kmer.clone(), p.clamp(0.0, 1.0));
-
-        if *p < 0.5 {
-            num_below_threshold += 1;
-        }
-        num_total += 1;
-    }
-
-    let (cleaned_kmers, cleaned_paths) = l1.clean_paths(0.5);
-    let (cleaned_tips_kmers, cleaned_tips_paths) = l1.clean_tips(2*kmer_size);
-
-    skydive::elog!("K-mers with p < 0.5: {} / {} ({:.2}%)", num_below_threshold, num_total, num_below_threshold as f32 / num_total as f32 * 100.0);
-    skydive::elog!("Removed {} k-mers in {} paths", cleaned_kmers, cleaned_paths);
-    skydive::elog!("Removed {} k-mers in {} tips", cleaned_tips_kmers, cleaned_tips_paths);
+    skydive::elog!("Removed {} k-mers in {} paths", l1.cleaned_path_kmers, l1.cleaned_paths);
+    skydive::elog!("Removed {} k-mers in {} tips", l1.cleaned_tip_kmers, l1.cleaned_tips);
 
     let mut all_corrected_seqs = Vec::new();
     for lr_seq in &all_lr_seqs {
@@ -137,8 +107,10 @@ pub fn start(
         let fasta_reader = bio::io::fasta::Reader::new(reader);
         let all_reads = fasta_reader.records().flatten().collect::<Vec<_>>();
 
-        let progress_bar =
-            skydive::utils::default_unbounded_progress_bar(format!("Filtering short reads with score < {}% (0 retained)", min_score_pct));
+        let progress_bar = skydive::utils::default_unbounded_progress_bar(format!(
+            "Filtering short reads with score < {}% (0 retained)",
+            min_score_pct
+        ));
 
         // Create some thread-safe counters.
         let found_items = Arc::new(AtomicUsize::new(0));
@@ -159,17 +131,22 @@ pub fn start(
                         progress_bar.set_message(format!(
                             "Filtering short reads with score < {}% ({} retained)",
                             min_score_pct,
-                            found_items.load(Ordering::Relaxed).to_formatted_string(&Locale::en)
+                            found_items
+                                .load(Ordering::Relaxed)
+                                .to_formatted_string(&Locale::en)
                         ));
                         progress_bar.inc(UPDATE_FREQUENCY as u64);
                     }
 
-                    let best_score = all_lr_seqs.iter().map(|lr_seq| {
-                        let matches = find_kmer_matches(&sr_seq, lr_seq, kmer_size);
-                        let sparse_al = lcskpp(&matches, kmer_size);
+                    let best_score = all_lr_seqs
+                        .iter()
+                        .map(|lr_seq| {
+                            let matches = find_kmer_matches(&sr_seq, lr_seq, kmer_size);
+                            let sparse_al = lcskpp(&matches, kmer_size);
 
-                        (100.0 * sparse_al.score as f64 / sr_seq.len() as f64) as usize
-                    }).max();
+                            (100.0 * sparse_al.score as f64 / sr_seq.len() as f64) as usize
+                        })
+                        .max();
 
                     if best_score.unwrap() >= min_score_pct {
                         found_items.fetch_add(1, Ordering::Relaxed);
@@ -196,7 +173,6 @@ pub fn start(
     skydive::elog!("{} long-read sequences.", all_lr_seqs.len());
     skydive::elog!("{} short-read sequences.", filtered_sr_seqs.len());
 
-    /*
     let filtered_sr_seqs = all_sr_seqs.iter().filter(|sr_seq| {
         let best_score = all_lr_seqs.iter().map(|lr_seq| {
             let matches = find_kmer_matches(*sr_seq, lr_seq, kmer_size);

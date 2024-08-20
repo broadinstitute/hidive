@@ -3,7 +3,7 @@ use std::fmt;
 use crate::edges::Edges;
 
 /// Represents a de Bruijn graph record.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Record {
     coverage: u16,
     edges: Edges,
@@ -18,9 +18,22 @@ impl Record {
         }
     }
 
+    // /// Create a default de Bruijn graph record with 0 coverage and no edges.
+    // pub fn default() -> Self {
+    //     Record {
+    //         coverage: 0,
+    //         edges: Edges::empty(),
+    //     }
+    // }
+
     /// Return the Record's coverage.
     pub fn coverage(&self) -> u16 {
         self.coverage
+    }
+
+    // Return all edges.
+    pub fn edges(&self) -> Edges {
+        self.edges
     }
 
     /// Return incoming edges

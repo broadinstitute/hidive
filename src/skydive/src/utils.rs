@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use needletail::Sequence;
+use parquet::data_type::AsBytes;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
@@ -74,6 +76,25 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
     progress_bar
 }
 
+/// Get the canonical (lexicographically-lowest) version of a k-mer.
+///
+/// # Arguments
+///
+/// * `kmer` - A slice representing the k-mer.
+///
+/// # Returns
+///
+/// A vector containing the canonical k-mer.
+#[inline(always)]
+pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    let rc_kmer = kmer.reverse_complement();
+    if kmer < rc_kmer.as_bytes() {
+        kmer.to_vec()
+    } else {
+        rc_kmer.as_bytes().to_vec()
+    }
+}
+
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
@@ -105,4 +126,26 @@ pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<Str
     }
 
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_canonicalize_kmer() {
+        let kmer1 = b"CGTA";
+        let kmer2 = b"TACG";
+        let kmer3 = b"AAAA";
+        let kmer4 = b"TTTT";
+
+        // Test canonical k-mer for kmer1 and kmer2
+        assert_eq!(canonicalize_kmer(kmer1), b"CGTA".to_vec());
+        assert_eq!(canonicalize_kmer(kmer2), b"CGTA".to_vec());
+
+        // Test canonical k-mer for kmer3 and kmer4
+        assert_eq!(canonicalize_kmer(kmer3), b"AAAA".to_vec());
+        assert_eq!(canonicalize_kmer(kmer4), b"AAAA".to_vec());
+    }
 }
