@@ -32,9 +32,12 @@ use std::f64::NAN;
 
 // Import the Url type to work with URLs
 use url::Url;
-// import spoa
-extern crate rust_spoa;
-use rust_spoa::poa_consensus;
+// import abpoa
+// extern crate rust_spoa;
+// use rust_spoa::poa_consensus;
+
+extern crate ab_poa;
+
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -550,14 +553,19 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
                 }                
             }
 
-            let mut sequences = vec![];
-            for seq in input_seq.iter_mut(){
-                seq.push('\0');
-                sequences.push((*seq).bytes().map(|x| {x as u8}).collect::<Vec<u8>>());
-            }
-            let mut consensus = poa_consensus(&sequences, 10000000, 1, 5, -4, -3, -1);
-            let consensus = String::from_utf8(consensus).expect("bytes to string");
-            println!("{:?}, {:?}", hap_id, consensus);
+            // let sequences: Vec<&str> = input_seq.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+            let sequences: Vec<&str> = [
+                    "CGTCAAT",
+                    "CCACGTCAAT",
+                    "CGTCAAT",
+                    "CGTCAATGCTA",
+                ].to_vec();
+            let mut aligner = unsafe { ab_poa::abpoa_wrapper::AbpoaAligner::new_with_example_params() };
+            let consensus = unsafe {
+                aligner.consensus_from_seqs(&sequences)
+            };
+            // let consensus = String::from_utf8(consensus).expect("bytes to string");
+            // println!("{:?}, {:?}", hap_id, consensus.cons);
         }
         
 
