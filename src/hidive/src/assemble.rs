@@ -36,7 +36,7 @@ use url::Url;
 // extern crate rust_spoa;
 // use rust_spoa::poa_consensus;
 
-extern crate ab_poa;
+use ab_poa::abpoa_wrapper:: {AbpoaCons,AbpoaAligner, AbpoaAlignmentResult, AbpoaAlignmentMode};
 
 
 // Import the skydive module, which contains the necessary functions for staging data
@@ -560,7 +560,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
                     "CGTCAAT",
                     "CGTCAATGCTA",
                 ].to_vec();
-            let mut aligner = unsafe { ab_poa::abpoa_wrapper::AbpoaAligner::new_with_example_params() };
+            let mut aligner = unsafe {AbpoaAligner::new_with_example_params() };
             let consensus = unsafe {
                 aligner.consensus_from_seqs(&sequences)
             };
