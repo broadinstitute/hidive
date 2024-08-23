@@ -167,9 +167,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
-        /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
-        #[clap(short, long, value_parser, default_value_t = 90)]
-        min_score_pct: usize,
+        // /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
+        // #[clap(short, long, value_parser, default_value_t = 90)]
+        // min_score_pct: usize,
 
         /// Trained error-cleaning model (long-read only).
         #[clap(short, long, required = true, value_parser)]
@@ -335,7 +335,7 @@ fn main() {
         Commands::Filter {
             output,
             kmer_size,
-            min_score_pct,
+            // min_score_pct,
             model_path,
             long_read_fasta_paths,
             short_read_fasta_paths,
@@ -343,7 +343,7 @@ fn main() {
             filter::start(
                 &output,
                 kmer_size,
-                min_score_pct,
+                // min_score_pct,
                 &model_path,
                 &long_read_fasta_paths,
                 &short_read_fasta_paths,

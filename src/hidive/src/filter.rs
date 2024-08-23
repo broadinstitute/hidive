@@ -21,7 +21,7 @@ use skydive::ldbg::LdBG;
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
-    min_score_pct: usize,
+    // min_score_pct: usize,
     model_path: &PathBuf,
     long_read_fasta_paths: &Vec<PathBuf>,
     short_read_fasta_paths: &Vec<PathBuf>,
@@ -66,26 +66,24 @@ pub fn start(
 
     skydive::elog!("Removed {} k-mers in {} paths", l1.cleaned_path_kmers, l1.cleaned_paths);
     skydive::elog!("Removed {} k-mers in {} tips", l1.cleaned_tip_kmers, l1.cleaned_tips);
+    skydive::elog!("{} k-mers remaining", l1.kmers.len());
 
-    let mut all_corrected_seqs = Vec::new();
-    for lr_seq in &all_lr_seqs {
-        let corrected_seqs = l1.correct_seq(&lr_seq);
-
-        all_corrected_seqs.extend(corrected_seqs);
-    }
+    // let all_corrected_seqs = l1.correct_seqs(&vec![all_lr_seqs[67].clone()]);
+    let all_corrected_seqs = l1.correct_seqs(&all_lr_seqs);
+    let l2 = l1.build_links(&all_corrected_seqs);
+    let contigs = l2.assemble_all();
 
     skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
 
     // Assemble contigs.
     // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
     // l3.links = LdBG::build_links(kmer_size, &all_lr_seqs2, &l3.kmers);
-    l1.links = LdBG::build_links(kmer_size, &all_corrected_seqs, &l1.kmers);
-    let contigs = l1.assemble_all();
 
     for contig in contigs {
         skydive::elog!("Contig: {}", contig.len());
     }
 
+    /*
     // Read and filter short reads.
     let mut filtered_sr_seqs: Vec<Vec<u8>> = Vec::new();
     for short_read_seq_url in &short_read_seq_urls {

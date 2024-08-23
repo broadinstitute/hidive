@@ -45,7 +45,7 @@ pub fn start(
 
             let kmers = rl_seq
                 .windows(kmer_size)
-                .map(skydive::ldbg::LdBG::canonicalize_kmer)
+                .map(skydive::utils::canonicalize_kmer)
                 .collect::<HashSet<Vec<u8>>>();
 
             kmer_set.extend(kmers);
@@ -106,7 +106,7 @@ pub fn start(
 
                 let num_kmers = rl_seq
                     .par_windows(kmer_size)
-                    .map(|kmer| kmer_set.contains(&skydive::ldbg::LdBG::canonicalize_kmer(kmer)))
+                    .map(|kmer| kmer_set.contains(&skydive::utils::canonicalize_kmer(kmer)))
                     .filter(|&contains| contains)
                     .count();
 
