@@ -563,6 +563,19 @@
 <a href="#563" id="563">563</a>
 <a href="#564" id="564">564</a>
 <a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
 </span><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::collections::HashMap;
@@ -571,6 +584,7 @@
 <span class="kw">use </span>std::iter::SkipWhile;
 <span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>rayon::string;
+<span class="kw">use </span>std::ffi::{CString, CStr};
 
 <span class="kw">use </span>serde_json::Value;
 <span class="comment">// Import the Absolutize trait to convert relative paths to absolute paths
@@ -596,11 +610,12 @@
 
 <span class="comment">// Import the Url type to work with URLs
 </span><span class="kw">use </span>url::Url;
-<span class="comment">// import spoa
+<span class="comment">// import abpoa
 // extern crate rust_spoa;
 // use rust_spoa::poa_consensus;
 
-// Import the skydive module, which contains the necessary functions for staging data
+</span><span class="kw">use </span>spoa;
+<span class="comment">// Import the skydive module, which contains the necessary functions for staging data
 </span><span class="kw">use </span>skydive;
 
 
@@ -1114,15 +1129,26 @@
                 }                
             }
 
-            <span class="kw">let </span><span class="kw-2">mut </span>sequences = <span class="macro">vec!</span>[];
-            <span class="kw">for </span>seq <span class="kw">in </span>input_seq.iter_mut(){
-                seq.push(<span class="string">'\0'</span>);
-                sequences.push((<span class="kw-2">*</span>seq).bytes().map(|x| {x <span class="kw">as </span>u8}).collect::&lt;Vec&lt;u8&gt;&gt;());
+            <span class="kw">let </span>sequences: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = input_seq.iter().map(AsRef::as_ref).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+            <span class="kw">let </span><span class="kw-2">mut </span>eng = spoa::AlignmentEngine::new(spoa::AlignmentType::kSW, <span class="number">5</span>, -<span class="number">4</span>, -<span class="number">8</span>, -<span class="number">6</span>, -<span class="number">8</span>, -<span class="number">6</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>graph = spoa::Graph::new();
+
+            <span class="kw">for </span>seq <span class="kw">in </span>sequences.iter() {
+                <span class="kw">let </span>c_string = CString::new(<span class="kw-2">*</span>seq).expect(<span class="string">"CString::new failed"</span>);
+                <span class="kw">let </span>c_str: <span class="kw-2">&amp;</span>CStr = c_string.as_c_str(); 
+                <span class="kw">let </span>qual = {
+                    <span class="kw">let </span><span class="kw-2">mut </span>qual = <span class="macro">vec!</span>[<span class="number">34u8</span>; seq.len()];
+                    qual.push(<span class="number">0</span>);
+                    CString::from_vec_with_nul(qual).unwrap()
+                };
+                <span class="kw">let </span>aln = eng.align(c_str, <span class="kw-2">&amp;</span>graph);
+                graph.add_alignment(<span class="kw-2">&amp;</span>aln, c_str, <span class="kw-2">&amp;</span>qual);
             }
-            <span class="comment">// let mut consensus = poa_consensus(&amp;sequences, 10000000, 1, 5, -4, -3, -1);
-            // let consensus = String::from_utf8(consensus).expect("bytes to string");
-            // println!("{:?}, {:?}", hap_id, consensus);
-        </span>}
+
+            <span class="kw">let </span>consensus = graph.consensus();
+            <span class="macro">println!</span>(<span class="string">"{:?}"</span>, consensus)
+        }
         
 
     }
