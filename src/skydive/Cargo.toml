@@ -9,50 +9,49 @@ resolver = "2"
 [dependencies]
 anyhow = "1.0"
 backoff = "0.4.0"
-bio = "*"
+bio = "2.0.1"
 bio-types = "1.0.1"
-bitflags = "*"
-chrono = "*"
-cloud-storage = { version = "*", features = ["sync"] }
-color-eyre = {version = "*"}
+bitflags = "=1.3.2"
+chrono = "0.4.38"
+cloud-storage = { version = "0.11.1", features = ["sync"] }
+color-eyre = {version = "0.6.3"}
 crossbeam-utils = "0.8.19"
+flate2 = "1.0.30"
 fs_extra = "1.2"
 gag = "1.0.0"
 gbdt = "0.1.3"
 glob = "0.3"
-google-cloud-storage = "*"
-humansize = "*"
-indextree = "*"
-indicatif = { version = "*", features = ["rayon"] }
+google-cloud-storage = "0.20.0"
+humansize = "2.1.3"
+indextree = "4.6.1"
+indicatif = { version = "0.17.8", features = ["rayon"] }
 iset = "0.2.2"
 itertools = "0.13.0"
 linear-map = "1.2.0"
 memoffset = "0.9.0"
 ndarray = { version = "0.15.6", features = ["rayon"] }
-needletail = "*"
+needletail = "0.5.1"
 openssl = { version = "0.10", features = ["vendored"] }
 path-absolutize = "3.1.1"
-parquet = "*"
-petgraph = "*"
+parquet = "52.1.0"
+petgraph = "0.6.5"
 #polars = { version = "*", features = ["parquet", "lazy", "csv-file", "strings", "temporal", "dtype-duration", "dtype-categorical", "concat_str", "list", "list_eval", "rank", "lazy_regex"]}
-pyo3 = { version = "*", features = ["abi3-py37", "extension-module"] }
-pyo3-asyncio = { version = "*", features = ["attributes", "async-std-runtime", "tokio-runtime"] }
-rand = {version = "*"}
-rand_chacha = "*"
-rayon = "*"
-regex = "*"
-reqwest = { version = "*", features = ["blocking"]}
-rust-htslib = { version = "*", features = ["curl", "gcs"] }
-serde = "*"
-serde_derive = "*"
-serde_json = "*"
+pyo3 = { version = "0.20.0", features = ["abi3-py37", "extension-module"] }
+pyo3-asyncio = { version = "0.20.0", features = ["attributes", "async-std-runtime", "tokio-runtime"] }
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+rayon = "1.10.0"
+regex = "1.10.5"
+reqwest = { version = "0.12.5", features = ["blocking"]}
+rust-htslib = { version = "0.47.0", features = ["curl", "gcs"] }
+serde = "1.0.204"
+serde_derive = "1.0.204"
+serde_json = "1.0.120"
 sprs = "0.11.1"
 sys-info = "0.9.1"
-tokio = "*"
-unzip-n = "*"
-url = "*"
-flate2 = "*"
-md5 = "0.7.0"
+tokio = "1.39.1"
+unzip-n = "0.1.2"
+url = "2.5.2"
 
 [dev-dependencies]
 pretty_assertions = "1"

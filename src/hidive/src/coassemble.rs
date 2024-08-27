@@ -14,6 +14,7 @@ use parquet::data_type::AsBytes;
 use petgraph::dot::Dot;
 
 use skydive::ldbg::LdBG;
+use skydive::mldbg::MLdBG;
 
 pub fn start(
     output: &PathBuf,
@@ -25,9 +26,12 @@ pub fn start(
     let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
+    let m = MLdBG::new(kmer_size);
+
     // Read all long reads.
     skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls);
-    let l1 = LdBG::from_files(String::from("l1"), kmer_size, &long_read_fasta_paths);
+    // let l1 = LdBG::from_files(String::from("l1"), kmer_size, &long_read_fasta_paths);
+    
 
     // Read all short reads.
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls);

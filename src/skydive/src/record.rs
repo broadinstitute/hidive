@@ -3,7 +3,7 @@ use std::fmt;
 use crate::edges::Edges;
 
 /// Represents a de Bruijn graph record.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     coverage: u16,
     edges: Edges,
