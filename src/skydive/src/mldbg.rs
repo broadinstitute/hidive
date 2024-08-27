@@ -5,20 +5,16 @@ use crate::ldbg::LdBG;
 /// Represents a multi-color linked de Bruijn graph, all built with same k-mer size.
 #[derive(Debug)]
 pub struct MLdBG {
-    pub ldbgs: Vec<LdBG>,
     pub kmer_size: usize,
-    pub clean: bool,
-    pub build_links: bool,
+    pub ldbgs: Vec<LdBG>,
 }
 
 impl MLdBG {
     /// Create an empty multi-color LdBG.
-    pub fn new(kmer_size: usize, clean: bool, build_links: bool) -> Self {
+    pub fn new(kmer_size: usize) -> Self {
         MLdBG {
-            ldbgs: Vec::new(),
             kmer_size,
-            clean,
-            build_links,
+            ldbgs: Vec::new(),
         }
     }
 
@@ -34,10 +30,8 @@ impl MLdBG {
         }
 
         MLdBG {
-            ldbgs,
             kmer_size,
-            clean: false,
-            build_links: false,
+            ldbgs,
         }
     }
 
@@ -65,7 +59,7 @@ impl MLdBG {
 
     /// Append an LdBG to the end of the MLdBG, created anew from a fasta file.
     pub fn append_from_file(&mut self, name: String, seq_path: &PathBuf) {
-        let l = LdBG::from_file(name, self.kmer_size, seq_path, self.clean, self.build_links);
+        let l = LdBG::from_file(name, self.kmer_size, seq_path);
         self.ldbgs.push(l);
     }
 
@@ -88,8 +82,6 @@ impl MLdBG {
             name,
             self.kmer_size,
             &filtered_reads,
-            self.clean,
-            self.build_links,
         );
         self.ldbgs.push(l);
     }

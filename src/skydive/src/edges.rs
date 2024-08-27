@@ -1,8 +1,7 @@
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    // #[derive(Debug, Clone)]
+    #[derive(Default)]
     pub struct Edges: u8 {
         const FLAG_EDGE_IN_A  = 0b0000_0001;
         const FLAG_EDGE_IN_C  = 0b0000_0010;

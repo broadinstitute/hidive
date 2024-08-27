@@ -76,7 +76,7 @@ const DEFAULT_KMER_SIZE: usize = 17;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Train a graph-cleaning model using short- and long-read data with ground truth assemblies.
+    /// Train a graph-cleaning model using long- and (optionally) short-read data with ground truth assemblies.
     #[clap(arg_required_else_help = true)]
     Train {
         /// Output path for trained model.
@@ -87,6 +87,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
+        /// Test split.
+        #[clap(short, long, value_parser, default_value_t = 0.2)]
+        test_split: f32,
+
         /// Number of training iterations.
         #[clap(short, long, value_parser, default_value_t = 50)]
         iterations: usize,
@@ -96,7 +100,7 @@ enum Commands {
         long_read_seq_paths: Vec<PathBuf>,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
-        #[clap(short, long, value_parser, required = true)]
+        #[clap(short, long, value_parser, required = false)]
         short_read_seq_paths: Vec<PathBuf>,
 
         /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
@@ -139,9 +143,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
-        /// Minimum number of k-mers to require before examining a read more carefully.
-        #[clap(short, long, value_parser, default_value_t = 10)]
-        min_kmers: usize,
+        /// Minimum percentage of k-mers to require before examining a read more carefully.
+        #[clap(short, long, value_parser, default_value_t = 70)]
+        min_kmers_pct: usize,
 
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
@@ -152,28 +156,20 @@ enum Commands {
         seq_paths: Vec<PathBuf>,
     },
 
-    /// Filter rescued reads to those most closely matching the long-read data.
+    /// Optionally further filter rescued reads to those most closely matching a long-read draft assembly.
     #[clap(arg_required_else_help = true)]
     Filter {
         /// Output path for filtered short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Kmer-size
-        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
-        kmer_size: usize,
-
-        /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
-        #[clap(short, long, value_parser, default_value_t = 90)]
-        min_score_pct: usize,
+        /// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
+        #[clap(short, long, value_parser, required = true)]
+        gfa_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
         short_read_fasta_paths: Vec<PathBuf>,
-
-        /// FASTA files with long-read sequences (may contain one or more samples).
-        #[clap(short, long, required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -296,6 +292,7 @@ fn main() {
         Commands::Train {
             output,
             kmer_size,
+            test_split,
             iterations,
             long_read_seq_paths,
             short_read_seq_paths,
@@ -306,6 +303,7 @@ fn main() {
                 &output,
                 kmer_size,
                 iterations,
+                test_split,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,
@@ -323,7 +321,7 @@ fn main() {
         Commands::Rescue {
             output,
             kmer_size,
-            min_kmers,
+            min_kmers_pct: min_kmers,
             fasta_paths,
             seq_paths,
         } => {
@@ -331,16 +329,12 @@ fn main() {
         }
         Commands::Filter {
             output,
-            kmer_size,
-            min_score_pct,
-            long_read_fasta_paths,
+            gfa_path,
             short_read_fasta_paths,
         } => {
             filter::start(
                 &output,
-                kmer_size,
-                min_score_pct,
-                &long_read_fasta_paths,
+                &gfa_path,
                 &short_read_fasta_paths,
             );
         }

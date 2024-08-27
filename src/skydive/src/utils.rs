@@ -1,5 +1,12 @@
 use std::borrow::Cow;
 
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
+use std::collections::HashMap;
+
+use needletail::Sequence;
+use parquet::data_type::AsBytes;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
@@ -74,6 +81,25 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
     progress_bar
 }
 
+/// Get the canonical (lexicographically-lowest) version of a k-mer.
+///
+/// # Arguments
+///
+/// * `kmer` - A slice representing the k-mer.
+///
+/// # Returns
+///
+/// A vector containing the canonical k-mer.
+#[inline(always)]
+pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
+    let rc_kmer = kmer.reverse_complement();
+    if kmer < rc_kmer.as_bytes() {
+        kmer.to_vec()
+    } else {
+        rc_kmer.as_bytes().to_vec()
+    }
+}
+
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
@@ -88,7 +114,7 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
-pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
+pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
 
@@ -105,4 +131,62 @@ pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<Str
     }
 
     Ok(())
+}
+
+pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut graph = DiGraph::new();
+    let mut node_map = HashMap::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        let fields: Vec<&str> = line.split('\t').collect();
+        
+        match fields[0] {
+            "S" => {
+                let id = fields[1];
+                let sequence = fields[2].to_string();
+                let node_index = graph.add_node(sequence);
+                node_map.insert(id.to_string(), node_index);
+            },
+            "L" => {
+                let from_id = fields[1];
+                let to_id = fields[3];
+                let weight = fields[5]
+                    .split(':')
+                    .last()
+                    .and_then(|s| s.parse::<f32>().ok())
+                    .unwrap_or(1.0) / 100.0;
+
+                if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
+                    graph.add_edge(from, to, weight);
+                }
+            },
+            _ => {} // Ignore other lines
+        }
+    }
+
+    Ok(graph)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_canonicalize_kmer() {
+        let kmer1 = b"CGTA";
+        let kmer2 = b"TACG";
+        let kmer3 = b"AAAA";
+        let kmer4 = b"TTTT";
+
+        // Test canonical k-mer for kmer1 and kmer2
+        assert_eq!(canonicalize_kmer(kmer1), b"CGTA".to_vec());
+        assert_eq!(canonicalize_kmer(kmer2), b"CGTA".to_vec());
+
+        // Test canonical k-mer for kmer3 and kmer4
+        assert_eq!(canonicalize_kmer(kmer3), b"AAAA".to_vec());
+        assert_eq!(canonicalize_kmer(kmer4), b"AAAA".to_vec());
+    }
 }
