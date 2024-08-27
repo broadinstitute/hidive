@@ -39,6 +39,7 @@ url = "2.5.2"
 #xgboost = "0.1.4"
 ndarray = "0.15"
 linfa = "0.5"
+cmake = "0.1"
 ab_poa = {git = "https://github.com/hangsuUNC/rs-abPOA.git"}
 rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
 grb = "2.0.1"
