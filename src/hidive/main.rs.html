@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0 (051478957 2024-07-21)" data-channel="1.80.0" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -402,6 +402,7 @@
 <a href="#402" id="402">402</a>
 <a href="#403" id="403">403</a>
 <a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -480,7 +481,7 @@
 
 <span class="attr">#[derive(Debug, Subcommand)]
 </span><span class="kw">enum </span>Commands {
-    <span class="doccomment">/// Train a graph-cleaning model using short- and long-read data with ground truth assemblies.
+    <span class="doccomment">/// Train a graph-cleaning model using long- and (optionally) short-read data with ground truth assemblies.
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
     </span>Train {
         <span class="doccomment">/// Output path for trained model.
@@ -491,6 +492,10 @@
         </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         </span>kmer_size: usize,
 
+        <span class="doccomment">/// Test split.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">0.2</span>)]
+        </span>test_split: f32,
+
         <span class="doccomment">/// Number of training iterations.
         </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">50</span>)]
         </span>iterations: usize,
@@ -500,7 +505,7 @@
         </span>long_read_seq_paths: Vec&lt;PathBuf&gt;,
 
         <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
-        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">false</span>)]
         </span>short_read_seq_paths: Vec&lt;PathBuf&gt;,
 
         <span class="doccomment">/// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
@@ -543,9 +548,9 @@
         </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         </span>kmer_size: usize,
 
-        <span class="doccomment">/// Minimum number of k-mers to require before examining a read more carefully.
-        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">10</span>)]
-        </span>min_kmers: usize,
+        <span class="doccomment">/// Minimum percentage of k-mers to require before examining a read more carefully.
+        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">70</span>)]
+        </span>min_kmers_pct: usize,
 
         <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
@@ -556,28 +561,20 @@
         </span>seq_paths: Vec&lt;PathBuf&gt;,
     },
 
-    <span class="doccomment">/// Filter rescued reads to those most closely matching the long-read data.
+    <span class="doccomment">/// Optionally further filter rescued reads to those most closely matching a long-read draft assembly.
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
     </span>Filter {
         <span class="doccomment">/// Output path for filtered short-read sequences.
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
 
-        <span class="doccomment">/// Kmer-size
-        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
-        </span>kmer_size: usize,
-
-        <span class="doccomment">/// Minimum percentage of bases in short-read sequences covered by the matched kmers.
-        </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">90</span>)]
-        </span>min_score_pct: usize,
+        <span class="doccomment">/// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span>gfa_path: PathBuf,
 
         <span class="doccomment">/// FASTA files with short-read sequences (may contain one or more samples).
         </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
         </span>short_read_fasta_paths: Vec&lt;PathBuf&gt;,
-
-        <span class="doccomment">/// FASTA files with long-read sequences (may contain one or more samples).
-        </span><span class="attr">#[clap(short, long, required = <span class="bool-val">true</span>, value_parser)]
-        </span>long_read_fasta_paths: Vec&lt;PathBuf&gt;,
     },
 
     <span class="doccomment">/// Cluster sequences based on k-mer presence/absence.
@@ -654,6 +651,13 @@
         <span class="doccomment">/// Series-parallel graph.
         </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
         </span>graph: PathBuf,
+
+        <span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
+        </span>reads: PathBuf,
+
+        <span class="doccomment">///K nearest _neighbor
+        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser, default_value_t = <span class="number">3</span>)]
+        </span>k_nearest_neighbor: usize
     },
 
     <span class="doccomment">/// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
@@ -693,6 +697,7 @@
         Commands::Train {
             output,
             kmer_size,
+            test_split,
             iterations,
             long_read_seq_paths,
             short_read_seq_paths,
@@ -703,6 +708,7 @@
                 <span class="kw-2">&amp;</span>output,
                 kmer_size,
                 iterations,
+                test_split,
                 <span class="kw-2">&amp;</span>long_read_seq_paths,
                 <span class="kw-2">&amp;</span>short_read_seq_paths,
                 <span class="kw-2">&amp;</span>truth_seq_paths,
@@ -720,7 +726,7 @@
         Commands::Rescue {
             output,
             kmer_size,
-            min_kmers,
+            min_kmers_pct: min_kmers,
             fasta_paths,
             seq_paths,
         } =&gt; {
@@ -728,16 +734,12 @@
         }
         Commands::Filter {
             output,
-            kmer_size,
-            min_score_pct,
-            long_read_fasta_paths,
+            gfa_path,
             short_read_fasta_paths,
         } =&gt; {
             filter::start(
                 <span class="kw-2">&amp;</span>output,
-                kmer_size,
-                min_score_pct,
-                <span class="kw-2">&amp;</span>long_read_fasta_paths,
+                <span class="kw-2">&amp;</span>gfa_path,
                 <span class="kw-2">&amp;</span>short_read_fasta_paths,
             );
         }
@@ -766,8 +768,8 @@
         Commands::Impute { output, graph } =&gt; {
             impute::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph);
         }
-        Commands::Assemble { output, graph } =&gt; {
-            assemble::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph);
+        Commands::Assemble { output, graph, reads, k_nearest_neighbor } =&gt; {
+            assemble::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph, <span class="kw-2">&amp;</span>reads, k_nearest_neighbor);
         }
         Commands::Coassemble {
             output,

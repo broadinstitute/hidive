@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/coassemble.rs`."><title>coassemble.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0 (051478957 2024-07-21)" data-channel="1.80.0" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/coassemble.rs`."><title>coassemble.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -166,53 +166,6 @@
 <a href="#166" id="166">166</a>
 <a href="#167" id="167">167</a>
 <a href="#168" id="168">168</a>
-<a href="#169" id="169">169</a>
-<a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
-<a href="#176" id="176">176</a>
-<a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
-<a href="#206" id="206">206</a>
-<a href="#207" id="207">207</a>
-<a href="#208" id="208">208</a>
-<a href="#209" id="209">209</a>
-<a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>std::{
@@ -229,6 +182,7 @@
 <span class="kw">use </span>petgraph::dot::Dot;
 
 <span class="kw">use </span>skydive::ldbg::LdBG;
+<span class="kw">use </span>skydive::mldbg::MLdBG;
 
 <span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
@@ -240,192 +194,144 @@
     <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
+    <span class="kw">let </span>m = MLdBG::new(kmer_size);
+
     <span class="comment">// Read all long reads.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>all_lr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
-    <span class="kw">let </span><span class="kw-2">mut </span>all_lr_seqs2: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read samples {:?}..."</span>, long_read_seq_urls);
+    <span class="comment">// let l1 = LdBG::from_files(String::from("l1"), kmer_size, &amp;long_read_fasta_paths);
+    
 
-    <span class="kw">for </span>long_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>long_read_seq_urls {
-        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-            <span class="kw-2">&amp;</span>long_read_seq_url,
-            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
-        );
-        <span class="kw">let </span>fasta_path = long_read_seq_url.to_file_path().unwrap();
+    // Read all short reads.
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read samples {:?}..."</span>, short_read_seq_urls);
+    <span class="kw">let </span>s1 = LdBG::from_files(String::from(<span class="string">"s1"</span>), kmer_size, <span class="kw-2">&amp;</span>short_read_fasta_paths);
 
-        <span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read sample {}..."</span>, basename);
+    <span class="comment">/*
+    // Union of kmers from l1 and s1.
+    let kmers: HashSet&lt;_&gt; = l1.kmers.keys().chain(s1.kmers.keys()).cloned().collect();
+    for kmer in kmers {
+        let lr = l1.kmers.get(&amp;kmer);
+        let sr = s1.kmers.get(&amp;kmer);
 
-        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
-        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
-
-        all_lr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
-        );
-
-        all_lr_seqs2.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
-        );
-    }
-
-    <span class="kw">let </span>l1 = LdBG::from_sequences(String::from(<span class="string">"l1"</span>), kmer_size, <span class="kw-2">&amp;</span>all_lr_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
-
-    <span class="comment">// Read all short reads.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>all_sr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
-    <span class="kw">for </span>short_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>short_read_seq_urls {
-        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-            <span class="kw-2">&amp;</span>short_read_seq_url,
-            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
-        );
-        <span class="kw">let </span>fasta_path = short_read_seq_url.to_file_path().unwrap();
-
-        <span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read sample {}..."</span>, basename);
-
-        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
-        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
-
-        all_sr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
-        );
-    }
-
-    <span class="kw">let </span><span class="kw-2">mut </span>s1 = LdBG::from_sequences(String::from(<span class="string">"s1"</span>), kmer_size, <span class="kw-2">&amp;</span>all_sr_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
-
-    <span class="comment">// Union of kmers from l1 and s1.
-    </span><span class="kw">let </span>kmers: HashSet&lt;<span class="kw">_</span>&gt; = l1.kmers.keys().chain(s1.kmers.keys()).cloned().collect();
-    <span class="kw">for </span>kmer <span class="kw">in </span>kmers {
-        <span class="kw">let </span>lr = l1.kmers.get(<span class="kw-2">&amp;</span>kmer);
-        <span class="kw">let </span>sr = s1.kmers.get(<span class="kw-2">&amp;</span>kmer);
-
-        <span class="kw">if </span>lr.is_none() &amp;&amp; sr.is_some() {
-            s1.remove(<span class="kw-2">&amp;</span>kmer);
+        if lr.is_none() &amp;&amp; sr.is_some() {
+            s1.remove(&amp;kmer);
         }
     }
 
-    <span class="comment">// s1.infer_edges();
-
     // Filter out the irrelevant short reads.
-    </span><span class="kw">let </span>filtered_sr_seqs = <span class="kw-2">&amp;</span>all_sr_seqs
+    let filtered_sr_seqs = &amp;all_sr_seqs
         .iter()
         .cloned()
         .filter(|read| {
-            <span class="kw">let </span>num_contained = read
+            let num_contained = read
                 .windows(kmer_size)
                 .filter(|kmer| {
                     s1.kmers
-                        .contains_key(<span class="kw-2">&amp;</span>skydive::ldbg::LdBG::canonicalize_kmer(kmer))
+                        .contains_key(&amp;skydive::ldbg::LdBG::canonicalize_kmer(kmer))
                 })
                 .count();
 
-            num_contained == read.len() - kmer_size + <span class="number">1
-        </span>})
+            num_contained == read.len() - kmer_size + 1
+        })
         .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
 
-    <span class="comment">// Report some stats.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Long reads: {}"</span>, <span class="kw-2">&amp;</span>all_lr_seqs.len());
-    <span class="macro">skydive::elog!</span>(<span class="string">"Short reads (before filtering): {}"</span>, <span class="kw-2">&amp;</span>all_sr_seqs.len());
-    <span class="macro">skydive::elog!</span>(<span class="string">"Short reads (after filtering): {}"</span>, <span class="kw-2">&amp;</span>filtered_sr_seqs.len());
+    // Report some stats.
+    skydive::elog!("Long reads: {}", &amp;all_lr_seqs.len());
+    skydive::elog!("Short reads (before filtering): {}", &amp;all_sr_seqs.len());
+    skydive::elog!("Short reads (after filtering): {}", &amp;filtered_sr_seqs.len());
 
-    <span class="kw">let </span>all_seqs = <span class="kw-2">&amp;</span>all_lr_seqs
+    let all_seqs = &amp;all_lr_seqs
         .into_iter()
         .chain(filtered_sr_seqs.iter().cloned())
         .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
-    <span class="macro">skydive::elog!</span>(<span class="string">"Combined reads: {}"</span>, <span class="kw-2">&amp;</span>all_seqs.len());
+    skydive::elog!("Combined reads: {}", &amp;all_seqs.len());
 
-    <span class="comment">// Assemble contigs.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>l3 = LdBG::from_sequences(String::from(<span class="string">"l3"</span>), kmer_size, <span class="kw-2">&amp;</span>all_seqs, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
-
-    <span class="comment">// l3.mark_tips(10*l3.kmer_size);
-
-    // let mut num_below_threshold = 0;
-    // for cn_kmer in l3.scores.keys() {
-    //     if l3.scores.get(cn_kmer).unwrap() &lt; &amp;0.5 {
-    //         num_below_threshold += 1;
-    //     }
-    // }
-
-    // skydive::elog!("{} {}", num_below_threshold, l3.scores.len());
+    // Assemble contigs.
+    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &amp;all_seqs);
 
     // Filter k-mers.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>eval_data: DataVec = Vec::new();
-    <span class="kw">let </span>graph_kmers = <span class="kw-2">&amp;</span>l3.kmers.keys().cloned().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-    <span class="kw">for </span>kmer <span class="kw">in </span>graph_kmers {
-        <span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |record| record.coverage());
-        <span class="kw">let </span>scov = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |record| record.coverage());
-        <span class="kw">let </span>compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+    let mut eval_data: DataVec = Vec::new();
+    let graph_kmers = &amp;l3.kmers.keys().cloned().collect::&lt;Vec&lt;_&gt;&gt;();
+    for kmer in graph_kmers {
+        let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
+        let scov = s1.kmers.get(kmer).map_or(0, |record| record.coverage());
+        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
-        <span class="kw">let </span>data = Data::new_training_data(
-            <span class="macro">vec!</span>[
-                lcov <span class="kw">as </span>f32,
-                scov <span class="kw">as </span>f32,
-                (kmer.len() - compressed_len) <span class="kw">as </span>f32,
+        let data = Data::new_training_data(
+            vec![
+                lcov as f32,
+                scov as f32,
+                (kmer.len() - compressed_len) as f32,
             ],
-            <span class="number">1.0</span>,
-            <span class="number">0.0</span>,
-            <span class="prelude-val">None</span>,
+            1.0,
+            0.0,
+            None,
         );
 
         eval_data.push(data);
     }
 
-    <span class="kw">let </span>gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
-    <span class="kw">let </span>predictions = gbdt.predict(<span class="kw-2">&amp;</span>eval_data);
-    <span class="kw">let </span><span class="kw-2">mut </span>num_below_threshold = <span class="number">0</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>num_total = <span class="number">0</span>;
+    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
+    let predictions = gbdt.predict(&amp;eval_data);
+    let mut num_below_threshold = 0;
+    let mut num_total = 0;
 
-    <span class="kw">for </span>(p, cn_kmer) <span class="kw">in </span>predictions.iter().zip(graph_kmers.iter()) {
-        l3.scores.insert(cn_kmer.clone(), p.clamp(<span class="number">0.0</span>, <span class="number">1.0</span>));
+    for (p, cn_kmer) in predictions.iter().zip(graph_kmers.iter()) {
+        l3.scores.insert(cn_kmer.clone(), p.clamp(0.0, 1.0));
 
-        <span class="kw">if </span><span class="kw-2">*</span>p &lt; <span class="number">0.5 </span>{
-            num_below_threshold += <span class="number">1</span>;
+        if *p &lt; 0.5 {
+            num_below_threshold += 1;
         }
-        num_total += <span class="number">1</span>;
+        num_total += 1;
     }
 
-    <span class="kw">let </span>(cleaned_kmers, cleaned_paths) = l3.clean_paths(<span class="number">0.4</span>);
-    <span class="kw">let </span>(cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(<span class="number">2</span><span class="kw-2">*</span>kmer_size);
+    let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
+    let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2 * kmer_size);
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"K-mers with p &lt; 0.5: {} / {} ({:.2}%)"</span>, num_below_threshold, num_total, num_below_threshold <span class="kw">as </span>f32 / num_total <span class="kw">as </span>f32 * <span class="number">100.0</span>);
-    <span class="macro">skydive::elog!</span>(<span class="string">"Removed {} k-mers in {} paths"</span>, cleaned_kmers, cleaned_paths);
-    <span class="macro">skydive::elog!</span>(<span class="string">"Removed {} k-mers in {} tips"</span>, cleaned_tips_kmers, cleaned_tips_paths);
+    skydive::elog!(
+        "K-mers with p &lt; 0.5: {} / {} ({:.2}%)",
+        num_below_threshold,
+        num_total,
+        num_below_threshold as f32 / num_total as f32 * 100.0
+    );
+    skydive::elog!(
+        "Removed {} k-mers in {} paths",
+        cleaned_kmers,
+        cleaned_paths
+    );
+    skydive::elog!(
+        "Removed {} k-mers in {} tips",
+        cleaned_tips_kmers,
+        cleaned_tips_paths
+    );
 
-    <span class="kw">let </span><span class="kw-2">mut </span>all_corrected_seqs = Vec::new();
-    <span class="kw">for </span>lr_seq <span class="kw">in </span>all_seqs {
-        <span class="kw">let </span>corrected_seqs = l3.correct_seq(lr_seq);
+    let mut all_corrected_seqs = Vec::new();
+    for lr_seq in all_seqs {
+        let corrected_seqs = l3.correct_seq(lr_seq);
 
         all_corrected_seqs.extend(corrected_seqs);
     }
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"Corrected sequences: {}"</span>, all_corrected_seqs.len());
+    skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
 
-    <span class="comment">// Assemble contigs.
-    // l3.links = LdBG::build_links(kmer_size, &amp;all_seqs, &amp;l3.kmers);
-    // l3.links = LdBG::build_links(kmer_size, &amp;all_lr_seqs2, &amp;l3.kmers);
-    </span>l3.links = LdBG::build_links(kmer_size, <span class="kw-2">&amp;</span>all_corrected_seqs, <span class="kw-2">&amp;</span>l3.kmers);
-    <span class="kw">let </span>contigs = l3.assemble_all();
+    // Assemble contigs.
+    l3.links = LdBG::build_links(kmer_size, &amp;all_corrected_seqs, &amp;l3.kmers);
+    let contigs = l3.assemble_all();
 
-    <span class="comment">// Write contigs to disk.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Writing {} contigs to disk..."</span>, <span class="kw-2">&amp;</span>contigs.len());
+    // Write contigs to disk.
+    skydive::elog!("Writing {} contigs to disk...", &amp;contigs.len());
 
-    <span class="kw">let </span>output_file = File::create(output).unwrap();
-    <span class="kw">let </span><span class="kw-2">mut </span>writer = BufWriter::new(output_file);
+    let output_file = File::create(output).unwrap();
+    let mut writer = BufWriter::new(output_file);
 
-    <span class="kw">for </span>(i, contig) <span class="kw">in </span>contigs.iter().enumerate() {
-        <span class="macro">writeln!</span>(writer, <span class="string">"&gt;contig_{}\n{}"</span>, i, String::from_utf8(contig.clone()).unwrap()).unwrap();
+    for (i, contig) in contigs.iter().enumerate() {
+        writeln!(
+            writer,
+            "&gt;contig_{}\n{}",
+            i,
+            String::from_utf8(contig.clone()).unwrap()
+        )
+        .unwrap();
     }
-
-    <span class="comment">// let graph = l3.traverse_all_kmers();
-    // let graph = l3.traverse_all_contigs();
-
-    // let mut gfa_output = Vec::new();
-    // skydive::utils::write_graph_as_gfa(&amp;mut gfa_output, &amp;graph).unwrap();
-    // let gfa_string = String::from_utf8(gfa_output).unwrap();
-    // writeln!(writer, "{}", gfa_string).unwrap();
+    */
 </span>}
 </code></pre></div></section></main></body></html>

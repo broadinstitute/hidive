@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/filter.rs`."><title>filter.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0 (051478957 2024-07-21)" data-channel="1.80.0" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/filter.rs`."><title>filter.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -86,51 +86,106 @@
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
 <a href="#88" id="88">88</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::io::Read;
 <span class="kw">use </span>std::path::PathBuf;
+<span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
+<span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::{
     fs::File,
     io::{BufWriter, Write},
 };
 
-<span class="kw">use </span>bio::alignment::sparse::<span class="kw-2">*</span>;
+<span class="kw">use </span>flate2::read::GzDecoder;
+<span class="kw">use </span>num_format::{Locale, ToFormattedString};
 
-<span class="kw">use </span>skydive::ldbg::LdBG;
+<span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
+
+<span class="kw">use </span>minimap2::Aligner;
+<span class="kw">use </span>tempfile::NamedTempFile;
 
 <span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
-    kmer_size: usize,
-    min_score_pct: usize,
-    long_read_fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
+    gfa_path: <span class="kw-2">&amp;</span>PathBuf,
     short_read_fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
 ) {
-    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
-    <span class="comment">// Read all long reads.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>all_lr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
-    <span class="kw">for </span>long_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>long_read_seq_urls {
-        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-            <span class="kw-2">&amp;</span>long_read_seq_url,
-            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
-        );
-        <span class="kw">let </span>fasta_path = long_read_seq_url.to_file_path().unwrap();
+    <span class="kw">let </span>g = skydive::utils::read_gfa(gfa_path).unwrap();
 
-        <span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read sample {}..."</span>, basename);
+    <span class="macro">skydive::elog!</span>(<span class="string">"{} contigs"</span>, g.node_count());
 
-        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
-        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
+    <span class="kw">let </span>temp_file = NamedTempFile::new().expect(<span class="string">"Failed to create temporary file"</span>);
+    <span class="kw">let </span>temp_path = temp_file.path().to_owned();
 
-        all_lr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
-        );
+    {
+        <span class="kw">let </span>file = File::create(<span class="kw-2">&amp;</span>temp_path).expect(<span class="string">"Failed to open temporary file for writing"</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>writer = BufWriter::new(file);
+
+        <span class="kw">for </span>(index, node) <span class="kw">in </span>g.node_indices().enumerate() {
+            <span class="kw">let </span>node_str = <span class="macro">format!</span>(<span class="string">"&gt;contig_{}\n{}\n"</span>, index, g[node]);
+            writer.write_all(node_str.as_bytes()).expect(<span class="string">"Failed to write to temporary file"</span>);
+        }
     }
 
-    <span class="comment">// Read all short reads.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>all_sr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
+    <span class="macro">skydive::elog!</span>(<span class="string">"Wrote {} nodes to temporary file: {:?}"</span>, g.node_count(), temp_path);
+
+    <span class="kw">let </span>aligner = Aligner::builder()
+        .short()
+        .with_cigar()
+        .with_index(temp_path, <span class="prelude-val">None</span>)
+        .expect(<span class="string">"Unable to build index"</span>);
+
+    <span class="kw">let </span><span class="kw-2">mut </span>filtered_sr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>short_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>short_read_seq_urls {
         <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
             <span class="kw-2">&amp;</span>short_read_seq_url,
@@ -140,38 +195,83 @@
 
         <span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read sample {}..."</span>, basename);
 
-        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
-        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
+        <span class="kw">let </span>file = File::open(<span class="kw-2">&amp;</span>fasta_path).unwrap();
+        <span class="kw">let </span>reader: Box&lt;<span class="kw">dyn </span>Read&gt; = <span class="kw">if </span>output.to_str().unwrap().ends_with(<span class="string">".gz"</span>) {
+            Box::new(GzDecoder::new(file))
+        } <span class="kw">else </span>{
+            Box::new(file)
+        };
 
-        all_sr_seqs.extend(
+        <span class="kw">let </span>fasta_reader = bio::io::fasta::Reader::new(reader);
+        <span class="kw">let </span>all_reads = fasta_reader.records().flatten().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+        <span class="kw">let </span>progress_bar = skydive::utils::default_unbounded_progress_bar(<span class="macro">format!</span>(
+            <span class="string">"Filtering short reads (0 retained)"</span>,
+        ));
+
+        <span class="comment">// Create some thread-safe counters.
+        </span><span class="kw">let </span>found_items = Arc::new(AtomicUsize::new(<span class="number">0</span>));
+        <span class="kw">let </span>processed_items = Arc::new(AtomicUsize::new(<span class="number">0</span>));
+        <span class="kw">let </span>progress_bar = Arc::new(progress_bar);
+
+        <span class="kw">const </span>UPDATE_FREQUENCY: usize = <span class="number">1_000_000</span>;
+
+        filtered_sr_seqs.extend(
             all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
+                .par_iter()
+                .filter_map(|r| {
+                    <span class="kw">let </span>sr_seq = r.seq().to_vec();
+
+                    <span class="comment">// Increment progress counters and update the progress bar every once in a while.
+                    </span><span class="kw">let </span>current_processed = processed_items.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
+                    <span class="kw">if </span>current_processed % UPDATE_FREQUENCY == <span class="number">0 </span>{
+                        progress_bar.set_message(<span class="macro">format!</span>(
+                            <span class="string">"Filtering short reads ({} retained)"</span>,
+                            found_items
+                                .load(Ordering::Relaxed)
+                                .to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)
+                        ));
+                        progress_bar.inc(UPDATE_FREQUENCY <span class="kw">as </span>u64);
+                    }
+
+                    <span class="kw">let </span>count = aligner
+                        .map(<span class="kw-2">&amp;</span>sr_seq, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
+                        .iter()
+                        .flatten()
+                        .filter_map(|a| {
+                            <span class="kw">if </span>a.target_name.is_some() {
+                                <span class="prelude-val">Some</span>(<span class="number">1</span>)
+                            } <span class="kw">else </span>{
+                                <span class="prelude-val">None
+                            </span>}
+                        })
+                        .sum::&lt;usize&gt;();
+
+                    <span class="kw">if </span>count &gt; <span class="number">0 </span>{
+                        found_items.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
+                        <span class="prelude-val">Some</span>(sr_seq)
+                    } <span class="kw">else </span>{
+                        <span class="prelude-val">None
+                    </span>}
+                })
                 .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
         );
+
+        <span class="comment">// Write filtered short read sequences to output
+        </span><span class="kw">let </span><span class="kw-2">mut </span>writer = std::io::BufWriter::new(std::fs::File::create(output).unwrap());
+        <span class="kw">for </span>(i, seq) <span class="kw">in </span>filtered_sr_seqs.iter().enumerate() {
+            <span class="kw">let _ </span>= <span class="macro">writeln!</span>(writer, <span class="string">"&gt;filtered_read_{}\n{}"</span>, i, String::from_utf8(seq.to_vec()).unwrap());
+        }
+
+        <span class="comment">// Final update to ensure the last counts are displayed
+        </span><span class="kw">let </span>final_found = found_items.load(Ordering::Relaxed);
+        <span class="kw">let </span>final_processed = processed_items.load(Ordering::Relaxed);
+        progress_bar.set_message(<span class="macro">format!</span>(
+            <span class="string">"Filtered {} short reads, retained {}."</span>,
+            final_processed.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
+            final_found.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
+        ));
+        progress_bar.finish();
     }
-
-    <span class="macro">skydive::elog!</span>(<span class="string">"{} long-read sequences."</span>, all_lr_seqs.len());
-    <span class="macro">skydive::elog!</span>(<span class="string">"{} short-read sequences."</span>, all_sr_seqs.len());
-
-    <span class="kw">let </span>filtered_sr_seqs = all_sr_seqs.iter().filter(|sr_seq| {
-        <span class="kw">let </span>best_score = all_lr_seqs.iter().map(|lr_seq| {
-            <span class="kw">let </span>matches = find_kmer_matches(<span class="kw-2">*</span>sr_seq, lr_seq, kmer_size);
-            <span class="kw">let </span>sparse_al = lcskpp(<span class="kw-2">&amp;</span>matches, kmer_size);
-
-            (<span class="number">100.0 </span>* sparse_al.score <span class="kw">as </span>f64 / sr_seq.len() <span class="kw">as </span>f64) <span class="kw">as </span>usize
-        }).max();
-
-        best_score.unwrap() &gt;= min_score_pct
-    }).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>Vec&lt;u8&gt;&gt;&gt;();
-
-    <span class="macro">skydive::elog!</span>(<span class="string">"{} filtered short-read sequences sparse alignment score &gt;= {}%."</span>, filtered_sr_seqs.len(), min_score_pct);
-
-    <span class="kw">let </span><span class="kw-2">mut </span>writer = BufWriter::new(File::create(<span class="kw-2">&amp;</span>output).unwrap());
-    <span class="kw">for </span>(i, sr_seq) <span class="kw">in </span>filtered_sr_seqs.iter().enumerate() {
-        writer.write_all(<span class="macro">format!</span>(<span class="string">"&gt;sr_{}\n{}\n"</span>, i, String::from_utf8(sr_seq.to_vec()).unwrap()).as_bytes()).unwrap();
-    }
-
-    <span class="macro">skydive::elog!</span>(<span class="string">"Wrote {} filtered short-read sequences to {}."</span>, filtered_sr_seqs.len(), output.to_str().unwrap());
 }
 </code></pre></div></section></main></body></html>

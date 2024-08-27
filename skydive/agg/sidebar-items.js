@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["GraphicalGenome"]};
+window.SIDEBAR_ITEMS = {"fn":["add_unique","reconstruct_path_seq","reverse_complement"],"struct":["FindAllPathBetweenAnchors","GraphicalGenome"]};
