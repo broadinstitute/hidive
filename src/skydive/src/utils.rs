@@ -1,5 +1,10 @@
 use std::borrow::Cow;
 
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
+use std::collections::HashMap;
+
 use needletail::Sequence;
 use parquet::data_type::AsBytes;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -109,7 +114,7 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
-pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
+pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
 
@@ -128,6 +133,42 @@ pub fn write_graph_as_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<Str
     Ok(())
 }
 
+pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut graph = DiGraph::new();
+    let mut node_map = HashMap::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        let fields: Vec<&str> = line.split('\t').collect();
+        
+        match fields[0] {
+            "S" => {
+                let id = fields[1];
+                let sequence = fields[2].to_string();
+                let node_index = graph.add_node(sequence);
+                node_map.insert(id.to_string(), node_index);
+            },
+            "L" => {
+                let from_id = fields[1];
+                let to_id = fields[3];
+                let weight = fields[5]
+                    .split(':')
+                    .last()
+                    .and_then(|s| s.parse::<f32>().ok())
+                    .unwrap_or(1.0) / 100.0;
+
+                if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
+                    graph.add_edge(from, to, weight);
+                }
+            },
+            _ => {} // Ignore other lines
+        }
+    }
+
+    Ok(graph)
+}
 
 #[cfg(test)]
 mod tests {

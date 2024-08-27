@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -9,82 +7,46 @@ use std::{
     io::{BufWriter, Write},
 };
 
-use bio::alignment::sparse::*;
-
 use flate2::read::GzDecoder;
-use gbdt::decision_tree::{Data, DataVec};
-use gbdt::gradient_boost::GBDT;
 use num_format::{Locale, ToFormattedString};
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
-use skydive::ldbg::LdBG;
+
+use rayon::prelude::*;
+
+use minimap2::Aligner;
+use tempfile::NamedTempFile;
 
 pub fn start(
     output: &PathBuf,
-    kmer_size: usize,
-    // min_score_pct: usize,
-    model_path: &PathBuf,
-    long_read_fasta_paths: &Vec<PathBuf>,
+    gfa_path: &PathBuf,
     short_read_fasta_paths: &Vec<PathBuf>,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
-    // Read all long reads.
-    let mut all_lr_seqs: Vec<Vec<u8>> = Vec::new();
-    for long_read_seq_url in &long_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(
-            &long_read_seq_url,
-            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
-        );
-        let fasta_path = long_read_seq_url.to_file_path().unwrap();
+    let g = skydive::utils::read_gfa(gfa_path).unwrap();
 
-        skydive::elog!("Processing long-read sample {}...", basename);
+    skydive::elog!("{} contigs", g.node_count());
 
-        let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
-        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
+    let temp_file = NamedTempFile::new().expect("Failed to create temporary file");
+    let temp_path = temp_file.path().to_owned();
 
-        all_lr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::<Vec<Vec<u8>>>(),
-        );
+    {
+        let file = File::create(&temp_path).expect("Failed to open temporary file for writing");
+        let mut writer = BufWriter::new(file);
+
+        for (index, node) in g.node_indices().enumerate() {
+            let node_str = format!(">contig_{}\n{}\n", index, g[node]);
+            writer.write_all(node_str.as_bytes()).expect("Failed to write to temporary file");
+        }
     }
 
-    // Assemble contigs.
-    let l1 = LdBG::from_sequences("l1".to_string(), kmer_size, &all_lr_seqs)
-        .score_kmers(model_path)
-        .clean_paths(0.5)
-        .clean_tips(2*kmer_size);
+    skydive::elog!("Wrote {} nodes to temporary file: {:?}", g.node_count(), temp_path);
 
-    // skydive::elog!(
-    //     "K-mers with p < 0.5: {} / {} ({:.2}%)",
-    //     num_below_threshold,
-    //     num_total,
-    //     num_below_threshold as f32 / num_total as f32 * 100.0
-    // );
+    let aligner = Aligner::builder()
+        .short()
+        .with_cigar()
+        .with_index(temp_path, None)
+        .expect("Unable to build index");
 
-    skydive::elog!("Removed {} k-mers in {} paths", l1.cleaned_path_kmers, l1.cleaned_paths);
-    skydive::elog!("Removed {} k-mers in {} tips", l1.cleaned_tip_kmers, l1.cleaned_tips);
-    skydive::elog!("{} k-mers remaining", l1.kmers.len());
-
-    // let all_corrected_seqs = l1.correct_seqs(&vec![all_lr_seqs[67].clone()]);
-    let all_corrected_seqs = l1.correct_seqs(&all_lr_seqs);
-    let l2 = l1.build_links(&all_corrected_seqs);
-    let contigs = l2.assemble_all();
-
-    skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
-
-    // Assemble contigs.
-    // l3.links = LdBG::build_links(kmer_size, &all_seqs, &l3.kmers);
-    // l3.links = LdBG::build_links(kmer_size, &all_lr_seqs2, &l3.kmers);
-
-    for contig in contigs {
-        skydive::elog!("Contig: {}", contig.len());
-    }
-
-    /*
-    // Read and filter short reads.
     let mut filtered_sr_seqs: Vec<Vec<u8>> = Vec::new();
     for short_read_seq_url in &short_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
@@ -106,8 +68,7 @@ pub fn start(
         let all_reads = fasta_reader.records().flatten().collect::<Vec<_>>();
 
         let progress_bar = skydive::utils::default_unbounded_progress_bar(format!(
-            "Filtering short reads with score < {}% (0 retained)",
-            min_score_pct
+            "Filtering short reads (0 retained)",
         ));
 
         // Create some thread-safe counters.
@@ -127,8 +88,7 @@ pub fn start(
                     let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
                     if current_processed % UPDATE_FREQUENCY == 0 {
                         progress_bar.set_message(format!(
-                            "Filtering short reads with score < {}% ({} retained)",
-                            min_score_pct,
+                            "Filtering short reads ({} retained)",
                             found_items
                                 .load(Ordering::Relaxed)
                                 .to_formatted_string(&Locale::en)
@@ -136,17 +96,20 @@ pub fn start(
                         progress_bar.inc(UPDATE_FREQUENCY as u64);
                     }
 
-                    let best_score = all_lr_seqs
+                    let count = aligner
+                        .map(&sr_seq, false, false, None, None)
                         .iter()
-                        .map(|lr_seq| {
-                            let matches = find_kmer_matches(&sr_seq, lr_seq, kmer_size);
-                            let sparse_al = lcskpp(&matches, kmer_size);
-
-                            (100.0 * sparse_al.score as f64 / sr_seq.len() as f64) as usize
+                        .flatten()
+                        .filter_map(|a| {
+                            if a.target_name.is_some() {
+                                Some(1)
+                            } else {
+                                None
+                            }
                         })
-                        .max();
+                        .sum::<usize>();
 
-                    if best_score.unwrap() >= min_score_pct {
+                    if count > 0 {
                         found_items.fetch_add(1, Ordering::Relaxed);
                         Some(sr_seq)
                     } else {
@@ -156,39 +119,20 @@ pub fn start(
                 .collect::<Vec<Vec<u8>>>(),
         );
 
+        // Write filtered short read sequences to output
+        let mut writer = std::io::BufWriter::new(std::fs::File::create(output).unwrap());
+        for (i, seq) in filtered_sr_seqs.iter().enumerate() {
+            let _ = writeln!(writer, ">filtered_read_{}\n{}", i, String::from_utf8(seq.to_vec()).unwrap());
+        }
+
         // Final update to ensure the last counts are displayed
         let final_found = found_items.load(Ordering::Relaxed);
         let final_processed = processed_items.load(Ordering::Relaxed);
         progress_bar.set_message(format!(
-            "Filtered {} short reads, retained {} with score >= {}%.",
+            "Filtered {} short reads, retained {}.",
             final_processed.to_formatted_string(&Locale::en),
             final_found.to_formatted_string(&Locale::en),
-            min_score_pct
         ));
         progress_bar.finish();
     }
-
-    skydive::elog!("{} long-read sequences.", all_lr_seqs.len());
-    skydive::elog!("{} short-read sequences.", filtered_sr_seqs.len());
-
-    let filtered_sr_seqs = all_sr_seqs.iter().filter(|sr_seq| {
-        let best_score = all_lr_seqs.iter().map(|lr_seq| {
-            let matches = find_kmer_matches(*sr_seq, lr_seq, kmer_size);
-            let sparse_al = lcskpp(&matches, kmer_size);
-
-            (100.0 * sparse_al.score as f64 / sr_seq.len() as f64) as usize
-        }).max();
-
-        best_score.unwrap() >= min_score_pct
-    }).collect::<Vec<&Vec<u8>>>();
-
-    skydive::elog!("{} filtered short-read sequences sparse alignment score >= {}%.", filtered_sr_seqs.len(), min_score_pct);
-
-    let mut writer = BufWriter::new(File::create(&output).unwrap());
-    for (i, sr_seq) in filtered_sr_seqs.iter().enumerate() {
-        writer.write_all(format!(">sr_{}\n{}\n", i, String::from_utf8(sr_seq.to_vec()).unwrap()).as_bytes()).unwrap();
-    }
-
-    skydive::elog!("Wrote {} filtered short-read sequences to {}.", filtered_sr_seqs.len(), output.to_str().unwrap());
-    */
 }

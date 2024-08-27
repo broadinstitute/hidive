@@ -156,32 +156,20 @@ enum Commands {
         seq_paths: Vec<PathBuf>,
     },
 
-    /// Filter rescued reads to those most closely matching the long-read data.
+    /// Optionally further filter rescued reads to those most closely matching a long-read draft assembly.
     #[clap(arg_required_else_help = true)]
     Filter {
         /// Output path for filtered short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Kmer-size
-        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
-        kmer_size: usize,
-
-        // /// Minimum percentage of bases in short-read sequences covered by the matched kmers.
-        // #[clap(short, long, value_parser, default_value_t = 90)]
-        // min_score_pct: usize,
-
-        /// Trained error-cleaning model (long-read only).
-        #[clap(short, long, required = true, value_parser)]
-        model_path: PathBuf,
+        /// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
+        #[clap(short, long, value_parser, required = true)]
+        gfa_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
         short_read_fasta_paths: Vec<PathBuf>,
-
-        /// FASTA files with long-read sequences (may contain one or more samples).
-        #[clap(short, long, required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -334,18 +322,12 @@ fn main() {
         }
         Commands::Filter {
             output,
-            kmer_size,
-            // min_score_pct,
-            model_path,
-            long_read_fasta_paths,
+            gfa_path,
             short_read_fasta_paths,
         } => {
             filter::start(
                 &output,
-                kmer_size,
-                // min_score_pct,
-                &model_path,
-                &long_read_fasta_paths,
+                &gfa_path,
                 &short_read_fasta_paths,
             );
         }

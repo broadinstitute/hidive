@@ -1799,7 +1799,7 @@ mod tests {
 
         // Write graph as GFA to a string
         let mut gfa_output = Vec::new();
-        crate::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+        crate::utils::write_gfa(&mut gfa_output, &graph).unwrap();
 
         // Print GFA string (commented out for test)
         let gfa_string = String::from_utf8(gfa_output).unwrap();
@@ -1816,7 +1816,7 @@ mod tests {
 
         // Write graph as GFA to a string
         let mut gfa_output = Vec::new();
-        crate::utils::write_graph_as_gfa(&mut gfa_output, &graph).unwrap();
+        crate::utils::write_gfa(&mut gfa_output, &graph).unwrap();
 
         // Print GFA string (commented out for test)
         let gfa_string = String::from_utf8(gfa_output).unwrap();
