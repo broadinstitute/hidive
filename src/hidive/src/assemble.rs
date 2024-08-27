@@ -6,6 +6,7 @@ use std::hash::Hash;
 use std::iter::SkipWhile;
 use std::path::PathBuf;
 use rayon::string;
+use std::ffi::{CString, CStr};
 
 
 use serde_json::Value;
@@ -36,9 +37,7 @@ use url::Url;
 // extern crate rust_spoa;
 // use rust_spoa::poa_consensus;
 
-use ab_poa::abpoa_wrapper:: {AbpoaCons,AbpoaAligner, AbpoaAlignmentResult, AbpoaAlignmentMode};
-
-
+use spoa;
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
@@ -553,19 +552,25 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
                 }                
             }
 
-            // let sequences: Vec<&str> = input_seq.iter().map(AsRef::as_ref).collect::<Vec<_>>();
-            let sequences: Vec<&str> = [
-                    "CGTCAAT",
-                    "CCACGTCAAT",
-                    "CGTCAAT",
-                    "CGTCAATGCTA",
-                ].to_vec();
-            let mut aligner = unsafe {AbpoaAligner::new_with_example_params() };
-            let consensus = unsafe {
-                aligner.consensus_from_seqs(&sequences)
-            };
-            // let consensus = String::from_utf8(consensus).expect("bytes to string");
-            // println!("{:?}, {:?}", hap_id, consensus.cons);
+            let sequences: Vec<&str> = input_seq.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+
+            let mut eng = spoa::AlignmentEngine::new(spoa::AlignmentType::kSW, 5, -4, -8, -6, -8, -6);
+            let mut graph = spoa::Graph::new();
+
+            for seq in sequences.iter() {
+                let c_string = CString::new(*seq).expect("CString::new failed");
+                let c_str: &CStr = c_string.as_c_str(); 
+                let qual = {
+                    let mut qual = vec![34u8; seq.len()];
+                    qual.push(0);
+                    CString::from_vec_with_nul(qual).unwrap()
+                };
+                let aln = eng.align(c_str, &graph);
+                graph.add_alignment(&aln, c_str, &qual);
+            }
+
+            let consensus = graph.consensus();
+            println!("{:?}", consensus)
         }
         
 
