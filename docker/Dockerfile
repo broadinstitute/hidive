@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS builder
+FROM gurobi/optimizer:10.0.3 AS builder
 
 MAINTAINER Kiran V Garimella
 
@@ -7,7 +7,7 @@ ARG branch
 # Install dependencies
 RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-    curl keychain git-lfs time datamash wget bzip2 make gcc-9 cmake g++-9 build-essential\
+    curl keychain git-lfs time datamash wget bzip2 make gcc cmake g++ build-essential\
     zlib1g-dev libssl-dev lbzip2 libbz2-dev libncurses5-dev libstdc++6\
     libncursesw5-dev liblzma-dev clang libclang-dev pkg-config \
     libtcmalloc-minimal4 python3-dev python3-setuptools && \
@@ -31,6 +31,7 @@ RUN mkdir -p ~/.ssh && \
 # Install cargo
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+
 
 # Install hidive
 RUN git clone https://github.com/broadinstitute/hidive.git && \

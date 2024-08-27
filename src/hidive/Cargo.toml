@@ -43,4 +43,9 @@ skydive = { path = "../skydive" }
 tempfile = "3.6.1"
 url = "2.5.2"
 #xgboost = "0.1.4"
-# rust-spoa = "0.2.4"
+ndarray = "0.15"
+linfa = "0.5"
+cmake = "0.1"
+spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}
+rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
+grb = "2.0.1"
