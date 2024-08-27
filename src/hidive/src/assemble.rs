@@ -7,7 +7,6 @@ use std::iter::SkipWhile;
 use std::path::PathBuf;
 use rayon::string;
 
-
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
@@ -33,8 +32,8 @@ use std::f64::NAN;
 // Import the Url type to work with URLs
 use url::Url;
 // import spoa
-extern crate rust_spoa;
-use rust_spoa::poa_consensus;
+// extern crate rust_spoa;
+// use rust_spoa::poa_consensus;
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -555,9 +554,9 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
                 seq.push('\0');
                 sequences.push((*seq).bytes().map(|x| {x as u8}).collect::<Vec<u8>>());
             }
-            let mut consensus = poa_consensus(&sequences, 10000000, 1, 5, -4, -3, -1);
-            let consensus = String::from_utf8(consensus).expect("bytes to string");
-            println!("{:?}, {:?}", hap_id, consensus);
+            // let mut consensus = poa_consensus(&sequences, 10000000, 1, 5, -4, -3, -1);
+            // let consensus = String::from_utf8(consensus).expect("bytes to string");
+            // println!("{:?}, {:?}", hap_id, consensus);
         }
         
 
