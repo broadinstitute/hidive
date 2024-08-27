@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use rayon::string;
 use std::ffi::{CString, CStr};
 
-
 use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
