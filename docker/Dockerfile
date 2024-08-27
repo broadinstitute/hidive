@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS builder
+FROM gurobi/optimizer:10.0.3 AS builder
 
 MAINTAINER Kiran V Garimella
 
@@ -31,6 +31,7 @@ RUN mkdir -p ~/.ssh && \
 # Install cargo
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+
 
 # Install hidive
 RUN git clone https://github.com/broadinstitute/hidive.git && \
