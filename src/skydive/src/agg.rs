@@ -120,7 +120,7 @@ impl GraphicalGenome {
                 let edgeindex = df_single_sample[[read_index, anchorindex]].round() - 1.0;
                 let usize_index = edgeindex as usize;
                 let edgename = d.get(&usize_index);
-                println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
+                // println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
                 new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
                 if let Some(edge_value) = self.edges.get(&edgename.as_ref().unwrap().to_string()) {
                     if let Some(seq_value) = edge_value.get("seq") {
