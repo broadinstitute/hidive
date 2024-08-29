@@ -240,7 +240,7 @@ enum Commands {
     #[clap(arg_required_else_help = true)]
     Assemble {
         /// Output path for assembled long-read sequences.
-        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        #[clap(short, long, value_parser)]
         output: PathBuf,
 
         /// Series-parallel graph.
@@ -252,7 +252,11 @@ enum Commands {
 
         ///K nearest _neighbor
         #[clap(required = true, value_parser, default_value_t = 3)]
-        k_nearest_neighbor: usize
+        k_nearest_neighbor: usize,
+
+        ///Sample_ID
+        #[clap(required = true, value_parser)]
+        sample: String
     },
 
     /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
@@ -363,8 +367,8 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph, reads, k_nearest_neighbor } => {
-            assemble::start(&output, &graph, &reads, k_nearest_neighbor);
+        Commands::Assemble { output, graph, reads, k_nearest_neighbor , sample} => {
+            assemble::start(&output, &graph, &reads, k_nearest_neighbor, &sample);
         }
         Commands::Coassemble {
             output,
