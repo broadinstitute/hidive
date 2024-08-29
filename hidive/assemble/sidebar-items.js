@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["calculate_edit_distance","construct_anchor_table","count_non_equal_elements","euclidean_distance","find_all_read","find_targetseq_in_reads","knn_impute","manhattan_distance","mip_optimization","start"]};
+window.SIDEBAR_ITEMS = {"fn":["calculate_edit_distance","construct_anchor_table","count_non_equal_elements","euclidean_distance","find_all_read","find_targetseq_in_reads","knn_impute","manhattan_distance","mip_optimization","start","write_fasta"]};

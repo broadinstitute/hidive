@@ -576,11 +576,52 @@
 <a href="#576" id="576">576</a>
 <a href="#577" id="577">577</a>
 <a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
 </span><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::hash::Hash;
-
+<span class="kw">use </span>std::fs::File;
+<span class="kw">use </span>std::io::{Write, <span class="prelude-ty">Result</span>};
 <span class="kw">use </span>std::iter::SkipWhile;
 <span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>rayon::string;
@@ -778,9 +819,9 @@
     <span class="comment">// pairwise alignment
     </span><span class="kw">let </span>single_sample_readsets = find_all_read(single_sample_graph);
     <span class="kw">let </span>path_list = skydive::agg::FindAllPathBetweenAnchors::new(single_sample_graph, source_node_name, sink_node_name, single_sample_readsets.clone());
-    <span class="macro">println!</span>( <span class="string">" candidate path number : {:?}"</span>, path_list.subpath.len());
+    <span class="comment">// println!( " candidate path number : {:?}", path_list.subpath.len());
 
-    <span class="kw">let </span><span class="kw-2">mut </span>data_info: HashMap&lt;usize, HashMap&lt;String, String&gt;&gt; = HashMap::new();
+    </span><span class="kw">let </span><span class="kw-2">mut </span>data_info: HashMap&lt;usize, HashMap&lt;String, String&gt;&gt; = HashMap::new();
     <span class="kw">let </span><span class="kw-2">mut </span>index:usize = <span class="number">0</span>;
 
     <span class="kw">for </span>(p, r) <span class="kw">in </span>path_list.subpath.iter() {
@@ -939,30 +980,30 @@
     <span class="macro">assert_eq!</span>(model.status().unwrap(), Status::Optimal);
 
     <span class="kw">let </span>least_cost = model.get_obj_attr(grb::attr::X, <span class="kw-2">&amp;</span>var_total_cost).unwrap();
-    <span class="macro">println!</span>(<span class="string">"least_cost is  {:?}"</span>, least_cost);
+    <span class="comment">// println!("least_cost is  {:?}", least_cost);
 
-    <span class="comment">// minimize most haplotypes that minimizes total cost
+    // minimize most haplotypes that minimizes total cost
     </span><span class="kw">let </span>aux = model.add_constr(<span class="string">"total_cost_equals_leastcost"</span>, <span class="macro">c!</span>(var_total_cost == least_cost)).unwrap();
     model.set_objective(var_num_haps, Minimize);
     model.optimize();   
     <span class="kw">let </span>most_haps = model.get_obj_attr(grb::attr::X, <span class="kw-2">&amp;</span>var_num_haps).unwrap();
-    <span class="macro">println!</span>(<span class="string">"most haplotype is {:?}"</span>, most_haps);
+    <span class="comment">// println!("most haplotype is {:?}", most_haps);
 
-    <span class="comment">// minimize haplotypes
+    // minimize haplotypes
     </span>model.remove(aux);
     model.optimize();
     <span class="kw">let </span>least_haps = model.get_obj_attr(grb::attr::X, <span class="kw-2">&amp;</span>var_num_haps).unwrap();
-    <span class="macro">println!</span>(<span class="string">"least haplotype is {:?}"</span>, least_haps);
+    <span class="comment">// println!("least haplotype is {:?}", least_haps);
 
-    <span class="comment">// find most_cost that minimizes haplotypes
+    // find most_cost that minimizes haplotypes
     </span><span class="kw">let </span>aux1 = model.add_constr(<span class="string">"least_haplotype"</span>, <span class="macro">c!</span>(var_num_haps == least_haps)).unwrap();
     model.set_objective(var_total_cost, Minimize);
     model.optimize();
     <span class="kw">let </span>most_cost = model.get_obj_attr(grb::attr::X, <span class="kw-2">&amp;</span>var_total_cost).unwrap();
     model.remove(aux1);
-    <span class="macro">println!</span>(<span class="string">"most_cost = {:?}"</span>, most_cost);
+    <span class="comment">// println!("most_cost = {:?}", most_cost);
 
-    <span class="comment">// final solution
+    // final solution
     </span><span class="kw">let </span>range_cost = most_cost - least_cost;
     <span class="kw">let </span>range_haps = most_haps - least_haps;
 
@@ -1005,14 +1046,40 @@
     (var_sample_hap_values, var_flow_values, unique_paths)
 }
 
-<span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, graph_path: <span class="kw-2">&amp;</span>PathBuf, read_path:<span class="kw-2">&amp;</span>PathBuf, k_nearest_neighbor: usize) {
+<span class="kw">fn </span>write_fasta(outputfile: <span class="kw-2">&amp;</span>PathBuf, sequences: Vec&lt;String&gt;, sample: <span class="kw-2">&amp;</span>str, genename: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;{
+    <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>file = File::create(outputfile)<span class="question-mark">?</span>;
+    <span class="kw">for </span>seq <span class="kw">in </span>sequences.iter(){
+        index += <span class="number">1</span>;
+        <span class="kw">let </span>header = <span class="macro">format!</span>(<span class="string">"&gt;{} {}, haplotype sequences {}\n"</span>, sample, genename, index);
+        file.write_all(header.as_bytes())<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>chars_per_line = <span class="number">60</span>;
+        <span class="kw">let </span>sequence_len = seq.len();
+        <span class="kw">let </span>full_lines = sequence_len / chars_per_line;
+
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..full_lines {
+            <span class="kw">let </span>start = i * chars_per_line;
+            <span class="kw">let </span>end = start + chars_per_line;
+            <span class="macro">writeln!</span>(file, <span class="string">"{}"</span>, <span class="kw-2">&amp;</span>seq[start..end])<span class="question-mark">?</span>;
+        }
+
+        <span class="comment">// Write any remaining characters that didn't make up a full line
+        </span><span class="kw">if </span>sequence_len % chars_per_line != <span class="number">0 </span>{
+            <span class="macro">writeln!</span>(file, <span class="string">"{}"</span>, <span class="kw-2">&amp;</span>seq[full_lines * chars_per_line..])<span class="question-mark">?</span>;
+        }
+    }
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, graph_path: <span class="kw-2">&amp;</span>PathBuf, read_path:<span class="kw-2">&amp;</span>PathBuf, k_nearest_neighbor: usize, sample: <span class="kw-2">&amp;</span>str ) {
     <span class="kw">let </span>graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
     <span class="kw">let </span>(vector_matrix, sorted_read_names) = construct_anchor_table(<span class="kw-2">&amp;</span>graph);
     <span class="comment">// println!("The answer is {:?} {:?}!", output, sorted_read_names);
-    </span><span class="macro">println!</span>(<span class="string">"columns:\n{:?}"</span>, sorted_read_names.len());
-    <span class="kw">let </span>d = vector_matrix.len();
-    <span class="macro">println!</span>(<span class="string">"The dimensino of vector_matrix is {}"</span>, d);
-    <span class="kw">let </span>vector_matrix_f64: Vec&lt;Vec&lt;f64&gt;&gt; = vector_matrix.iter()
+    // println!("columns:\n{:?}", sorted_read_names.len());
+    </span><span class="kw">let </span>d = vector_matrix.len();
+    <span class="comment">// println!("The dimensino of vector_matrix is {}", d);
+    </span><span class="kw">let </span>vector_matrix_f64: Vec&lt;Vec&lt;f64&gt;&gt; = vector_matrix.iter()
         .map(|row| row.iter().map(|<span class="kw-2">&amp;</span>x| x.unwrap_or(f64::NAN)).collect())
         .collect();
 
@@ -1024,12 +1091,12 @@
     <span class="comment">// Create the KNN imputer
     </span><span class="kw">let </span>data_t = data.t().to_owned();
     <span class="kw">let </span>imputed_data = knn_impute(<span class="kw-2">&amp;</span>data_t, k_nearest_neighbor);
-    <span class="macro">println!</span>(<span class="string">"Input Data:\n{:?}"</span>, data);
-    <span class="macro">println!</span>(<span class="string">"Imputed Data:\n{:?}"</span>, imputed_data);
+    <span class="comment">// println!("Input Data:\n{:?}", data);
+    // println!("Imputed Data:\n{:?}", imputed_data);
 
-    <span class="comment">//  find single sample matrix from the imputed data
-    </span><span class="kw">let </span>sample = <span class="string">"HG002"</span>;
-    <span class="kw">let </span>row_index: Vec&lt;usize&gt; = sorted_read_names.iter()
+    //  find single sample matrix from the imputed data
+    // let sample = "HG002";
+    </span><span class="kw">let </span>row_index: Vec&lt;usize&gt; = sorted_read_names.iter()
         .enumerate()
         .filter_map(|(index, readname)| {
             <span class="kw">if </span>readname.split(<span class="string">'|'</span>).last().unwrap_or(<span class="string">""</span>) == sample{
@@ -1042,15 +1109,15 @@
     <span class="kw">let </span>read_sets: Vec&lt;String&gt; = row_index.iter()
         .map(|<span class="kw-2">&amp;</span>i| sorted_read_names[i].clone())
         .collect();
-    <span class="macro">println!</span>(<span class="string">"Read_sets {:?}"</span>, read_sets);
-    <span class="kw">let </span>vector_single_sample = imputed_data.select(Axis(<span class="number">0</span>), <span class="kw-2">&amp;</span>row_index);
+    <span class="comment">// println!("Read_sets {:?}", read_sets);
+    </span><span class="kw">let </span>vector_single_sample = imputed_data.select(Axis(<span class="number">0</span>), <span class="kw-2">&amp;</span>row_index);
     <span class="comment">// println!("Single sample Matrix:\n{:?}", vector_single_sample);
     
     // get anchorlist and start end anchor sequences
     </span><span class="kw">let </span><span class="kw-2">mut </span>anchorlist: Vec&lt;String&gt; = graph.anchor.keys().cloned().collect();
     anchorlist.sort();
-    <span class="macro">println!</span>(<span class="string">"{:?}"</span>, anchorlist.last());
-    <span class="kw">let </span>source_node_name = anchorlist.first().unwrap();
+    <span class="comment">// println!("{:?}", anchorlist.last());
+    </span><span class="kw">let </span>source_node_name = anchorlist.first().unwrap();
     <span class="kw">let </span>source = <span class="kw">if let </span><span class="prelude-val">Some</span>(anchor_data) = graph.anchor.get(source_node_name) {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(serde_json::Value::String(seq)) = anchor_data.get(<span class="string">"seq"</span>) {
             seq 
@@ -1099,14 +1166,15 @@
             path_read_pair.entry(path).or_insert_with(Vec::new).push(read_path_id.clone());
         }
     }
-    <span class="macro">println!</span>(<span class="string">"{:?}"</span>, path_read_pair);
+    <span class="comment">// println!("{:?}", path_read_pair);
 
-    <span class="comment">// get read sequences
+    // get read sequences
     </span><span class="kw">let </span>reader = Reader::from_file(read_path).unwrap();
     <span class="kw">let </span>all_reads: Vec&lt;Record&gt; = reader.records().map(|r| r.unwrap()).collect();
 
     <span class="comment">// calculate consensus
-    </span><span class="kw">for </span>(sample_hap_id, var) <span class="kw">in </span>var_sample_hap_values.iter(){
+    </span><span class="kw">let </span><span class="kw-2">mut </span>consensus_sequences = Vec::new();
+    <span class="kw">for </span>(sample_hap_id, var) <span class="kw">in </span>var_sample_hap_values.iter(){
         
         <span class="kw">let </span>hap_id = sample_hap_id.split(<span class="string">"_"</span>).last().unwrap();
         <span class="kw">let </span>haplotype = path_dict.get(hap_id).expect(<span class="string">"not in the haplotype dictionary"</span>);
@@ -1115,8 +1183,8 @@
 
         <span class="kw">if </span><span class="kw-2">*</span>var == <span class="number">1.0</span>{
             <span class="kw">let </span>path_seq = skydive::agg::reconstruct_path_seq(<span class="kw-2">&amp;</span>single_sample_graph, <span class="kw-2">&amp;</span>path_absolute);
-            <span class="macro">println!</span>(<span class="string">"{:?}, {:?}, {:?}"</span>, sample_hap_id, hap_id, path_seq.len());
-            input_seq.push(path_seq);
+            <span class="comment">// println!("{:?}, {:?}, {:?}", sample_hap_id, hap_id, path_seq.len());
+            </span>input_seq.push(path_seq);
             <span class="kw">let </span>readlist = path_read_pair.get(hap_id).expect(<span class="string">"haplotype not found"</span>);
             <span class="kw">for </span>read <span class="kw">in </span>readlist.iter(){
                 <span class="kw">for </span>record <span class="kw">in </span>all_reads.clone() {
@@ -1147,10 +1215,22 @@
             }
 
             <span class="kw">let </span>consensus = graph.consensus();
-            <span class="macro">println!</span>(<span class="string">"{:?}"</span>, consensus)
+            
+            consensus_sequences.push(consensus)
+            
         }
         
 
     }
+
+    <span class="macro">println!</span>(<span class="string">"{:?}"</span>, consensus_sequences);
+    <span class="comment">// let outputfile = PathBuf::from("haplotype.fasta");
+    </span><span class="kw">let </span>genename = graph_path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string()).unwrap();
+    <span class="kw">let </span>consensus_sequences: Vec&lt;String&gt; = consensus_sequences.iter()
+    .map(|c_str| c_str.to_str().unwrap().to_string())
+    .collect();
+    write_fasta(<span class="kw-2">&amp;</span>output, consensus_sequences, sample, <span class="kw-2">&amp;</span>genename);
 
 }</code></pre></div></section></main></body></html>

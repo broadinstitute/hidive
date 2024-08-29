@@ -403,6 +403,10 @@
 <a href="#403" id="403">403</a>
 <a href="#404" id="404">404</a>
 <a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -645,7 +649,7 @@
     </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
     </span>Assemble {
         <span class="doccomment">/// Output path for assembled long-read sequences.
-        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
+        </span><span class="attr">#[clap(short, long, value_parser)]
         </span>output: PathBuf,
 
         <span class="doccomment">/// Series-parallel graph.
@@ -657,7 +661,11 @@
 
         <span class="doccomment">///K nearest _neighbor
         </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser, default_value_t = <span class="number">3</span>)]
-        </span>k_nearest_neighbor: usize
+        </span>k_nearest_neighbor: usize,
+
+        <span class="doccomment">///Sample_ID
+        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
+        </span>sample: String
     },
 
     <span class="doccomment">/// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
@@ -768,8 +776,8 @@
         Commands::Impute { output, graph } =&gt; {
             impute::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph);
         }
-        Commands::Assemble { output, graph, reads, k_nearest_neighbor } =&gt; {
-            assemble::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph, <span class="kw-2">&amp;</span>reads, k_nearest_neighbor);
+        Commands::Assemble { output, graph, reads, k_nearest_neighbor , sample} =&gt; {
+            assemble::start(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>graph, <span class="kw-2">&amp;</span>reads, k_nearest_neighbor, <span class="kw-2">&amp;</span>sample);
         }
         Commands::Coassemble {
             output,
