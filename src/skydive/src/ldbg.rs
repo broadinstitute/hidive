@@ -39,14 +39,19 @@ pub struct LdBG {
     pub kmers: KmerGraph,
     pub scores: KmerScores,
     pub links: Links,
-
-    pub cleaned_path_kmers: usize,
-    pub cleaned_paths: usize,
-    pub cleaned_tip_kmers: usize,
-    pub cleaned_tips: usize,
 }
 
 impl LdBG {
+    pub fn new(name: String, kmer_size: usize) -> Self {
+        LdBG {
+            name,
+            kmer_size,
+            kmers: KmerGraph::new(),
+            scores: KmerScores::new(),
+            links: Links::new(),
+        }
+    }
+
     /// Create a de Bruijn graph (and optional links) from a file path.
     ///
     /// # Arguments
@@ -81,11 +86,6 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
         }
     }
 
@@ -124,11 +124,6 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
         }
     }
 
@@ -160,11 +155,6 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
         }
     }
 
@@ -194,11 +184,6 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
         }
     }
 
@@ -709,25 +694,25 @@ impl LdBG {
         self
     }
 
-    fn infer_edges(&mut self) {
+    pub fn infer_edges(&mut self) {
         let mut kmers = KmerGraph::new();
 
         self.kmers.iter().for_each(|(cn_kmer, record)| {
             let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
 
-            for next_kmer in self.next_kmers(cn_kmer) {
+            for edge_base in vec![b'A', b'C', b'G', b'T'] {
+                let next_kmer = [&cn_kmer[1..], &[edge_base]].concat();
                 let next_cn_kmer = crate::utils::canonicalize_kmer(&next_kmer);
 
                 if self.kmers.contains_key(&next_cn_kmer) {
-                    new_record.set_outgoing_edge(next_kmer[next_kmer.len() - 1]);
+                    new_record.set_outgoing_edge(edge_base);
                 }
-            }
 
-            for prev_kmer in self.prev_kmers(cn_kmer) {
+                let prev_kmer = [&[edge_base], &cn_kmer[0..cn_kmer.len() - 1]].concat();
                 let prev_cn_kmer = crate::utils::canonicalize_kmer(&prev_kmer);
 
                 if self.kmers.contains_key(&prev_cn_kmer) {
-                    new_record.set_incoming_edge(prev_kmer[0]);
+                    new_record.set_incoming_edge(edge_base);
                 }
             }
 
@@ -956,6 +941,31 @@ impl LdBG {
         Err(anyhow::anyhow!("No stopping k-mer found"))
     }
 
+    fn assemble_forward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>> {
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+        loop {
+            if contig.len() >= limit {
+                return Ok(last_kmer);
+            }
+
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
+
+            match self.next_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.push(this_kmer[this_kmer.len() - 1]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!("No stopping k-mer found"))
+    }
+
     /// Assemble a contig in the backward direction.
     ///
     /// # Arguments
@@ -994,6 +1004,31 @@ impl LdBG {
         let mut last_kmer = start_kmer.clone();
         loop {
             if stop_kmers.contains(&last_kmer) {
+                return Ok(last_kmer);
+            }
+
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
+
+            match self.prev_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.insert(0, this_kmer[0]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!("No stopping k-mer found"))
+    }
+
+    fn assemble_backward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>>{
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+        loop {
+            if contig.len() >= limit {
                 return Ok(last_kmer);
             }
 
@@ -1072,8 +1107,6 @@ impl LdBG {
 
         contigs
     }
-
-
 
     /// Update links available to inform navigation during graph traversal.
     ///
@@ -1201,10 +1234,9 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        self.infer_edges();
+        crate::elog!(" -- Removed {} bad paths ({} kmers)", bad_paths, to_remove.len());
 
-        self.cleaned_path_kmers = to_remove.len();
-        self.cleaned_paths = bad_paths;
+        self.infer_edges();
 
         self
     }
@@ -1219,7 +1251,7 @@ impl LdBG {
 
                 for cur_kmer in next_kmers {
                     let mut fw_contig = cur_kmer.to_vec();
-                    self.assemble_forward(&mut fw_contig, cur_kmer.clone());
+                    self.assemble_forward_limit(&mut fw_contig, cur_kmer.clone(), max_tip_length + 1);
 
                     let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
                     let num_next = self.next_kmers(last_kmer).len();
@@ -1239,7 +1271,7 @@ impl LdBG {
 
                 for cur_kmer in prev_kmers {
                     let mut rv_contig = cur_kmer.to_vec();
-                    self.assemble_backward(&mut rv_contig, cur_kmer.clone());
+                    self.assemble_backward_limit(&mut rv_contig, cur_kmer.clone(), max_tip_length + 1);
 
                     let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
                     let num_prev = self.prev_kmers(first_kmer).len();
@@ -1260,10 +1292,9 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        self.infer_edges();
+        crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
 
-        self.cleaned_tip_kmers = to_remove.len();
-        self.cleaned_tips = bad_paths;
+        self.infer_edges();
 
         self
     }

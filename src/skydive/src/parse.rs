@@ -11,15 +11,36 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
 
     // Iterate over each locus in the provided list
     for locus in loci_list {
-        // Attempt to parse the locus using a function from the skydive module
-        match parse_locus(locus.to_owned()) {
-            Ok(l_fmt) => {
-                // If parsing is successful, insert the formatted locus into the HashSet
-                loci.insert(l_fmt);
+        // Check if the locus represents a file on disk
+        let path = PathBuf::from(locus);
+        if path.is_file() {
+            // If it's a file, read its contents and parse each line as a locus
+            let file = std::fs::File::open(&path).expect("Failed to open file");
+            let reader = std::io::BufReader::new(file);
+            for line in reader.lines() {
+                let line = line.expect("Failed to read line");
+                match parse_locus(line.to_owned()) {
+                    Ok(l_fmt) => {
+                        loci.insert(l_fmt);
+                    }
+                    Err(_) => {
+                        panic!("Could not parse locus '{}' from file '{}'.", line, locus);
+                    }
+                }
             }
-            Err(_) => {
-                // If parsing fails, panic and terminate the program, providing an error message
-                panic!("Could not parse locus '{}'.", locus);
+            // Skip the rest of the loop iteration
+            continue;
+        } else {
+            // Attempt to parse the locus
+            match parse_locus(locus.to_owned()) {
+                Ok(l_fmt) => {
+                    // If parsing is successful, insert the formatted locus into the HashSet
+                    loci.insert(l_fmt);
+                }
+                Err(_) => {
+                    // If parsing fails, panic and terminate the program, providing an error message
+                    panic!("Could not parse locus '{}'.", locus);
+                }
             }
         }
     }
@@ -29,8 +50,8 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
 
 pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
     let l_fmt = locus.replace(',', "");
-    let parts1: Vec<&str> = l_fmt.split(|c| c == ':').collect();
-    let parts2: Vec<&str> = parts1[1].split(|c| c == '-').collect();
+    let parts1: Vec<&str> = l_fmt.split(|c| c == ':' || c == '\t').collect();
+    let parts2: Vec<&str> = parts1[1].split(|c| c == '-' || c == '\t').collect();
 
     let chr = parts1[0].to_string();
 

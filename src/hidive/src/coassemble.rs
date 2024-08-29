@@ -26,16 +26,44 @@ pub fn start(
     let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
-    let m = MLdBG::new(kmer_size);
-
     // Read all long reads.
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls);
-    // let l1 = LdBG::from_files(String::from("l1"), kmer_size, &long_read_fasta_paths);
-    
+    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    let l1 = LdBG::from_files(String::from("l1"), kmer_size, &long_read_fasta_paths);
+    skydive::elog!(" -- {} k-mers", l1.kmers.len());
 
     // Read all short reads.
-    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls);
+    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
     let s1 = LdBG::from_files(String::from("s1"), kmer_size, &short_read_fasta_paths);
+    skydive::elog!(" -- {} k-mers", s1.kmers.len());
+
+    // Create multi-color linked de Bruijn graph.
+    skydive::elog!("Creating and cleaning joint graph...");
+    let g = MLdBG::from_ldbgs(vec![l1, s1])
+        .score_kmers(model_path)
+        .collapse()
+        .clean_paths(0.5)
+        .clean_tips(kmer_size);
+
+    skydive::elog!(" -- {} k-mers", g.kmers.len());
+
+    let mut gfa_output = Vec::new();
+    skydive::utils::write_gfa(&mut gfa_output, &g.traverse_all_contigs()).unwrap();
+
+    let gfa_string = String::from_utf8(gfa_output).unwrap();
+
+    // Create a file writer for the output
+    let mut file = BufWriter::new(File::create(output).expect("Unable to create file"));
+    file.write_all(gfa_string.as_bytes()).expect("Unable to write data");
+    file.flush().expect("Unable to flush data");
+
+    /*
+    1. Create a MLdBG.
+    2. Score k-mers.
+    3. Filter paths and tips.
+    4. When remaining long- and short-read paths disagree, accept the long-read path.
+    5. Error-correct the long reads.
+    6. Assemble contigs.
+    */
 
     /*
     // Union of kmers from l1 and s1.
@@ -44,6 +72,7 @@ pub fn start(
         let lr = l1.kmers.get(&kmer);
         let sr = s1.kmers.get(&kmer);
 
+        // If a kmer isn't in the long read graph, but it is in the short read graph, remove it from the short read graph.
         if lr.is_none() && sr.is_some() {
             s1.remove(&kmer);
         }

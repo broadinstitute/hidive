@@ -1,12 +1,15 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
-use crate::ldbg::LdBG;
+use gbdt::{decision_tree::Data, gradient_boost::GBDT};
+
+use crate::{ldbg::LdBG, record::Record};
 
 /// Represents a multi-color linked de Bruijn graph, all built with same k-mer size.
 #[derive(Debug)]
 pub struct MLdBG {
     pub kmer_size: usize,
     pub ldbgs: Vec<LdBG>,
+    pub scores: HashMap<Vec<u8>, f32>,
 }
 
 impl MLdBG {
@@ -15,6 +18,7 @@ impl MLdBG {
         MLdBG {
             kmer_size,
             ldbgs: Vec::new(),
+            scores: HashMap::new(),
         }
     }
 
@@ -32,6 +36,7 @@ impl MLdBG {
         MLdBG {
             kmer_size,
             ldbgs,
+            scores: HashMap::new(),
         }
     }
 
@@ -84,6 +89,59 @@ impl MLdBG {
             &filtered_reads,
         );
         self.ldbgs.push(l);
+    }
+
+    pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
+        let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
+
+        self.scores = self.union_of_kmers().iter().map(|cn_kmer| {
+            let mut features = vec![];
+
+            for ldbg in &self.ldbgs {
+                let cov = ldbg.kmers.get(cn_kmer).map_or(0, |record| record.coverage());
+                features.push(cov as f32);
+            }
+
+            let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
+            features.push(compressed_len as f32);
+
+            let data = Data::new_test_data(features, Some(0.0));
+            let prediction = *gbdt.predict(&vec![data]).first().unwrap_or(&0.0);
+
+            (cn_kmer.clone(), prediction)
+        }).collect();
+
+        self
+    }
+
+    pub fn collapse(&mut self) -> LdBG {
+        let mut ldbg = LdBG::new(self.ldbgs[0].name.clone(), self.kmer_size);
+
+        for cn_kmer in self.union_of_kmers() {
+            let coverage = self.ldbgs
+                .iter()
+                .map(|ldbg|
+                    ldbg.kmers
+                        .get(&cn_kmer)
+                        .map_or(0, |record| record.coverage())
+                )
+                .sum::<u16>();
+
+            ldbg.kmers.insert(cn_kmer, Record::new(coverage, None));
+        }
+
+        ldbg.scores = self.scores.clone();
+
+        let mut below_threshold = 0;
+        for (cn_kmer, score) in &ldbg.scores {
+            if *score < 0.5 {
+                below_threshold += 1;
+            }
+        }
+
+        ldbg.infer_edges();
+
+        ldbg
     }
 
     pub fn filter_reads<F>(&mut self, seq_path: &PathBuf, filter: F) -> Vec<Vec<u8>>
