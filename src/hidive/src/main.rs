@@ -55,6 +55,7 @@ use clap::{Parser, Subcommand};
 mod assemble;
 mod build;
 mod cluster;
+mod correct;
 mod coassemble;
 mod fetch;
 mod filter;
@@ -119,13 +120,13 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Zero or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        #[clap(short, long, value_parser, required = false)]
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
 
         /// Include unmapped reads.
-        #[clap(short, long, value_parser)]
-        unmapped: bool,
+        #[clap(short, long, value_parser, default_value_t = 0)]
+        padding: u64,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
@@ -255,6 +256,30 @@ enum Commands {
         k_nearest_neighbor: usize
     },
 
+    /// Correct reads.
+    #[clap(arg_required_else_help = true)]
+    Correct {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, required = false, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_paths: Vec<PathBuf>,
+    },
+
     /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
@@ -313,10 +338,10 @@ fn main() {
         Commands::Fetch {
             output,
             loci,
-            unmapped,
+            padding,
             seq_paths,
         } => {
-            fetch::start(&output, &loci, unmapped, &seq_paths);
+            fetch::start(&output, &loci, padding, &seq_paths);
         }
         Commands::Rescue {
             output,
@@ -365,6 +390,21 @@ fn main() {
         }
         Commands::Assemble { output, graph, reads, k_nearest_neighbor } => {
             assemble::start(&output, &graph, &reads, k_nearest_neighbor);
+        }
+        Commands::Correct {
+            output,
+            model_path,
+            kmer_size,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            correct::start(
+                &output,
+                kmer_size,
+                &model_path,
+                &long_read_fasta_paths,
+                &short_read_fasta_paths,
+            );
         }
         Commands::Coassemble {
             output,

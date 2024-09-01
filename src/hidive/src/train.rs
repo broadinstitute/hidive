@@ -137,7 +137,7 @@ pub fn start(
 
         let data = Data::new_training_data(
             vec![
-                lcov as f32,
+                if lcov > 0 { 1.0 } else { 0.0 },
                 scov as f32,
                 (kmer.len() - compressed_len) as f32,
             ],

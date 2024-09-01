@@ -147,7 +147,7 @@ pub fn start(
 
         let data = Data::new_training_data(
             vec![
-                lcov as f32,
+                if lcov > 0 { 1.0 } else { 0.0 },
                 scov as f32,
                 (kmer.len() - compressed_len) as f32,
             ],
@@ -206,32 +206,14 @@ pub fn start(
     //     cleaned_tips_paths
     // );
 
-    let mut all_corrected_seqs = Vec::new();
-    for lr_seq in all_seqs {
-        let corrected_seqs = l3.correct_seq(lr_seq);
-
-        all_corrected_seqs.extend(corrected_seqs);
-    }
-
-    skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
-
-    // Assemble contigs.
-    // l3.links = LdBG::build_links(kmer_size, &all_corrected_seqs, &l3.kmers);
-    let contigs = l3.assemble_all();
-
-    // Write contigs to disk.
-    skydive::elog!("Writing {} contigs to disk...", &contigs.len());
-
     let output_file = File::create(output).unwrap();
     let mut writer = BufWriter::new(output_file);
 
-    for (i, contig) in contigs.iter().enumerate() {
-        writeln!(
-            writer,
-            ">contig_{}\n{}",
-            i,
-            String::from_utf8(contig.clone()).unwrap()
-        )
-        .unwrap();
+    for (i, lr_seq) in all_seqs.iter().enumerate() {
+        let corrected_seqs = l3.correct_seq(lr_seq);
+
+        for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+            writeln!(writer, ">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
+        }
     }
 }

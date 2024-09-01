@@ -211,6 +211,10 @@ impl LdBG {
 
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
+            if fwd_seq.len() < k + 1 {
+                continue;
+            }
+
             // Iterate over k-mers
             for i in 0..fwd_seq.len() - k + 1 {
                 let fw_kmer = &fwd_seq[i..i + k];
@@ -245,6 +249,8 @@ impl LdBG {
         let links: Links = fwd_seqs
             .par_iter()
             .progress_with(progress_bar)
+            .map(|fwd_seq| self.correct_seq(fwd_seq))
+            .flatten()
             .map(|fwd_seq| {
                 let mut local_links = Links::new();
 
@@ -894,11 +900,21 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut visited = HashSet::new();
+
         loop {
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
 
             match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
+                    if links_in_scope.len() == 0 {
+                        if visited.contains(&this_kmer) {
+                            break;
+                        }
+
+                        visited.insert(this_kmer.clone());
+                    }
+
                     contig.push(this_kmer[this_kmer.len() - 1]);
                     last_kmer = this_kmer;
                 }
@@ -976,11 +992,21 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut visited = HashSet::new();
+
         loop {
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
 
             match self.prev_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
+                    if links_in_scope.len() == 0 {
+                        if visited.contains(&this_kmer) {
+                            break;
+                        }
+
+                        visited.insert(this_kmer.clone());
+                    }
+
                     contig.insert(0, this_kmer[0]);
                     last_kmer = this_kmer;
                 }
