@@ -164,13 +164,13 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
-        #[clap(short, long, value_parser, required = true)]
-        gfa_path: PathBuf,
-
         /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(required = true, value_parser)]
+        #[clap(short, long, required = false, value_parser)]
         short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -354,12 +354,12 @@ fn main() {
         }
         Commands::Filter {
             output,
-            gfa_path,
             short_read_fasta_paths,
+            long_read_fasta_paths,
         } => {
             filter::start(
                 &output,
-                &gfa_path,
+                &long_read_fasta_paths,
                 &short_read_fasta_paths,
             );
         }

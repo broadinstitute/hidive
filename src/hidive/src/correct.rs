@@ -15,6 +15,7 @@ use petgraph::dot::Dot;
 
 use skydive::ldbg::LdBG;
 use skydive::mldbg::MLdBG;
+use spoa::AlignmentType;
 
 pub fn start(
     output: &PathBuf,
@@ -119,7 +120,7 @@ pub fn start(
                 })
                 .count();
 
-            num_contained == read.len() - kmer_size + 1
+            num_contained >= read.len() - 2*(kmer_size + 1)
         })
         .collect::<Vec<Vec<u8>>>();
 
@@ -209,11 +210,64 @@ pub fn start(
     let output_file = File::create(output).unwrap();
     let mut writer = BufWriter::new(output_file);
 
-    for (i, lr_seq) in all_seqs.iter().enumerate() {
-        let corrected_seqs = l3.correct_seq(lr_seq);
+    // for (i, lr_seq) in all_lr_seqs2.iter().enumerate() {
+    //     let corrected_seqs = l3.correct_seq(lr_seq);
 
-        for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-            writeln!(writer, ">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
-        }
+    //     for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+    //         writeln!(writer, ">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
+    //     }
+    // }
+
+    let mut ae = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -10, -4);
+    let mut sg = spoa::Graph::new();
+
+    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    long_read_fasta_paths
+        .iter()
+        .for_each(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader.records().filter_map(|r| r.ok()).for_each(|r| {
+                let seq = r.seq().to_vec();
+                // let corrected_seqs = l3.correct_seq(&seq);
+
+                let seq_cstr = std::ffi::CString::new(seq).unwrap();
+                let seq_qual = std::ffi::CString::new(vec![b'I'; r.seq().len()]).unwrap();
+                let a = ae.align(seq_cstr.as_ref(), &sg);
+
+                sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+
+                // for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+                //     writeln!(writer, ">{}_{}\n{}", r.id(), j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
+                // }
+            });
+        });
+
+    // let output_file2 = File::create(output.with_extension("sr.fasta")).unwrap();
+    // let mut writer2 = BufWriter::new(output_file2);
+
+    let mut ae2 = spoa::AlignmentEngine::new(AlignmentType::kNW, 10, -20, -20, -6, -10, -4);
+
+    filtered_sr_seqs
+        .iter()
+        .enumerate()
+        .for_each(|(i, seq)| {
+            // writeln!(writer2, ">sr_{}\n{}", i, String::from_utf8(seq.clone()).unwrap()).unwrap();
+
+            let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
+            let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
+            let a = ae2.align(seq_cstr.as_ref(), &sg);
+
+            sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+        });
+
+    let msa_cstrs = sg.multiple_sequence_alignment(true);
+    let msa_strings = msa_cstrs.iter().map(|cstr| cstr.to_str().unwrap().to_string()).collect::<Vec<String>>();
+
+    for msa_string in msa_strings {
+        writeln!(writer, ">msa\n{}", msa_string).unwrap();
     }
+
+    // let msa_cstr = sg.consensus();
+    // let msa_string = msa_cstr.to_str().unwrap().to_string();
+    // writeln!(writer, ">msa\n{}", msa_string).unwrap();
 }

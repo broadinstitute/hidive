@@ -815,6 +815,9 @@ impl LdBG {
     }
 
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
+        // vec![seq.to_vec()]
+
+        //
         let mut graph = DiGraph::new();
 
         let nodes = seq.windows(self.kmer_size).map(|kmer| {
@@ -833,9 +836,17 @@ impl LdBG {
                 graph.edges_directed(node, petgraph::Direction::Outgoing).count() == 0)
             .collect();
 
-        for node in nodes_to_remove {
-            graph.remove_node(node);
-        }
+        // for node in nodes_to_remove {
+        //     graph.remove_node(node);
+        // }
+
+        // Write graph to a DOT file
+        use std::fs::File;
+        use petgraph::dot::{Dot, Config};
+
+        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+        let mut file = File::create(format!("graph_{}.dot", seq.len())).unwrap();
+        write!(file, "{:?}", dot).unwrap();
 
         // List all nodes with no incoming edges
         let start_nodes: Vec<NodeIndex> = graph
@@ -874,6 +885,7 @@ impl LdBG {
         }
 
         corrected_seqs
+        //
     }
 
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
