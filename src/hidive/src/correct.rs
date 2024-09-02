@@ -1,26 +1,23 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::io::Read;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::{
     fs::File,
     io::{BufWriter, Write},
 };
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
-use gbdt::gradient_boost::GBDT;
+use flate2::read::GzDecoder;
+use indicatif::ParallelProgressIterator;
+use num_format::{Locale, ToFormattedString};
 
-use needletail::Sequence;
-use parquet::data_type::AsBytes;
-use petgraph::dot::Dot;
+use rayon::prelude::*;
 
-use skydive::ldbg::LdBG;
-use skydive::mldbg::MLdBG;
 use spoa::AlignmentType;
 
 pub fn start(
     output: &PathBuf,
-    kmer_size: usize,
-    model_path: &PathBuf,
     long_read_fasta_paths: &Vec<PathBuf>,
     short_read_fasta_paths: &Vec<PathBuf>,
 ) {
@@ -38,10 +35,17 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    let mut l1 = LdBG::from_sequences("l1".to_string(), kmer_size, &all_lr_seqs);
-    skydive::elog!(" -- {} k-mers", l1.kmers.len());
+    let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -10, -4);
 
-    // Read all short reads.
+    let mut sg = spoa::Graph::new();
+    for lr_seq in &all_lr_seqs {
+        let seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
+        let seq_qual = std::ffi::CString::new(vec![b'I'; lr_seq.len()]).unwrap();
+        let a = la.align(seq_cstr.as_ref(), &sg);
+
+        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+    }
+
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
     let all_sr_seqs = short_read_fasta_paths
         .iter()
@@ -52,222 +56,196 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    let mut s1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_sr_seqs);
-    skydive::elog!(" -- {} k-mers", s1.kmers.len());
+    let mut sa = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
 
-    // // Create multi-color linked de Bruijn graph.
-    // skydive::elog!("Creating and cleaning joint graph...");
-    // let g = MLdBG::from_ldbgs(vec![l1, s1])
-    //     .score_kmers(model_path)
-    //     .collapse()
-    //     .clean_paths(0.5)
-    //     .clean_tips(kmer_size)
-    //     .build_links(&all_lr_seqs);
+    let progress_bar = skydive::utils::default_bounded_progress_bar("Processing short reads", all_sr_seqs.len() as u64);
+    for sr_seq in all_sr_seqs {
+        let seq_cstr = std::ffi::CString::new(sr_seq.clone()).unwrap();
+        let seq_qual = std::ffi::CString::new(vec![b'I'; sr_seq.len()]).unwrap();
+        let a = sa.align(seq_cstr.as_ref(), &sg);
 
-    // skydive::elog!(" -- {} k-mers remaining", g.kmers.len());
+        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+        progress_bar.inc(1);
+    }
 
-    // let l = LdBG::from_files(String::from("l"), kmer_size, &long_read_fasta_paths)
-    //     .clean_tips(2*kmer_size)
-    //     .build_links(&all_lr_seqs);
+    let msa_cstrs = sg.multiple_sequence_alignment(false);
+    let msa_strings = msa_cstrs.iter().map(|cstr| cstr.to_str().unwrap().to_string()).collect::<Vec<String>>();
 
-    // for (i, lr_seq) in all_lr_seqs.iter().enumerate() {
-    //     let corrected_seqs = g.correct_seq(lr_seq);
-    //     for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-    //         println!(">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
-    //     }
-    // }
+    let mut lr_msas = msa_strings.iter().take(all_lr_seqs.len()).map(|msa| trim_unaligned_bases(msa)).collect::<Vec<String>>();
+    let sr_msas = msa_strings.iter().skip(all_lr_seqs.len()).cloned().collect::<Vec<String>>();
 
-    // let mut gfa_output = Vec::new();
-    // skydive::utils::write_gfa(&mut gfa_output, &l.traverse_all_kmers()).unwrap();
+    let rightmost_base_position = lr_msas.iter().map(|msa| {
+        msa.rfind(|c| c == 'A' || c == 'C' || c == 'G' || c == 'T').unwrap_or(0)
+    }).max().unwrap_or(0);
 
-    // let gfa_string = String::from_utf8(gfa_output).unwrap();
+    progress_bar.reset();
+    progress_bar.set_message("Filtering short reads");
+    progress_bar.set_length(sr_msas.len() as u64);
 
-    // // Create a file writer for the output
-    // let mut file = BufWriter::new(File::create(output).expect("Unable to create file"));
-    // file.write_all(gfa_string.as_bytes()).expect("Unable to write data");
-    // file.flush().expect("Unable to flush data");
+    let mut filtered_sr_msas = sr_msas.par_iter().progress_with(progress_bar).filter_map(|sr_msa| {
+        let num_good_bases = sr_msa.chars().enumerate().filter_map(|(i, sr_char)| {
+            let lr_chars = &lr_msas
+                .iter()
+                .map(|lr_msa| lr_msa.chars().nth(i).unwrap())
+                .filter(|c| c.is_ascii_alphabetic())
+                .collect::<HashSet<char>>();
 
-    /*
-    1. Create a MLdBG.
-    2. Score k-mers.
-    3. Filter paths and tips.
-    4. When remaining long- and short-read paths disagree, accept the long-read path.
-    5. Error-correct the long reads.
-    6. Assemble contigs.
-    */
+            if lr_chars.contains(&sr_char) {
+                Some(1)
+            } else {
+                Some(0)
+            }
+        }).sum::<usize>();
 
-    // Union of kmers from l1 and s1.
-    let kmers: HashSet<_> = l1.kmers.keys().chain(s1.kmers.keys()).cloned().collect();
-    for kmer in kmers {
-        let lr = l1.kmers.get(&kmer);
-        let sr = s1.kmers.get(&kmer);
+        let len = sr_msa.replace("-", "").len();
+        let score = 100.0 * num_good_bases as f64 / len as f64;
 
-        // If a kmer isn't in the long read graph, but it is in the short read graph, remove it from the short read graph.
-        if lr.is_none() && sr.is_some() {
-            s1.remove(&kmer);
+        if score > 90.0 {
+            Some(trim_n_bases(&trim_unaligned_bases(&sr_msa[..=rightmost_base_position].to_string()), 10))
+        } else {
+            None
+        }
+    }).collect::<Vec<String>>();
+
+    lr_msas.iter().for_each(|msa| {
+        println!("{}", msa);
+    });
+
+    let length = filtered_sr_msas.first().unwrap().len();
+
+    for column in 0..length {
+        let mut lr_chars = BTreeMap::new();
+        let mut sr_chars = BTreeMap::new();
+
+        for row in 0..lr_msas.len() {
+            let char = lr_msas[row].chars().nth(column).unwrap();
+            *lr_chars.entry(char).or_insert(0) += 1;
+        }
+
+        lr_chars.remove(&' ');
+
+        for row in 0..filtered_sr_msas.len() {
+            let char = filtered_sr_msas[row].chars().nth(column).unwrap();
+            *sr_chars.entry(char).or_insert(0) += 1;
+        }
+
+        sr_chars.remove(&' ');
+
+        if lr_chars.len() > 0 && sr_chars.len() > 0 {
+            let lr_mod_char = lr_chars.iter()
+                .filter(|(_, &count)| count == 1)
+                .map(|(&ch, _)| ch)
+                .collect::<Vec<char>>();
+
+            if lr_mod_char.len() > 0 {
+                let lr_mod_char_not_in_sr = lr_mod_char.iter()
+                    .filter(|&ch| !sr_chars.contains_key(ch))
+                    .cloned()
+                    .collect::<Vec<char>>();
+
+                if lr_mod_char_not_in_sr.len() > 0 {
+                    println!("{} {:?} {:?} {:?} {:?}", column, lr_chars, lr_mod_char, sr_chars, lr_mod_char_not_in_sr);
+
+                    for base in lr_mod_char_not_in_sr {
+                        for lr_msa in lr_msas.iter_mut() {
+                            if let Some(ch) = lr_msa.chars().nth(column) {
+                                if ch == base {
+                                    let mut chars: Vec<char> = lr_msa.chars().collect();
+
+                                    let most_common_sr_base = sr_chars.iter()
+                                        .max_by_key(|&(_, count)| count)
+                                        .map(|(base, _)| *base);
+                                    if let Some(sr_base) = most_common_sr_base {
+                                        chars[column] = sr_base;
+                                    } else {
+                                        chars[column] = '.';
+                                    }
+
+                                    // println!(" --> {} {} {}", chars[column], ch, base);
+
+                                    // chars[column] = '.';
+                                    *lr_msa = chars.into_iter().collect();
+
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // Filter out the irrelevant short reads.
-    let filtered_sr_seqs = &all_sr_seqs
-        .iter()
-        .cloned()
-        .filter(|read| {
-            let num_contained = read
-                .windows(kmer_size)
-                .filter(|kmer| {
-                    s1.kmers.contains_key(&skydive::utils::canonicalize_kmer(kmer))
-                })
-                .count();
+    println!();
 
-            num_contained >= read.len() - 2*(kmer_size + 1)
-        })
-        .collect::<Vec<Vec<u8>>>();
+    lr_msas.iter().for_each(|msa| {
+        println!("{}", msa);
+    });
 
-    // Report some stats.
-    skydive::elog!("Long reads: {}", &all_lr_seqs.len());
-    skydive::elog!("Short reads (before filtering): {}", &all_sr_seqs.len());
-    skydive::elog!("Short reads (after filtering): {}", &filtered_sr_seqs.len());
+    filtered_sr_msas.sort_by(|a, b| b.cmp(a));
 
-    let all_seqs = &all_lr_seqs
-        .into_iter()
-        .chain(filtered_sr_seqs.iter().cloned())
-        .collect::<Vec<Vec<u8>>>();
-    skydive::elog!("Combined reads: {}", &all_seqs.len());
-
-    // Assemble contigs.
-    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &all_seqs);
-
-    // Filter k-mers.
-    let mut eval_data: DataVec = Vec::new();
-    let graph_kmers = &l3.kmers.keys().cloned().collect::<Vec<_>>();
-    for kmer in graph_kmers {
-        let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let scov = s1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
-
-        let data = Data::new_training_data(
-            vec![
-                if lcov > 0 { 1.0 } else { 0.0 },
-                scov as f32,
-                (kmer.len() - compressed_len) as f32,
-            ],
-            1.0,
-            0.0,
-            None,
-        );
-
-        eval_data.push(data);
-    }
-
-    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
-    let predictions = gbdt.predict(&eval_data);
-    let mut num_below_threshold = 0;
-    let mut num_total = 0;
-
-    for (p, cn_kmer) in predictions.iter().zip(graph_kmers.iter()) {
-        l3.scores.insert(cn_kmer.clone(), p.clamp(0.0, 1.0));
-
-        if *p < 0.5 {
-            num_below_threshold += 1;
-        }
-        num_total += 1;
-    }
-
-    // let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
-    // let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2 * kmer_size);
-    let all_lr_seqs2 = long_read_fasta_paths
-        .iter()
-        .map(|p| {
-            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
-            reader.records().filter_map(|r| r.ok()).map(|r| r.seq().to_vec()).collect::<Vec<Vec<u8>>>()
-        })
-        .flatten()
-        .collect::<Vec<Vec<u8>>>();
-
-    l3 = l3
-            .clean_paths(0.4)
-            .clean_tips(2 * kmer_size)
-            .build_links(&all_lr_seqs2);
-
-    skydive::elog!(
-        "K-mers with p < 0.5: {} / {} ({:.2}%)",
-        num_below_threshold,
-        num_total,
-        num_below_threshold as f32 / num_total as f32 * 100.0
-    );
-    // skydive::elog!(
-    //     "Removed {} k-mers in {} paths",
-    //     cleaned_kmers,
-    //     cleaned_paths
-    // );
-    // skydive::elog!(
-    //     "Removed {} k-mers in {} tips",
-    //     cleaned_tips_kmers,
-    //     cleaned_tips_paths
-    // );
+    filtered_sr_msas.iter().for_each(|msa| {
+        println!("{}", msa);
+    });
 
     let output_file = File::create(output).unwrap();
     let mut writer = BufWriter::new(output_file);
 
-    // for (i, lr_seq) in all_lr_seqs2.iter().enumerate() {
-    //     let corrected_seqs = l3.correct_seq(lr_seq);
+    lr_msas.iter().enumerate().for_each(|(i, msa)| {
+        let filtered_msa: String = msa.chars()
+            .filter(|&c| c != '-' && c != ' ')
+            .collect();
 
-    //     for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-    //         writeln!(writer, ">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
-    //     }
-    // }
+        let _ = writeln!(writer, ">{}\n{}", i, filtered_msa);
+    });
+}
 
-    let mut ae = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -10, -4);
-    let mut sg = spoa::Graph::new();
+fn trim_unaligned_bases(aligned_seq: &String) -> String {
+    let trimmed_sr_msa_left: String = aligned_seq.chars().enumerate()
+        .map(|(i, c)| {
+            if i < aligned_seq.find(|ch: char| ch == 'A' || ch == 'C' || ch == 'G' || ch == 'T').unwrap_or(aligned_seq.len()) {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
 
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    long_read_fasta_paths
-        .iter()
-        .for_each(|p| {
-            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
-            reader.records().filter_map(|r| r.ok()).for_each(|r| {
-                let seq = r.seq().to_vec();
-                // let corrected_seqs = l3.correct_seq(&seq);
-
-                let seq_cstr = std::ffi::CString::new(seq).unwrap();
-                let seq_qual = std::ffi::CString::new(vec![b'I'; r.seq().len()]).unwrap();
-                let a = ae.align(seq_cstr.as_ref(), &sg);
-
-                sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
-
-                // for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-                //     writeln!(writer, ">{}_{}\n{}", r.id(), j, String::from_utf8(corrected_seq.clone()).unwrap()).unwrap();
-                // }
-            });
-        });
-
-    // let output_file2 = File::create(output.with_extension("sr.fasta")).unwrap();
-    // let mut writer2 = BufWriter::new(output_file2);
-
-    let mut ae2 = spoa::AlignmentEngine::new(AlignmentType::kNW, 10, -20, -20, -6, -10, -4);
-
-    filtered_sr_seqs
-        .iter()
+    let trimmed_sr_msa: String = trimmed_sr_msa_left.chars().rev()
         .enumerate()
-        .for_each(|(i, seq)| {
-            // writeln!(writer2, ">sr_{}\n{}", i, String::from_utf8(seq.clone()).unwrap()).unwrap();
+        .map(|(i, c)| {
+            if i < trimmed_sr_msa_left.chars().rev()
+                .position(|ch| ch == 'A' || ch == 'C' || ch == 'G' || ch == 'T')
+                .unwrap_or(trimmed_sr_msa_left.len())
+            {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect::<String>()
+        .chars().rev().collect();
 
-            let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
-            let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
-            let a = ae2.align(seq_cstr.as_ref(), &sg);
+    trimmed_sr_msa
+}
 
-            sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
-        });
+fn trim_n_bases(aligned_seq: &String, num_bases: usize) -> String {
+    let is_base = |c: char| matches!(c, 'A' | 'C' | 'G' | 'T');
+    let replace_bases = |s: &str| {
+        s.chars()
+            .scan(0, |count, c| {
+                if *count < num_bases {
+                    if is_base(c) {
+                        *count += 1;
+                    }
+                    Some(c)
+                } else {
+                    Some(c)
+                }
+            })
+            .collect::<String>()
+    };
 
-    let msa_cstrs = sg.multiple_sequence_alignment(true);
-    let msa_strings = msa_cstrs.iter().map(|cstr| cstr.to_str().unwrap().to_string()).collect::<Vec<String>>();
-
-    for msa_string in msa_strings {
-        writeln!(writer, ">msa\n{}", msa_string).unwrap();
-    }
-
-    // let msa_cstr = sg.consensus();
-    // let msa_string = msa_cstr.to_str().unwrap().to_string();
-    // writeln!(writer, ">msa\n{}", msa_string).unwrap();
+    let left_trimmed = replace_bases(aligned_seq);
+    let right_trimmed = replace_bases(&left_trimmed.chars().rev().collect::<String>());
+    right_trimmed.chars().rev().collect()
 }

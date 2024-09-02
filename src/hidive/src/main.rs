@@ -55,10 +55,10 @@ use clap::{Parser, Subcommand};
 mod assemble;
 mod build;
 mod cluster;
-mod correct;
+mod filter;
 mod coassemble;
 mod fetch;
-mod filter;
+mod correct;
 mod impute;
 mod rescue;
 mod train;
@@ -165,12 +165,12 @@ enum Commands {
         output: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(short, long, required = false, value_parser)]
-        short_read_fasta_paths: Vec<PathBuf>,
+        #[clap(short, long, value_parser)]
+        gfa_path: PathBuf,
 
-        /// FASTA files with long-read sequences (may contain one or more samples).
+        /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
+        short_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Cluster sequences based on k-mer presence/absence.
@@ -263,14 +263,6 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Kmer-size
-        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
-        kmer_size: usize,
-
-        /// Trained error-cleaning model.
-        #[clap(short, long, required = true, value_parser)]
-        model_path: PathBuf,
-
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(short, long, required = false, value_parser)]
         short_read_fasta_paths: Vec<PathBuf>,
@@ -354,12 +346,12 @@ fn main() {
         }
         Commands::Filter {
             output,
+            gfa_path,
             short_read_fasta_paths,
-            long_read_fasta_paths,
         } => {
             filter::start(
                 &output,
-                &long_read_fasta_paths,
+                &gfa_path,
                 &short_read_fasta_paths,
             );
         }
@@ -393,15 +385,11 @@ fn main() {
         }
         Commands::Correct {
             output,
-            model_path,
-            kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
         } => {
             correct::start(
                 &output,
-                kmer_size,
-                &model_path,
                 &long_read_fasta_paths,
                 &short_read_fasta_paths,
             );
