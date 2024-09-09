@@ -189,7 +189,7 @@ pub fn get_final_anchor(
     let mut last_position = 0;
 
     for anchor in anchornames {
-        let mut position = anchor_info[anchor].pos;
+        let position = anchor_info[anchor].pos;
         if position > last_position + k {
             anchor_unadjacent_list.push(anchor.to_string());
             last_position = position;
@@ -594,7 +594,7 @@ impl FindAllPathBetweenAnchors {
         g: &GraphicalGenome,
         start: &str,
         end: &str,
-        mut sofar: Vec<String>,
+        sofar: Vec<String>,
         depth: usize,
         readset: HashSet<String>,
     ) {
@@ -663,7 +663,7 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
 
 pub fn find_all_reads(graph: &GraphicalGenome) -> HashSet<String> {
     let mut read_sets = HashSet::new();
-    for (item, edge) in &graph.edges {
+    for (_item, edge) in &graph.edges {
         if let Some(readlist) = edge.get("reads").and_then(|r| r.as_array()) {
             for read in readlist {
                 if let Some(read_str) = read.as_str() {
@@ -964,7 +964,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
     let anchors = get_anchors(&anchorlist, &position_dict, k, &stem);
 
     let final_anchor = get_final_anchor(&anchors, k);
-    let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
+    let (edge_info, _outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
 
     let dereferenced_final_anchor = final_anchor
         .iter()

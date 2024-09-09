@@ -200,8 +200,8 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
     let mut data_info: HashMap<usize, HashMap<String, String>> = HashMap::new();
     let mut index:usize = 0;
 
-    for (p, r) in path_list.subpath.iter() {
-        let pseq = skydive::agg::reconstruct_path_seq(single_sample_graph, p);
+    for (p, _r) in path_list.subpath.iter() {
+        // let pseq = skydive::agg::reconstruct_path_seq(single_sample_graph, p);
         // println!("path lenth:{:?}", pseq.len());
         // minimap2 let aligner = Aligner::builder().asm5().with_seq(pseq.as_bytes()).expect("Unable to build index");
         
@@ -222,8 +222,8 @@ pub fn calculate_edit_distance(read_path:&PathBuf, sample:&str, single_sample_gr
                     // rust_wfa2
                     let alignment_scope = rust_wfa2::aligner::AlignmentScope::Alignment;
                     let memory_model = rust_wfa2::aligner::MemoryModel::MemoryUltraLow;
-                    let mut aligner = rust_wfa2::aligner::WFAlignerGapAffine::new(1, 5, 2, alignment_scope, memory_model);
-                    let status = aligner.align_end_to_end(target.as_bytes(), pseq.as_bytes());
+                    let aligner = rust_wfa2::aligner::WFAlignerGapAffine::new(1, 5, 2, alignment_scope, memory_model);
+                    // let status = aligner.align_end_to_end(target.as_bytes(), pseq.as_bytes());
                     let score = aligner.score();
 
                     // bio::alignment too slow
@@ -280,7 +280,7 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
     let mut var_sample_hap = HashMap::new();
     let mut var_flow = HashMap::new();
 
-    for (hap_name, hap) in unique_paths.iter(){
+    for (_hap_name, hap) in unique_paths.iter(){
         var_haps.insert(hap.clone(), add_binvar!(model, name:&hap.to_string()).unwrap());
     }
 
@@ -323,7 +323,7 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
     }
 
     for read in unique_reads.iter(){
-        let mut flow_out_var = flow_out.get(read).unwrap();
+        let flow_out_var = flow_out.get(read).unwrap();
         model.add_constr(read, c!(flow_out_var.clone() == 1));
     }
 
@@ -336,15 +336,15 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
         model.add_constr(&format!("constraint_for_{}", sample), c!(sum_expr <= 2)).unwrap();
     }
 
-    let mut var_num_haps = add_var!(model, Continuous, name: "var_num_haps", obj: 0.0).unwrap();
+    let var_num_haps = add_var!(model, Continuous, name: "var_num_haps", obj: 0.0).unwrap();
     let mut var_num_haps_expr = grb::expr::LinExpr::new();
-    for (path_index, var) in var_haps.iter(){
+    for (_path_index, var) in var_haps.iter(){
         var_num_haps_expr.add_term(1.0, *var);
     }
     var_num_haps_expr.add_term(-1.0, var_num_haps);
     model.add_constr("constraints_of_var_num_haps", c!(var_num_haps_expr == 0));
 
-    let mut var_total_cost = add_var!(model, Continuous, name: "var_total_cost", obj: 0.0).unwrap();
+    let var_total_cost = add_var!(model, Continuous, name: "var_total_cost", obj: 0.0).unwrap();
     total_cost_expr.add_term(-1.0, var_total_cost);
     model.add_constr("total_cost", c!(total_cost_expr == 0));
 
@@ -392,10 +392,10 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
         let mut final_expr = grb::expr::QuadExpr::new();
         let coeff1 = 1.0/range_haps;
         let coeff2 = 1.0 / range_cost;
-        let mut var1 = add_var!(model, Continuous, name: "var_num_hap_minus_leasthap", obj: 0.0).unwrap();
+        let var1 = add_var!(model, Continuous, name: "var_num_hap_minus_leasthap", obj: 0.0).unwrap();
         model.add_constr("var1", c!(var_num_haps - least_haps - var1 == 0));
         // let var1 = var_num_haps - least_haps;
-        let mut var2 = add_var!(model, Continuous, name: "var_total_cost_minus_leastcost", obj: 0.0).unwrap();
+        let var2 = add_var!(model, Continuous, name: "var_total_cost_minus_leastcost", obj: 0.0).unwrap();
         model.add_constr("var2", c!(var_total_cost - least_cost - var2 == 0));
         // let var2 = var_total_cost - least_cost;
         final_expr.add_qterm(coeff1, var1.clone(), var1.clone());
@@ -410,12 +410,12 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
 
     let mut var_sample_hap_values = HashMap::new();
     for (identifier, var) in var_sample_hap.iter() {
-        let mut var_value = model.get_obj_attr(grb::attr::X, var).unwrap();
+        let var_value = model.get_obj_attr(grb::attr::X, var).unwrap();
         var_sample_hap_values.insert(identifier.clone(), var_value); 
     }
     let mut var_flow_values = HashMap::new();
     for (ridentifier, var) in var_flow.iter() {
-        let mut v = model.get_obj_attr(grb::attr::X, var).unwrap();
+        let v = model.get_obj_attr(grb::attr::X, var).unwrap();
         var_flow_values.insert(ridentifier.clone(), v);
     }
 
@@ -453,7 +453,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
     // println!("The answer is {:?} {:?}!", output, sorted_read_names);
     // println!("columns:\n{:?}", sorted_read_names.len());
-    let d = vector_matrix.len();
+    // let d = vector_matrix.len();
     // println!("The dimensino of vector_matrix is {}", d);
     let vector_matrix_f64: Vec<Vec<f64>> = vector_matrix.iter()
         .map(|row| row.iter().map(|&x| x.unwrap_or(f64::NAN)).collect())
@@ -503,7 +503,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     } else {
         panic!("source node name not found")
     };
-    let source_rev = skydive::agg::reverse_complement(&source);
+    // let source_rev = skydive::agg::reverse_complement(&source);
     let sink_node_name = anchorlist.last().unwrap();
     let sink = if let Some(anchor_data) = graph.anchor.get(sink_node_name) {
         if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {

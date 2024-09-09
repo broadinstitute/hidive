@@ -122,13 +122,13 @@ impl GraphicalGenome {
                 new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
                 if let Some(edge_value) = self.edges.get(&edgename.as_ref().unwrap().to_string()) {
                     if let Some(seq_value) = edge_value.get("seq") {
-                        let mut new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
+                        let new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
                         new_edge_value["seq"] = seq_value.clone();
                     }
                 }
 
                 let edgename_str = edgename.as_ref().unwrap().to_string();
-                let mut new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
+                let new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
                 if !new_edge_value.get("reads").is_some() {
                     new_edge_value["reads"] = serde_json::Value::Array(vec![]);
                 }
@@ -191,7 +191,7 @@ impl FindAllPathBetweenAnchors {
         finder
     }
 
-    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, mut sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
+    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
         if start == end {
             let mut sofar1 = sofar.clone();
             sofar1.push(end.to_string());
