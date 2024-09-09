@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use bio::io::fasta::{IndexedReader, Reader, Record};
+use bio::io::fasta::{Reader, Record};
 
 use flate2::read::GzDecoder;
 use serde_json::Value;
@@ -10,13 +10,11 @@ use serde_json::Value;
 // Import the skydive module, which contains the necessary functions for building graphs
 use skydive;
 
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
-use std::sync::Mutex;
 
 pub fn get_reference_kmer_profile(ref_hla: &str, k: usize) -> Vec<String> {
     let mut ref_kmer_profile: HashMap<String, i32> = HashMap::new();

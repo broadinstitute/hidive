@@ -1,22 +1,18 @@
+extern crate ndarray;
+use std::collections::HashMap;
 // Import necessary standard library modules
 use std::collections::HashSet;
-use std::collections::HashMap;
-use std::hash::Hash;
+use std::ffi::{CStr, CString};
 use std::fs::File;
-use std::io::{Write, Result};
-use std::iter::SkipWhile;
+use std::io::{Result, Write};
 use std::path::PathBuf;
-use rayon::string;
-use std::ffi::{CString, CStr};
 
-use serde_json::Value;
 // Import the Absolutize trait to convert relative paths to absolute paths
 use bio::io::fasta::{Reader, Record};
+use serde_json::Value;
 
 // use minimap2::{Aligner, Preset};
 
-
-extern crate ndarray;
 
 use rust_wfa2;
 // use russcip::prelude::*;
@@ -26,20 +22,18 @@ use rust_wfa2;
 
 use grb::prelude::*;
 
-use ndarray::{Array,Array1, Array2, array};
 use ndarray::Axis;
+use ndarray::{Array1, Array2};
 use skydive::agg::GraphicalGenome;
 use std::f64::NAN;
 
-// Import the Url type to work with URLs
-use url::Url;
 // import abpoa
 // extern crate rust_spoa;
 // use rust_spoa::poa_consensus;
 
-use spoa;
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
+use spoa;
 
 
 pub fn find_all_read (graph: &skydive::agg::GraphicalGenome) -> HashSet<String> {

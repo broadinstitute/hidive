@@ -1,10 +1,8 @@
 use anyhow::Result;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{self, Write};
+use std::collections::{HashMap, HashSet};
 
 use indicatif::ProgressIterator;
-use itertools::Itertools;
 use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
@@ -13,14 +11,13 @@ use petgraph::algo::astar;
 use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+use petgraph::visit::{EdgeRef};
 
 use indicatif::ParallelProgressIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
 use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelRefIterator};
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
 
 use crate::edges::Edges;

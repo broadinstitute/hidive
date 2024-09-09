@@ -1,13 +1,11 @@
 use core::panic;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use flate2::read::GzDecoder;
 use ndarray::Array2;
 use serde_json::Value;
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
-use flate2::read::GzDecoder;
+use std::io::{self, BufRead, BufReader};
 
 
 #[derive(Debug)]

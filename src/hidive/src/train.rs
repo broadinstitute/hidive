@@ -6,7 +6,6 @@ use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
-use rayon::iter;
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive::ldbg::LdBG;
 
