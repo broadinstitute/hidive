@@ -514,7 +514,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     }else{
         panic!("Sink node name not found")
     };
-    let sink_rev = skydive::agg::reverse_complement(&sink);
+    // let sink_rev = skydive::agg::reverse_complement(&sink);
 
     // Extract single sample graph
     let single_sample_graph = skydive::agg::GraphicalGenome::extract_single_sample_graph(&graph, &vector_single_sample, anchorlist.clone(), read_sets, sample).unwrap();

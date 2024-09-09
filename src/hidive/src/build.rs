@@ -350,7 +350,7 @@ pub fn create_edge_file(
             .last()
             .unwrap_or_default()
             .to_string();
-        let (a, svs) = mapping_info(&final_anchor, contig.to_string(), k);
+        let (a, _svs) = mapping_info(&final_anchor, contig.to_string(), k);
         let mut splitposlist: Vec<_> = a.values().filter_map(|&x| x).collect();
         splitposlist.sort();
         let mut edgeindex = 0;
@@ -786,11 +786,11 @@ impl GetSeriesParallelGraph {
                 FindAllPathBetweenAnchors::new(subgraph, start_node, end_node, initial_set.clone());
             let mut index = 0;
             for (p, rs) in path.subpath.iter() {
-                let edgename = format!(
-                    "E{:05}.{:04}",
-                    start_node[1..].parse::<usize>().unwrap(),
-                    index
-                );
+                // let edgename = format!(
+                //     "E{:05}.{:04}",
+                //     start_node[1..].parse::<usize>().unwrap(),
+                //     index
+                // );
                 let seq = reconstruct_path_seq(subgraph, &p[1..p.len() - 1]);
                 let edgelist = outgoing_dict
                     .get(start_node)
