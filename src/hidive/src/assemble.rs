@@ -322,7 +322,7 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
 
     for read in unique_reads.iter(){
         let flow_out_var = flow_out.get(read).unwrap();
-        model.add_constr(read, c!(flow_out_var.clone() == 1));
+        let _ = model.add_constr(read, c!(flow_out_var.clone() == 1));
     }
 
     for sample in unique_samples.iter() {
@@ -340,17 +340,17 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
         var_num_haps_expr.add_term(1.0, *var);
     }
     var_num_haps_expr.add_term(-1.0, var_num_haps);
-    model.add_constr("constraints_of_var_num_haps", c!(var_num_haps_expr == 0));
+    let _ = model.add_constr("constraints_of_var_num_haps", c!(var_num_haps_expr == 0));
 
     let var_total_cost = add_var!(model, Continuous, name: "var_total_cost", obj: 0.0).unwrap();
     total_cost_expr.add_term(-1.0, var_total_cost);
-    model.add_constr("total_cost", c!(total_cost_expr == 0));
+    let _ = model.add_constr("total_cost", c!(total_cost_expr == 0));
 
 
     // solving models
     // minimize total cost
-    model.set_objective(var_total_cost, Minimize);
-    model.optimize();
+    let _ = model.set_objective(var_total_cost, Minimize);
+    let _ = model.optimize();
     assert_eq!(model.status().unwrap(), Status::Optimal);
 
     let least_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
@@ -358,23 +358,23 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
 
     // minimize most haplotypes that minimizes total cost
     let aux = model.add_constr("total_cost_equals_leastcost", c!(var_total_cost == least_cost)).unwrap();
-    model.set_objective(var_num_haps, Minimize);
-    model.optimize();   
+    let _ = model.set_objective(var_num_haps, Minimize);
+    let _ = model.optimize();
     let most_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
     // println!("most haplotype is {:?}", most_haps);
 
     // minimize haplotypes
-    model.remove(aux);
-    model.optimize();
+    let _ = model.remove(aux);
+    let _ = model.optimize();
     let least_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
     // println!("least haplotype is {:?}", least_haps);
 
     // find most_cost that minimizes haplotypes
     let aux1 = model.add_constr("least_haplotype", c!(var_num_haps == least_haps)).unwrap();
-    model.set_objective(var_total_cost, Minimize);
-    model.optimize();
+    let _ = model.set_objective(var_total_cost, Minimize);
+    let _ = model.optimize();
     let most_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
-    model.remove(aux1);
+    let _ = model.remove(aux1);
     // println!("most_cost = {:?}", most_cost);
 
     // final solution
@@ -391,16 +391,16 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
         let coeff1 = 1.0/range_haps;
         let coeff2 = 1.0 / range_cost;
         let var1 = add_var!(model, Continuous, name: "var_num_hap_minus_leasthap", obj: 0.0).unwrap();
-        model.add_constr("var1", c!(var_num_haps - least_haps - var1 == 0));
+        let _ = model.add_constr("var1", c!(var_num_haps - least_haps - var1 == 0));
         // let var1 = var_num_haps - least_haps;
         let var2 = add_var!(model, Continuous, name: "var_total_cost_minus_leastcost", obj: 0.0).unwrap();
-        model.add_constr("var2", c!(var_total_cost - least_cost - var2 == 0));
+        let _ = model.add_constr("var2", c!(var_total_cost - least_cost - var2 == 0));
         // let var2 = var_total_cost - least_cost;
         final_expr.add_qterm(coeff1, var1.clone(), var1.clone());
         final_expr.add_qterm(coeff2, var2.clone(), var2.clone());
 
-        model.set_objective(final_expr, Minimize);
-        model.optimize();
+        let _ = model.set_objective(final_expr, Minimize);
+        let _ = model.optimize();
         let optimal_value = model.get_attr(grb::attr::ObjVal).unwrap();
         let optimal_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
         let optimal_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
@@ -605,6 +605,6 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     let consensus_sequences: Vec<String> = consensus_sequences.iter()
     .map(|c_str| c_str.to_str().unwrap().to_string())
     .collect();
-    write_fasta(&output, consensus_sequences, sample, &genename);
+    let _ = write_fasta(&output, consensus_sequences, sample, &genename);
 
 }

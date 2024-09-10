@@ -975,7 +975,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
     let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
 
     // Write final graph to disk.
-    write_gfa(
+    let _ = write_gfa(
         &dereferenced_final_anchor,
         &filtered_edges,
         output.to_str().unwrap(),
@@ -987,7 +987,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
     let mut sp_graph = GetSeriesParallelGraph::new(&graph);
     let outputfilename_str = output.with_extension("sp.gfa");
     // println!("{:?}", outputfilename_str);
-    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);
+    let _ = write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);
     println!("{:?}", outputfilename_str);
     // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
 }
