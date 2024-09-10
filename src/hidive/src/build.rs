@@ -256,7 +256,7 @@ pub fn construct_edges(
     contig: String,
     contigname: String,
     sample: String,
-    Anchorseq: &HashMap<String, String>,
+    anchorseq: &HashMap<String, String>,
 ) -> EdgeInfo {
     let src_seq: String;
     let mut pr = false;
@@ -268,12 +268,12 @@ pub fn construct_edges(
         pr = true;
     } else {
         src_seq = contig.chars().skip(src_pos).take(k).collect();
-        src = match Anchorseq.get(&src_seq) {
+        src = match anchorseq.get(&src_seq) {
             Some(value) => value.clone(),
             None => {
                 let reversed_src_seq = reverse_complement(&src_seq);
                 pr = true;
-                Anchorseq
+                anchorseq
                     .get(&reversed_src_seq)
                     .unwrap_or(&"".to_string())
                     .clone()
@@ -290,12 +290,12 @@ pub fn construct_edges(
         sr = true;
     } else {
         dst_seq = contig.chars().skip(dst_pos).take(k).collect::<String>();
-        dst = match Anchorseq.get(&dst_seq) {
+        dst = match anchorseq.get(&dst_seq) {
             Some(value) => value.clone(),
             None => {
                 let reversed_dst_seq = reverse_complement(&dst_seq);
                 sr = true;
-                Anchorseq
+                anchorseq
                     .get(&reversed_dst_seq)
                     .unwrap_or(&"".to_string())
                     .clone()
