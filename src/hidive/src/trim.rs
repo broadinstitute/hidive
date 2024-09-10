@@ -168,16 +168,16 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     });
 }
 
-fn get_rg_to_sm_mapping(bam: &IndexedReader) -> HashMap<String, String> {
-    let header = bam::Header::from_template(bam.header());
-
-    let rg_sm_map: HashMap<String, String> = header
-        .to_hashmap()
-        .into_iter()
-        .flat_map(|(_, records)| records)
-        .filter(|record| record.contains_key("ID") && record.contains_key("SM"))
-        .map(|record| (record["ID"].to_owned(), record["SM"].to_owned()))
-        .collect();
-
-    rg_sm_map
-}
+// fn get_rg_to_sm_mapping(bam: &IndexedReader) -> HashMap<String, String> {
+//     let header = bam::Header::from_template(bam.header());
+//
+//     let rg_sm_map: HashMap<String, String> = header
+//         .to_hashmap()
+//         .into_iter()
+//         .flat_map(|(_, records)| records)
+//         .filter(|record| record.contains_key("ID") && record.contains_key("SM"))
+//         .map(|record| (record["ID"].to_owned(), record["SM"].to_owned()))
+//         .collect();
+//
+//     rg_sm_map
+// }

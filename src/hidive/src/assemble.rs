@@ -120,17 +120,15 @@ fn knn_impute(data: &Array2<f64>, k: usize) -> Array2<f64> {
     imputed_data
 }
 
-fn euclidean_distance(a: &Array1<f64>, b: &Array1<f64>) -> f64 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| if x.is_nan() || y.is_nan() { 0.0 } else { (x - y).powi(2) })
-        .sum::<f64>()
-        .sqrt()
-}
+// fn euclidean_distance(a: &Array1<f64>, b: &Array1<f64>) -> f64 {
+//     a.iter()
+//         .zip(b.iter())
+//         .map(|(x, y)| if x.is_nan() || y.is_nan() { 0.0 } else { (x - y).powi(2) })
+//         .sum::<f64>()
+//         .sqrt()
+// }
 
-fn manhattan_distance(a: &Array1<f64>, b: &Array1<f64>) -> f64 {
-    a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum::<f64>()
-}
+// s
 
 fn count_non_equal_elements(a: &Array1<f64>, b: &Array1<f64>) -> usize {
     // Count the number of elements that are not equal, ignoring NaNs
