@@ -27,12 +27,22 @@ pub fn start(
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
     // Read all long reads.
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!(
+        "Processing long-read samples {:?}...",
+        long_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
     let all_lr_seqs = long_read_fasta_paths
         .iter()
         .map(|p| {
             let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
-            reader.records().filter_map(|r| r.ok()).map(|r| r.seq().to_vec()).collect::<Vec<Vec<u8>>>()
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
         })
         .flatten()
         .collect::<Vec<Vec<u8>>>();
@@ -41,12 +51,22 @@ pub fn start(
     skydive::elog!(" -- {} k-mers", l1.kmers.len());
 
     // Read all short reads.
-    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!(
+        "Processing short-read samples {:?}...",
+        short_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
     let all_sr_seqs = short_read_fasta_paths
         .iter()
         .map(|p| {
             let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
-            reader.records().filter_map(|r| r.ok()).map(|r| r.seq().to_vec()).collect::<Vec<Vec<u8>>>()
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
         })
         .flatten()
         .collect::<Vec<Vec<u8>>>();
@@ -115,7 +135,8 @@ pub fn start(
             let num_contained = read
                 .windows(kmer_size)
                 .filter(|kmer| {
-                    s1.kmers.contains_key(&skydive::utils::canonicalize_kmer(kmer))
+                    s1.kmers
+                        .contains_key(&skydive::utils::canonicalize_kmer(kmer))
                 })
                 .count();
 
@@ -179,15 +200,19 @@ pub fn start(
         .iter()
         .map(|p| {
             let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
-            reader.records().filter_map(|r| r.ok()).map(|r| r.seq().to_vec()).collect::<Vec<Vec<u8>>>()
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
         })
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
     l3 = l3
-            .clean_paths(0.4)
-            .clean_tips(2 * kmer_size)
-            .build_links(&all_lr_seqs2);
+        .clean_paths(0.4)
+        .clean_tips(2 * kmer_size)
+        .build_links(&all_lr_seqs2);
 
     skydive::elog!(
         "K-mers with p < 0.5: {} / {} ({:.2}%)",

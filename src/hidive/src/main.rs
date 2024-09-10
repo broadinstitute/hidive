@@ -55,10 +55,10 @@ use clap::{Parser, Subcommand};
 mod assemble;
 mod build;
 mod cluster;
-mod filter;
 mod coassemble;
-mod fetch;
 mod correct;
+mod fetch;
+mod filter;
 mod impute;
 mod rescue;
 mod train;
@@ -184,6 +184,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
+        /// Jaccard threshold
+        #[clap(short, long, value_parser, default_value_t = 0.9)]
+        jaccard_threshold: f64,
+
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
         fasta_path: PathBuf,
@@ -253,7 +257,7 @@ enum Commands {
 
         ///K nearest _neighbor
         #[clap(required = true, value_parser, default_value_t = 3)]
-        k_nearest_neighbor: usize
+        k_nearest_neighbor: usize,
     },
 
     /// Correct reads.
@@ -349,18 +353,15 @@ fn main() {
             gfa_path,
             short_read_fasta_paths,
         } => {
-            filter::start(
-                &output,
-                &gfa_path,
-                &short_read_fasta_paths,
-            );
+            filter::start(&output, &gfa_path, &short_read_fasta_paths);
         }
         Commands::Cluster {
             output,
             kmer_size,
+            jaccard_threshold,
             fasta_path,
         } => {
-            cluster::start(&output, kmer_size, &fasta_path);
+            cluster::start(&output, kmer_size, jaccard_threshold, &fasta_path);
         }
         Commands::Trim {
             output,
@@ -380,7 +381,12 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph, reads, k_nearest_neighbor } => {
+        Commands::Assemble {
+            output,
+            graph,
+            reads,
+            k_nearest_neighbor,
+        } => {
             assemble::start(&output, &graph, &reads, k_nearest_neighbor);
         }
         Commands::Correct {
@@ -388,11 +394,7 @@ fn main() {
             long_read_fasta_paths,
             short_read_fasta_paths,
         } => {
-            correct::start(
-                &output,
-                &long_read_fasta_paths,
-                &short_read_fasta_paths,
-            );
+            correct::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
         Commands::Coassemble {
             output,
