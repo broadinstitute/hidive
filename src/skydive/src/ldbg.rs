@@ -55,6 +55,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_file(
         name: String,
         kmer_size: usize,
@@ -97,6 +98,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_files(
         name: String,
         kmer_size: usize,
@@ -140,6 +142,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequence(
         name: String,
         kmer_size: usize,
@@ -176,6 +179,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequences(
         name: String,
         kmer_size: usize,
@@ -204,6 +208,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A reference to the name of the graph.
+    #[must_use]
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -250,6 +255,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A map of links.
+    #[must_use]
     pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>) -> Self {
         let progress_bar =
             crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
@@ -689,6 +695,7 @@ impl LdBG {
         self.kmers.remove(&cn_kmer)
     }
 
+    #[must_use]
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
@@ -820,6 +827,7 @@ impl LdBG {
         }
     }
 
+    #[must_use]
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
         let mut graph = DiGraph::new();
 
@@ -882,6 +890,7 @@ impl LdBG {
         corrected_seqs
     }
 
+    #[must_use]
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let progress_bar = crate::utils::default_bounded_progress_bar(
             "Correcting reads",
@@ -1019,6 +1028,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector containing the assembled contig.
+    #[must_use]
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
@@ -1040,6 +1050,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector of contigs.
+    #[must_use]
     pub fn assemble_all(&self) -> Vec<Vec<u8>> {
         let mut contigs = Vec::new();
 
@@ -1136,6 +1147,7 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    #[must_use]
     pub fn clean_paths(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1206,6 +1218,7 @@ impl LdBG {
         self
     }
 
+    #[must_use]
     pub fn clean_tips(mut self, max_tip_length: usize) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
@@ -1265,6 +1278,7 @@ impl LdBG {
         self
     }
 
+    #[must_use]
     pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
@@ -1318,6 +1332,7 @@ impl LdBG {
         graph
     }
 
+    #[must_use]
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
@@ -1382,6 +1397,7 @@ impl LdBG {
         graph
     }
 
+    #[must_use]
     pub fn traverse_all_kmers(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()
@@ -1428,6 +1444,7 @@ impl LdBG {
         graph
     }
 
+    #[must_use]
     pub fn traverse_all_contigs(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()

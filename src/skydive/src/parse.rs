@@ -5,6 +5,7 @@ use url::Url;
 
 use path_absolutize::Absolutize;
 
+#[must_use]
 pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();

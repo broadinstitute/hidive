@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use cloud_storage::{object::ObjectList, sync::*, ListRequest};
 
+#[must_use]
 pub fn gcs_split_path(path: &str) -> (String, String) {
     let re = regex::Regex::new(r"^gs://").unwrap();
     let path = re.replace(path, "");

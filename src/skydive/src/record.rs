@@ -11,6 +11,7 @@ pub struct Record {
 
 impl Record {
     /// Create an empty de Bruijn graph record.
+    #[must_use]
     pub fn new(coverage: u16, edges: Option<Edges>) -> Self {
         Record {
             coverage,
@@ -27,16 +28,19 @@ impl Record {
     // }
 
     /// Return the Record's coverage.
+    #[must_use]
     pub fn coverage(&self) -> u16 {
         self.coverage
     }
 
     // Return all edges.
+    #[must_use]
     pub fn edges(&self) -> Edges {
         self.edges
     }
 
     /// Return incoming edges
+    #[must_use]
     pub fn incoming_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
@@ -57,6 +61,7 @@ impl Record {
     }
 
     /// Return outgoing edges
+    #[must_use]
     pub fn outgoing_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
@@ -109,6 +114,7 @@ impl Record {
     }
 
     /// The in-degree of a particular k-mer.
+    #[must_use]
     pub fn in_degree(&self) -> u8 {
         let mut degree: u8 = 0;
         degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
@@ -136,6 +142,7 @@ impl Record {
     }
 
     /// The out-degree of a particular k-mer.
+    #[must_use]
     pub fn out_degree(&self) -> u8 {
         let mut degree: u8 = 0;
         degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
@@ -163,6 +170,7 @@ impl Record {
     }
 
     /// Identifies junctions in the graph
+    #[must_use]
     pub fn is_junction(&self) -> bool {
         self.in_degree() > 1 || self.out_degree() > 1
     }

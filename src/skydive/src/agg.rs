@@ -21,6 +21,8 @@ pub fn add_unique(vec: &mut Vec<String>, item: String) {
         vec.push(item);
     }
 }
+
+#[must_use]
 pub fn reverse_complement(kmer: &str) -> String {
     kmer.chars()
         .rev()
@@ -183,6 +185,7 @@ pub struct FindAllPathBetweenAnchors {
 }
 
 impl FindAllPathBetweenAnchors {
+    #[must_use]
     pub fn new(graph: &GraphicalGenome, start: &str, end: &str, read_sets: HashSet<String>) -> Self {
         let mut finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
@@ -236,6 +239,7 @@ impl FindAllPathBetweenAnchors {
 }
 
 // Series parallele graph
+#[must_use]
 pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String {
     let mut seq = String::new();
     for item in path {

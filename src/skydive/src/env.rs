@@ -7,6 +7,7 @@ pub fn local_guess_curl_ca_bundle() {
     }
 }
 
+#[must_use]
 pub fn gcs_gcloud_is_installed() -> bool {
     // Check if gcloud is installed on the PATH
     // Suppress stdout and stderr to prevent them from printing to the screen

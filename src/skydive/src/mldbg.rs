@@ -11,6 +11,7 @@ pub struct MLdBG {
 
 impl MLdBG {
     /// Create an empty multi-color LdBG.
+    #[must_use]
     pub fn new(kmer_size: usize) -> Self {
         MLdBG {
             kmer_size,
@@ -19,6 +20,7 @@ impl MLdBG {
     }
 
     /// Create an MLdBG from a vector of LdBGs.
+    #[must_use]
     pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
         let kmer_size = ldbgs[0].kmer_size;
 
@@ -105,6 +107,7 @@ impl MLdBG {
     }
 
     /// Get the union of kmers from all LdBGs in the MLdBG.
+    #[must_use]
     pub fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
         let mut kmer_union = HashSet::new();
 
@@ -118,6 +121,7 @@ impl MLdBG {
     }
 
     /// Get a reference to the LdBG at a specific index.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&LdBG> {
         self.ldbgs.get(index)
     }
@@ -147,11 +151,13 @@ impl MLdBG {
     }
 
     /// Returns the number of LdBGs in the MLdBG.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.ldbgs.len()
     }
 
     /// Check if the MLdBG is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ldbgs.is_empty()
     }

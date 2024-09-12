@@ -14,6 +14,7 @@ bitflags! {
 }
 
 impl Edges {
+    #[must_use]
     pub fn from_string(s: String) -> Self {
         let mut edges = Edges::empty();
 

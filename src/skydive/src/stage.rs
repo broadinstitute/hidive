@@ -332,6 +332,7 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
+#[must_use]
 pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>) -> bool {
     loci.iter()
         .any(|e| start <= e.1 as i64 && end >= e.2 as i64)

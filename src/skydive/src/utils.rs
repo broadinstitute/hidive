@@ -31,6 +31,7 @@ use petgraph::visit::{EdgeRef};
 /// let basename = basename_without_extension(&url, &extensions);
 /// assert_eq!(basename, "file");
 /// ```
+#[must_use]
 pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> String {
     let mut basename = seq_url
         .path_segments()
@@ -91,6 +92,7 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
 ///
 /// A vector containing the canonical k-mer.
 #[inline(always)]
+#[must_use]
 pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     let rc_kmer = kmer.reverse_complement();
     if kmer < rc_kmer.as_bytes() {
@@ -100,6 +102,7 @@ pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     }
 }
 
+#[must_use]
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
