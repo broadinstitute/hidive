@@ -5,9 +5,14 @@ use std::{
     io::{BufWriter, Write},
 };
 
+use bio::alignment::pairwise::Scoring;
+use bio::alignment::poa::Aligner;
 use indicatif::ParallelProgressIterator;
+use parquet::data_type::AsBytes;
 use petgraph::dot::Dot;
+use petgraph::visit::EdgeRef;
 use petgraph::Graph;
+use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -260,36 +265,55 @@ pub fn start(
     let lr_clusters = cluster_sequences(&lr_msas, &lr_msas, 200, 0.90);
     let lr_groups = group_clusters(&lr_clusters);
 
-    for lr_group in lr_groups {
+    for (lr_group_index, lr_group) in lr_groups.iter().enumerate() {
         println!("Cluster: {:?}", lr_group);
 
-        for &index in &lr_group {
+        for &index in lr_group {
             println!("  MSA {:5}: {}", index, lr_msas[index]);
         }
-        println!();  // Add an empty line between clusters for better readability
+        println!();
 
         let group_lr_msas = lr_group.iter().map(|i| lr_msas[*i].clone()).collect::<Vec<String>>();
         let sr_clusters = cluster_sequences(&group_lr_msas, &filtered_sr_msas, 100, 0.90);
         let sr_groups = group_clusters(&sr_clusters);
 
-        for (sr_group_index, sr_group) in sr_groups.iter().enumerate() {
+        for sr_group in sr_groups {
             println!("  Group: {:?}", sr_group);
 
             let group_sr_msas = sr_group.iter().map(|i| filtered_sr_msas[*i].clone()).collect::<Vec<String>>();
-
-            // for &index in &group {
-            //     println!("  msa {:5}: {}", index, filtered_sr_msas[index]);
-            // }
 
             for (i, group_sr_msa) in group_sr_msas.iter().enumerate() {
                 println!("  msa {:5}: {}", i, group_sr_msa);
             }
             println!();
 
-            let g = create_graph(&group_lr_msas, &group_sr_msas);
+            let g = create_graph(&group_lr_msas, &group_sr_msas, 0);
+            let hap1 = haplotype(&g, true);
+            let hap2 = haplotype(&g, false);
+
+            let scoring = Scoring::from_scores(-8, -6, 5, -4);
+            let mut aligner1 = Aligner::new(scoring, hap1.as_bytes());
+            let mut aligner2 = Aligner::new(scoring, hap2.as_bytes());
+
+            let total_score = all_lr_seqs
+                .iter()
+                .map(|lr_seq| {
+                    let score1 = aligner1.local(&lr_seq.as_bytes()).alignment().score;
+                    let score2 = aligner2.local(&lr_seq.as_bytes()).alignment().score;
+
+                    println!("scores: {} {}", score1, score2);
+
+                    score1 + score2
+                })
+                .sum::<i32>();
+
+            println!("Total score: {}", total_score);
+
+            println!("Consensus 1: {}", hap1);
+            println!("Consensus 2: {}", hap2);
 
             let dot = Dot::new(&g);
-            let mut dot_file = File::create(format!("graph_{}.dot", sr_group_index)).unwrap();
+            let mut dot_file = File::create(format!("graph_{}.dot", lr_group_index)).unwrap();
             write!(dot_file, "{:?}", dot).unwrap();
 
             // Write graph as GFA to a string
@@ -303,7 +327,40 @@ pub fn start(
     }
 }
 
-fn create_graph(lr_msas: &Vec<String>, sr_msas: &Vec<String>) -> Graph<String, f32> {
+fn haplotype(g: &Graph<String, f32>, hap1: bool) -> String {
+    // Find the start node (a node with no incoming edges)
+    let start_node = g.node_indices().find(|&n| g.edges_directed(n, petgraph::Direction::Incoming).count() == 0)
+        .expect("No start node found");
+
+    // Initialize the path with the start node
+    let mut path = vec![start_node];
+    let mut current_node = start_node;
+
+    // Traverse the graph
+    while let Some(next_edge) = g.edges_directed(current_node, petgraph::Direction::Outgoing)
+        .filter(|e| if hap1 { *g.edge_weight(e.id()).unwrap() > -0.1 } else { *g.edge_weight(e.id()).unwrap() < 0.1 })
+        .next()
+    {
+        let next_node = next_edge.target();
+        path.push(next_node);
+        current_node = next_node;
+
+        // Break if we've reached an end node (no outgoing edges)
+        if g.edges_directed(current_node, petgraph::Direction::Outgoing).count() == 0 {
+            break;
+        }
+    }
+
+    // Construct the consensus sequence from the path
+    let consensus = path.iter()
+        .map(|&node| g.node_weight(node).unwrap().clone())
+        .collect::<String>();
+    consensus
+}
+
+fn create_graph(lr_msas: &Vec<String>, sr_msas: &Vec<String>, seed: u64) -> Graph<String, f32> {
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+
     let mut graph = Graph::new();
 
     let mut prev_nodes = Vec::new();
@@ -326,7 +383,7 @@ fn create_graph(lr_msas: &Vec<String>, sr_msas: &Vec<String>) -> Graph<String, f
             let node = graph.add_node(contig.clone());
 
             prev_nodes.iter().for_each(|prev_node| {
-                graph.add_edge(*prev_node, node, 1.0);
+                graph.add_edge(*prev_node, node, 0.0);
             });
             prev_nodes.clear();
 
@@ -345,11 +402,21 @@ fn create_graph(lr_msas: &Vec<String>, sr_msas: &Vec<String>) -> Graph<String, f
                 .take(2)
                 .collect::<BTreeMap<_, _>>();
 
-            let mut phase = false;
-            for (allele, count) in allele_counts {
-                if count > 5 {
+            let filtered_allele_counts = allele_counts.into_iter().filter(|(_, count)| *count > 5).collect::<BTreeMap<_, _>>();
+
+            if filtered_allele_counts.len() == 1 {
+                for (allele, _) in filtered_allele_counts {
                     let new_node = graph.add_node(allele.clone());
 
+                    graph.add_edge(node, new_node,  0.0);
+                    prev_nodes.push(new_node);
+                }
+            } else {
+                let mut phase = false;
+                for (allele, _) in filtered_allele_counts {
+                    let new_node = graph.add_node(allele.clone());
+
+                    // let phase = rng.gen_bool(0.5);
                     graph.add_edge(node, new_node, if phase { 1.0 } else { -1.0 });
                     phase = !phase;
 
