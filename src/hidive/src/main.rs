@@ -395,7 +395,9 @@ fn elapsed_time(start_time: std::time::Instant) -> String {
     let elapsed_time = end_time.duration_since(start_time);
 
     let elapsed_secs = elapsed_time.as_secs_f64();
-    let elapsed_str = if elapsed_secs < 60.0 {
+    
+
+    if elapsed_secs < 60.0 {
         format!("{:.2} seconds", elapsed_secs)
     } else if elapsed_secs < 3600.0 {
         format!("{:.2} minutes", elapsed_secs / 60.0)
@@ -403,7 +405,5 @@ fn elapsed_time(start_time: std::time::Instant) -> String {
         format!("{:.2} hours", elapsed_secs / 3600.0)
     } else {
         format!("{:.2} days", elapsed_secs / 86400.0)
-    };
-
-    elapsed_str
+    }
 }

@@ -19,15 +19,15 @@ pub fn start(
     truth_seq_paths: &Vec<PathBuf>,
     debug: bool,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
-    let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
-    let truth_seq_urls = skydive::parse::parse_file_names(&truth_seq_paths);
+    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
+    let short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
+    let truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
 
     // Read all long reads.
     let mut all_lr_seqs: Vec<Vec<u8>> = Vec::new();
     for long_read_seq_url in &long_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
-            &long_read_seq_url,
+            long_read_seq_url,
             &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
         );
         let fasta_path = long_read_seq_url.to_file_path().unwrap();
@@ -51,7 +51,7 @@ pub fn start(
     let mut all_sr_seqs: Vec<Vec<u8>> = Vec::new();
     for short_read_seq_url in &short_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
-            &short_read_seq_url,
+            short_read_seq_url,
             &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
         );
         let fasta_path = short_read_seq_url.to_file_path().unwrap();
@@ -75,7 +75,7 @@ pub fn start(
     let mut all_truth_seqs: Vec<Vec<u8>> = Vec::new();
     for truth_seq_url in &truth_seq_urls {
         let basename = skydive::utils::basename_without_extension(
-            &truth_seq_url,
+            truth_seq_url,
             &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
         );
         let fasta_path = truth_seq_url.to_file_path().unwrap();

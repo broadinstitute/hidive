@@ -4,7 +4,6 @@ use std::io::Write;
 use std::{collections::HashMap, path::PathBuf};
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
 
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{
@@ -60,17 +59,14 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
                         bmap.get_mut(&qname).unwrap().push(a as char);
                     }
 
-                    match alignment.indel() {
-                        bam::pileup::Indel::Ins(len) => {
-                            let pos1 = alignment.qpos().unwrap() as usize;
-                            let pos2 = pos1 + (len as usize);
-                            for pos in pos1..pos2 {
-                                let a = alignment.record().seq()[pos];
+                    if let bam::pileup::Indel::Ins(len) = alignment.indel() {
+                        let pos1 = alignment.qpos().unwrap();
+                        let pos2 = pos1 + (len as usize);
+                        for pos in pos1..pos2 {
+                            let a = alignment.record().seq()[pos];
 
-                                bmap.get_mut(&qname).unwrap().push(a as char);
-                            }
+                            bmap.get_mut(&qname).unwrap().push(a as char);
                         }
-                        _ => {}
                     }
                 }
             }

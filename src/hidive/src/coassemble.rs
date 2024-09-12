@@ -22,7 +22,7 @@ pub fn start(
 
     // Read all short reads.
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls);
-    let s1 = LdBG::from_files(String::from("s1"), kmer_size, &short_read_fasta_paths);
+    let s1 = LdBG::from_files(String::from("s1"), kmer_size, short_read_fasta_paths);
 
     /*
     // Union of kmers from l1 and s1.

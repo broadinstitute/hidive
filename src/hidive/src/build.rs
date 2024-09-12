@@ -8,7 +8,6 @@ use flate2::read::GzDecoder;
 use serde_json::Value;
 
 // Import the skydive module, which contains the necessary functions for building graphs
-use skydive;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -221,10 +220,10 @@ pub fn mapping_info(
         let anchor_rev = reverse_complement(&anchor_seq);
         position_dict
             .entry(anchor_seq.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
         position_dict
             .entry(anchor_rev.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
     }
 
     for i in 0..contig.len() - k + 1 {
@@ -321,8 +320,8 @@ pub fn construct_edges(
 
     EdgeInfo {
         seq: edge_seq,
-        src: src,
-        dst: dst,
+        src,
+        dst,
         reads: vec![contigname],
         samples: vec![sample].into_iter().collect(),
     }
@@ -350,7 +349,7 @@ pub fn create_edge_file(
             .last()
             .unwrap_or_default()
             .to_string();
-        let (a, _svs) = mapping_info(&final_anchor, contig.to_string(), k);
+        let (a, _svs) = mapping_info(final_anchor, contig.to_string(), k);
         let mut splitposlist: Vec<_> = a.values().filter_map(|&x| x).collect();
         splitposlist.sort();
         let mut edgeindex = 0;
@@ -366,7 +365,7 @@ pub fn create_edge_file(
                 &anchorseq,
             );
             let src = &e.src;
-            let edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+            let edgelist = outgoing.entry(src.clone()).or_default();
             if let Some(pos) = edgelist
                 .iter()
                 .position(|edge| edge_info[edge].dst == e.dst && edge_info[edge].seq == e.seq)
@@ -394,7 +393,7 @@ pub fn create_edge_file(
             &anchorseq,
         );
         let src = &e.src;
-        let edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+        let edgelist = outgoing.entry(src.clone()).or_default();
         if let Some(pos) = edgelist
             .iter()
             .position(|edge| edge_info[edge].dst == e.dst && edge_info[edge].seq == e.seq)
@@ -565,8 +564,8 @@ impl GraphicalGenome {
         Ok(GraphicalGenome {
             anchor: anchor_dict,
             edges: edge_dict,
-            outgoing: outgoing,
-            incoming: incoming,
+            outgoing,
+            incoming,
         })
     }
 }
@@ -649,12 +648,12 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
     for item in path {
         if item.starts_with('A') {
             if let Some(anchor) = graph.anchor.get(item) {
-                seq += &anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
+                seq += anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
                                                                     // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             }
         } else if item.starts_with("E") {
             if let Some(edge) = graph.edges.get(item) {
-                seq += &edge["seq"].as_str().unwrap_or_default(); // Assuming `edges` is a HashMap and "seq" is a key
+                seq += edge["seq"].as_str().unwrap_or_default(); // Assuming `edges` is a HashMap and "seq" is a key
             }
         }
     }
@@ -736,7 +735,7 @@ impl GetSeriesParallelGraph {
         let mut node = Self::find_furthest_node(&node_candidate, subgraph, &start_node);
         nodelist.push(node.clone());
 
-        while node != end_node && node != "" {
+        while node != end_node && !node.is_empty() {
             let edgelist = &subgraph.outgoing[&node];
             let mut node_candidate: Vec<String> = Vec::new();
             for edge in edgelist {
@@ -744,7 +743,7 @@ impl GetSeriesParallelGraph {
                 if nodelist.contains(&"SINK".to_string()) {
                     continue;
                 }
-                if nodelist[0] != ""
+                if !nodelist[0].is_empty()
                     && subgraph.anchor.contains_key(&nodelist[0])
                     && subgraph.outgoing.contains_key(&nodelist[0])
                 {

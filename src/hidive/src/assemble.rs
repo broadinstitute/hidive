@@ -14,7 +14,6 @@ use serde_json::Value;
 // use minimap2::{Aligner, Preset};
 
 
-use rust_wfa2;
 // use russcip::prelude::*;
 
 // use good_lp::{variables, variable, scip, constraint, SolverModel, Solution};
@@ -32,8 +31,6 @@ use std::f64::NAN;
 // use rust_spoa::poa_consensus;
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
-use spoa;
 
 
 pub fn find_all_read (graph: &skydive::agg::GraphicalGenome) -> HashSet<String> {
@@ -142,8 +139,8 @@ pub fn find_targetseq_in_reads(read_seq: &str, source_kmer:&str, sink_kmer: &str
     let source_rev = skydive::agg::reverse_complement(source_kmer);
     let sink_rev = skydive::agg::reverse_complement(sink_kmer);
 
-    let spos = read_seq.find(&source_kmer);
-    let epos = read_seq.find(&sink_kmer);
+    let spos = read_seq.find(source_kmer);
+    let epos = read_seq.find(sink_kmer);
     let rspos = read_seq.find(&source_rev);
     let repos = read_seq.find(&sink_rev);
 
@@ -279,45 +276,42 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
     let mut var_flow = HashMap::new();
 
     for (_hap_name, hap) in unique_paths.iter(){
-        var_haps.insert(hap.clone(), add_binvar!(model, name:&hap.to_string()).unwrap());
+        var_haps.insert(*hap, add_binvar!(model, name:&hap.to_string()).unwrap());
     }
 
     let mut total_cost_expr = grb::expr::LinExpr::new();
     let mut flow_out = HashMap::new();
     let mut connected_haps_per_sample = HashMap::new();
 
-    for (index, submap) in data_info.iter(){
+    for (index, submap) in data_info.iter() {
         let s = submap.get("sample").unwrap();
         let r = submap.get("read").unwrap();
         let p = submap.get("path").unwrap();
-        let c:f64 = submap.get("cost").unwrap().parse().expect("Not a valid integer for cost");
+        let c: f64 = submap.get("cost").unwrap().parse().expect("Not a valid integer for cost");
 
         let r_p_identifier = format!("{}_{}", r, unique_paths.get(p).unwrap());
         let s_p_identifier = format!("{}_{}", s, unique_paths.get(p).unwrap());
-        var_flow.insert(r_p_identifier.clone(), add_var!(model, Continuous, name: &r_p_identifier, obj: 0.0, bounds: 0..1).unwrap());
+        var_flow.insert(r_p_identifier.clone(), add_var!(model, Continuous, name: &r_p_identifier, obj: 0.0, bounds: 0..1_f64).unwrap());
 
-
-        if !var_sample_hap.contains_key(&s_p_identifier){
-            let inserted_value = add_binvar!(model, name:&s_p_identifier).unwrap();
+        if !var_sample_hap.contains_key(&s_p_identifier) {
+            let inserted_value = add_binvar!(model, name: &s_p_identifier).unwrap();
             var_sample_hap.insert(s_p_identifier.clone(), inserted_value);
             connected_haps_per_sample.entry(s.clone()).or_insert_with(Vec::new).push(inserted_value);
         }
-
-
 
         // total flows:
         let flow_var = var_flow.get(&r_p_identifier).unwrap();
         let sample_hap_var = var_sample_hap.get(&s_p_identifier).unwrap();
         let hap_index = unique_paths.get(p).unwrap();
         let hap_var = var_haps.get(hap_index).unwrap();
-        total_cost_expr.add_term( c, *flow_var);
-        flow_out.entry(r).or_insert(grb::expr::LinExpr::new()).add_term(1.0, *flow_var) ;  
+        total_cost_expr.add_term(c, *flow_var);
+        flow_out.entry(r).or_insert(grb::expr::LinExpr::new()).add_term(1.0, *flow_var);
 
         // add constraints
-        let name1 = (2*index).to_string();
+        let name1 = (2 * index).to_string();
         model.add_constr(&name1, c!(*flow_var - *sample_hap_var <= 0)).unwrap();
-        let name2 = (2*index + 1).to_string();
-        model.add_constr(&name2, c!( *sample_hap_var - *hap_var <= 0)).unwrap();      
+        let name2 = (2 * index + 1).to_string();
+        model.add_constr(&name2, c!(*sample_hap_var - *hap_var <= 0)).unwrap();
     }
 
     for read in unique_reads.iter(){
@@ -391,13 +385,13 @@ pub fn mip_optimization (data_info: HashMap<usize, HashMap<String, String>>) -> 
         let coeff1 = 1.0/range_haps;
         let coeff2 = 1.0 / range_cost;
         let var1 = add_var!(model, Continuous, name: "var_num_hap_minus_leasthap", obj: 0.0).unwrap();
-        let _ = model.add_constr("var1", c!(var_num_haps - least_haps - var1 == 0));
+        let _ = model.add_constr("var1", c!((((var_num_haps - least_haps - var1) - least_haps - var1) - least_haps - var1) - least_haps - var1 == 0));
         // let var1 = var_num_haps - least_haps;
         let var2 = add_var!(model, Continuous, name: "var_total_cost_minus_leastcost", obj: 0.0).unwrap();
-        let _ = model.add_constr("var2", c!(var_total_cost - least_cost - var2 == 0));
+        let _ = model.add_constr("var2", c!((((var_total_cost - least_cost - var2) - least_cost - var2) - least_cost - var2) - least_cost - var2 == 0));
         // let var2 = var_total_cost - least_cost;
-        final_expr.add_qterm(coeff1, var1.clone(), var1.clone());
-        final_expr.add_qterm(coeff2, var2.clone(), var2.clone());
+        final_expr.add_qterm(coeff1, var1, var1);
+        final_expr.add_qterm(coeff2, var2, var2);
 
         let _ = model.set_objective(final_expr, Minimize);
         let _ = model.optimize();
@@ -457,7 +451,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
         .map(|row| row.iter().map(|&x| x.unwrap_or(f64::NAN)).collect())
         .collect();
 
-    let flat_data: Vec<f64> = vector_matrix_f64.iter().flatten().map(|&x| x as f64).collect();
+    let flat_data: Vec<f64> = vector_matrix_f64.iter().flatten().copied().collect();
     let rows = vector_matrix_f64.len();
     let cols = if !vector_matrix_f64.is_empty() { vector_matrix_f64[0].len() } else { 0 };
     let data = Array2::from_shape_vec((rows, cols), flat_data).unwrap();
@@ -521,7 +515,7 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     // pairwise alignment between reads and candidate paths from single_sample graph, 
     // construct HashMap for Ryan's optimizer
     let data_info = calculate_edit_distance(read_path, sample, &single_sample_graph, source_node_name, source, sink_node_name, sink);
-    
+
     //  Ryan's optimizer translated using gurobi
 
     let (var_sample_hap_values, var_flow_values, unique_paths) = mip_optimization(data_info);
@@ -605,6 +599,6 @@ pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_neare
     let consensus_sequences: Vec<String> = consensus_sequences.iter()
     .map(|c_str| c_str.to_str().unwrap().to_string())
     .collect();
-    let _ = write_fasta(&output, consensus_sequences, sample, &genename);
+    let _ = write_fasta(output, consensus_sequences, sample, &genename);
 
 }
