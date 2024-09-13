@@ -151,8 +151,8 @@ impl GraphicalGenome {
     pub fn extract_single_sample_graph(
         &self,
         df_single_sample: &Array2<f64>, 
-        anchorlist: Vec<String>,
-        readset:Vec<String>,
+        anchorlist: &Vec<String>,
+        readset:&Vec<String>,
         sample: &str,
     ) -> io::Result<GraphicalGenome> {
 
@@ -247,11 +247,11 @@ impl FindAllPathBetweenAnchors {
         let mut finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
         };
-        finder.find_path(graph, start, end, Vec::new(), 0, read_sets);
+        finder.find_path(graph, start, end, &Vec::new(), 0, read_sets);
         finder
     }
 
-    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
+    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, sofar: &Vec<String>, depth: usize, readset: HashSet<String>) {
         if start == end {
             let mut sofar1 = sofar.clone();
             sofar1.push(end.to_string());
@@ -289,7 +289,7 @@ impl FindAllPathBetweenAnchors {
                 }
                 let mut sofar1 = sofar.clone();
                 sofar1.push(start.to_string());
-                self.find_path(g, dst, end, sofar1, depth1, readset1);
+                self.find_path(g, dst, end, &sofar1, depth1, readset1);
             }
         }
     }

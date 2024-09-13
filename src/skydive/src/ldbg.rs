@@ -783,7 +783,7 @@ impl LdBG {
                     .collect::<HashSet<Vec<u8>>>();
     
                 let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until(&mut contig, this_kmer.to_vec(), &stop_kmers.clone()) {
+                if let Ok(_) = self.assemble_forward_until(&mut contig, &this_kmer.to_vec(), &stop_kmers.clone()) {
                     for j in 0..=(contig.len() - self.kmer_size - 1) {
                         let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
                         let contig_next_kmer = &contig[j+1..j+self.kmer_size+1].to_vec();
@@ -826,7 +826,7 @@ impl LdBG {
                     .collect::<HashSet<Vec<u8>>>();
 
                 let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_backward_until(&mut contig, this_kmer.to_vec(), &stop_kmers.clone()) {
+                if let Ok(_) = self.assemble_backward_until(&mut contig, &this_kmer.to_vec(), &stop_kmers.clone()) {
                     for j in (1..=(contig.len() - self.kmer_size)).rev() {
                         let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
                         let contig_prev_kmer = &contig[j-1..j+self.kmer_size-1].to_vec();
@@ -975,7 +975,7 @@ impl LdBG {
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>> {
+    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: &Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
@@ -1040,7 +1040,7 @@ impl LdBG {
     /// # Panics
     ///
     /// If no stopping k-mer is found.
-    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>>{
+    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: &Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>>{
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
@@ -1376,7 +1376,7 @@ impl LdBG {
     ///
     /// If the k-mer size is not a positive integer.
     #[must_use]
-    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    pub fn traverse_kmers(&self, start_kmer: &Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -1445,7 +1445,7 @@ impl LdBG {
     ///
     /// If the k-mer size is not a positive integer.
     #[must_use]
-    pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    pub fn traverse_contigs(&self, start_kmer: &Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -1535,7 +1535,7 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_kmers(cn_kmer);
+                let g = self.traverse_kmers(&cn_kmer);
 
                 g.node_weights().for_each(|node| {
                     let cn_kmer = crate::utils::canonicalize_kmer(node.as_bytes());
@@ -1595,7 +1595,7 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_contigs(cn_kmer);
+                let g = self.traverse_contigs(&cn_kmer);
 
                 g.node_weights().for_each(|node| {
                     for kmer in node.as_bytes().kmers(self.kmer_size as u8) {
@@ -1892,7 +1892,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_kmers(b"ATTTC".to_vec());
+        let graph = g.traverse_kmers(&b"ATTTC".to_vec());
 
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
@@ -1981,7 +1981,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_contigs(b"CCACG".to_vec());
+        let graph = g.traverse_contigs(&b"CCACG".to_vec());
 
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
@@ -2218,11 +2218,11 @@ mod tests {
             .build_links(&fwd_seqs);
 
         let mut contig1 = b"ACTGA".to_vec();
-        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), &HashSet::from([b"TTCGA".to_vec()]));
+        let _ = g.assemble_forward_until(&mut contig1, &b"ACTGA".to_vec(), &HashSet::from([b"TTCGA".to_vec()]));
         assert_eq!(contig1, b"ACTGATTTCGA".to_vec());
 
         let mut contig2 = b"GGTGG".to_vec();
-        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), &HashSet::from([b"TGCCA".to_vec()]));
+        let _ = g.assemble_backward_until(&mut contig2, &b"GGTGG".to_vec(), &HashSet::from([b"TGCCA".to_vec()]));
         assert_eq!(contig2, b"TGCCACGGTGG".to_vec());
     }
 

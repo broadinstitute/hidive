@@ -107,7 +107,7 @@ pub fn gcs_get_file_update_time(path: &str) -> Result<DateTime<Utc>> {
 /// # Panics
 ///
 /// This function panics if the GCS path is invalid.
-pub fn gcs_download_file(path: String) -> Result<String> {
+pub fn gcs_download_file(path: &str) -> Result<String> {
     let (bucket_name, prefix) = gcs_split_path(&path);
     let filename = prefix.split('/').last().unwrap_or_default().to_string();
 

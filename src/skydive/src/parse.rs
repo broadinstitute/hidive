@@ -26,7 +26,7 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     // Iterate over each locus in the provided list
     for locus in loci_list {
         // Attempt to parse the locus using a function from the skydive module
-        match parse_locus(locus.to_owned()) {
+        match parse_locus(&locus.to_owned()) {
             Ok(l_fmt) => {
                 // If parsing is successful, insert the formatted locus into the HashSet
                 loci.insert(l_fmt);
@@ -59,7 +59,7 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
 /// # Panics
 ///
 /// This function panics if the start or stop positions cannot be parsed.
-pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
+pub fn parse_locus(locus: &str) -> Result<(String, u64, u64)> {
     let l_fmt = locus.replace(',', "");
     let parts1: Vec<&str> = l_fmt.split(|c| c == ':').collect();
     let parts2: Vec<&str> = parts1[1].split(|c| c == '-').collect();
