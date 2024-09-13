@@ -28,7 +28,23 @@ use rust_htslib::faidx::Reader;
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 
-// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+/// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// An `IndexedReader` object representing the opened BAM/CRAM file.
+///
+/// # Errors
+///
+/// This function returns an error if the BAM/CRAM file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -62,7 +78,23 @@ pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     Ok(bam)
 }
 
-// Function to open a FASTA file from a URL and cache its contents locally.
+/// Function to open a FASTA file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// A `Reader` object representing the opened FASTA file.
+///
+/// # Errors
+///
+/// This function returns an error if the FASTA file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_fasta(seqs_url: &Url) -> Result<Reader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -338,7 +370,28 @@ pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>
         .any(|e| start <= e.1 as i64 && end >= e.2 as i64)
 }
 
-// Public function to stage data from multiple BAM files and write to an output file.
+/// Public function to stage data from multiple BAM files and write to an output file.
+///
+/// # Arguments
+///
+/// * `output_path` - A reference to a `PathBuf` representing the output file path.
+/// * `loci` - A reference to a `HashSet` of tuples representing the loci to extract.
+/// * `seq_urls` - A reference to a `HashSet` of URLs representing the sequence files.
+/// * `unmapped` - A boolean indicating whether to extract unmapped reads.
+/// * `cache_path` - A reference to a `PathBuf` representing the cache directory path.
+///
+/// # Returns
+///
+/// The number of records written to the output file.
+///
+/// # Errors
+///
+/// This function returns an error if the output file cannot be created.
+///
+/// # Panics
+///
+/// If an error occurs while staging data from the files.
+///
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64)>,

@@ -22,6 +22,19 @@ pub fn add_unique(vec: &mut Vec<String>, item: String) {
     }
 }
 
+/// Reverse complement of a k-mer
+///
+/// # Arguments
+///
+/// * `kmer` - A string representing the k-mer.
+///
+/// # Returns
+///
+/// A string containing the reverse complement of the k-mer.
+///
+/// # Panics
+///
+/// If the k-mer contains an unexpected character.
 #[must_use]
 pub fn reverse_complement(kmer: &str) -> String {
     kmer.chars()
@@ -38,6 +51,27 @@ pub fn reverse_complement(kmer: &str) -> String {
 }
 
 impl GraphicalGenome {
+    /// Load a graphical genome from a file
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - A string slice that holds the name of the file to be loaded
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome if the file was successfully loaded
+    ///
+    /// # Errors
+    ///
+    /// * The file cannot be opened (e.g., permission issues, file not found).
+    /// * The file format is invalid (e.g., not a valid GZIP file or has unexpected content).
+    ///
+    /// # Panics
+    ///
+    /// - The file cannot be opened.
+    /// - The file is not a valid GZIP-compressed file.
+    /// - The annotation string is not valid JSON.
+    /// - There is a memory allocation error or other unexpected issue with the `HashMap` operations.
     pub fn load_graph(filename: &str) -> io::Result<GraphicalGenome> {
         let file = File::open(filename)?;
         let reader: Box<dyn BufRead> = if filename.ends_with(".gz") {
@@ -90,7 +124,30 @@ impl GraphicalGenome {
         })
     }
 
-    // Method to extract a single sample graph
+    /// Method to extract a single sample graph
+    ///
+    /// # Arguments
+    ///
+    /// * `df_single_sample` - A 2D array containing the imputed data matrix
+    /// * `anchorlist` - A vector of strings containing the anchor names
+    /// * `readset` - A vector of strings containing the read names
+    /// * `sample` - A string slice containing the sample name
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome of the single sample
+    ///
+    /// # Errors
+    ///
+    /// * The `df_single_sample` array has an invalid shape.
+    /// * The anchor or read indices are invalid.
+    /// * There is a memory allocation error.
+    /// * The JSON data is invalid.
+    /// * There is an unexpected data structure or other internal error.
+    ///
+    /// # Panics
+    ///
+    /// If the edge do not have outgoing anchor
     pub fn extract_single_sample_graph(
         &self,
         df_single_sample: &Array2<f64>, 

@@ -10,7 +10,7 @@ pub struct MLdBG {
 }
 
 impl MLdBG {
-    /// Create an empty multi-color LdBG.
+    /// Create an empty multi-color `LdBG`.
     #[must_use]
     pub fn new(kmer_size: usize) -> Self {
         MLdBG {
@@ -19,7 +19,19 @@ impl MLdBG {
         }
     }
 
-    /// Create an MLdBG from a vector of LdBGs.
+    /// Create an `MLdBG` from a vector of `LdBGs`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbgs` - A vector of `LdBGs`.
+    ///
+    /// # Returns
+    ///
+    /// A multi-color `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size of the `LdBGs` do not match.
     #[must_use]
     pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
         let kmer_size = ldbgs[0].kmer_size;
@@ -27,7 +39,7 @@ impl MLdBG {
         for ldbg in &ldbgs {
             assert!(
                 ldbg.kmer_size == kmer_size,
-                "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+                "The k-mer size of the `LdBG` does not match the k-mer size of the MLdBG."
             );
         }
 
@@ -37,34 +49,62 @@ impl MLdBG {
         }
     }
 
-    /// Add a LdBG to the MLdBG.
+    /// Add a `LdBG` to the `MLdBG`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbg` - The `LdBG` to add.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
     pub fn push(&mut self, ldbg: LdBG) {
         assert!(
             ldbg.kmer_size == self.kmer_size,
-            "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
+            "The k-mer size of the `LdBG` does not match the k-mer size of the MLdBG."
         );
 
         self.ldbgs.push(ldbg);
     }
 
-    /// Insert a LdBG at a specific position in the MLdBG.
+    /// Insert a `LdBG` at a specific position in the `MLdBG`.
     pub fn insert(&mut self, index: usize, ldbg: LdBG) {
         if index <= self.ldbgs.len() {
             self.ldbgs.insert(index, ldbg);
         }
     }
 
-    /// Append a LdBG to the end of the MLdBG.
+    /// Append a `LdBG` to the end of the `MLdBG`.
     pub fn append(&mut self, ldbg: LdBG) {
         self.ldbgs.push(ldbg);
     }
 
-    /// Append an LdBG to the end of the MLdBG, created anew from a fasta file.
+    /// Append an `LdBG` to the end of the `MLdBG`, created anew from a fasta file.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the `LdBG`.
+    /// * `seq_path` - The path to the fasta file.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
     pub fn append_from_file(&mut self, name: String, seq_path: &PathBuf) {
         let l = LdBG::from_file(name, self.kmer_size, seq_path);
         self.ldbgs.push(l);
     }
 
+    /// Append an `LdBG` to the end of the `MLdBG`, created anew from a fasta file, with a filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the `LdBG`.
+    /// * `seq_path` - The path to the fasta file.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
     pub fn append_from_filtered_file<F>(&mut self, name: String, seq_path: &PathBuf, filter: F)
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
@@ -88,6 +128,21 @@ impl MLdBG {
         self.ldbgs.push(l);
     }
 
+    /// Filter reads from a fasta file based on a closure and return the filtered reads.
+    /// The closure takes a fasta record and a set of kmers and returns a boolean.
+    ///
+    /// # Arguments
+    ///
+    /// * `seq_path` - The path to the fasta file.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
+    ///
+    /// # Returns
+    ///
+    /// A vector of byte vectors representing the filtered reads.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
     pub fn filter_reads<F>(&mut self, seq_path: &PathBuf, filter: F) -> Vec<Vec<u8>>
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
@@ -106,7 +161,7 @@ impl MLdBG {
         filtered_reads
     }
 
-    /// Get the union of kmers from all LdBGs in the MLdBG.
+    /// Get the union of kmers from all `LdBGs` in the `MLdBG`.
     #[must_use]
     pub fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
         let mut kmer_union = HashSet::new();
@@ -120,28 +175,28 @@ impl MLdBG {
         kmer_union
     }
 
-    /// Get a reference to the LdBG at a specific index.
+    /// Get a reference to the `LdBG` at a specific index.
     #[must_use]
     pub fn get(&self, index: usize) -> Option<&LdBG> {
         self.ldbgs.get(index)
     }
 
-    /// Returns an iterator over the LdBGs in the MLdBG.
+    /// Returns an iterator over the `LdBGs` in the `MLdBG`.
     pub fn iter(&self) -> std::slice::Iter<LdBG> {
         self.ldbgs.iter()
     }
 
-    /// Returns a mutable iterator over the LdBGs in the MLdBG.
+    /// Returns a mutable iterator over the `LdBGs` in the `MLdBG`.
     pub fn iter_mut(&mut self) -> std::slice::IterMut<LdBG> {
         self.ldbgs.iter_mut()
     }
 
-    /// Clear all LdBGs from the MLdBG.
+    /// Clear all `LdBGs` from the `MLdBG`.
     pub fn clear(&mut self) {
         self.ldbgs.clear();
     }
 
-    /// Remove a LdBG from the MLdBG by index.
+    /// Remove a `LdBG` from the `MLdBG` by index.
     pub fn remove(&mut self, index: usize) -> Option<LdBG> {
         if index < self.ldbgs.len() {
             Some(self.ldbgs.remove(index))
@@ -150,24 +205,24 @@ impl MLdBG {
         }
     }
 
-    /// Returns the number of LdBGs in the MLdBG.
+    /// Returns the number of `LdBGs` in the `MLdBG`.
     #[must_use]
     pub fn len(&self) -> usize {
         self.ldbgs.len()
     }
 
-    /// Check if the MLdBG is empty.
+    /// Check if the `MLdBG` is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ldbgs.is_empty()
     }
 
-    /// Remove and return the last LdBG from the MLdBG.
+    /// Remove and return the last `LdBG` from the `MLdBG`.
     pub fn pop(&mut self) -> Option<LdBG> {
         self.ldbgs.pop()
     }
 
-    /// Remove and return the LdBG from the MLdBG if it matches a certain condition.
+    /// Remove and return the `LdBG` from the `MLdBG` if it matches a certain condition.
     pub fn pop_if<F>(&mut self, condition: F) -> Option<LdBG>
     where
         F: Fn(&LdBG) -> bool,

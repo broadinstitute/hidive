@@ -55,6 +55,10 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If the file cannot be opened.
     #[must_use]
     pub fn from_file(
         name: String,
@@ -98,6 +102,10 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If a file cannot be opened.
     #[must_use]
     pub fn from_files(
         name: String,
@@ -695,6 +703,21 @@ impl LdBG {
         self.kmers.remove(&cn_kmer)
     }
 
+    /// The score of a k-mer function is used to determine the likelihood of a k-mer being a part of a path.
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the `LdBG`.
+    /// * `model_path` - The path to the model file.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If the model cannot be loaded.
+    ///
     #[must_use]
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
@@ -827,6 +850,21 @@ impl LdBG {
         }
     }
 
+    /// Takes a reference to a sequence and returns a vector of corrected sequences
+    /// based on De Bruijn graph traversal.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `seq` - A reference to the input sequence of bytes that needs to be corrected.
+    ///
+    /// # Returns
+    ///
+    /// A vector of corrected sequences.
+    ///
+    /// # Panics
+    ///
+    /// If the sequence is empty.
     #[must_use]
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
         let mut graph = DiGraph::new();
@@ -994,6 +1032,14 @@ impl LdBG {
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmer` - A vector representing the stopping k-mer.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the last k-mer in the contig.
+    ///
+    /// # Panics
+    ///
+    /// If no stopping k-mer is found.
     fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>>{
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
@@ -1028,6 +1074,10 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector containing the assembled contig.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer length does not match the expected length.
     #[must_use]
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
@@ -1050,6 +1100,10 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector of contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn assemble_all(&self) -> Vec<Vec<u8>> {
         let mut contigs = Vec::new();
@@ -1147,6 +1201,20 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    /// Removes paths that have a score below a given threshold.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `LdBG`.
+    /// * `min_score` - The minimum score threshold.
+    ///
+    /// # Returns
+    ///
+    /// A reference with the cleaned paths.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn clean_paths(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
@@ -1218,6 +1286,20 @@ impl LdBG {
         self
     }
 
+    /// Removes tips from the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `LdBG`.
+    /// * `max_tip_length` - The maximum tip length.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `LdBG` with the tips removed.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn clean_tips(mut self, max_tip_length: usize) -> Self {
         let mut to_remove = HashSet::new();
@@ -1278,6 +1360,21 @@ impl LdBG {
         self
     }
 
+    /// Builds a directed graph (`DiGraph`) starting from a given `start_kmer`,
+    /// and traverses both forward and backward through adjacent kmers.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `start_kmer` - A vector representing the starting k-mer.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of kmers.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
@@ -1332,6 +1429,21 @@ impl LdBG {
         graph
     }
 
+    /// Builds a directed graph (`DiGraph`) starting from a given `start_kmer`,
+    /// and traverses both forward and backward through adjacent contigs.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `start_kmer` - A vector representing the starting k-mer.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
@@ -1397,6 +1509,19 @@ impl LdBG {
         graph
     }
 
+    /// Traverse all kmers in the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of all kmers.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn traverse_all_kmers(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
@@ -1444,6 +1569,19 @@ impl LdBG {
         graph
     }
 
+    /// Traverse all contigs in the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of all contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
     #[must_use]
     pub fn traverse_all_contigs(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
