@@ -53,7 +53,7 @@ pub fn gcs_download_file(path: String) -> Result<String> {
     Ok(filename)
 }
 
-pub fn gcs_list_files_of_type(path: String, suffix: &str) -> Result<Vec<String>> {
+pub fn gcs_list_files_of_type(path: &str, suffix: &str) -> Result<Vec<String>> {
     let file_list = gcs_list_files(&path).unwrap();
 
     let bam_files: Vec<_> = file_list
