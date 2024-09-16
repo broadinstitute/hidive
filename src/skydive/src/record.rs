@@ -117,27 +117,10 @@ impl Record {
     #[must_use]
     pub fn in_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_C) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_G) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_T) {
-            1
-        } else {
-            0
-        };
-
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_A));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_C));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_G));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_T));
         degree
     }
 
@@ -145,27 +128,10 @@ impl Record {
     #[must_use]
     pub fn out_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_C) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_G) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_T) {
-            1
-        } else {
-            0
-        };
-
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_T));
         degree
     }
 
