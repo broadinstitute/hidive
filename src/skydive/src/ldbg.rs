@@ -1313,11 +1313,16 @@ impl LdBG {
                     let mut fw_contig = cur_kmer.to_vec();
                     self.assemble_forward(&mut fw_contig, ToOwned::to_owned(&cur_kmer).as_slice());
 
-                    let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
+                    let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                        Ok(kmer_size_u8) => kmer_size_u8,
+                        Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                    };
+
+                    let last_kmer = fw_contig.kmers(kmer_size_u8).last().unwrap();
                     let num_next = self.next_kmers(last_kmer).len();
 
                     if fw_contig.len() <= max_tip_length && num_next == 0 {
-                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
+                        for kmer in fw_contig.kmers(kmer_size_u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
 
@@ -1333,11 +1338,16 @@ impl LdBG {
                     let mut rv_contig = cur_kmer.to_vec();
                     self.assemble_backward(&mut rv_contig,  ToOwned::to_owned(&cur_kmer).as_slice());
 
-                    let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
+                    let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                        Ok(kmer_size_u8) => kmer_size_u8,
+                        Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                    };
+
+                    let first_kmer = rv_contig.kmers(kmer_size_u8).next().unwrap();
                     let num_prev = self.prev_kmers(first_kmer).len();
 
                     if rv_contig.len() <= max_tip_length && num_prev == 0 {
-                        for kmer in rv_contig.kmers(self.kmer_size as u8) {
+                        for kmer in rv_contig.kmers(kmer_size_u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
 
@@ -1463,7 +1473,12 @@ impl LdBG {
                         let mut next_contig = next_kmer.clone();
                         self.assemble_forward(&mut next_contig, ToOwned::to_owned(&next_kmer).as_slice());
 
-                        let weight = next_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+                        let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                            Ok(kmer_size_u8) => kmer_size_u8,
+                            Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                        };
+
+                        let weight = next_contig.as_bytes().kmers(kmer_size_u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
 
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
@@ -1490,7 +1505,15 @@ impl LdBG {
                         let mut prev_contig = prev_kmer.clone();
                         self.assemble_backward(&mut prev_contig, ToOwned::to_owned(&prev_kmer).as_slice());
 
-                        let weight = prev_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+                        let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                            Ok(size) => size,
+                            Err(_) => {
+                                // Handle the error case (e.g., panic, return)
+                                panic!("kmer_size is too large to fit in a u8"); // Replace with your error handling logic
+                            }
+                        };
+
+                        let weight = prev_contig.as_bytes().kmers(kmer_size_u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
 
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
                         graph.add_edge(node, prev_node, weight);
@@ -1597,8 +1620,15 @@ impl LdBG {
             if !visited.contains(&cn_kmer) {
                 let g = self.traverse_contigs(&cn_kmer);
 
+                let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                    Ok(size) => size,
+                    Err(_) => {
+                        // Handle the error case (e.g., panic, return)
+                        panic!("kmer_size is too large to fit in a u8"); // Replace with your error handling logic
+                    }
+                };
                 g.node_weights().for_each(|node| {
-                    for kmer in node.as_bytes().kmers(self.kmer_size as u8) {
+                    for kmer in node.as_bytes().kmers(kmer_size_u8) {
                         visited.insert(crate::utils::canonicalize_kmer(&kmer));
                     }
                 });
