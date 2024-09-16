@@ -179,14 +179,14 @@ impl GraphicalGenome {
                 let edgename = d.get(&usize_index);
                 // println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
                 new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
-                if let Some(edge_value) = self.edges.get(&edgename.as_ref().unwrap().to_string()) {
+                if let Some(edge_value) = self.edges.get(&(*edgename.as_ref().unwrap()).to_string()) {
                     if let Some(seq_value) = edge_value.get("seq") {
-                        let new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
+                        let new_edge_value = new_edges.entry((*edgename.as_ref().unwrap()).to_string()).or_insert_with(|| serde_json::json!({}));
                         new_edge_value["seq"] = seq_value.clone();
                     }
                 }
 
-                let edgename_str = edgename.as_ref().unwrap().to_string();
+                let edgename_str = (*edgename.as_ref().unwrap()).to_string();
                 let new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
                 if !new_edge_value.get("reads").is_some() {
                     new_edge_value["reads"] = serde_json::Value::Array(vec![]);
@@ -205,16 +205,16 @@ impl GraphicalGenome {
                 }
 
 
-                if let Some(outgoing_list) = self.outgoing.get(&edgename.as_ref().unwrap().to_string()) {
+                if let Some(outgoing_list) = self.outgoing.get(&(*edgename.as_ref().unwrap()).to_string()) {
                     if let Some(dst) = outgoing_list.get(0){
-                        let incoming_list = new_incoming.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        let incoming_list = new_incoming.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(incoming_list, anchor.to_string());
 
                         let incoming_dst_list = new_incoming.entry(dst.to_string()).or_default();
-                        add_unique(incoming_dst_list, edgename.as_ref().unwrap().to_string());
+                        add_unique(incoming_dst_list, (*edgename.as_ref().unwrap()).to_string());
                         let outgoing_list = new_outgoing.entry(anchor.to_string()).or_default();
-                        add_unique(outgoing_list, edgename.as_ref().unwrap().to_string());
-                        let outgoing_edgename_list = new_outgoing.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        add_unique(outgoing_list, (*edgename.as_ref().unwrap()).to_string());
+                        let outgoing_edgename_list = new_outgoing.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(outgoing_edgename_list, dst.to_string());
                     }
                     else{
