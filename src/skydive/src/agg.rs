@@ -175,6 +175,7 @@ impl GraphicalGenome {
 
             for (read_index, read) in readset.iter().enumerate(){
                 let edgeindex = df_single_sample[[read_index, anchorindex]].round() - 1.0;
+                #[allow(clippy::cast_possible_truncation)]#[allow(clippy::cast_sign_loss)]
                 let usize_index = edgeindex as usize;
                 let edgename = d.get(&usize_index);
                 // println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>

@@ -173,7 +173,9 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     for edge in graph.edge_references() {
         let (from, to) = (edge.source().index(), edge.target().index());
         let weight = edge.weight();
-        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, (100.0*weight).round() as u8)?;
+
+        #[allow(clippy::cast_possible_truncation)]
+        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, u8::try_from((100.0 * weight).round() as i32).unwrap_or_default())?;
     }
 
     Ok(())

@@ -176,7 +176,7 @@ fn extract_aligned_bam_reads(
     for p in bam.pileup() {
         let pileup = p.unwrap();
 
-        if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+        if *start <= (u64::from(pileup.pos())) && (u64::from(pileup.pos())) < *stop {
             for alignment in pileup.alignments() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
@@ -257,8 +257,7 @@ fn extract_fasta_seqs(
 ) -> Result<Vec<fasta::Record>> {
     let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
     let seq = fasta
-        .fetch_seq_string(chr, *start as usize, (*stop - 1) as usize)
-        .unwrap();
+        .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
     let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
@@ -364,10 +363,12 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
-#[must_use]
-pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>) -> bool {
-    loci.iter()
-        .any(|e| start <= e.1 as i64 && end >= e.2 as i64)
+pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>) -> Result<bool, String> {
+    if start < 0 || end < 0 {
+        return Err("Error: Negative genomic positions are not allowed.".to_string());
+    }
+
+    Ok(loci.iter().any(|e| start <= e.1 && end >= e.2))
 }
 
 /// Public function to stage data from multiple BAM files and write to an output file.

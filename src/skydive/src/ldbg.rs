@@ -727,7 +727,10 @@ impl LdBG {
             let scov: u16 = 0;
             let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
 
-            let data = Data::new_test_data(vec![lcov as f32, scov as f32, (cn_kmer.len() - compressed_len) as f32], Some(0.0));
+            let lcov_f32 = f32::from(lcov);
+            let scov_f32 = f32::from(scov);
+            #[allow(clippy::cast_precision_loss)]
+            let data = Data::new_test_data(vec![lcov_f32, scov_f32, (cn_kmer.len() - compressed_len) as f32], Some(0.0));
             let prediction = *gbdt.predict(&vec![data]).first().unwrap_or(&0.0);
 
             (cn_kmer.clone(), prediction)
@@ -1264,6 +1267,7 @@ impl LdBG {
                     }
                 }
 
+                #[allow(clippy::cast_precision_loss)]
                 let weight = score_sum / seen_kmers.len() as f32;
 
                 if weight < min_score {
