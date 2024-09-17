@@ -14,6 +14,7 @@ pub struct Link {
 
 impl Link {
     /// Create an empty link record.
+    #[must_use]
     pub fn new(is_forward: bool) -> Self {
         Link {
             is_forward,
@@ -22,6 +23,7 @@ impl Link {
     }
 
     /// Create a link from a sequence of junction choices.
+    #[must_use]
     pub fn from_junctions(is_forward: bool, seq: &[u8]) -> Self {
         Link {
             is_forward,
@@ -30,16 +32,19 @@ impl Link {
     }
 
     /// Return orientation of the link.
+    #[must_use]
     pub fn is_forward(&self) -> bool {
         self.is_forward
     }
 
     /// Return the number of junction choices in the link.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.junctions.len()
     }
 
     /// Indicate whether the list of junctions is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.junctions.is_empty()
     }
@@ -50,6 +55,7 @@ impl Link {
     }
 
     /// Peek at a junction from the front of the queue.
+    #[must_use]
     pub fn front(&self) -> Option<&u8> {
         self.junctions.front()
     }
@@ -60,6 +66,7 @@ impl Link {
     }
 
     /// Return a new link with the junction choices complemented.
+    #[must_use]
     pub fn complement(&self) -> Link {
         let mut new_link = Link::new(self.is_forward);
 

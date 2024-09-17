@@ -28,7 +28,23 @@ use rust_htslib::faidx::Reader;
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 
-// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+/// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// An `IndexedReader` object representing the opened BAM/CRAM file.
+///
+/// # Errors
+///
+/// This function returns an error if the BAM/CRAM file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -62,7 +78,23 @@ pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     Ok(bam)
 }
 
-// Function to open a FASTA file from a URL and cache its contents locally.
+/// Function to open a FASTA file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// A `Reader` object representing the opened FASTA file.
+///
+/// # Errors
+///
+/// This function returns an error if the FASTA file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_fasta(seqs_url: &Url) -> Result<Reader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -144,7 +176,7 @@ fn extract_aligned_bam_reads(
     for p in bam.pileup() {
         let pileup = p.unwrap();
 
-        if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+        if *start <= (u64::from(pileup.pos())) && (u64::from(pileup.pos())) < *stop {
             for alignment in pileup.alignments() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
@@ -225,8 +257,7 @@ fn extract_fasta_seqs(
 ) -> Result<Vec<fasta::Record>> {
     let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
     let seq = fasta
-        .fetch_seq_string(chr, *start as usize, (*stop - 1) as usize)
-        .unwrap();
+        .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
     let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
@@ -332,12 +363,36 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
-pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>) -> bool {
-    loci.iter()
-        .any(|e| start <= e.1 as i64 && end >= e.2 as i64)
+pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>) -> Result<bool, String> {
+    if start < 0 || end < 0 {
+        return Err("Error: Negative genomic positions are not allowed.".to_string());
+    }
+
+    Ok(loci.iter().any(|e| start <= e.1 && end >= e.2))
 }
 
-// Public function to stage data from multiple BAM files and write to an output file.
+/// Public function to stage data from multiple BAM files and write to an output file.
+///
+/// # Arguments
+///
+/// * `output_path` - A reference to a `PathBuf` representing the output file path.
+/// * `loci` - A reference to a `HashSet` of tuples representing the loci to extract.
+/// * `seq_urls` - A reference to a `HashSet` of URLs representing the sequence files.
+/// * `unmapped` - A boolean indicating whether to extract unmapped reads.
+/// * `cache_path` - A reference to a `PathBuf` representing the cache directory path.
+///
+/// # Returns
+///
+/// The number of records written to the output file.
+///
+/// # Errors
+///
+/// This function returns an error if the output file cannot be created.
+///
+/// # Panics
+///
+/// If an error occurs while staging data from the files.
+///
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64)>,

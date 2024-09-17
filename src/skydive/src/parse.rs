@@ -5,6 +5,20 @@ use url::Url;
 
 use path_absolutize::Absolutize;
 
+/// Parse a list of loci into a `HashSet` of formatted loci.
+///
+/// # Arguments
+///
+/// * `loci_list` - A reference to a vector of strings representing loci.
+///
+/// # Returns
+///
+/// A `HashSet` containing tuples of chromosome, start, and stop positions.
+///
+/// # Panics
+///
+/// If a locus cannot be parsed.
+#[must_use]
 pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();
@@ -12,7 +26,7 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     // Iterate over each locus in the provided list
     for locus in loci_list {
         // Attempt to parse the locus using a function from the skydive module
-        match parse_locus(locus.to_owned()) {
+        match parse_locus(&locus.to_owned()) {
             Ok(l_fmt) => {
                 // If parsing is successful, insert the formatted locus into the HashSet
                 loci.insert(l_fmt);
@@ -27,7 +41,25 @@ pub fn parse_loci(loci_list: &Vec<String>) -> HashSet<(String, u64, u64)> {
     loci
 }
 
-pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
+/// Parse a locus string into a tuple of chromosome, start, and stop positions.
+/// The locus should be in the format `chr:start[-stop]`.
+///
+/// # Arguments
+///
+/// * `locus` - A string representing the locus.
+///
+/// # Returns
+///
+/// A tuple containing the chromosome, start, and stop positions.
+///
+/// # Errors
+///
+/// This function returns an error if the locus format is incorrect.
+///
+/// # Panics
+///
+/// This function panics if the start or stop positions cannot be parsed.
+pub fn parse_locus(locus: &str) -> Result<(String, u64, u64)> {
     let l_fmt = locus.replace(',', "");
     let parts1: Vec<&str> = l_fmt.split(|c| c == ':').collect();
     let parts2: Vec<&str> = parts1[1].split(|c| c == '-').collect();
@@ -67,6 +99,19 @@ pub fn parse_locus(locus: String) -> Result<(String, u64, u64)> {
     }
 }
 
+/// Parse a list of file paths into a `HashSet` of URLs.
+///
+/// # Arguments
+///
+/// * `bam_paths` - A reference to a vector of `PathBufs` representing file paths.
+///
+/// # Returns
+///
+/// A `HashSet` containing URLs for each file path.
+///
+/// # Panics
+///
+/// If a file path cannot be parsed as a URL.
 pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     // Convert the list of BAM file paths into a HashSet of URLs
     let mut reads_urls: HashSet<Url> = bam_paths

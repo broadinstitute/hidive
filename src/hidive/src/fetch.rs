@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use path_absolutize::Absolutize;
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
 
 /// Starts the data fetching process.
 ///
@@ -28,7 +27,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, unmapped: bool, seq_path
 
     // Call the stage_data function from the skydive module to process and stage the data
     skydive::elog!("Fetching data...");
-    let r = skydive::stage::stage_data(&output, &loci, &seq_urls, unmapped, &cache_path);
+    let r = skydive::stage::stage_data(output, &loci, &seq_urls, unmapped, &cache_path);
 
     match r {
         Ok(n) => {

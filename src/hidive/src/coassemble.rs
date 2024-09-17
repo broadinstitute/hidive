@@ -1,17 +1,4 @@
-use std::collections::HashSet;
 use std::path::PathBuf;
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-};
-
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
-use gbdt::gradient_boost::GBDT;
-
-use needletail::Sequence;
-use parquet::data_type::AsBytes;
-use petgraph::dot::Dot;
 
 use skydive::ldbg::LdBG;
 use skydive::mldbg::MLdBG;
@@ -35,7 +22,7 @@ pub fn start(
 
     // Read all short reads.
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls);
-    let s1 = LdBG::from_files(String::from("s1"), kmer_size, &short_read_fasta_paths);
+    let s1 = LdBG::from_files(String::from("s1"), kmer_size, short_read_fasta_paths);
 
     /*
     // Union of kmers from l1 and s1.

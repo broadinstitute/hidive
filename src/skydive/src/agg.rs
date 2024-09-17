@@ -1,13 +1,11 @@
 use core::panic;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use flate2::read::GzDecoder;
 use ndarray::Array2;
 use serde_json::Value;
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
-use flate2::read::GzDecoder;
+use std::io::{self, BufRead, BufReader};
 
 
 #[derive(Debug)]
@@ -23,6 +21,21 @@ pub fn add_unique(vec: &mut Vec<String>, item: String) {
         vec.push(item);
     }
 }
+
+/// Reverse complement of a k-mer
+///
+/// # Arguments
+///
+/// * `kmer` - A string representing the k-mer.
+///
+/// # Returns
+///
+/// A string containing the reverse complement of the k-mer.
+///
+/// # Panics
+///
+/// If the k-mer contains an unexpected character.
+#[must_use]
 pub fn reverse_complement(kmer: &str) -> String {
     kmer.chars()
         .rev()
@@ -38,6 +51,27 @@ pub fn reverse_complement(kmer: &str) -> String {
 }
 
 impl GraphicalGenome {
+    /// Load a graphical genome from a file
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - A string slice that holds the name of the file to be loaded
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome if the file was successfully loaded
+    ///
+    /// # Errors
+    ///
+    /// * The file cannot be opened (e.g., permission issues, file not found).
+    /// * The file format is invalid (e.g., not a valid GZIP file or has unexpected content).
+    ///
+    /// # Panics
+    ///
+    /// - The file cannot be opened.
+    /// - The file is not a valid GZIP-compressed file.
+    /// - The annotation string is not valid JSON.
+    /// - There is a memory allocation error or other unexpected issue with the `HashMap` operations.
     pub fn load_graph(filename: &str) -> io::Result<GraphicalGenome> {
         let file = File::open(filename)?;
         let reader: Box<dyn BufRead> = if filename.ends_with(".gz") {
@@ -90,12 +124,35 @@ impl GraphicalGenome {
         })
     }
 
-    // Method to extract a single sample graph
+    /// Method to extract a single sample graph
+    ///
+    /// # Arguments
+    ///
+    /// * `df_single_sample` - A 2D array containing the imputed data matrix
+    /// * `anchorlist` - A vector of strings containing the anchor names
+    /// * `readset` - A vector of strings containing the read names
+    /// * `sample` - A string slice containing the sample name
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome of the single sample
+    ///
+    /// # Errors
+    ///
+    /// * The `df_single_sample` array has an invalid shape.
+    /// * The anchor or read indices are invalid.
+    /// * There is a memory allocation error.
+    /// * The JSON data is invalid.
+    /// * There is an unexpected data structure or other internal error.
+    ///
+    /// # Panics
+    ///
+    /// If the edge do not have outgoing anchor
     pub fn extract_single_sample_graph(
         &self,
         df_single_sample: &Array2<f64>, 
-        anchorlist: Vec<String>,
-        readset:Vec<String>,
+        anchorlist: &Vec<String>,
+        readset:&Vec<String>,
         sample: &str,
     ) -> io::Result<GraphicalGenome> {
 
@@ -118,19 +175,20 @@ impl GraphicalGenome {
 
             for (read_index, read) in readset.iter().enumerate(){
                 let edgeindex = df_single_sample[[read_index, anchorindex]].round() - 1.0;
+                #[allow(clippy::cast_possible_truncation)]#[allow(clippy::cast_sign_loss)]
                 let usize_index = edgeindex as usize;
                 let edgename = d.get(&usize_index);
                 // println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
                 new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
-                if let Some(edge_value) = self.edges.get(&edgename.as_ref().unwrap().to_string()) {
+                if let Some(edge_value) = self.edges.get(&(*edgename.as_ref().unwrap()).to_string()) {
                     if let Some(seq_value) = edge_value.get("seq") {
-                        let mut new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
+                        let new_edge_value = new_edges.entry((*edgename.as_ref().unwrap()).to_string()).or_insert_with(|| serde_json::json!({}));
                         new_edge_value["seq"] = seq_value.clone();
                     }
                 }
 
-                let edgename_str = edgename.as_ref().unwrap().to_string();
-                let mut new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
+                let edgename_str = (*edgename.as_ref().unwrap()).to_string();
+                let new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
                 if !new_edge_value.get("reads").is_some() {
                     new_edge_value["reads"] = serde_json::Value::Array(vec![]);
                 }
@@ -148,16 +206,16 @@ impl GraphicalGenome {
                 }
 
 
-                if let Some(outgoing_list) = self.outgoing.get(&edgename.as_ref().unwrap().to_string()) {
+                if let Some(outgoing_list) = self.outgoing.get(&(*edgename.as_ref().unwrap()).to_string()) {
                     if let Some(dst) = outgoing_list.get(0){
-                        let incoming_list = new_incoming.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        let incoming_list = new_incoming.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(incoming_list, anchor.to_string());
 
                         let incoming_dst_list = new_incoming.entry(dst.to_string()).or_default();
-                        add_unique(incoming_dst_list, edgename.as_ref().unwrap().to_string());
+                        add_unique(incoming_dst_list, (*edgename.as_ref().unwrap()).to_string());
                         let outgoing_list = new_outgoing.entry(anchor.to_string()).or_default();
-                        add_unique(outgoing_list, edgename.as_ref().unwrap().to_string());
-                        let outgoing_edgename_list = new_outgoing.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        add_unique(outgoing_list, (*edgename.as_ref().unwrap()).to_string());
+                        let outgoing_edgename_list = new_outgoing.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(outgoing_edgename_list, dst.to_string());
                     }
                     else{
@@ -185,15 +243,16 @@ pub struct FindAllPathBetweenAnchors {
 }
 
 impl FindAllPathBetweenAnchors {
+    #[must_use]
     pub fn new(graph: &GraphicalGenome, start: &str, end: &str, read_sets: HashSet<String>) -> Self {
         let mut finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
         };
-        finder.find_path(graph, start, end, Vec::new(), 0, read_sets);
+        finder.find_path(graph, start, end, &Vec::new(), 0, read_sets);
         finder
     }
 
-    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, mut sofar: Vec<String>, depth: usize, readset: HashSet<String>) {
+    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, sofar: &Vec<String>, depth: usize, readset: HashSet<String>) {
         if start == end {
             let mut sofar1 = sofar.clone();
             sofar1.push(end.to_string());
@@ -231,13 +290,14 @@ impl FindAllPathBetweenAnchors {
                 }
                 let mut sofar1 = sofar.clone();
                 sofar1.push(start.to_string());
-                self.find_path(g, dst, end, sofar1, depth1, readset1);
+                self.find_path(g, dst, end, &sofar1, depth1, readset1);
             }
         }
     }
 }
 
 // Series parallele graph
+#[must_use]
 pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String {
     let mut seq = String::new();
     for item in path {

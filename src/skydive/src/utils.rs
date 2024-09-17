@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::collections::HashMap;
 
 use needletail::Sequence;
 use parquet::data_type::AsBytes;
-use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+use petgraph::graph::DiGraph;
+use petgraph::visit::{EdgeRef};
 
 /// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
 /// without any of the provided extensions. It does this by first extracting the last segment of the URL path,
@@ -31,6 +31,11 @@ use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 /// let basename = basename_without_extension(&url, &extensions);
 /// assert_eq!(basename, "file");
 /// ```
+/// # Panics
+///
+/// * The URL path segments are empty (`path_segments().is_empty()`)
+/// * There is no last segment in the path segments (`last().is_none()`)
+#[must_use]
 pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> String {
     let mut basename = seq_url
         .path_segments()
@@ -50,6 +55,16 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     basename
 }
 
+/// Displays a progress bar with defined total length
+///
+/// # Argument
+///
+/// * 'msg' - a message to display
+/// * 'len' - length of tasks
+///
+/// # Panics
+///
+/// If the template creation for the progress bar style fails.
 pub fn default_bounded_progress_bar(
     msg: impl Into<Cow<'static, str>>,
     len: u64,
@@ -68,6 +83,15 @@ pub fn default_bounded_progress_bar(
     progress_bar
 }
 
+/// Displays a spinner without a defined total length
+///
+/// # Argument
+///
+/// * 'msg' - a message to display
+///
+/// # Panics
+///
+/// If the template creation for the progress bar style fails.
 pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indicatif::ProgressBar {
     let progress_bar_style = indicatif::ProgressStyle::default_bar()
         .template("{msg} ... [{elapsed_precise}] {human_pos}")
@@ -91,6 +115,7 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
 ///
 /// A vector containing the canonical k-mer.
 #[inline(always)]
+#[must_use]
 pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     let rc_kmer = kmer.reverse_complement();
     if kmer < rc_kmer.as_bytes() {
@@ -100,6 +125,7 @@ pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     }
 }
 
+#[must_use]
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
@@ -114,6 +140,26 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
+/// Writes the contents of a directed graph (graph) in the Genome File Format (GFA)
+/// to a specified writer (writer). GFA is a text-based format for
+/// representing graphs commonly used in genomics.
+///
+/// # Arguments
+///
+/// * `writer` - A mutable reference to a writer object.
+/// * `graph` - A reference to a directed graph object.
+///
+/// # Returns
+///
+/// An `io::Result` object.
+///
+/// # Errors
+///
+/// If the writer encounters an error while writing to the output stream.
+///
+/// # Panics
+///
+/// If the writer encounters an error while writing to the output stream.
 pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
@@ -127,12 +173,31 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     for edge in graph.edge_references() {
         let (from, to) = (edge.source().index(), edge.target().index());
         let weight = edge.weight();
-        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, (100.0*weight).round() as u8)?;
+
+        #[allow(clippy::cast_possible_truncation)]
+        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, u8::try_from((100.0 * weight).round() as i32).unwrap_or_default())?;
     }
 
     Ok(())
 }
 
+/// Reads a directed graph in the Genome File Format (GFA) from a specified file path.
+///
+/// # Arguments
+///
+/// * `path` - A reference to a path object representing the file path.
+///
+/// # Returns
+///
+/// A `Result` object containing a directed graph object.
+///
+/// # Errors
+///
+/// If the file cannot be opened or read.
+///
+/// # Panics
+///
+/// If the file cannot be opened or read.
 pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);

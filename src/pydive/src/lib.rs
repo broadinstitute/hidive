@@ -1,5 +1,5 @@
-use skydive;
 use pyo3::prelude::*;
+use skydive;
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]

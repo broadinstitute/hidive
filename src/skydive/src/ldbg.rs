@@ -1,10 +1,8 @@
 use anyhow::Result;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{self, Write};
+use std::collections::{HashMap, HashSet};
 
 use indicatif::ProgressIterator;
-use itertools::Itertools;
 use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
@@ -13,16 +11,15 @@ use petgraph::algo::astar;
 use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+use petgraph::visit::{EdgeRef};
 
 use indicatif::ParallelProgressIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
 use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelRefIterator};
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
-
+use sprs::DenseVector;
 use crate::edges::Edges;
 use crate::link::Link;
 use crate::record::Record;
@@ -58,6 +55,11 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If the file cannot be opened.
+    #[must_use]
     pub fn from_file(
         name: String,
         kmer_size: usize,
@@ -100,6 +102,11 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If a file cannot be opened.
+    #[must_use]
     pub fn from_files(
         name: String,
         kmer_size: usize,
@@ -143,6 +150,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequence(
         name: String,
         kmer_size: usize,
@@ -179,6 +187,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequences(
         name: String,
         kmer_size: usize,
@@ -207,6 +216,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A reference to the name of the graph.
+    #[must_use]
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -253,6 +263,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A map of links.
+    #[must_use]
     pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>) -> Self {
         let progress_bar =
             crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
@@ -308,7 +319,7 @@ impl LdBG {
 
         // If it's not already there, insert k-mer and empty record into k-mer map.
         if !graph.contains_key(cn_kmer) {
-            graph.insert(cn_kmer.to_owned(), Record::new(0, None));
+            graph.insert(<[u8] as ToOwned>::to_owned(&cn_kmer), Record::new(0, None));
         }
 
         // Increment the canonical k-mer's coverage.
@@ -373,7 +384,7 @@ impl LdBG {
                     if !link.junctions.is_empty() {
                         // Add link to links map.
                         if !links.contains_key(cn_anchor_kmer) {
-                            links.insert(cn_anchor_kmer.to_owned(), HashMap::new());
+                            links.insert(<[u8]as ToOwned>::to_owned(&cn_anchor_kmer), HashMap::new());
                         }
 
                         if !links.get(cn_anchor_kmer).unwrap().contains_key(&link) {
@@ -470,7 +481,7 @@ impl LdBG {
     }
 
     fn next_kmers(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = ToOwned::to_owned(&crate::utils::canonicalize_kmer(kmer));
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -482,13 +493,13 @@ impl LdBG {
 
         let next_kmers = if cn_kmer == kmer {
             r.outgoing_edges().iter().map(|&e| {
-                let mut next_kmer = kmer[1..].to_owned();
+                let mut next_kmer = ToOwned::to_owned(&kmer[1..]);
                 next_kmer.push(e);
                 next_kmer
             }).collect::<Vec<Vec<u8>>>()
         } else {
             r.incoming_edges().iter().map(|&e| {
-                let mut next_kmer = kmer[1..].to_owned();
+                let mut next_kmer = ToOwned::to_owned(&kmer[1..]);
                 next_kmer.push(complement(e));
                 next_kmer
             }).collect::<Vec<Vec<u8>>>()
@@ -498,7 +509,7 @@ impl LdBG {
     }
 
     fn prev_kmers(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = ToOwned::to_owned(&crate::utils::canonicalize_kmer(kmer));
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -510,13 +521,13 @@ impl LdBG {
 
         let prev_kmers = if cn_kmer == kmer {
             r.incoming_edges().iter().map(|&e| {
-                let mut prev_kmer = kmer[0..kmer.len() - 1].to_owned();
+                let mut prev_kmer = ToOwned::to_owned(&kmer[0..kmer.len() - 1]);
                 prev_kmer.insert(0, e);
                 prev_kmer
             }).collect::<Vec<Vec<u8>>>()
         } else {
             r.outgoing_edges().iter().map(|&e| {
-                let mut prev_kmer = kmer[0..kmer.len() - 1].to_owned();
+                let mut prev_kmer = ToOwned::to_owned(&kmer[0..kmer.len() - 1]);
                 prev_kmer.insert(0, complement(e));
                 prev_kmer
             }).collect::<Vec<Vec<u8>>>()
@@ -536,7 +547,7 @@ impl LdBG {
     ///
     /// An optional vector containing the next k-mer.
     fn next_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Link>) -> Option<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = ToOwned::to_owned(&crate::utils::canonicalize_kmer(kmer));
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -614,7 +625,7 @@ impl LdBG {
     ///
     /// An optional vector containing the previous k-mer.
     fn prev_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Link>) -> Option<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = ToOwned::to_owned(&crate::utils::canonicalize_kmer(kmer));
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -692,6 +703,22 @@ impl LdBG {
         self.kmers.remove(&cn_kmer)
     }
 
+    /// The score of a k-mer function is used to determine the likelihood of a k-mer being a part of a path.
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the `LdBG`.
+    /// * `model_path` - The path to the model file.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the `LdBG`.
+    ///
+    /// # Panics
+    ///
+    /// If the model cannot be loaded.
+    ///
+    #[must_use]
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
@@ -700,7 +727,10 @@ impl LdBG {
             let scov: u16 = 0;
             let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
 
-            let data = Data::new_test_data(vec![lcov as f32, scov as f32, (cn_kmer.len() - compressed_len) as f32], Some(0.0));
+            let lcov_f32 = f32::from(lcov);
+            let scov_f32 = f32::from(scov);
+            #[allow(clippy::cast_precision_loss)]
+            let data = Data::new_test_data(vec![lcov_f32, scov_f32, (cn_kmer.len() - compressed_len) as f32], Some(0.0));
             let prediction = *gbdt.predict(&vec![data]).first().unwrap_or(&0.0);
 
             (cn_kmer.clone(), prediction)
@@ -756,7 +786,7 @@ impl LdBG {
                     .collect::<HashSet<Vec<u8>>>();
     
                 let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until(&mut contig, this_kmer.to_vec(), stop_kmers.clone()) {
+                if let Ok(_) = self.assemble_forward_until(&mut contig, &this_kmer.to_vec(), &stop_kmers.clone()) {
                     for j in 0..=(contig.len() - self.kmer_size - 1) {
                         let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
                         let contig_next_kmer = &contig[j+1..j+self.kmer_size+1].to_vec();
@@ -799,7 +829,7 @@ impl LdBG {
                     .collect::<HashSet<Vec<u8>>>();
 
                 let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_backward_until(&mut contig, this_kmer.to_vec(), stop_kmers.clone()) {
+                if let Ok(_) = self.assemble_backward_until(&mut contig, &this_kmer.to_vec(), &stop_kmers.clone()) {
                     for j in (1..=(contig.len() - self.kmer_size)).rev() {
                         let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
                         let contig_prev_kmer = &contig[j-1..j+self.kmer_size-1].to_vec();
@@ -823,6 +853,22 @@ impl LdBG {
         }
     }
 
+    /// Takes a reference to a sequence and returns a vector of corrected sequences
+    /// based on De Bruijn graph traversal.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `seq` - A reference to the input sequence of bytes that needs to be corrected.
+    ///
+    /// # Returns
+    ///
+    /// A vector of corrected sequences.
+    ///
+    /// # Panics
+    ///
+    /// If the sequence is empty.
+    #[must_use]
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
         let mut graph = DiGraph::new();
 
@@ -885,6 +931,7 @@ impl LdBG {
         corrected_seqs
     }
 
+    #[must_use]
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let progress_bar = crate::utils::default_bounded_progress_bar(
             "Correcting reads",
@@ -905,10 +952,10 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
+    fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: &[u8]) {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = <[u8] as ToOwned>::to_owned(&start_kmer);
         loop {
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
 
@@ -931,7 +978,7 @@ impl LdBG {
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>> {
+    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: &Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
@@ -962,10 +1009,10 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
+    fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: &[u8]) {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = <[u8] as ToOwned>::to_owned(&start_kmer);
         loop {
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
 
@@ -988,7 +1035,15 @@ impl LdBG {
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>>{
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the last k-mer in the contig.
+    ///
+    /// # Panics
+    ///
+    /// If no stopping k-mer is found.
+    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: &Vec<u8>, stop_kmers: &HashSet<Vec<u8>>) -> Result<Vec<u8>>{
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
@@ -1022,6 +1077,11 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector containing the assembled contig.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer length does not match the expected length.
+    #[must_use]
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
@@ -1032,8 +1092,8 @@ impl LdBG {
             self.kmer_size
         );
 
-        self.assemble_forward(&mut contig, kmer.to_vec());
-        self.assemble_backward(&mut contig, kmer.to_vec());
+        self.assemble_forward(&mut contig, ToOwned::to_owned(&kmer));
+        self.assemble_backward(&mut contig, ToOwned::to_owned(&kmer));
 
         contig
     }
@@ -1043,6 +1103,11 @@ impl LdBG {
     /// # Returns
     ///
     /// A vector of contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
     pub fn assemble_all(&self) -> Vec<Vec<u8>> {
         let mut contigs = Vec::new();
 
@@ -1090,7 +1155,7 @@ impl LdBG {
         used_links: &mut HashSet<Link>,
         forward: bool,
     ) {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
+        let cn_kmer_vec = ToOwned::to_owned(&crate::utils::canonicalize_kmer(last_kmer.as_bytes()));
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         if self.links.contains_key(cn_kmer.as_bytes()) {
@@ -1139,6 +1204,21 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    /// Removes paths that have a score below a given threshold.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `LdBG`.
+    /// * `min_score` - The minimum score threshold.
+    ///
+    /// # Returns
+    ///
+    /// A reference with the cleaned paths.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
     pub fn clean_paths(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1156,7 +1236,7 @@ impl LdBG {
                 let mut score_sum = 0.0;
 
                 let mut fw_contig = bad_cn_kmer.clone();
-                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+                self.assemble_forward(&mut fw_contig, ToOwned::to_owned(&bad_cn_kmer).as_slice());
 
                 for kmer in fw_contig.windows(self.kmer_size) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1172,7 +1252,7 @@ impl LdBG {
                 }
 
                 let mut rc_contig = bad_cn_kmer.clone();
-                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+                self.assemble_backward(&mut rc_contig, ToOwned::to_owned(&bad_cn_kmer).as_slice());
 
                 for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1187,6 +1267,7 @@ impl LdBG {
                     }
                 }
 
+                #[allow(clippy::cast_precision_loss)]
                 let weight = score_sum / seen_kmers.len() as f32;
 
                 if weight < min_score {
@@ -1209,6 +1290,21 @@ impl LdBG {
         self
     }
 
+    /// Removes tips from the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `LdBG`.
+    /// * `max_tip_length` - The maximum tip length.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `LdBG` with the tips removed.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
     pub fn clean_tips(mut self, max_tip_length: usize) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
@@ -1219,13 +1315,18 @@ impl LdBG {
 
                 for cur_kmer in next_kmers {
                     let mut fw_contig = cur_kmer.to_vec();
-                    self.assemble_forward(&mut fw_contig, cur_kmer.clone());
+                    self.assemble_forward(&mut fw_contig, ToOwned::to_owned(&cur_kmer).as_slice());
 
-                    let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
+                    let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                        Ok(kmer_size_u8) => kmer_size_u8,
+                        Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                    };
+
+                    let last_kmer = fw_contig.kmers(kmer_size_u8).last().unwrap();
                     let num_next = self.next_kmers(last_kmer).len();
 
                     if fw_contig.len() <= max_tip_length && num_next == 0 {
-                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
+                        for kmer in fw_contig.kmers(kmer_size_u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
 
@@ -1239,13 +1340,18 @@ impl LdBG {
 
                 for cur_kmer in prev_kmers {
                     let mut rv_contig = cur_kmer.to_vec();
-                    self.assemble_backward(&mut rv_contig, cur_kmer.clone());
+                    self.assemble_backward(&mut rv_contig,  ToOwned::to_owned(&cur_kmer).as_slice());
 
-                    let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
+                    let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                        Ok(kmer_size_u8) => kmer_size_u8,
+                        Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                    };
+
+                    let first_kmer = rv_contig.kmers(kmer_size_u8).next().unwrap();
                     let num_prev = self.prev_kmers(first_kmer).len();
 
                     if rv_contig.len() <= max_tip_length && num_prev == 0 {
-                        for kmer in rv_contig.kmers(self.kmer_size as u8) {
+                        for kmer in rv_contig.kmers(kmer_size_u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
 
@@ -1268,7 +1374,23 @@ impl LdBG {
         self
     }
 
-    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    /// Builds a directed graph (`DiGraph`) starting from a given `start_kmer`,
+    /// and traverses both forward and backward through adjacent kmers.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `start_kmer` - A vector representing the starting k-mer.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of kmers.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
+    pub fn traverse_kmers(&self, start_kmer: &Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -1321,7 +1443,23 @@ impl LdBG {
         graph
     }
 
-    pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    /// Builds a directed graph (`DiGraph`) starting from a given `start_kmer`,
+    /// and traverses both forward and backward through adjacent contigs.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    /// * `start_kmer` - A vector representing the starting k-mer.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
+    pub fn traverse_contigs(&self, start_kmer: &Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -1337,9 +1475,14 @@ impl LdBG {
                 for next_kmer in self.next_kmers(&last_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&next_kmer)) {
                         let mut next_contig = next_kmer.clone();
-                        self.assemble_forward(&mut next_contig, next_kmer.clone());
+                        self.assemble_forward(&mut next_contig, ToOwned::to_owned(&next_kmer).as_slice());
 
-                        let weight = next_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+                        let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                            Ok(kmer_size_u8) => kmer_size_u8,
+                            Err(_) => panic!("kmer_size is too large to fit in a u8"),
+                        };
+
+                        let weight = next_contig.as_bytes().kmers(kmer_size_u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
 
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
@@ -1364,9 +1507,17 @@ impl LdBG {
                 for prev_kmer in self.prev_kmers(&first_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&prev_kmer)) {
                         let mut prev_contig = prev_kmer.clone();
-                        self.assemble_backward(&mut prev_contig, prev_kmer.clone());
+                        self.assemble_backward(&mut prev_contig, ToOwned::to_owned(&prev_kmer).as_slice());
 
-                        let weight = prev_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
+                        let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                            Ok(size) => size,
+                            Err(_) => {
+                                // Handle the error case (e.g., panic, return)
+                                panic!("kmer_size is too large to fit in a u8"); // Replace with your error handling logic
+                            }
+                        };
+
+                        let weight = prev_contig.as_bytes().kmers(kmer_size_u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
 
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
                         graph.add_edge(node, prev_node, weight);
@@ -1385,6 +1536,20 @@ impl LdBG {
         graph
     }
 
+    /// Traverse all kmers in the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of all kmers.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
     pub fn traverse_all_kmers(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()
@@ -1397,7 +1562,7 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_kmers(cn_kmer);
+                let g = self.traverse_kmers(&cn_kmer);
 
                 g.node_weights().for_each(|node| {
                     let cn_kmer = crate::utils::canonicalize_kmer(node.as_bytes());
@@ -1431,6 +1596,20 @@ impl LdBG {
         graph
     }
 
+    /// Traverse all contigs in the linked de Bruijn graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `LdBG` instance.
+    ///
+    /// # Returns
+    ///
+    /// A directed graph (`DiGraph`) representing the traversal of all contigs.
+    ///
+    /// # Panics
+    ///
+    /// If the k-mer size is not a positive integer.
+    #[must_use]
     pub fn traverse_all_contigs(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()
@@ -1443,10 +1622,17 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_contigs(cn_kmer);
+                let g = self.traverse_contigs(&cn_kmer);
 
+                let kmer_size_u8 = match u8::try_from(self.kmer_size) {
+                    Ok(size) => size,
+                    Err(_) => {
+                        // Handle the error case (e.g., panic, return)
+                        panic!("kmer_size is too large to fit in a u8"); // Replace with your error handling logic
+                    }
+                };
                 g.node_weights().for_each(|node| {
-                    for kmer in node.as_bytes().kmers(self.kmer_size as u8) {
+                    for kmer in node.as_bytes().kmers(kmer_size_u8) {
                         visited.insert(crate::utils::canonicalize_kmer(&kmer));
                     }
                 });
@@ -1740,7 +1926,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_kmers(b"ATTTC".to_vec());
+        let graph = g.traverse_kmers(&b"ATTTC".to_vec());
 
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
@@ -1829,7 +2015,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_contigs(b"CCACG".to_vec());
+        let graph = g.traverse_contigs(&b"CCACG".to_vec());
 
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
@@ -1907,87 +2093,87 @@ mod tests {
         let mut exp_graph = KmerGraph::new();
         exp_graph.insert(
             b"AAATC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"AATCA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a.....G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("a.....G."))),
         );
         exp_graph.insert(
             b"ACCGT".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c....G.".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c....G."))),
         );
         exp_graph.insert(
             b"ACTGA".to_vec(),
-            Record::new(1, Some(Edges::from_string(".......T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".......T"))),
         );
         exp_graph.insert(
             b"ATCAG".to_vec(),
-            Record::new(1, Some(Edges::from_string("a......T".to_string()))),
+            Record::new(1, Some(Edges::from_string("a......T"))),
         );
         exp_graph.insert(
             b"ATCGA".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c..A...".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c..A..."))),
         );
         exp_graph.insert(
             b"ATCGC".to_vec(),
-            Record::new(2, Some(Edges::from_string(".c..A...".to_string()))),
+            Record::new(2, Some(Edges::from_string(".c..A..."))),
         );
         exp_graph.insert(
             b"ATGCC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"ATGCG".to_vec(),
-            Record::new(2, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(2, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"ATTTC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g...G."))),
         );
         exp_graph.insert(
             b"CACCG".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c.....T"))),
         );
         exp_graph.insert(
             b"CACGG".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c.....T"))),
         );
         exp_graph.insert(
             b"CATCG".to_vec(),
-            Record::new(3, Some(Edges::from_string("..g.AC..".to_string()))),
+            Record::new(3, Some(Edges::from_string("..g.AC.."))),
         );
         exp_graph.insert(
             b"CCACC".to_vec(),
-            Record::new(1, Some(Edges::from_string("......G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("......G."))),
         );
         exp_graph.insert(
             b"CCACG".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g...G."))),
         );
         exp_graph.insert(
             b"CGAAA".to_vec(),
-            Record::new(1, Some(Edges::from_string("...t...T".to_string()))),
+            Record::new(1, Some(Edges::from_string("...t...T"))),
         );
         exp_graph.insert(
             b"GATGC".to_vec(),
-            Record::new(3, Some(Edges::from_string(".c...CG.".to_string()))),
+            Record::new(3, Some(Edges::from_string(".c...CG."))),
         );
         exp_graph.insert(
             b"GCCAC".to_vec(),
-            Record::new(1, Some(Edges::from_string("...t..G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("...t..G."))),
         );
         exp_graph.insert(
             b"TCGAA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a...A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("a...A..."))),
         );
         exp_graph.insert(
             b"TCGCA".to_vec(),
-            Record::new(2, Some(Edges::from_string("a......T".to_string()))),
+            Record::new(2, Some(Edges::from_string("a......T"))),
         );
         exp_graph.insert(
             b"TGCCA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a....C..".to_string()))),
+            Record::new(1, Some(Edges::from_string("a....C.."))),
         );
 
         let mut exp_links = Links::new();
@@ -2066,11 +2252,11 @@ mod tests {
             .build_links(&fwd_seqs);
 
         let mut contig1 = b"ACTGA".to_vec();
-        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]));
+        let _ = g.assemble_forward_until(&mut contig1, &b"ACTGA".to_vec(), &HashSet::from([b"TTCGA".to_vec()]));
         assert_eq!(contig1, b"ACTGATTTCGA".to_vec());
 
         let mut contig2 = b"GGTGG".to_vec();
-        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]));
+        let _ = g.assemble_backward_until(&mut contig2, &b"GGTGG".to_vec(), &HashSet::from([b"TGCCA".to_vec()]));
         assert_eq!(contig2, b"TGCCACGGTGG".to_vec());
     }
 
