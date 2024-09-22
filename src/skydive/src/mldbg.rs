@@ -132,13 +132,6 @@ impl MLdBG {
 
         ldbg.scores = self.scores.clone();
 
-        let mut below_threshold = 0;
-        for (cn_kmer, score) in &ldbg.scores {
-            if *score < 0.5 {
-                below_threshold += 1;
-            }
-        }
-
         ldbg.infer_edges();
 
         ldbg

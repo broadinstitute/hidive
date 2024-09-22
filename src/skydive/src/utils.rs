@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 
 use needletail::Sequence;
@@ -48,6 +48,21 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     }
 
     basename
+}
+
+pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
+    paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>()
 }
 
 pub fn default_bounded_progress_bar(

@@ -1137,6 +1137,8 @@ impl LdBG {
                         used_kmers.insert(crate::utils::canonicalize_kmer(kmer_in_contig));
                     }
                     contigs.push(contig);
+                } else if r.in_degree() == 0 && r.out_degree() == 0 {
+                    contigs.push(cn_kmer.to_vec());
                 }
 
                 used_kmers.insert(cn_kmer.clone());
@@ -1337,11 +1339,58 @@ impl LdBG {
         self
     }
 
+    pub fn clean_contigs(mut self, min_contig_length: usize) -> Self {
+        let mut to_remove = HashSet::new();
+        let mut bad_contigs: usize = 0;
+
+        self.assemble_all().iter().for_each(|contig| {
+            if contig.len() < min_contig_length {
+                let mut process = true;
+
+                // Check if the first k-mer has no incoming edges
+                let first_kmer = contig.windows(self.kmer_size).next().unwrap();
+                let prev_kmers = self.prev_kmers(first_kmer);
+                if prev_kmers.len() > 0 {
+                    process = false;
+                }
+
+                // Check if the last k-mer has no outgoing edges
+                let last_kmer = contig.windows(self.kmer_size).last().unwrap();
+                let next_kmers = self.next_kmers(last_kmer);
+                if next_kmers.len() > 0 {
+                    process = false;
+                }
+
+                if process {
+                    for kmer in contig.windows(self.kmer_size) {
+                        to_remove.insert(crate::utils::canonicalize_kmer(kmer));
+                    }
+
+                    bad_contigs += 1;
+                }
+            }
+        });
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad contigs ({} kmers)", bad_contigs, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    /// Traverse kmers starting from a given kmer and build a graph.
     pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
-        let mut visited = HashMap::new();
+        let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
 
-        let start_node = graph.add_node(String::from_utf8_lossy(&start_kmer).to_string());
+        let start_label = String::from_utf8_lossy(&start_kmer).to_string();
+        let start_node = graph.add_node(start_label.clone());
+        visited.insert(start_label.clone(), start_node);
 
         // Traverse forward
         let mut fwd_stack = vec![start_node];
@@ -1349,18 +1398,23 @@ impl LdBG {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
 
             for next_kmer in self.next_kmers(this_kmer) {
-                let next_node = graph.add_node(String::from_utf8_lossy(&next_kmer).to_string());
-                graph.add_edge(node, next_node, *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&1.0));
-
-                if !visited.contains_key(&next_kmer) {
-                    visited.insert(next_kmer.clone(), next_node);
-
-                    fwd_stack.push(next_node);
+                let next_label = String::from_utf8_lossy(&next_kmer).to_string();
+                let next_node = if let Some(&existing_node) = visited.get(&next_label) {
+                    existing_node
                 } else {
-                    for end_kmer in self.next_kmers(&next_kmer) {
-                        let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(next_node, *end_node, *self.scores.get(&crate::utils::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
-                    }
+                    let new_node = graph.add_node(next_label.clone());
+                    visited.insert(next_label.clone(), new_node);
+                    fwd_stack.push(new_node);
+                    new_node
+                };
+
+                if !graph.contains_edge(node, next_node) {
+                    graph.add_edge(
+                        node,
+                        next_node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer))
+                            .unwrap_or(&1.0),
+                    );
                 }
             }
         }
@@ -1371,18 +1425,23 @@ impl LdBG {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
 
             for prev_kmer in self.prev_kmers(this_kmer) {
-                let prev_node = graph.add_node(String::from_utf8_lossy(&prev_kmer).to_string());
-                graph.add_edge(prev_node, node, *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&1.0));
-
-                if !visited.contains_key(&prev_kmer) {
-                    visited.insert(prev_kmer.clone(), prev_node);
-
-                    rev_stack.push(prev_node);
+                let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
+                let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
+                    existing_node
                 } else {
-                    for end_kmer in self.prev_kmers(&prev_kmer) {
-                        let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(*end_node, prev_node, *self.scores.get(&crate::utils::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
-                    }
+                    let new_node = graph.add_node(prev_label.clone());
+                    visited.insert(prev_label.clone(), new_node);
+                    rev_stack.push(new_node);
+                    new_node
+                };
+
+                if !graph.contains_edge(prev_node, node) {
+                    graph.add_edge(
+                        prev_node,
+                        node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer))
+                            .unwrap_or(&1.0),
+                    );
                 }
             }
         }
@@ -1393,64 +1452,85 @@ impl LdBG {
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
-
+    
         let start_contig = self.assemble(&start_kmer);
         let start_node = graph.add_node(String::from_utf8_lossy(&start_contig).to_string());
-
+        
+        // Mark all k-mers in the start contig as visited
+        for kmer in start_contig.windows(self.kmer_size) {
+            visited.insert(crate::utils::canonicalize_kmer(kmer), start_node);
+        }
+    
         // Traverse forward
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-
+    
             if let Some(last_kmer) = self.last_kmer(this_contig) {
                 for next_kmer in self.next_kmers(&last_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&next_kmer)) {
                         let mut next_contig = next_kmer.clone();
                         self.assemble_forward(&mut next_contig, next_kmer.clone());
-
-                        let weight = next_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
-
+    
+                        let weight = next_contig.windows(self.kmer_size)
+                            .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
+                            .fold(f32::INFINITY, |acc, x| acc.min(*x));
+    
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
-
-                        visited.insert(crate::utils::canonicalize_kmer(&next_kmer), next_node);
-
+    
+                        // Mark all k-mers in the new contig as visited
+                        for kmer in next_contig.windows(self.kmer_size) {
+                            visited.insert(crate::utils::canonicalize_kmer(kmer), next_node);
+                        }
+    
                         fwd_stack.push(next_node);
                     } else {
-                        let next_node = visited.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap();
-                        graph.add_edge(node, *next_node, 1.0);
+                        let next_node = *visited.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap();
+                        if !graph.contains_edge(node, next_node) {
+                            let weight = *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&1.0);
+                            graph.add_edge(node, next_node, weight);
+                        }
                     }
                 }
             }
         }
-
+    
         // Traverse backward
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-
+    
             if let Some(first_kmer) = self.first_kmer(this_contig) {
                 for prev_kmer in self.prev_kmers(&first_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&prev_kmer)) {
                         let mut prev_contig = prev_kmer.clone();
                         self.assemble_backward(&mut prev_contig, prev_kmer.clone());
-
-                        let weight = prev_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
-
+    
+                        let weight = prev_contig.windows(self.kmer_size)
+                            .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
+                            .fold(f32::INFINITY, |acc, x| acc.min(*x));
+    
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
-                        graph.add_edge(node, prev_node, weight);
-
-                        visited.insert(crate::utils::canonicalize_kmer(&prev_kmer), prev_node);
-
+                        graph.add_edge(prev_node, node, weight);  // Note the reversed edge direction
+    
+                        // Mark all k-mers in the new contig as visited
+                        for kmer in prev_contig.windows(self.kmer_size) {
+                            visited.insert(crate::utils::canonicalize_kmer(kmer), prev_node);
+                        }
+    
                         rev_stack.push(prev_node);
                     } else {
-                        let prev_node = visited.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap();
-                        graph.add_edge(node, *prev_node, 1.0);
+                        let prev_node = *visited.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap();
+                        if !graph.contains_edge(prev_node, node) {
+                            let weight = *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&1.0);
+                            graph.add_edge(prev_node, node, weight);  // Note the reversed edge direction
+                        }
                     }
                 }
             }
         }
-
+    
         graph
     }
 
@@ -1463,36 +1543,39 @@ impl LdBG {
 
         let mut visited = HashSet::new();
         let mut graph = DiGraph::new();
+        let mut node_indices = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_kmers(cn_kmer);
+                let g = self.traverse_kmers(cn_kmer.clone());
 
-                g.node_weights().for_each(|node| {
-                    let cn_kmer = crate::utils::canonicalize_kmer(node.as_bytes());
+                // Mark kmers as visited
+                for node_label in g.node_weights() {
+                    let cn_kmer = crate::utils::canonicalize_kmer(node_label.as_bytes());
                     visited.insert(cn_kmer);
-                });
-
-                // Add all nodes from g to graph
-                for node_index in g.node_indices() {
-                    let node_weight = g.node_weight(node_index).unwrap();
-                    graph.add_node(node_weight.clone());
                 }
 
-                // Add all edges from g to graph
+                // Add nodes to the main graph, avoiding duplicates
+                for node_index in g.node_indices() {
+                    let node_label = g.node_weight(node_index).unwrap().clone();
+                    if !node_indices.contains_key(&node_label) {
+                        let new_node_idx = graph.add_node(node_label.clone());
+                        node_indices.insert(node_label.clone(), new_node_idx);
+                    }
+                }
+
+                // Add edges, mapping nodes correctly
                 for edge in g.edge_references() {
                     let (source, target) = (edge.source(), edge.target());
-                    let source_weight = g.node_weight(source).unwrap();
-                    let target_weight = g.node_weight(target).unwrap();
-                    
-                    let new_source = graph.node_indices()
-                        .find(|&i| graph[i] == *source_weight)
-                        .unwrap();
-                    let new_target = graph.node_indices()
-                        .find(|&i| graph[i] == *target_weight)
-                        .unwrap();
-                    
-                    graph.add_edge(new_source, new_target, *edge.weight());
+                    let source_label = g.node_weight(source).unwrap();
+                    let target_label = g.node_weight(target).unwrap();
+
+                    let new_source = *node_indices.get(source_label).expect("Source node should exist");
+                    let new_target = *node_indices.get(target_label).expect("Target node should exist");
+
+                    if !graph.contains_edge(new_source, new_target) {
+                        graph.add_edge(new_source, new_target, *edge.weight());
+                    }
                 }
             }
         }
@@ -1814,8 +1897,8 @@ mod tests {
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
         // Check if the graph is consistent with the expected structure
-        assert_eq!(graph.node_count(), 22);
-        assert_eq!(graph.edge_count(), 22);
+        assert_eq!(graph.node_count(), 21);
+        assert_eq!(graph.edge_count(), 21);
 
         // Check specific nodes and their labels
         let node_labels: Vec<_> = graph.node_weights().cloned().collect();
@@ -1843,7 +1926,7 @@ mod tests {
 
         // Check specific edges
         let edges = graph.edge_indices().collect::<Vec<_>>();
-        assert_eq!(edges.len(), 22);
+        assert_eq!(edges.len(), 21);
 
         // Helper function to find node index by label
         let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
@@ -1900,6 +1983,8 @@ mod tests {
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
         let graph = g.traverse_contigs(b"CCACG".to_vec());
 
+        // Uncomment to manually verify structure of the graph
+        // use petgraph::dot::Dot;
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
         // Check if the graph is consistent with the expected structure
@@ -1920,9 +2005,9 @@ mod tests {
         let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
 
         // Check some specific edges
-        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("ACTGATTTCGAT")));
-        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("CGATGCGAT")));
-        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("ACTGATTTCGAT")));
+        assert!(graph.contains_edge(find_node("ACTGATTTCGAT"), find_node("CGATGCCACGGTGG")));
+        assert!(graph.contains_edge(find_node("ACTGATTTCGAT"), find_node("CGATGCGAT")));
+        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("CGATGCCACGGTGG")));
         assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("CGATGCGAT")));
     }
 
