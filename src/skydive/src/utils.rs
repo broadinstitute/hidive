@@ -129,6 +129,25 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
+pub fn shannon_entropy(seq: &[u8]) -> f32 {
+    let mut freq = HashMap::new();
+    let len = seq.len() as f32;
+
+    for &base in seq {
+        *freq.entry(base).or_insert(0) += 1;
+    }
+
+    -freq.values().map(|&count| {
+        let p = count as f32 / len;
+        p * p.log2()
+    }).sum::<f32>()
+}
+
+pub fn gc_content(seq: &[u8]) -> f32 {
+    let gc_count = seq.iter().filter(|&&base| base == b'G' || base == b'C').count();
+    gc_count as f32 / seq.len() as f32
+}
+
 pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
