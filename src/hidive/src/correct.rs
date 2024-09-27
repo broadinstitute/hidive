@@ -34,9 +34,12 @@ pub fn start(
         .clean_paths(0.01)
         .clean_tips(3*kmer_size)
         .clean_contigs(100)
-        ;
+        .build_links(&all_lr_seqs);
 
-    let contigs = m.assemble_all();
+    // let contigs = m.assemble_all();
+    // for contig in contigs {
+    //     println!(">contig\n{}", String::from_utf8(contig.clone()).unwrap());
+    // }
 
     for (i, all_lr_seq) in all_lr_seqs.iter().enumerate() {
         // println!(">{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
@@ -61,21 +64,10 @@ pub fn start(
             seq.push(kmer[kmer_size-1] as char);
         }
 
-        // println!(">{}\n{}", i, seq);
-
-        // let corrected_seqs = m.correct_seq(all_lr_seq);
-        // for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-        //     println!(">corrected_{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
-        // }
-    }
-
-    let orig_seq = b"GATTCTCCCCAGACGCCGAGGATGGCCGTCATGGCGCCCCGAACCCTCGTCCTGCTACTCTCGGGGGCTCTGGCCCTGACCCAGACCTGGGCGGGTGAGTGCGGGGTCGGGGAGGGAAACGGCCTCTGTGGGGAGAAGCAACGGGCCCGCCTGGGCGGGGGCGCAGGACCCGGGAAGCCGCGCCGGGAGGAGGGTCGGGCGGGTCTCAAGCCACTCCTCTCCCCAGGCTCTCACTCCATGAGGTATTTCTACACCTCCGTGTCCCGGCCCGGCCGCGGGGAGCCCCGCTTCATCGCAGTGGG";
-    let corr_seqs = m.correct_seq(orig_seq);
-
-    skydive::elog!("Corrected sequence: {}", corr_seqs.len());
-
-    for (i, corr_seq) in corr_seqs.iter().enumerate() {
-        println!(">corrected_{}\n{}", i, String::from_utf8(corr_seq.clone()).unwrap());
+        let corrected_seqs = m.correct_seq(all_lr_seq);
+        for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+            println!(">corrected_{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
+        }
     }
 
     let g = m.traverse_all_kmers();
