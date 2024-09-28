@@ -64,10 +64,16 @@ pub fn start(
             seq.push(kmer[kmer_size-1] as char);
         }
 
-        let corrected_seqs = m.correct_seq(all_lr_seq);
-        for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
-            println!(">corrected_{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
-        }
+        // let corrected_seqs = m.correct_seq(all_lr_seq);
+        // for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+        //     println!(">corrected_{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
+        // }
+    }
+
+    let raw_read = b"GATTCTCCCCAGACGCCGAGGATGGCCGTCATGGCGCCCCGAACCCTCGTCCTGCTACTCTCGGGGGCTCTGGCCCTGACCCAGACCTGGGCCGGGTGAGTGGCGGGGTCGGGAGGGAAACGGCCTCTGTGGGGAGAAGCAACGGGCCCGCCTGGCGGGGGCGCAGGACCCGGGAAGCCGCGCCGGGAGGAGGGTCGGGCGGGTCTCAGCCACTCCTCGTCCCCAGGCTCTCACTCCATGAGGTATTTCTACACCTCCGTGTCCCGGCCCGGCCGCGGGGAGCCCCGCTTCATCGCAGTGGG";
+    let cor_reads = m.correct_seq(raw_read);
+    for (i, cor_read) in cor_reads.iter().enumerate() {
+        println!(">corrected_{}\n{}", i, String::from_utf8(cor_read.clone()).unwrap());
     }
 
     let g = m.traverse_all_kmers();
