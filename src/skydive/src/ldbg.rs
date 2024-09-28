@@ -733,18 +733,8 @@ impl LdBG {
     }
 
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
-        let mut graph = DiGraph::<String, f64>::new();
+        let (mut graph, node_indices) = self.initialize_read_graph(seq);
 
-        let mut node_indices = Vec::new();
-
-        for kmer in seq.windows(self.kmer_size) {
-            if self.kmers.contains_key(&crate::utils::canonicalize_kmer(kmer)) {
-                let node_index = graph.add_node(String::from_utf8_lossy(kmer).to_string());
-                node_indices.push(node_index);
-            }
-        }
-
-        // Connect nodes in the graph
         for window in node_indices.windows(2) {
             let (from, to) = (window[0], window[1]);
 
@@ -764,120 +754,56 @@ impl LdBG {
                 let mut forward_contig = from_kmer.to_vec();
                 let mut backward_contig = to_kmer.to_vec();
 
-                let forward_stop_kmers = HashSet::from([to_kmer.to_vec()]);
-                let backward_stop_kmers = HashSet::from([from_kmer.to_vec()]);
-                
-                if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), forward_stop_kmers.clone()) {
-                    // If forward assembly succeeded, add path to graph
-                    for i in 0..forward_contig.len() - self.kmer_size {
-                        let current_kmer = &forward_contig[i..i + self.kmer_size];
-                        let next_kmer = &forward_contig[i + 1..i + 1 + self.kmer_size];
-                        
-                        let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                            .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                        let next_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(next_kmer).to_string())
-                            .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
-                        
-                        graph.add_edge(current_node, next_node, 1.0);
-                    }
-                } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), backward_stop_kmers.clone()) {
-                    // If backward assembly succeeded, add path to graph
-                    for i in (0..backward_contig.len() - self.kmer_size).rev() {
-                        let current_kmer = &backward_contig[i..i + self.kmer_size];
-                        let prev_kmer = &backward_contig[i + 1..i + 1 + self.kmer_size];
-                        
-                        let prev_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                            .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                        let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
-                            .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
-                        
-                        graph.add_edge(prev_node, current_node, 1.0);
-                    }
+                if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()])) {
+                    self.add_to_read_graph_forward(forward_contig, &mut graph);
+                } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()])) {
+                    self.add_to_read_graph_backward(backward_contig, &mut graph);
                 } else {
-                    'outer: for i in 0..=5 {
-                        for j in 0..=5 {
-                            if let Some(new_from) = navigate_back(from, i, &graph) {
-                                if let Some(new_to) = navigate_forward(to, j, &graph) {
-                                    // Attempt to assemble contig between new_from and new_to
+                    'outer: for scan_left in 0..=5 {
+                        for scan_right in 0..=5 {
+                            if let Some(new_from) = navigate_back(from, scan_left, &graph) {
+                                if let Some(new_to) = navigate_forward(to, scan_right, &graph) {
                                     let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
                                     let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
-
-                                    // crate::elog!("{} {} {} {}", i, j, String::from_utf8_lossy(new_from_kmer), String::from_utf8_lossy(new_to_kmer));
 
                                     let mut forward_contig = new_from_kmer.to_vec();
                                     let mut backward_contig = new_to_kmer.to_vec();
 
-                                    let forward_stop_kmers = HashSet::from([new_to_kmer.to_vec()]);
-                                    let backward_stop_kmers = HashSet::from([new_from_kmer.to_vec()]);
-                                    
-                                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), forward_stop_kmers.clone()) {
-                                        for i in 0..forward_contig.len() - self.kmer_size {
-                                            let current_kmer = &forward_contig[i..i + self.kmer_size];
-                                            let next_kmer = &forward_contig[i + 1..i + 1 + self.kmer_size];
-                                        
-                                            let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                                                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                                            let next_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(next_kmer).to_string())
-                                                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
-                                            
-                                            graph.add_edge(current_node, next_node, 1.0);
-                                        }
+                                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
+                                        self.add_to_read_graph_forward(forward_contig, &mut graph);
 
                                         break 'outer;
-                                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), backward_stop_kmers.clone()) {
-                                        // If backward assembly succeeded, add path to graph
-                                        for i in (0..backward_contig.len() - self.kmer_size).rev() {
-                                            let current_kmer = &backward_contig[i..i + self.kmer_size];
-                                            let prev_kmer = &backward_contig[i + 1..i + 1 + self.kmer_size];
-                                            
-                                            let prev_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                                                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                                            let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
-                                                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
-                                            
-                                            graph.add_edge(prev_node, current_node, 1.0);
-                                        }
+                                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
+                                        self.add_to_read_graph_backward(backward_contig, &mut graph);
+
                                         break 'outer;
                                     } else {
-                                        // let score = |a: u8, b: u8| if a == b { 1i32 } else { -1i32 };
-                                        // let mut aligner = Aligner::with_capacity(forward_contig.len(), backward_contig.len(), -5, -1, &score);
-                                        // let alignment = aligner.semiglobal(&forward_contig, &backward_contig);
-
-                                        // let p = alignment.pretty(&forward_contig, &backward_contig, 100);
-                                        // crate::elog!("\n{}", p);
-
                                         let mut contig = from_kmer.to_vec();
                                         if let Ok(_) = LdBG::from_sequences("contig".to_string(), self.kmer_size, &vec![forward_contig.clone(), backward_contig.clone()])
                                             .build_links(&vec![forward_contig.clone(), backward_contig.clone()])
-                                            .assemble_forward_until(&mut contig, new_from_kmer.to_vec(), forward_stop_kmers.clone())
+                                            .assemble_forward_until(&mut contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]))
                                         {
-                                            for i in (0..contig.len() - self.kmer_size).rev() {
-                                                let current_kmer = &contig[i..i + self.kmer_size];
-                                                let prev_kmer = &contig[i + 1..i + 1 + self.kmer_size];
-                                                
-                                                let prev_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                                                    .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                                                let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
-                                                    .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
-                                                
-                                                graph.add_edge(prev_node, current_node, 1.0);
-                                            }
+                                            self.add_to_read_graph_forward(contig, &mut graph);
+
                                             break 'outer;
+                                        } else if let Ok(_) = LdBG::from_sequences("contig".to_string(), self.kmer_size, &vec![forward_contig.clone(), backward_contig.clone()])
+                                            .build_links(&vec![forward_contig.clone(), backward_contig.clone()])
+                                            .assemble_backward_until(&mut contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]))
+                                        {
+                                            self.add_to_read_graph_backward(contig, &mut graph);
+
+                                            break 'outer;
+
                                         } else {
                                             if let Some(start_pos) = seq.windows(new_from_kmer.len()).position(|window| window == new_from_kmer) {
                                                 if let Some(end_pos) = seq[start_pos + new_from_kmer.len()..].windows(new_to_kmer.len()).position(|window| window == new_to_kmer) {
                                                     let substring = &seq[start_pos..start_pos + new_from_kmer.len() + end_pos + new_to_kmer.len()];
 
-                                                    crate::elog!("{} {} {} {}", i, j, String::from_utf8_lossy(new_from_kmer), String::from_utf8_lossy(new_to_kmer));
-                                                    crate::elog!("sub {}", String::from_utf8_lossy(substring));
-
                                                     let mut fwd_contig = new_from_kmer.to_vec();
                                                     let _ = self.assemble_forward_until(&mut fwd_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]));
-                                                    crate::elog!("fwd {}", String::from_utf8_lossy(&fwd_contig));
 
                                                     let mut rev_contig = new_to_kmer.to_vec();
                                                     let _ = self.assemble_backward_until(&mut rev_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]));
-                                                    crate::elog!("rev {}", String::from_utf8_lossy(&rev_contig));
 
                                                     let mut subgraph = DiGraph::new();
                                                     let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
@@ -921,28 +847,9 @@ impl LdBG {
                                                             }
                                                         }
 
-                                                        crate::elog!("Best contig: {} (ldist: {}) {}", best_contig, min_ldist, (substring.len() / 10) as u32);
-                                                        crate::elog!("Substring  : {}", String::from_utf8_lossy(&substring));
-
                                                         if min_ldist < (substring.len() / 10) as u32 {
-                                                            for i in 0..best_contig.len() - self.kmer_size {
-                                                                let current_kmer = best_contig[i..i + self.kmer_size].as_bytes();
-                                                                let next_kmer = best_contig[i + 1..i + 1 + self.kmer_size].as_bytes();
+                                                            self.add_to_read_graph_forward(best_contig.as_bytes().to_vec(), &mut graph);
 
-                                                                // crate::elog!("{} {}", String::from_utf8_lossy(current_kmer), String::from_utf8_lossy(next_kmer));
-
-                                                                // let cn = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string());
-                                                                // let nn = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(next_kmer).to_string());
-
-                                                                // crate::elog!("{:?} {:?}", cn, nn);
-                                                            
-                                                                let current_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(current_kmer).to_string())
-                                                                    .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
-                                                                let next_node = graph.node_indices().find(|&n| graph[n] == String::from_utf8_lossy(next_kmer).to_string())
-                                                                    .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
-                                                                
-                                                                graph.add_edge(current_node, next_node, 1.0);
-                                                            }
                                                             break 'outer;
                                                         }
                                                     } else {
@@ -968,60 +875,54 @@ impl LdBG {
             }
         }
 
-        // Populate corrected_seqs with all contiguous stretches of the graph more than 1 node long
-        let mut corrected_seqs = Vec::new();
-        let mut visited = HashSet::new();
-        for node in graph.node_indices() {
-            if !visited.contains(&node) {
-                let mut current_seq = Vec::new();
-                let mut current_node = node;
-                
-                loop {
-                    visited.insert(current_node);
-                    if current_seq.is_empty() {
-                        current_seq.push(graph[current_node].clone());
-                    } else {
-                        current_seq.push(graph[current_node].chars().last().unwrap().to_string());
-                    }
-                    
-                    let outgoing_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
-                    if outgoing_edges.len() == 1 {
-                        let next_node = outgoing_edges[0].target();
-                        if !visited.contains(&next_node) {
-                            current_node = next_node;
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                
-                // if current_seq.len() > 1 {
-                    let contig = current_seq.join("").as_bytes().to_vec();
-                    corrected_seqs.push(contig);
-                // }
-            }
-        }
-
-        // Write the graph to a dot file
-        // use std::fs::File;
-        // use petgraph::dot::{Dot, Config};
-        use petgraph::dot::Config;
-
-        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
-
-        if let Ok(mut file) = File::create("graph.dot") {
-            if let Err(e) = write!(file, "{:?}", dot) {
-                eprintln!("Failed to write to file: {}", e);
-            }
-        } else {
-            eprintln!("Failed to create file");
-        }
+        let corrected_seqs = traverse_read_graph(graph);
 
         corrected_seqs
     }
 
+    fn add_to_read_graph_backward(&self, backward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+        // If backward assembly succeeded, add path to graph
+        for i in (0..backward_contig.len() - self.kmer_size).rev() {
+            let current_kmer = &backward_contig[i..i + self.kmer_size];
+            let prev_kmer = &backward_contig[i + 1..i + 1 + self.kmer_size];
+    
+            let prev_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
+            let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
+    
+            graph.add_edge(prev_node, current_node, 1.0);
+        }
+    }
+    
+    fn add_to_read_graph_forward(&self, forward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+        // If forward assembly succeeded, add path to graph
+        for i in 0..forward_contig.len() - self.kmer_size {
+            let current_kmer = &forward_contig[i..i + self.kmer_size];
+            let next_kmer = &forward_contig[i + 1..i + 1 + self.kmer_size];
+    
+            let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
+            let next_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(next_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
+    
+            graph.add_edge(current_node, next_node, 1.0);
+        }
+    }
+    
+    fn initialize_read_graph(&self, seq: &[u8]) -> (petgraph::Graph<String, f64>, Vec<NodeIndex>) {
+        let mut graph = DiGraph::<String, f64>::new();
+    
+        let mut node_indices = Vec::new();
+        for kmer in seq.windows(self.kmer_size) {
+            if self.kmers.contains_key(&crate::utils::canonicalize_kmer(kmer)) {
+                let node_index = graph.add_node(String::from_utf8_lossy(kmer).to_string());
+                node_indices.push(node_index);
+            }
+        }
+        (graph, node_indices)
+    }
+    
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let progress_bar = crate::utils::default_bounded_progress_bar(
             "Correcting reads",
@@ -1852,6 +1753,45 @@ impl LdBG {
 
         graph
     }
+}
+
+fn traverse_read_graph(graph: petgraph::Graph<String, f64>) -> Vec<Vec<u8>> {
+    // Populate corrected_seqs with all contiguous stretches of the graph more than 1 node long
+    let mut corrected_seqs = Vec::new();
+    let mut visited = HashSet::new();
+    for node in graph.node_indices() {
+        if !visited.contains(&node) {
+            let mut current_seq = Vec::new();
+            let mut current_node = node;
+        
+            loop {
+                visited.insert(current_node);
+                if current_seq.is_empty() {
+                    current_seq.push(graph[current_node].clone());
+                } else {
+                    current_seq.push(graph[current_node].chars().last().unwrap().to_string());
+                }
+            
+                let outgoing_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
+                if outgoing_edges.len() == 1 {
+                    let next_node = outgoing_edges[0].target();
+                    if !visited.contains(&next_node) {
+                        current_node = next_node;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        
+            if current_seq.len() > 1 {
+                let contig = current_seq.join("").as_bytes().to_vec();
+                corrected_seqs.push(contig);
+            }
+        }
+    }
+    corrected_seqs
 }
 
 fn navigate_back(node: NodeIndex, steps: i32, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
