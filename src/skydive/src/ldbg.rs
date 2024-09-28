@@ -795,25 +795,15 @@ impl LdBG {
                                             break 'outer;
 
                                         } else {
-                                            if let Some(start_pos) = seq.windows(new_from_kmer.len()).position(|window| window == new_from_kmer) {
-                                                if let Some(end_pos) = seq[start_pos + new_from_kmer.len()..].windows(new_to_kmer.len()).position(|window| window == new_to_kmer) {
-                                                    let substring = &seq[start_pos..start_pos + new_from_kmer.len() + end_pos + new_to_kmer.len()];
+                                            if let Some(substring) = self.find_read_substring(seq, new_from_kmer, new_to_kmer) {
+                                                let mut subgraph = DiGraph::new();
+                                                let mut visited = HashMap::<String, NodeIndex>::new();
 
-                                                    let mut fwd_contig = new_from_kmer.to_vec();
-                                                    let _ = self.assemble_forward_until(&mut fwd_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]));
+                                                let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
+                                                let start_node = subgraph.add_node(start_label.clone());
+                                                visited.insert(start_label.clone(), start_node);
 
-                                                    let mut rev_contig = new_to_kmer.to_vec();
-                                                    let _ = self.assemble_backward_until(&mut rev_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]));
-
-                                                    let mut subgraph = DiGraph::new();
-                                                    let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
-
-                                                    let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
-                                                    let start_node = subgraph.add_node(start_label.clone());
-                                                    visited.insert(start_label.clone(), start_node);
-
-                                                    let r = self.traverse_forward_until(&mut subgraph, &mut visited, start_node, new_to_kmer);
-
+                                                if let Ok(_) = self.traverse_forward_until(&mut subgraph, &mut visited, start_node, new_to_kmer) {
                                                     let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
                                                     let end_label = String::from_utf8_lossy(&new_to_kmer).to_string();
 
@@ -852,18 +842,8 @@ impl LdBG {
 
                                                             break 'outer;
                                                         }
-                                                    } else {
-                                                        crate::elog!("Start or end node not found in the graph.");
                                                     }
-
-                                                    let mut file = File::create("subgraph.dot").unwrap();
-                                                    write!(file, "{:?}", Dot::new(&subgraph)).unwrap();
-
-                                                } else {
-                                                    // Handle case where `new_to_kmer` is not found after `new_from_kmer`
                                                 }
-                                            } else {
-                                                // Handle case where `new_from_kmer` is not found in `seq`
                                             }
                                         }
                                     }
@@ -878,6 +858,19 @@ impl LdBG {
         let corrected_seqs = traverse_read_graph(graph);
 
         corrected_seqs
+    }
+
+    fn find_read_substring(&self, seq: &[u8], from_kmer: &[u8], to_kmer: &[u8]) -> Option<Vec<u8>> {
+        seq.windows(from_kmer.len())
+            .position(|window| window == from_kmer)
+            .and_then(|start_pos| {
+                seq[start_pos + from_kmer.len()..]
+                    .windows(to_kmer.len())
+                    .position(|window| window == to_kmer)
+                    .map(|end_pos| {
+                        seq[start_pos..start_pos + from_kmer.len() + end_pos + to_kmer.len()].to_vec()
+                    })
+            })
     }
 
     fn add_to_read_graph_backward(&self, backward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
