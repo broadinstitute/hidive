@@ -750,107 +750,14 @@ impl LdBG {
             if self.kmers.contains_key(&from_cn_kmer) && self.kmers.contains_key(&to_cn_kmer) && from_next_kmers.contains(&to_kmer.to_vec()) && to_prev_kmers.contains(&from_kmer.to_vec()) {
                 graph.add_edge(from, to, 1.0);
             } else {
-                // Attempt to assemble contig between from_kmer and to_kmer
-                let mut forward_contig = from_kmer.to_vec();
-                let mut backward_contig = to_kmer.to_vec();
-
-                if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()])) {
-                    self.add_to_read_graph_forward(forward_contig, &mut graph);
-                } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()])) {
-                    self.add_to_read_graph_backward(backward_contig, &mut graph);
-                } else {
-                    'outer: for scan_left in 0..=5 {
-                        for scan_right in 0..=5 {
-                            if let Some(new_from) = navigate_back(from, scan_left, &graph) {
-                                if let Some(new_to) = navigate_forward(to, scan_right, &graph) {
-                                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
-                                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
-
-                                    let mut forward_contig = new_from_kmer.to_vec();
-                                    let mut backward_contig = new_to_kmer.to_vec();
-
-                                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
-                                        self.add_to_read_graph_forward(forward_contig, &mut graph);
-
-                                        break 'outer;
-                                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
-                                        self.add_to_read_graph_backward(backward_contig, &mut graph);
-
-                                        break 'outer;
-                                    } else {
-                                        let mut contig = from_kmer.to_vec();
-                                        if let Ok(_) = LdBG::from_sequences("contig".to_string(), self.kmer_size, &vec![forward_contig.clone(), backward_contig.clone()])
-                                            .build_links(&vec![forward_contig.clone(), backward_contig.clone()])
-                                            .assemble_forward_until(&mut contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]))
-                                        {
-                                            self.add_to_read_graph_forward(contig, &mut graph);
-
-                                            break 'outer;
-                                        } else if let Ok(_) = LdBG::from_sequences("contig".to_string(), self.kmer_size, &vec![forward_contig.clone(), backward_contig.clone()])
-                                            .build_links(&vec![forward_contig.clone(), backward_contig.clone()])
-                                            .assemble_backward_until(&mut contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]))
-                                        {
-                                            self.add_to_read_graph_backward(contig, &mut graph);
-
-                                            break 'outer;
-
-                                        } else {
-                                            if let Some(substring) = self.find_read_substring(seq, new_from_kmer, new_to_kmer) {
-                                                let mut subgraph = DiGraph::new();
-                                                let mut visited = HashMap::<String, NodeIndex>::new();
-
-                                                let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
-                                                let start_node = subgraph.add_node(start_label.clone());
-                                                visited.insert(start_label.clone(), start_node);
-
-                                                if let Ok(_) = self.traverse_forward_until(&mut subgraph, &mut visited, start_node, new_to_kmer) {
-                                                    let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
-                                                    let end_label = String::from_utf8_lossy(&new_to_kmer).to_string();
-
-                                                    // Find the node indices for the start and end kmers
-                                                    let start_node = subgraph.node_indices().find(|&n| subgraph[n] == start_label);
-                                                    let end_node = subgraph.node_indices().find(|&n| subgraph[n] == end_label);
-
-                                                    if let (Some(start), Some(end)) = (start_node, end_node) {
-                                                        let mut best_contig = String::new();
-                                                        let mut min_ldist = u32::MAX;
-
-                                                        // List all paths from start_node to end_node
-                                                        for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, None) {
-                                                            // Convert the path to labels
-                                                            let path_labels: Vec<&String> = path.iter().map(|&n| &subgraph[n]).collect();
-
-                                                            // Create the full contig from the path_labels
-                                                            let mut new_contig = String::new();
-                                                            for kmer in path_labels.iter() {
-                                                                if new_contig.is_empty() {
-                                                                    new_contig.push_str(kmer);
-                                                                } else {
-                                                                    new_contig.push_str(&kmer.chars().last().unwrap().to_string());
-                                                                }
-                                                            }
-
-                                                            let ldist = levenshtein(&new_contig.as_bytes().to_vec(), &substring);
-                                                            if ldist < min_ldist {
-                                                                min_ldist = ldist;
-                                                                best_contig = new_contig;
-                                                            }
-                                                        }
-
-                                                        if min_ldist < (substring.len() / 10) as u32 {
-                                                            self.add_to_read_graph_forward(best_contig.as_bytes().to_vec(), &mut graph);
-
-                                                            break 'outer;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if let Ok((contig, forward)) = self.try_simple_paths(from_kmer, to_kmer) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_alternate_paths(&graph, from, to, 5) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_overlapping_paths(&graph, from, to, 5) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_exploratory_paths(&graph, from, to, seq, 5) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
                 }
             }
         }
@@ -860,6 +767,128 @@ impl LdBG {
         corrected_seqs
     }
 
+    fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
+        let mut forward_contig = from_kmer.to_vec();
+        let mut backward_contig = to_kmer.to_vec();
+
+        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()])) {
+            return Ok((forward_contig, true));
+        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()])) {
+            return Ok((backward_contig, false));
+        }
+
+        Err(anyhow::anyhow!("No simple path found"))
+    }
+
+    fn try_alternate_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
+
+                    let mut forward_contig = new_from_kmer.to_vec();
+                    let mut backward_contig = new_to_kmer.to_vec();
+
+                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
+                        return Ok((forward_contig, true));
+                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
+                        return Ok((backward_contig, false));
+                    }
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No alternate path found"));
+    }
+
+    fn try_overlapping_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
+
+                    let mut forward_contig = new_from_kmer.to_vec();
+                    let mut backward_contig = new_to_kmer.to_vec();
+
+                    let seqs = vec![forward_contig.clone(), backward_contig.clone()];
+                    let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs);
+
+                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
+                        return Ok((forward_contig, true));
+                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
+                        return Ok((backward_contig, false));
+                    }
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No overlapping path found"));
+    }
+
+    fn try_exploratory_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, seq: &[u8], window: u8) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
+
+                    if let Some(substring) = self.find_read_substring(seq, new_from_kmer, new_to_kmer) {
+                        let mut subgraph = DiGraph::new();
+                        let mut visited = HashMap::<String, NodeIndex>::new();
+
+                        let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
+                        let start_node = subgraph.add_node(start_label.clone());
+                        visited.insert(start_label.clone(), start_node);
+
+                        if let Ok(_) = self.traverse_forward_until(&mut subgraph, &mut visited, start_node, new_to_kmer) {
+                            let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
+                            let end_label = String::from_utf8_lossy(&new_to_kmer).to_string();
+
+                            // Find the node indices for the start and end kmers
+                            let start_node = subgraph.node_indices().find(|&n| subgraph[n] == start_label);
+                            let end_node = subgraph.node_indices().find(|&n| subgraph[n] == end_label);
+
+                            if let (Some(start), Some(end)) = (start_node, end_node) {
+                                let mut best_contig = String::new();
+                                let mut min_ldist = u32::MAX;
+
+                                // List all paths from start_node to end_node
+                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, None) {
+                                    // Convert the path to labels
+                                    let path_labels: Vec<&String> = path.iter().map(|&n| &subgraph[n]).collect();
+
+                                    // Create the full contig from the path_labels
+                                    let mut new_contig = String::new();
+                                    for kmer in path_labels.iter() {
+                                        if new_contig.is_empty() {
+                                            new_contig.push_str(kmer);
+                                        } else {
+                                            new_contig.push_str(&kmer.chars().last().unwrap().to_string());
+                                        }
+                                    }
+
+                                    let ldist = levenshtein(&new_contig.as_bytes().to_vec(), &substring);
+                                    if ldist < min_ldist {
+                                        min_ldist = ldist;
+                                        best_contig = new_contig;
+                                    }
+                                }
+
+                                if min_ldist < (substring.len() / 10) as u32 {
+                                    return Ok((best_contig.as_bytes().to_vec(), true));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No alternate path found"));
+    }
+    
     fn find_read_substring(&self, seq: &[u8], from_kmer: &[u8], to_kmer: &[u8]) -> Option<Vec<u8>> {
         seq.windows(from_kmer.len())
             .position(|window| window == from_kmer)
@@ -871,6 +900,14 @@ impl LdBG {
                         seq[start_pos..start_pos + from_kmer.len() + end_pos + to_kmer.len()].to_vec()
                     })
             })
+    }
+
+    fn add_to_read_graph(&self, contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>, forward: bool) {
+        if forward {
+            self.add_to_read_graph_forward(contig, graph);
+        } else {
+            self.add_to_read_graph_backward(contig, graph);
+        }
     }
 
     fn add_to_read_graph_backward(&self, backward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
@@ -1787,7 +1824,7 @@ fn traverse_read_graph(graph: petgraph::Graph<String, f64>) -> Vec<Vec<u8>> {
     corrected_seqs
 }
 
-fn navigate_back(node: NodeIndex, steps: i32, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
+fn navigate_back(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
     let mut current_node = node;
     let mut steps_back = 0;
 
@@ -1807,7 +1844,7 @@ fn navigate_back(node: NodeIndex, steps: i32, graph: &petgraph::Graph<String, f6
     }
 }
 
-fn navigate_forward(node: NodeIndex, steps: i32, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
+fn navigate_forward(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
     let mut current_node = node;
     let mut steps_forward = 0;
 
