@@ -34,47 +34,15 @@ pub fn start(
         .clean_paths(0.01)
         .clean_tips(3*kmer_size)
         .clean_contigs(100)
-        .build_links(&all_lr_seqs);
-
-    // let contigs = m.assemble_all();
-    // for contig in contigs {
-    //     println!(">contig\n{}", String::from_utf8(contig.clone()).unwrap());
-    // }
+        // .build_links(&all_lr_seqs)
+        ;
 
     for (i, all_lr_seq) in all_lr_seqs.iter().enumerate() {
-        // println!(">{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
-        // println!(">{}\n{}", i, String::from_utf8(all_lr_seq.clone()).unwrap());
-
-        let kmers = all_lr_seq
-            .windows(kmer_size)
-            .map(|kmer| {
-                let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
-                if m.kmers.contains_key(&cn_kmer) {
-                    kmer.to_vec()
-                } else {
-                    "N".repeat(kmer_size).as_bytes().to_vec()
-                }
-            })
-            .collect::<Vec<Vec<u8>>>();
-
-        let first_kmer = kmers.first().unwrap();
-        let mut seq = String::from_utf8(first_kmer[0..kmer_size-1].to_vec()).unwrap();
-
-        for kmer in kmers {
-            seq.push(kmer[kmer_size-1] as char);
-        }
-
         let corrected_seqs = m.correct_seq(all_lr_seq);
         for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
             println!(">corrected_{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
         }
     }
-
-    // let raw_read = b"GATTCTCCCCAGACGCCGAGGATGGCCGTCATGGCGCCCCGAACCCTCGTCCTGCTACTCTCGGGGGCTCTGGCCCTGACCCAGACCTGGGCCGGGTGAGTGGCGGGGTCGGGAGGGAAACGGCCTCTGTGGGGAGAAGCAACGGGCCCGCCTGGCGGGGGCGCAGGACCCGGGAAGCCGCGCCGGGAGGAGGGTCGGGCGGGTCTCAGCCACTCCTCGTCCCCAGGCTCTCACTCCATGAGGTATTTCTACACCTCCGTGTCCCGGCCCGGCCGCGGGGAGCCCCGCTTCATCGCAGTGGG";
-    // let cor_reads = m.correct_seq(raw_read);
-    // for (i, cor_read) in cor_reads.iter().enumerate() {
-    //     println!(">corrected_{}\n{}", i, String::from_utf8(cor_read.clone()).unwrap());
-    // }
 
     let g = m.traverse_all_kmers();
     let _ = write_gfa(&mut File::create(output).unwrap(), &g);

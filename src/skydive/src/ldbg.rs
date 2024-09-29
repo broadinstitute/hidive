@@ -1,28 +1,22 @@
 use anyhow::Result;
-use petgraph::dot::Dot;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::fs::File;
-use std::io::{self, Write};
+use std::collections::{HashMap, HashSet};
 
 use indicatif::ProgressIterator;
-use itertools::Itertools;
 use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
 use needletail::Sequence;
-use petgraph::algo::astar;
 use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+use petgraph::visit::EdgeRef;
 
 use indicatif::ParallelProgressIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
+use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
 
 use bio::alignment::distance::*;
@@ -762,18 +756,16 @@ impl LdBG {
             }
         }
 
-        let corrected_seqs = traverse_read_graph(graph);
-
-        corrected_seqs
+        traverse_read_graph(graph)
     }
 
     fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
         let mut forward_contig = from_kmer.to_vec();
         let mut backward_contig = to_kmer.to_vec();
 
-        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()])) {
+        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()]), 100) {
             return Ok((forward_contig, true));
-        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()])) {
+        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()]), 100) {
             return Ok((backward_contig, false));
         }
 
@@ -790,9 +782,9 @@ impl LdBG {
                     let mut forward_contig = new_from_kmer.to_vec();
                     let mut backward_contig = new_to_kmer.to_vec();
 
-                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
+                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
                         return Ok((forward_contig, true));
-                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
+                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
                         return Ok((backward_contig, false));
                     }
                 }
@@ -815,9 +807,9 @@ impl LdBG {
                     let seqs = vec![forward_contig.clone(), backward_contig.clone()];
                     let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs);
 
-                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()])) {
+                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
                         return Ok((forward_contig, true));
-                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()])) {
+                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
                         return Ok((backward_contig, false));
                     }
                 }
@@ -855,7 +847,7 @@ impl LdBG {
                                 let mut min_ldist = u32::MAX;
 
                                 // List all paths from start_node to end_node
-                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, None) {
+                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, Some(100)) {
                                     // Convert the path to labels
                                     let path_labels: Vec<&String> = path.iter().map(|&n| &subgraph[n]).collect();
 
@@ -1002,20 +994,27 @@ impl LdBG {
         }
     }
 
-    /// Assemble a contig in the forward direction until a stopping k-mer is reached.
+    /// Assemble a contig in the forward direction until a stopping k-mer is reached or the limit is hit.
     ///
     /// # Arguments
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>> {
+    /// * `stop_kmers` - A HashSet of k-mers to stop at.
+    /// * `limit` - The maximum number of nodes to traverse before giving up.
+    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut nodes_traversed = 0;
+
         loop {
             if stop_kmers.contains(&last_kmer) {
                 return Ok(last_kmer);
+            }
+
+            if nodes_traversed >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
             }
 
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
@@ -1024,6 +1023,7 @@ impl LdBG {
                 Some(this_kmer) => {
                     contig.push(this_kmer[this_kmer.len() - 1]);
                     last_kmer = this_kmer;
+                    nodes_traversed += 1;
                 }
                 None => {
                     break;
@@ -1094,20 +1094,27 @@ impl LdBG {
         }
     }
 
-    /// Assemble a contig in the backward direction until a stopping k-mer is reached.
+    /// Assemble a contig in the backward direction until a stopping k-mer is reached or the limit is hit.
     ///
     /// # Arguments
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>>{
+    /// * `stop_kmers` - A HashSet of vectors representing the stopping k-mers.
+    /// * `limit` - The maximum number of nodes to traverse before giving up.
+    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut nodes_traversed = 0;
+
         loop {
             if stop_kmers.contains(&last_kmer) {
                 return Ok(last_kmer);
+            }
+
+            if nodes_traversed >= limit {
+                return Err(anyhow::anyhow!("Limit reached before finding a stopping k-mer"));
             }
 
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
@@ -1116,6 +1123,7 @@ impl LdBG {
                 Some(this_kmer) => {
                     contig.insert(0, this_kmer[0]);
                     last_kmer = this_kmer;
+                    nodes_traversed += 1;
                 }
                 None => {
                     break;
@@ -1356,7 +1364,7 @@ impl LdBG {
 
                 for cur_kmer in next_kmers {
                     let mut fw_contig = cur_kmer.to_vec();
-                    self.assemble_forward_limit(&mut fw_contig, cur_kmer.clone(), max_tip_length + 1);
+                    let _ = self.assemble_forward_limit(&mut fw_contig, cur_kmer.clone(), max_tip_length + 1);
 
                     let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
                     let num_next = self.next_kmers(last_kmer).len();
@@ -1376,7 +1384,7 @@ impl LdBG {
 
                 for cur_kmer in prev_kmers {
                     let mut rv_contig = cur_kmer.to_vec();
-                    self.assemble_backward_limit(&mut rv_contig, cur_kmer.clone(), max_tip_length + 1);
+                    let _ = self.assemble_backward_limit(&mut rv_contig, cur_kmer.clone(), max_tip_length + 1);
 
                     let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
                     let num_prev = self.prev_kmers(first_kmer).len();
@@ -2453,11 +2461,11 @@ mod tests {
             .build_links(&fwd_seqs);
 
         let mut contig1 = b"ACTGA".to_vec();
-        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]));
+        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]), 100);
         assert_eq!(contig1, b"ACTGATTTCGA".to_vec());
 
         let mut contig2 = b"GGTGG".to_vec();
-        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]));
+        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]), 100);
         assert_eq!(contig2, b"TGCCACGGTGG".to_vec());
     }
 
