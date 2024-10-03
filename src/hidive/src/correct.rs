@@ -46,11 +46,11 @@ pub fn start(
     let read = b"GGCTACTACAACCAGAGCGAGGCCGGTGAGTGACCCCGGCCCGGGGCGCAGGTCACGACCTCTCATCCCCCACGGACGGGCCAGGTCGCCCACAGTCTCCGGGTCCGAGATCCGCCCCGAAGCCGCGGGACCCCGAGACCCTTGCCCCCGGGAGAGGCCCAGGCGCCTTTACCCGGTTTCATTTTCAGTTTAAGGCCAAAAATCCCCCCAGGTTGGTCGGGGCCGGGGCGGGGCTCGGGGGACCGGGCTGACCGCGGGGTCCGGGCCAGGGTTCTCACACCGTCCAGAGGATGTATGGCTGCGACGTGGGGTCGGACTGGCGCTTCCTCCGCGGGTACCACCAGTACGCCTACGACGGCAAGGATTACATCGCCCTGAAAGAGGACCTGCGCTCTTGGAC";
 
     let corrected_seqs =
-        vec![read.to_vec()]
-        .iter()
-        // all_lr_seqs
-        // .par_iter()
-        // .progress_with(progress_bar)
+        // vec![read.to_vec()]
+        // .iter()
+        all_lr_seqs
+        .par_iter()
+        .progress_with(progress_bar)
         .map(|seq| m.correct_seq(seq))
         .flatten()
         .collect::<Vec<Vec<u8>>>();

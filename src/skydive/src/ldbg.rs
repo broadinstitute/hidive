@@ -1,7 +1,8 @@
 use anyhow::Result;
-use color_eyre::owo_colors::OwoColorize;
 
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Write;
 
 use parquet::data_type::AsBytes;
 
@@ -11,6 +12,7 @@ use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
+use petgraph::dot::{Dot, Config};
 
 use indicatif::{ProgressIterator, ParallelProgressIterator};
 use rayon::iter::IntoParallelRefIterator;
@@ -789,14 +791,43 @@ impl LdBG {
             }
         }
 
-        // Write graph to disk as a dot file
-        use petgraph::dot::{Dot, Config};
-        use std::fs::File;
-        use std::io::Write;
+        if graph.node_count() > 0 {
+            // Find nodes with more than one outgoing edge and prune short branches
+            let mut nodes_to_remove = HashSet::new();
+            for node in graph.node_indices() {
+                let out_degree = graph.edges_directed(node, petgraph::Outgoing).count();
+                if out_degree > 1 {
+                    for edge in graph.edges_directed(node, petgraph::Outgoing) {
+                        let mut branch = vec![edge.target()];
+                        let mut current = edge.target();
+                        let mut branch_length = 0;
 
-        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
-        let mut file = File::create("read_graph.dot").expect("Unable to create file");
-        write!(file, "{:?}", dot).expect("Unable to write data");
+                        while branch_length < 2 * self.kmer_size {
+                            let out_edges: Vec<_> = graph.edges_directed(current, petgraph::Outgoing).collect();
+                            if out_edges.len() != 1 {
+                                break;
+                            }
+                            current = out_edges[0].target();
+                            branch.push(current);
+                            branch_length += 1;
+                        }
+
+                        if branch_length < 2 * self.kmer_size {
+                            nodes_to_remove.extend(branch);
+                        }
+                    }
+                }
+            }
+
+            // Remove the identified nodes from the graph
+            for node in nodes_to_remove {
+                graph.remove_node(node);
+            }
+
+            let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+            let mut file = File::create("read_graph.dot").expect("Unable to create file");
+            write!(file, "{:?}", dot).expect("Unable to write data");
+        }
 
         traverse_read_graph(&graph, self.kmer_size)
     }
@@ -946,7 +977,8 @@ impl LdBG {
     }
 
     fn try_connecting_segments(&self, segment1: &[u8], segment2: &[u8]) -> Result<(Vec<u8>, bool)> {
-        let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len() - 2*self.kmer_size).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+        // let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len() - 2*self.kmer_size).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+        let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len().saturating_sub(2*self.kmer_size)).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
         let end_kmers = segment2.windows(self.kmer_size).take(10).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
 
         for start_kmer in start_kmers.iter() {
