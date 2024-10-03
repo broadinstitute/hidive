@@ -149,6 +149,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
+        /// Restrict processing to these contigs.
+        #[clap(short, long, value_parser, required = true)]
+        contigs: Vec<String>,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -368,10 +372,11 @@ fn main() {
             output,
             kmer_size,
             min_kmers_pct: min_kmers,
+            contigs,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers, &contigs, &fasta_paths, &seq_paths);
         }
         Commands::Filter {
             output,

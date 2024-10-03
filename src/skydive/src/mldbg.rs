@@ -1,6 +1,7 @@
 use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 use gbdt::{decision_tree::Data, gradient_boost::GBDT};
+use itertools::Itertools;
 
 use crate::{ldbg::LdBG, record::Record};
 
@@ -127,7 +128,14 @@ impl MLdBG {
                 )
                 .sum::<u16>();
 
-            ldbg.kmers.insert(cn_kmer, Record::new(coverage, None));
+            let sources = self.ldbgs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, ldbg)| if ldbg.kmers.contains_key(&cn_kmer) { Some(index) } else { None })
+                .collect::<Vec<_>>();
+
+            ldbg.kmers.insert(cn_kmer.clone(), Record::new(coverage, None));
+            ldbg.sources.insert(cn_kmer.clone(), sources);
         }
 
         ldbg.scores = self.scores.clone();

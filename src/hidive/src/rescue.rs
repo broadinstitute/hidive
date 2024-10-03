@@ -24,11 +24,14 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
+    contigs: &Vec<String>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
 ) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
+
+    let contigs = contigs.iter().map(|c| c.to_string()).collect::<HashSet<String>>();
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
@@ -67,11 +70,6 @@ pub fn start(
 
         const UPDATE_FREQUENCY: usize = 1_000_000;
 
-        // Iterate over the records in parallel.
-        reader
-            .fetch(FetchDefinition::All)
-            .expect("Failed to fetch reads");
-
         // Create an immutable map of tid to chromosome name
         let tid_to_chrom: HashMap<i32, String> = reader
             .header()
@@ -80,6 +78,18 @@ pub fn start(
             .enumerate()
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect();
+
+        let fetch_definition = if !contigs.is_empty() {
+            FetchDefinition::String(contigs.iter().next().unwrap().as_bytes())
+        } else {
+            FetchDefinition::All
+        };
+
+        // Iterate over the records in parallel.
+        reader
+            // .fetch(FetchDefinition::All)
+            .fetch(fetch_definition)
+            .expect("Failed to fetch reads");
 
         let records: Vec<_> = reader
             .records()

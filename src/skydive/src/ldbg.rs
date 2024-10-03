@@ -1,8 +1,8 @@
 use anyhow::Result;
+use color_eyre::owo_colors::OwoColorize;
 
 use std::collections::{HashMap, HashSet};
 
-use indicatif::ProgressIterator;
 use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 
-use indicatif::ParallelProgressIterator;
+use indicatif::{ProgressIterator, ParallelProgressIterator};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
@@ -28,6 +28,7 @@ use crate::record::Record;
 type KmerGraph = HashMap<Vec<u8>, Record>;
 type KmerScores = HashMap<Vec<u8>, f32>;
 type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
+type Sources = HashMap<Vec<u8>, Vec<usize>>;
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug, Clone)]
@@ -37,6 +38,8 @@ pub struct LdBG {
     pub kmers: KmerGraph,
     pub scores: KmerScores,
     pub links: Links,
+    pub sources: Sources,
+    pub verbose: bool,
 }
 
 impl LdBG {
@@ -47,6 +50,8 @@ impl LdBG {
             kmers: KmerGraph::new(),
             scores: KmerScores::new(),
             links: Links::new(),
+            sources: Sources::new(),
+            verbose: false,
         }
     }
 
@@ -77,6 +82,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -84,6 +90,8 @@ impl LdBG {
             kmers,
             scores,
             links,
+            sources,
+            verbose: false,
         }
     }
 
@@ -115,6 +123,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -122,6 +131,8 @@ impl LdBG {
             kmers,
             scores,
             links,
+            sources,
+            verbose: false,
         }
     }
 
@@ -146,6 +157,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -153,6 +165,8 @@ impl LdBG {
             kmers,
             scores,
             links,
+            sources,
+            verbose: false,
         }
     }
 
@@ -175,6 +189,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -182,6 +197,8 @@ impl LdBG {
             kmers,
             scores,
             links,
+            sources,
+            verbose: false,
         }
     }
 
@@ -192,6 +209,11 @@ impl LdBG {
     /// A reference to the name of the graph.
     pub fn name(&self) -> &String {
         &self.name
+    }
+
+    pub fn verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
     }
 
     /// Build a de Bruijn graph from a vector of sequences.
@@ -241,8 +263,11 @@ impl LdBG {
     ///
     /// A map of links.
     pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>) -> Self {
-        let progress_bar =
-            crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         let links: Links = fwd_seqs
             .par_iter()
@@ -750,13 +775,30 @@ impl LdBG {
                     self.add_to_read_graph(contig, &mut graph, forward);
                 } else if let Ok((contig, forward)) = self.try_overlapping_paths(&graph, from, to, 5) {
                     self.add_to_read_graph(contig, &mut graph, forward);
-                } else if let Ok((contig, forward)) = self.try_exploratory_paths(&graph, from, to, seq, 5) {
+                } else if let Ok((contig, forward)) = self.try_exploratory_paths(&graph, from, to, seq, 5, 100) {
                     self.add_to_read_graph(contig, &mut graph, forward);
                 }
             }
         }
 
-        traverse_read_graph(graph)
+        let initial_segments = traverse_read_graph(&graph, 0);
+
+        if let Ok(connecting_segments) = self.try_connecting_all_segments(initial_segments) {
+            for (contig, forward) in connecting_segments.into_iter() {
+                self.add_to_read_graph(contig, &mut graph, forward);
+            }
+        }
+
+        // Write graph to disk as a dot file
+        use petgraph::dot::{Dot, Config};
+        use std::fs::File;
+        use std::io::Write;
+
+        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+        let mut file = File::create("read_graph.dot").expect("Unable to create file");
+        write!(file, "{:?}", dot).expect("Unable to write data");
+
+        traverse_read_graph(&graph, self.kmer_size)
     }
 
     fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
@@ -775,7 +817,7 @@ impl LdBG {
     fn try_alternate_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
         for scan_left in 0..=window {
             for scan_right in 0..=window {
-                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
                     let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
                     let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
 
@@ -797,7 +839,7 @@ impl LdBG {
     fn try_overlapping_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
         for scan_left in 0..=window {
             for scan_right in 0..=window {
-                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
                     let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
                     let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
 
@@ -819,10 +861,10 @@ impl LdBG {
         return Err(anyhow::anyhow!("No overlapping path found"));
     }
 
-    fn try_exploratory_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, seq: &[u8], window: u8) -> Result<(Vec<u8>, bool)> {
+    fn try_exploratory_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, seq: &[u8], window: u8, max_intermediate_nodes: usize) -> Result<(Vec<u8>, bool)> {
         for scan_left in 0..=window {
             for scan_right in 0..=window {
-                if let (Some(new_from), Some(new_to)) = (navigate_back(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
                     let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
                     let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
 
@@ -847,7 +889,7 @@ impl LdBG {
                                 let mut min_ldist = u32::MAX;
 
                                 // List all paths from start_node to end_node
-                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, Some(100)) {
+                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, Some(max_intermediate_nodes)) {
                                     // Convert the path to labels
                                     let path_labels: Vec<&String> = path.iter().map(|&n| &subgraph[n]).collect();
 
@@ -879,6 +921,49 @@ impl LdBG {
         }
 
         return Err(anyhow::anyhow!("No alternate path found"));
+    }
+
+    fn try_connecting_all_segments(&self, segments: Vec<Vec<u8>>) -> Result<Vec<(Vec<u8>, bool)>> {
+        let mut connecting_segments = Vec::new();
+
+        for segment1 in segments.iter() {
+            for segment2 in segments.iter() {
+                if segment1 == segment2 {
+                    continue;
+                }
+
+                if let Ok(result) = self.try_connecting_segments(segment1, segment2) {
+                    connecting_segments.push(result);
+                }
+            }
+        }
+
+        if connecting_segments.len() == 0 {
+            return Err(anyhow::anyhow!("No connecting path found"));
+        }
+
+        Ok(connecting_segments)
+    }
+
+    fn try_connecting_segments(&self, segment1: &[u8], segment2: &[u8]) -> Result<(Vec<u8>, bool)> {
+        let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len() - 2*self.kmer_size).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+        let end_kmers = segment2.windows(self.kmer_size).take(10).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+
+        for start_kmer in start_kmers.iter() {
+            let mut forward_contig = start_kmer.to_vec();
+            if let Ok(_) = self.assemble_forward_until(&mut forward_contig, start_kmer.to_vec(), end_kmers.clone(), 100) {
+                return Ok((forward_contig, true));
+            }
+        }
+
+        for end_kmer in end_kmers.iter() {
+            let mut backward_contig = end_kmer.to_vec();
+            if let Ok(_) = self.assemble_backward_until(&mut backward_contig, end_kmer.to_vec(), start_kmers.clone(), 100) {
+                return Ok((backward_contig, false));
+            }
+        }
+
+        return Err(anyhow::anyhow!("No connecting path found"));
     }
     
     fn find_read_substring(&self, seq: &[u8], from_kmer: &[u8], to_kmer: &[u8]) -> Option<Vec<u8>> {
@@ -913,7 +998,9 @@ impl LdBG {
             let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
     
-            graph.add_edge(prev_node, current_node, 1.0);
+            if !graph.contains_edge(prev_node, current_node) {
+                graph.add_edge(prev_node, current_node, 1.0);
+            }
         }
     }
     
@@ -928,7 +1015,9 @@ impl LdBG {
             let next_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(next_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
     
-            graph.add_edge(current_node, next_node, 1.0);
+            if !graph.contains_edge(current_node, next_node) {
+                graph.add_edge(current_node, next_node, 1.0);
+            }
         }
     }
     
@@ -946,10 +1035,11 @@ impl LdBG {
     }
     
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
-        let progress_bar = crate::utils::default_bounded_progress_bar(
-            "Correcting reads",
-            seqs.len() as u64,
-        );
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Correcting reads", seqs.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         seqs
             .par_iter()
@@ -1195,10 +1285,11 @@ impl LdBG {
         let mut used_kmers = HashSet::new();
         let k = self.kmer_size;
 
-        let progress_bar = crate::utils::default_bounded_progress_bar(
-            "Assembling contigs",
-            self.kmers.len() as u64,
-        );
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Assembling contigs", self.kmers.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         for cn_kmer in self.kmers.keys().progress_with(progress_bar) {
             if !used_kmers.contains(cn_kmer) {
@@ -1283,6 +1374,104 @@ impl LdBG {
         }
 
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
+    }
+
+    pub fn find_a_superbubble(&self, g: &petgraph::Graph<String, f32>) -> Vec<String> {
+        let start = g.node_indices().find(|&n| g[n] == "TCCCTCGAATACTGATG".to_string());
+        let end = g.node_indices().find(|&n| g[n] == "CGTGACTTTTCCTCTCA".to_string());
+
+        crate::elog!("Superbubble nodes: {:?} {:?}", start, end);
+
+        // List all paths from start_node to end_node
+        let contigs = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, start.unwrap(), end.unwrap(), 0, Some(500)).map(|path| {
+            // Convert the path to labels
+            let path_labels: Vec<&String> = path.iter().map(|&n| &g[n]).collect();
+
+            // Create the full contig from the path_labels
+            let mut new_contig = String::new();
+            for kmer in path_labels.iter() {
+                if new_contig.is_empty() {
+                    new_contig.push_str(kmer);
+                } else {
+                    new_contig.push_str(&kmer.chars().last().unwrap().to_string());
+                }
+            }
+
+            new_contig
+        })
+        .collect::<Vec<String>>();
+
+        contigs
+    }
+
+    pub fn clean_color_specific_paths(mut self, color: usize, min_score: f32) -> Self {
+        let bad_cn_kmers = self.kmers
+            .keys()
+            .cloned()
+            .filter(|cn_kmer| self.sources.get(cn_kmer).unwrap_or(&vec![]) == &vec![color])
+            .filter(|cn_kmer| self.scores.get(cn_kmer).unwrap_or(&1.0) < &min_score)
+            .filter(|cn_kmer| self.kmers.get(cn_kmer).unwrap().in_degree() == 1 && self.kmers.get(cn_kmer).unwrap().out_degree() == 1)
+            .collect::<Vec<Vec<u8>>>();
+
+        let mut to_remove = HashSet::new();
+        let mut bad_paths: usize = 0;
+
+        for bad_cn_kmer in bad_cn_kmers {
+            if !to_remove.contains(&bad_cn_kmer) {
+                let mut seen_kmers = HashSet::new();
+                let mut score_sum = 0.0;
+
+                let mut fw_contig = bad_cn_kmer.clone();
+                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+
+                for kmer in fw_contig.windows(self.kmer_size) {
+                    let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let mut rc_contig = bad_cn_kmer.clone();
+                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+
+                for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
+                    let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let weight = score_sum / seen_kmers.len() as f32;
+
+                if weight < min_score {
+                    to_remove.extend(seen_kmers);
+                    bad_paths += 1;
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad paths specific to color {} ({} kmers)", bad_paths, color, to_remove.len());
+
+        self.infer_edges();
+
+        self
     }
 
     pub fn clean_paths(mut self, min_score: f32) -> Self {
@@ -1793,7 +1982,7 @@ impl LdBG {
     }
 }
 
-fn traverse_read_graph(graph: petgraph::Graph<String, f64>) -> Vec<Vec<u8>> {
+fn traverse_read_graph(graph: &petgraph::Graph<String, f64>, min_length: usize) -> Vec<Vec<u8>> {
     // Populate corrected_seqs with all contiguous stretches of the graph more than 1 node long
     let mut corrected_seqs = Vec::new();
     let mut visited = HashSet::new();
@@ -1823,7 +2012,7 @@ fn traverse_read_graph(graph: petgraph::Graph<String, f64>) -> Vec<Vec<u8>> {
                 }
             }
         
-            if current_seq.len() > 1 {
+            if current_seq.len() > min_length {
                 let contig = current_seq.join("").as_bytes().to_vec();
                 corrected_seqs.push(contig);
             }
@@ -1832,20 +2021,20 @@ fn traverse_read_graph(graph: petgraph::Graph<String, f64>) -> Vec<Vec<u8>> {
     corrected_seqs
 }
 
-fn navigate_back(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
+fn navigate_backward(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
     let mut current_node = node;
-    let mut steps_back = 0;
+    let mut steps_backward = 0;
 
-    while steps_back < steps {
+    while steps_backward < steps {
         let incoming_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Incoming).collect();
         if incoming_edges.is_empty() {
             return None;
         }
         current_node = incoming_edges[0].source();
-        steps_back += 1;
+        steps_backward += 1;
     }
 
-    if steps_back == steps {
+    if steps_backward == steps {
         Some(current_node)
     } else {
         None

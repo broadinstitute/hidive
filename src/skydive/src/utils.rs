@@ -65,6 +65,10 @@ pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
         .collect::<Vec<Vec<u8>>>()
 }
 
+pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
+    indicatif::ProgressBar::hidden()
+}
+
 pub fn default_bounded_progress_bar(
     msg: impl Into<Cow<'static, str>>,
     len: u64,
