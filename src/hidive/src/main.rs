@@ -56,6 +56,8 @@ mod assemble;
 mod build;
 mod cluster;
 mod coassemble;
+mod correct;
+mod poa_assemble;
 mod fetch;
 mod filter;
 mod impute;
@@ -119,13 +121,13 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Zero or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        #[clap(short, long, value_parser, required = false)]
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
 
         /// Include unmapped reads.
-        #[clap(short, long, value_parser)]
-        unmapped: bool,
+        #[clap(short, long, value_parser, default_value_t = 0)]
+        padding: u64,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
@@ -147,6 +149,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
+        /// Restrict processing to these contigs.
+        #[clap(short, long, value_parser, required = false)]
+        contigs: Vec<String>,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -163,8 +169,8 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
-        #[clap(short, long, value_parser, required = true)]
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, value_parser)]
         gfa_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
@@ -182,6 +188,10 @@ enum Commands {
         /// Kmer-size
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
+
+        /// Jaccard threshold
+        #[clap(short, long, value_parser, default_value_t = 0.9)]
+        jaccard_threshold: f64,
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
@@ -253,10 +263,46 @@ enum Commands {
         ///K nearest _neighbor
         #[clap(required = true, value_parser, default_value_t = 3)]
         k_nearest_neighbor: usize,
+    },
 
-        ///Sample_ID
+    /// Correct reads.
+    #[clap(arg_required_else_help = true)]
+    Correct {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, required = false, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        sample: String
+        long_read_fasta_paths: Vec<PathBuf>,
+    },
+
+    /// Assemble target locus from long-read data using POA.
+    #[clap(arg_required_else_help = true)]
+    POAAssemble {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, required = false, value_parser)]
+        short_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_paths: Vec<PathBuf>,
     },
 
     /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
@@ -317,37 +363,35 @@ fn main() {
         Commands::Fetch {
             output,
             loci,
-            unmapped,
+            padding,
             seq_paths,
         } => {
-            fetch::start(&output, &loci, unmapped, &seq_paths);
+            fetch::start(&output, &loci, padding, &seq_paths);
         }
         Commands::Rescue {
             output,
             kmer_size,
             min_kmers_pct: min_kmers,
+            contigs,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers, &contigs, &fasta_paths, &seq_paths);
         }
         Commands::Filter {
             output,
             gfa_path,
             short_read_fasta_paths,
         } => {
-            filter::start(
-                &output,
-                &gfa_path,
-                &short_read_fasta_paths,
-            );
+            filter::start(&output, &gfa_path, &short_read_fasta_paths);
         }
         Commands::Cluster {
             output,
             kmer_size,
+            jaccard_threshold,
             fasta_path,
         } => {
-            cluster::start(&output, kmer_size, &fasta_path);
+            cluster::start(&output, kmer_size, jaccard_threshold, &fasta_path);
         }
         Commands::Trim {
             output,
@@ -367,8 +411,29 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph, reads, k_nearest_neighbor , sample} => {
-            assemble::start(&output, &graph, &reads, k_nearest_neighbor, &sample);
+        Commands::Assemble {
+            output,
+            graph,
+            reads,
+            k_nearest_neighbor,
+        } => {
+            assemble::start(&output, &graph, &reads, k_nearest_neighbor);
+        }
+        Commands::Correct {
+            output,
+            kmer_size,
+            model_path,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            correct::start(&output, kmer_size, &model_path, &long_read_fasta_paths, &short_read_fasta_paths);
+        }
+        Commands::POAAssemble {
+            output,
+            long_read_fasta_paths,
+            short_read_fasta_paths,
+        } => {
+            poa_assemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
         Commands::Coassemble {
             output,

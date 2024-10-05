@@ -26,24 +26,102 @@ pub fn start(
     let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
-    let m = MLdBG::new(kmer_size);
-
     // Read all long reads.
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls);
-    // let l1 = LdBG::from_files(String::from("l1"), kmer_size, &long_read_fasta_paths);
-    
+    skydive::elog!(
+        "Processing long-read samples {:?}...",
+        long_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
+    let all_lr_seqs = long_read_fasta_paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>();
+
+    let mut l1 = LdBG::from_sequences("l1".to_string(), kmer_size, &all_lr_seqs);
+    skydive::elog!(" -- {} k-mers", l1.kmers.len());
 
     // Read all short reads.
-    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls);
-    let s1 = LdBG::from_files(String::from("s1"), kmer_size, &short_read_fasta_paths);
+    skydive::elog!(
+        "Processing short-read samples {:?}...",
+        short_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
+    let all_sr_seqs = short_read_fasta_paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>();
+
+    let mut s1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_sr_seqs);
+    skydive::elog!(" -- {} k-mers", s1.kmers.len());
+
+    // // Create multi-color linked de Bruijn graph.
+    // skydive::elog!("Creating and cleaning joint graph...");
+    // let g = MLdBG::from_ldbgs(vec![l1, s1])
+    //     .score_kmers(model_path)
+    //     .collapse()
+    //     .clean_paths(0.5)
+    //     .clean_tips(kmer_size)
+    //     .build_links(&all_lr_seqs);
+
+    // skydive::elog!(" -- {} k-mers remaining", g.kmers.len());
+
+    // let l = LdBG::from_files(String::from("l"), kmer_size, &long_read_fasta_paths)
+    //     .clean_tips(2*kmer_size)
+    //     .build_links(&all_lr_seqs);
+
+    // for (i, lr_seq) in all_lr_seqs.iter().enumerate() {
+    //     let corrected_seqs = g.correct_seq(lr_seq);
+    //     for (j, corrected_seq) in corrected_seqs.iter().enumerate() {
+    //         println!(">{}_{}\n{}", i, j, String::from_utf8(corrected_seq.clone()).unwrap());
+    //     }
+    // }
+
+    // let mut gfa_output = Vec::new();
+    // skydive::utils::write_gfa(&mut gfa_output, &l.traverse_all_kmers()).unwrap();
+
+    // let gfa_string = String::from_utf8(gfa_output).unwrap();
+
+    // // Create a file writer for the output
+    // let mut file = BufWriter::new(File::create(output).expect("Unable to create file"));
+    // file.write_all(gfa_string.as_bytes()).expect("Unable to write data");
+    // file.flush().expect("Unable to flush data");
 
     /*
+    1. Create a MLdBG.
+    2. Score k-mers.
+    3. Filter paths and tips.
+    4. When remaining long- and short-read paths disagree, accept the long-read path.
+    5. Error-correct the long reads.
+    6. Assemble contigs.
+    */
+
     // Union of kmers from l1 and s1.
     let kmers: HashSet<_> = l1.kmers.keys().chain(s1.kmers.keys()).cloned().collect();
     for kmer in kmers {
         let lr = l1.kmers.get(&kmer);
         let sr = s1.kmers.get(&kmer);
 
+        // If a kmer isn't in the long read graph, but it is in the short read graph, remove it from the short read graph.
         if lr.is_none() && sr.is_some() {
             s1.remove(&kmer);
         }
@@ -58,7 +136,7 @@ pub fn start(
                 .windows(kmer_size)
                 .filter(|kmer| {
                     s1.kmers
-                        .contains_key(&skydive::ldbg::LdBG::canonicalize_kmer(kmer))
+                        .contains_key(&skydive::utils::canonicalize_kmer(kmer))
                 })
                 .count();
 
@@ -116,8 +194,25 @@ pub fn start(
         num_total += 1;
     }
 
-    let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
-    let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2 * kmer_size);
+    // let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
+    // let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2 * kmer_size);
+    let all_lr_seqs2 = long_read_fasta_paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>();
+
+    l3 = l3
+        .clean_branches(0.4)
+        .clean_tips(2 * kmer_size, 0.4)
+        .build_links(&all_lr_seqs2);
 
     skydive::elog!(
         "K-mers with p < 0.5: {} / {} ({:.2}%)",
@@ -125,16 +220,16 @@ pub fn start(
         num_total,
         num_below_threshold as f32 / num_total as f32 * 100.0
     );
-    skydive::elog!(
-        "Removed {} k-mers in {} paths",
-        cleaned_kmers,
-        cleaned_paths
-    );
-    skydive::elog!(
-        "Removed {} k-mers in {} tips",
-        cleaned_tips_kmers,
-        cleaned_tips_paths
-    );
+    // skydive::elog!(
+    //     "Removed {} k-mers in {} paths",
+    //     cleaned_kmers,
+    //     cleaned_paths
+    // );
+    // skydive::elog!(
+    //     "Removed {} k-mers in {} tips",
+    //     cleaned_tips_kmers,
+    //     cleaned_tips_paths
+    // );
 
     let mut all_corrected_seqs = Vec::new();
     for lr_seq in all_seqs {
@@ -146,7 +241,7 @@ pub fn start(
     skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
 
     // Assemble contigs.
-    l3.links = LdBG::build_links(kmer_size, &all_corrected_seqs, &l3.kmers);
+    // l3.links = LdBG::build_links(kmer_size, &all_corrected_seqs, &l3.kmers);
     let contigs = l3.assemble_all();
 
     // Write contigs to disk.
@@ -164,5 +259,4 @@ pub fn start(
         )
         .unwrap();
     }
-    */
 }

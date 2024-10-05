@@ -18,8 +18,8 @@ use skydive;
 /// # Panics
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
-pub fn start(output: &PathBuf, loci_list: &Vec<String>, unmapped: bool, seq_paths: &Vec<PathBuf>) {
-    let loci = skydive::parse::parse_loci(loci_list);
+pub fn start(output: &PathBuf, loci_list: &Vec<String>, padding: u64, seq_paths: &Vec<PathBuf>) {
+    let loci = skydive::parse::parse_loci(loci_list, padding);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
     // Get the system's temporary directory path
@@ -28,7 +28,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, unmapped: bool, seq_path
 
     // Call the stage_data function from the skydive module to process and stage the data
     skydive::elog!("Fetching data...");
-    let r = skydive::stage::stage_data(&output, &loci, &seq_urls, unmapped, &cache_path);
+    let r = skydive::stage::stage_data(&output, &loci, &seq_urls, false, &cache_path);
 
     match r {
         Ok(n) => {

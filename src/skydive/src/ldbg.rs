@@ -1,27 +1,27 @@
 use anyhow::Result;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{self, Write};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs::File;
+use std::io::Write;
 
-use indicatif::ProgressIterator;
-use itertools::Itertools;
 use parquet::data_type::AsBytes;
 
 use needletail::sequence::complement;
 use needletail::Sequence;
-use petgraph::algo::astar;
 use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
+use petgraph::visit::EdgeRef;
+use petgraph::dot::{Dot, Config};
 
-use indicatif::ParallelProgressIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
+use indicatif::{ProgressIterator, ParallelProgressIterator};
+use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
+
+use bio::alignment::distance::*;
 
 use crate::edges::Edges;
 use crate::link::Link;
@@ -30,23 +30,33 @@ use crate::record::Record;
 type KmerGraph = HashMap<Vec<u8>, Record>;
 type KmerScores = HashMap<Vec<u8>, f32>;
 type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
+type Sources = HashMap<Vec<u8>, Vec<usize>>;
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LdBG {
     pub name: String,
     pub kmer_size: usize,
     pub kmers: KmerGraph,
     pub scores: KmerScores,
     pub links: Links,
-
-    pub cleaned_path_kmers: usize,
-    pub cleaned_paths: usize,
-    pub cleaned_tip_kmers: usize,
-    pub cleaned_tips: usize,
+    pub sources: Sources,
+    pub verbose: bool,
 }
 
 impl LdBG {
+    pub fn new(name: String, kmer_size: usize) -> Self {
+        LdBG {
+            name,
+            kmer_size,
+            kmers: KmerGraph::new(),
+            scores: KmerScores::new(),
+            links: Links::new(),
+            sources: Sources::new(),
+            verbose: false,
+        }
+    }
+
     /// Create a de Bruijn graph (and optional links) from a file path.
     ///
     /// # Arguments
@@ -74,6 +84,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -81,11 +92,8 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
+            sources,
+            verbose: false,
         }
     }
 
@@ -117,6 +125,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -124,11 +133,8 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
+            sources,
+            verbose: false,
         }
     }
 
@@ -153,6 +159,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, &fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -160,11 +167,8 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
+            sources,
+            verbose: false,
         }
     }
 
@@ -187,6 +191,7 @@ impl LdBG {
         let kmers = Self::build_graph(kmer_size, fwd_seqs);
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
+        let sources: Sources = Sources::new();
 
         LdBG {
             name,
@@ -194,11 +199,8 @@ impl LdBG {
             kmers,
             scores,
             links,
-
-            cleaned_path_kmers: 0,
-            cleaned_paths: 0,
-            cleaned_tip_kmers: 0,
-            cleaned_tips: 0,
+            sources,
+            verbose: false,
         }
     }
 
@@ -209,6 +211,11 @@ impl LdBG {
     /// A reference to the name of the graph.
     pub fn name(&self) -> &String {
         &self.name
+    }
+
+    pub fn verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
     }
 
     /// Build a de Bruijn graph from a vector of sequences.
@@ -226,6 +233,10 @@ impl LdBG {
 
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
+            if fwd_seq.len() < k + 1 {
+                continue;
+            }
+
             // Iterate over k-mers
             for i in 0..fwd_seq.len() - k + 1 {
                 let fw_kmer = &fwd_seq[i..i + k];
@@ -254,12 +265,17 @@ impl LdBG {
     ///
     /// A map of links.
     pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>) -> Self {
-        let progress_bar =
-            crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64);
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         let links: Links = fwd_seqs
             .par_iter()
             .progress_with(progress_bar)
+            .map(|fwd_seq| self.correct_seq(fwd_seq))
+            .flatten()
             .map(|fwd_seq| {
                 let mut local_links = Links::new();
 
@@ -709,25 +725,25 @@ impl LdBG {
         self
     }
 
-    fn infer_edges(&mut self) {
+    pub fn infer_edges(&mut self) {
         let mut kmers = KmerGraph::new();
 
         self.kmers.iter().for_each(|(cn_kmer, record)| {
             let mut new_record = Record::new(record.coverage(), Some(Edges::empty()));
 
-            for next_kmer in self.next_kmers(cn_kmer) {
+            for edge_base in vec![b'A', b'C', b'G', b'T'] {
+                let next_kmer = [&cn_kmer[1..], &[edge_base]].concat();
                 let next_cn_kmer = crate::utils::canonicalize_kmer(&next_kmer);
 
                 if self.kmers.contains_key(&next_cn_kmer) {
-                    new_record.set_outgoing_edge(next_kmer[next_kmer.len() - 1]);
+                    new_record.set_outgoing_edge(edge_base);
                 }
-            }
 
-            for prev_kmer in self.prev_kmers(cn_kmer) {
+                let prev_kmer = [&[edge_base], &cn_kmer[0..cn_kmer.len() - 1]].concat();
                 let prev_cn_kmer = crate::utils::canonicalize_kmer(&prev_kmer);
 
                 if self.kmers.contains_key(&prev_cn_kmer) {
-                    new_record.set_incoming_edge(prev_kmer[0]);
+                    new_record.set_incoming_edge(edge_base);
                 }
             }
 
@@ -737,159 +753,389 @@ impl LdBG {
         self.kmers = kmers;
     }
 
-    fn connect_forward(&self, nodes: &Vec<NodeIndex>, graph: &mut petgraph::prelude::Graph<String, f64>) {
-        for i in 0..nodes.len() - 1 {
-            let this_node = nodes[i];
-            let this_kmer = graph.node_weight(this_node).unwrap().as_bytes();
-    
-            let next_node = nodes[i+1];
-            let next_kmer = graph.node_weight(next_node).unwrap().as_bytes().to_vec();
-    
-            let self_next_kmers = self.next_kmers(this_kmer);
-    
-            if self_next_kmers.contains(&next_kmer) {
-                graph.add_edge(this_node, next_node, 1.0);
-            } else {
-                let stop_kmers = nodes[i+1..]
-                    .iter()
-                    .map(|node| graph.node_weight(*node).unwrap().as_bytes().to_vec())
-                    .collect::<HashSet<Vec<u8>>>();
-    
-                let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until(&mut contig, this_kmer.to_vec(), stop_kmers.clone()) {
-                    for j in 0..=(contig.len() - self.kmer_size - 1) {
-                        let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
-                        let contig_next_kmer = &contig[j+1..j+self.kmer_size+1].to_vec();
-    
-                        let contig_this_node = if let Some(existing_node) = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(contig_this_kmer).to_string()) {
-                            existing_node
-                        } else {
-                            graph.add_node(String::from_utf8_lossy(contig_this_kmer).to_string())
-                        };
-    
-                        let contig_next_node = if let Some(existing_node) = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(contig_next_kmer).to_string()) {
-                            existing_node
-                        } else {
-                            graph.add_node(String::from_utf8_lossy(contig_next_kmer).to_string())
-                        };
-    
-                        graph.add_edge(contig_this_node, contig_next_node, 1.0);
-                    }
-                }
-            }
-        }
-    }
-
-    fn connect_backward(&self, nodes: &Vec<NodeIndex>, graph: &mut petgraph::prelude::Graph<String, f64>) {
-        for i in (1..nodes.len()).rev() {
-            let this_node = nodes[i];
-            let this_kmer = graph.node_weight(this_node).unwrap().as_bytes();
-    
-            let prev_node = nodes[i-1];
-            let prev_kmer = graph.node_weight(prev_node).unwrap().as_bytes().to_vec();
-    
-            let self_prev_kmers = self.prev_kmers(this_kmer);
-    
-            if self_prev_kmers.contains(&prev_kmer) {
-                graph.add_edge(prev_node, this_node, 1.0);
-            } else {
-                let stop_kmers = nodes[0..i-1]
-                    .iter()
-                    .map(|node| graph.node_weight(*node).unwrap().as_bytes().to_vec())
-                    .collect::<HashSet<Vec<u8>>>();
-
-                let mut contig = this_kmer.to_vec();
-                if let Ok(_) = self.assemble_backward_until(&mut contig, this_kmer.to_vec(), stop_kmers.clone()) {
-                    for j in (1..=(contig.len() - self.kmer_size)).rev() {
-                        let contig_this_kmer = &contig[j..j+self.kmer_size].to_vec();
-                        let contig_prev_kmer = &contig[j-1..j+self.kmer_size-1].to_vec();
-
-                        let contig_this_node = if let Some(existing_node) = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(contig_this_kmer).to_string()) {
-                            existing_node
-                        } else {
-                            graph.add_node(String::from_utf8_lossy(contig_this_kmer).to_string())
-                        };
-    
-                        let contig_prev_node = if let Some(existing_node) = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(contig_prev_kmer).to_string()) {
-                            existing_node
-                        } else {
-                            graph.add_node(String::from_utf8_lossy(contig_prev_kmer).to_string())
-                        };
-    
-                        graph.add_edge(contig_prev_node, contig_this_node, 1.0);
-                    }
-                }
-            }
-        }
-    }
-
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
-        let mut graph = DiGraph::new();
+        let (mut graph, node_indices) = self.initialize_read_graph(seq);
 
-        let nodes = seq.windows(self.kmer_size).map(|kmer| {
-            graph.add_node(String::from_utf8_lossy(kmer).to_string())
-        })
-        .collect::<Vec<NodeIndex>>();
+        for window in node_indices.windows(2) {
+            let (from, to) = (window[0], window[1]);
 
-        self.connect_forward(&nodes, &mut graph);
-        self.connect_backward(&nodes, &mut graph);
+            let from_kmer = graph.node_weight(from).unwrap().as_bytes();
+            let to_kmer = graph.node_weight(to).unwrap().as_bytes();
 
-        // Remove nodes with no incoming or outgoing edges
-        let nodes_to_remove: Vec<NodeIndex> = graph
-            .node_indices()
-            .filter(|&node|
-                graph.edges_directed(node, petgraph::Direction::Incoming).count() == 0 &&
-                graph.edges_directed(node, petgraph::Direction::Outgoing).count() == 0)
-            .collect();
+            let from_cn_kmer = crate::utils::canonicalize_kmer(from_kmer);
+            let to_cn_kmer = crate::utils::canonicalize_kmer(to_kmer);
 
+            let from_next_kmers = self.next_kmers(&from_kmer);
+            let to_prev_kmers = self.prev_kmers(&to_kmer);
+
+            if self.kmers.contains_key(&from_cn_kmer) && self.kmers.contains_key(&to_cn_kmer) && from_next_kmers.contains(&to_kmer.to_vec()) && to_prev_kmers.contains(&from_kmer.to_vec()) {
+                graph.add_edge(from, to, 1.0);
+            } else {
+                if let Ok((contig, forward)) = self.try_simple_paths(from_kmer, to_kmer) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_alternate_paths(&graph, from, to, 5) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_overlapping_paths(&graph, from, to, 5) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                } else if let Ok((contig, forward)) = self.try_exploratory_paths(&graph, from, to, seq, 5, 100) {
+                    self.add_to_read_graph(contig, &mut graph, forward);
+                }
+            }
+        }
+
+        let initial_segments = traverse_read_graph(&graph, 0);
+
+        if let Ok(connecting_segments) = self.try_connecting_all_segments(initial_segments) {
+            for (contig, forward) in connecting_segments.into_iter() {
+                self.add_to_read_graph(contig, &mut graph, forward);
+            }
+        }
+
+        if graph.node_count() > 0 {
+            self.remove_short_branches(&mut graph, 2 * self.kmer_size);
+        
+            let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+            let mut file = File::create("read_graph.dot").expect("Unable to create file");
+            write!(file, "{:?}", dot).expect("Unable to write data");
+        }
+
+        let corrected_segments = traverse_read_graph(&graph, self.kmer_size);
+
+        if corrected_segments.len() > 1 {
+            self.try_combinatorially_combining_sequences(&corrected_segments)
+        } else {
+            corrected_segments
+        }
+    }
+
+    fn try_combinatorially_combining_sequences(&self, corrected_segments: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        let mut segments = corrected_segments.clone();
+        let mut combined = true;
+        
+        while combined {
+            combined = false;
+            let mut new_segments = Vec::new();
+        
+            while let Some(segment_i) = segments.pop() {
+                let mut combined_i = false;
+        
+                for j in 0..segments.len() {
+                    let segment_j = &segments[j];
+        
+                    let overlap_end = self.compute_overlap(&segment_i, segment_j, 9, self.kmer_size);
+                    let overlap_start = self.compute_overlap(segment_j, &segment_i, 9, self.kmer_size);
+            
+                    if overlap_end > 0 || overlap_start > 0 {
+                        let combined_seq = if overlap_end >= overlap_start {
+                            [&segment_i[..segment_i.len() - overlap_end], segment_j].concat()
+                        } else {
+                            [segment_j, &segment_i[overlap_start..]].concat()
+                        };
+        
+                        new_segments.push(combined_seq);
+                        segments.remove(j);
+                        combined = true;
+                        combined_i = true;
+
+                        break;
+                    }
+                }
+        
+                if !combined_i {
+                    new_segments.push(segment_i);
+                }
+            }
+        
+            segments = new_segments;
+        }
+        
+        segments
+    }
+    
+    fn compute_overlap(&self, seq1: &[u8], seq2: &[u8], min_len: usize, max_len: usize) -> usize {
+        for overlap_len in (min_len..=max_len).rev() {
+            if seq1[seq1.len() - overlap_len..] == seq2[..overlap_len] {
+                return overlap_len;
+            }
+        }
+        
+        0
+    }
+
+    fn remove_short_branches(&self, graph: &mut petgraph::Graph<String, f64>, min_size: usize) {
+        // Find nodes with more than one outgoing edge and prune short branches
+        let mut nodes_to_remove = HashSet::new();
+        for node in graph.node_indices() {
+            let out_degree = graph.edges_directed(node, petgraph::Outgoing).count();
+            if out_degree > 1 {
+                for edge in graph.edges_directed(node, petgraph::Outgoing) {
+                    let mut branch = vec![edge.target()];
+                    let mut current = edge.target();
+                    let mut branch_length = 0;
+    
+                    while branch_length < 2 * self.kmer_size {
+                        let out_edges: Vec<_> = graph.edges_directed(current, petgraph::Outgoing).collect();
+                        if out_edges.len() != 1 {
+                            break;
+                        }
+                        current = out_edges[0].target();
+                        branch.push(current);
+                        branch_length += 1;
+                    }
+    
+                    if branch_length < min_size {
+                        nodes_to_remove.extend(branch);
+                    }
+                }
+            }
+        }
+    
+        // Remove the identified nodes from the graph
         for node in nodes_to_remove {
             graph.remove_node(node);
         }
+    }
+    
+    fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
+        let mut forward_contig = from_kmer.to_vec();
+        let mut backward_contig = to_kmer.to_vec();
 
-        // List all nodes with no incoming edges
-        let start_nodes: Vec<NodeIndex> = graph
-            .node_indices()
-            .filter(|&node| graph.edges_directed(node, petgraph::Direction::Incoming).count() == 0)
-            .collect();
+        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()]), 100) {
+            return Ok((forward_contig, true));
+        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()]), 100) {
+            return Ok((backward_contig, false));
+        }
 
-        // List all nodes with no outgoing edges
-        let end_nodes: Vec<NodeIndex> = graph
-            .node_indices()
-            .filter(|&node| graph.edges_directed(node, petgraph::Direction::Outgoing).count() == 0)
-            .collect();
+        Err(anyhow::anyhow!("No simple path found"))
+    }
 
-        let mut corrected_seqs = Vec::new();
+    fn try_alternate_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
 
-        for start_node in &start_nodes {
-            for end_node in &end_nodes {
-                if let Some((_, path)) = astar(
-                    &graph,
-                    *start_node,
-                    |finish| finish == *end_node,
-                    |e| *e.weight(),
-                    |_| 0.0) {
+                    let mut forward_contig = new_from_kmer.to_vec();
+                    let mut backward_contig = new_to_kmer.to_vec();
 
-                    let mut corrected_seq = Vec::new();
-                    corrected_seq.push(graph.node_weight(path[0]).unwrap().as_bytes());
-
-                    path.iter().skip(1).for_each(|node| {
-                        let kmer = graph.node_weight(*node).unwrap().as_bytes();
-                        corrected_seq.push(&kmer[(kmer.len() - 1)..]);
-                    });
-
-                    corrected_seqs.push(corrected_seq.concat());
+                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
+                        return Ok((forward_contig, true));
+                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
+                        return Ok((backward_contig, false));
+                    }
                 }
             }
         }
 
-        corrected_seqs
+        return Err(anyhow::anyhow!("No alternate path found"));
     }
 
+    fn try_overlapping_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, window: u8) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
+
+                    let mut forward_contig = new_from_kmer.to_vec();
+                    let mut backward_contig = new_to_kmer.to_vec();
+
+                    let seqs = vec![forward_contig.clone(), backward_contig.clone()];
+                    let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs);
+
+                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
+                        return Ok((forward_contig, true));
+                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
+                        return Ok((backward_contig, false));
+                    }
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No overlapping path found"));
+    }
+
+    fn try_exploratory_paths(&self, graph: &petgraph::Graph<String, f64>, from: NodeIndex, to: NodeIndex, seq: &[u8], window: u8, max_intermediate_nodes: usize) -> Result<(Vec<u8>, bool)> {
+        for scan_left in 0..=window {
+            for scan_right in 0..=window {
+                if let (Some(new_from), Some(new_to)) = (navigate_backward(from, scan_left, graph), navigate_forward(to, scan_right, graph)) {
+                    let new_from_kmer = graph.node_weight(new_from).unwrap().as_bytes();
+                    let new_to_kmer = graph.node_weight(new_to).unwrap().as_bytes();
+
+                    if let Some(substring) = self.find_read_substring(seq, new_from_kmer, new_to_kmer) {
+                        let mut subgraph = DiGraph::new();
+                        let mut visited = HashMap::<String, NodeIndex>::new();
+
+                        let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
+                        let start_node = subgraph.add_node(start_label.clone());
+                        visited.insert(start_label.clone(), start_node);
+
+                        if let Ok(_) = self.traverse_forward_until(&mut subgraph, &mut visited, start_node, new_to_kmer) {
+                            let start_label = String::from_utf8_lossy(&new_from_kmer).to_string();
+                            let end_label = String::from_utf8_lossy(&new_to_kmer).to_string();
+
+                            // Find the node indices for the start and end kmers
+                            let start_node = subgraph.node_indices().find(|&n| subgraph[n] == start_label);
+                            let end_node = subgraph.node_indices().find(|&n| subgraph[n] == end_label);
+
+                            if let (Some(start), Some(end)) = (start_node, end_node) {
+                                let mut best_contig = String::new();
+                                let mut min_ldist = u32::MAX;
+
+                                // List all paths from start_node to end_node
+                                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&subgraph, start, end, 0, Some(max_intermediate_nodes)) {
+                                    // Convert the path to labels
+                                    let path_labels: Vec<&String> = path.iter().map(|&n| &subgraph[n]).collect();
+
+                                    // Create the full contig from the path_labels
+                                    let mut new_contig = String::new();
+                                    for kmer in path_labels.iter() {
+                                        if new_contig.is_empty() {
+                                            new_contig.push_str(kmer);
+                                        } else {
+                                            new_contig.push_str(&kmer.chars().last().unwrap().to_string());
+                                        }
+                                    }
+
+                                    let ldist = levenshtein(&new_contig.as_bytes().to_vec(), &substring);
+                                    if ldist < min_ldist {
+                                        min_ldist = ldist;
+                                        best_contig = new_contig;
+                                    }
+                                }
+
+                                if min_ldist < (substring.len() / 10) as u32 {
+                                    return Ok((best_contig.as_bytes().to_vec(), true));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No alternate path found"));
+    }
+
+    fn try_connecting_all_segments(&self, segments: Vec<Vec<u8>>) -> Result<Vec<(Vec<u8>, bool)>> {
+        let mut connecting_segments = Vec::new();
+
+        for segment1 in segments.iter() {
+            for segment2 in segments.iter() {
+                if segment1 == segment2 {
+                    continue;
+                }
+
+                if let Ok(result) = self.try_connecting_segments(segment1, segment2) {
+                    connecting_segments.push(result);
+                }
+            }
+        }
+
+        if connecting_segments.len() == 0 {
+            return Err(anyhow::anyhow!("No connecting path found"));
+        }
+
+        Ok(connecting_segments)
+    }
+
+    fn try_connecting_segments(&self, segment1: &[u8], segment2: &[u8]) -> Result<(Vec<u8>, bool)> {
+        // let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len() - 2*self.kmer_size).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+        let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len().saturating_sub(2*self.kmer_size)).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+        let end_kmers = segment2.windows(self.kmer_size).take(10).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
+
+        for start_kmer in start_kmers.iter() {
+            let mut forward_contig = start_kmer.to_vec();
+            if let Ok(_) = self.assemble_forward_until(&mut forward_contig, start_kmer.to_vec(), end_kmers.clone(), 100) {
+                return Ok((forward_contig, true));
+            }
+        }
+
+        for end_kmer in end_kmers.iter() {
+            let mut backward_contig = end_kmer.to_vec();
+            if let Ok(_) = self.assemble_backward_until(&mut backward_contig, end_kmer.to_vec(), start_kmers.clone(), 100) {
+                return Ok((backward_contig, false));
+            }
+        }
+
+        return Err(anyhow::anyhow!("No connecting path found"));
+    }
+    
+    fn find_read_substring(&self, seq: &[u8], from_kmer: &[u8], to_kmer: &[u8]) -> Option<Vec<u8>> {
+        seq.windows(from_kmer.len())
+            .position(|window| window == from_kmer)
+            .and_then(|start_pos| {
+                seq[start_pos + from_kmer.len()..]
+                    .windows(to_kmer.len())
+                    .position(|window| window == to_kmer)
+                    .map(|end_pos| {
+                        seq[start_pos..start_pos + from_kmer.len() + end_pos + to_kmer.len()].to_vec()
+                    })
+            })
+    }
+
+    fn add_to_read_graph(&self, contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>, forward: bool) {
+        if forward {
+            self.add_to_read_graph_forward(contig, graph);
+        } else {
+            self.add_to_read_graph_backward(contig, graph);
+        }
+    }
+
+    fn add_to_read_graph_backward(&self, backward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+        // If backward assembly succeeded, add path to graph
+        for i in (0..backward_contig.len() - self.kmer_size).rev() {
+            let current_kmer = &backward_contig[i..i + self.kmer_size];
+            let prev_kmer = &backward_contig[i + 1..i + 1 + self.kmer_size];
+    
+            let prev_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
+            let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
+    
+            if !graph.contains_edge(prev_node, current_node) {
+                graph.add_edge(prev_node, current_node, 1.0);
+            }
+        }
+    }
+    
+    fn add_to_read_graph_forward(&self, forward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+        // If forward assembly succeeded, add path to graph
+        for i in 0..forward_contig.len() - self.kmer_size {
+            let current_kmer = &forward_contig[i..i + self.kmer_size];
+            let next_kmer = &forward_contig[i + 1..i + 1 + self.kmer_size];
+    
+            let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
+            let next_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(next_kmer).to_string())
+                .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
+    
+            if !graph.contains_edge(current_node, next_node) {
+                graph.add_edge(current_node, next_node, 1.0);
+            }
+        }
+    }
+    
+    fn initialize_read_graph(&self, seq: &[u8]) -> (petgraph::Graph<String, f64>, Vec<NodeIndex>) {
+        let mut graph = DiGraph::<String, f64>::new();
+    
+        let mut node_indices = Vec::new();
+        for kmer in seq.windows(self.kmer_size) {
+            if self.kmers.contains_key(&crate::utils::canonicalize_kmer(kmer)) {
+                let node_index = graph.add_node(String::from_utf8_lossy(kmer).to_string());
+                node_indices.push(node_index);
+            }
+        }
+        (graph, node_indices)
+    }
+    
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
-        let progress_bar = crate::utils::default_bounded_progress_bar(
-            "Correcting reads",
-            seqs.len() as u64,
-        );
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Correcting reads", seqs.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         seqs
             .par_iter()
@@ -909,11 +1155,21 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut visited = HashSet::new();
+
         loop {
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
 
             match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
+                    if links_in_scope.len() == 0 {
+                        if visited.contains(&this_kmer) {
+                            break;
+                        }
+
+                        visited.insert(this_kmer.clone());
+                    }
+
                     contig.push(this_kmer[this_kmer.len() - 1]);
                     last_kmer = this_kmer;
                 }
@@ -924,19 +1180,87 @@ impl LdBG {
         }
     }
 
-    /// Assemble a contig in the forward direction until a stopping k-mer is reached.
+    /// Assemble a contig in the forward direction until a stopping k-mer is reached or the limit is hit.
     ///
     /// # Arguments
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>> {
+    /// * `stop_kmers` - A HashSet of k-mers to stop at.
+    /// * `limit` - The maximum number of nodes to traverse before giving up.
+    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+        let mut nodes_traversed = 0;
+
+        loop {
+            if stop_kmers.contains(&last_kmer) {
+                return Ok(last_kmer);
+            }
+
+            if nodes_traversed >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
+            }
+
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
+
+            match self.next_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.push(this_kmer[this_kmer.len() - 1]);
+                    last_kmer = this_kmer;
+                    nodes_traversed += 1;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!("No stopping k-mer found"))
+    }
+
+    fn assemble_forward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let initial_contig_length = contig.len();
+
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+    
+        loop {
+            if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
+                return Ok(last_kmer);
+            }
+
+            if contig.len() - initial_contig_length >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
+            }
+    
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
+    
+            match self.next_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.push(this_kmer[this_kmer.len() - 1]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+    
+        Err(anyhow::anyhow!("Stopping condition not satisfied"))
+    }
+
+    fn assemble_forward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            if stop_kmers.contains(&last_kmer) {
+            if contig.len() >= limit {
                 return Ok(last_kmer);
             }
 
@@ -966,7 +1290,90 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
+        let mut visited = HashSet::new();
+
         loop {
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
+
+            match self.prev_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    if links_in_scope.len() == 0 {
+                        if visited.contains(&this_kmer) {
+                            break;
+                        }
+
+                        visited.insert(this_kmer.clone());
+                    }
+
+                    contig.insert(0, this_kmer[0]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Assemble a contig in the backward direction until a stopping k-mer is reached or the limit is hit.
+    ///
+    /// # Arguments
+    ///
+    /// * `contig` - A mutable reference to the contig being assembled.
+    /// * `start_kmer` - A vector representing the starting k-mer.
+    /// * `stop_kmers` - A HashSet of vectors representing the stopping k-mers.
+    /// * `limit` - The maximum number of nodes to traverse before giving up.
+    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+        let mut nodes_traversed = 0;
+
+        loop {
+            if stop_kmers.contains(&last_kmer) {
+                return Ok(last_kmer);
+            }
+
+            if nodes_traversed >= limit {
+                return Err(anyhow::anyhow!("Limit reached before finding a stopping k-mer"));
+            }
+
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
+
+            match self.prev_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.insert(0, this_kmer[0]);
+                    last_kmer = this_kmer;
+                    nodes_traversed += 1;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!("No stopping k-mer found"))
+    }
+
+    fn assemble_backward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let initial_contig_length = contig.len();
+
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+    
+        loop {
+            if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
+                return Ok(last_kmer);
+            }
+
+            if contig.len() - initial_contig_length >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
+            }
+    
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
 
             match self.prev_kmer(&last_kmer, &mut links_in_scope) {
@@ -979,21 +1386,16 @@ impl LdBG {
                 }
             }
         }
+    
+        Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
-    /// Assemble a contig in the backward direction until a stopping k-mer is reached.
-    ///
-    /// # Arguments
-    ///
-    /// * `contig` - A mutable reference to the contig being assembled.
-    /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmer` - A vector representing the stopping k-mer.
-    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>) -> Result<Vec<u8>>{
+    fn assemble_backward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>>{
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
         loop {
-            if stop_kmers.contains(&last_kmer) {
+            if contig.len() >= limit {
                 return Ok(last_kmer);
             }
 
@@ -1049,10 +1451,11 @@ impl LdBG {
         let mut used_kmers = HashSet::new();
         let k = self.kmer_size;
 
-        let progress_bar = crate::utils::default_bounded_progress_bar(
-            "Assembling contigs",
-            self.kmers.len() as u64,
-        );
+        let progress_bar = if self.verbose {
+            crate::utils::default_bounded_progress_bar("Assembling contigs", self.kmers.len() as u64)
+        } else {
+            crate::utils::default_hidden_progress_bar()
+        };
 
         for cn_kmer in self.kmers.keys().progress_with(progress_bar) {
             if !used_kmers.contains(cn_kmer) {
@@ -1064,6 +1467,8 @@ impl LdBG {
                         used_kmers.insert(crate::utils::canonicalize_kmer(kmer_in_contig));
                     }
                     contigs.push(contig);
+                } else if r.in_degree() == 0 && r.out_degree() == 0 {
+                    contigs.push(cn_kmer.to_vec());
                 }
 
                 used_kmers.insert(cn_kmer.clone());
@@ -1072,8 +1477,6 @@ impl LdBG {
 
         contigs
     }
-
-
 
     /// Update links available to inform navigation during graph traversal.
     ///
@@ -1139,7 +1542,77 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
-    pub fn clean_paths(mut self, min_score: f32) -> Self {
+    pub fn clean_color_specific_paths(mut self, color: usize, min_score: f32) -> Self {
+        let bad_cn_kmers = self.kmers
+            .keys()
+            .cloned()
+            .filter(|cn_kmer| self.sources.get(cn_kmer).unwrap_or(&vec![]) == &vec![color])
+            .filter(|cn_kmer| self.scores.get(cn_kmer).unwrap_or(&1.0) < &min_score)
+            .filter(|cn_kmer| self.kmers.get(cn_kmer).unwrap().in_degree() == 1 && self.kmers.get(cn_kmer).unwrap().out_degree() == 1)
+            .collect::<Vec<Vec<u8>>>();
+
+        let mut to_remove = HashSet::new();
+        let mut bad_paths: usize = 0;
+
+        for bad_cn_kmer in bad_cn_kmers {
+            if !to_remove.contains(&bad_cn_kmer) {
+                let mut seen_kmers = HashSet::new();
+                let mut score_sum = 0.0;
+
+                let mut fw_contig = bad_cn_kmer.clone();
+                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+
+                for kmer in fw_contig.windows(self.kmer_size) {
+                    let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let mut rc_contig = bad_cn_kmer.clone();
+                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+
+                for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
+                    let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                    if let Some(r) = self.kmers.get(&cn_kmer) {
+                        if r.in_degree() == 1 && r.out_degree() == 1 {
+                            seen_kmers.insert(cn_kmer.clone());
+                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                let weight = score_sum / seen_kmers.len() as f32;
+
+                if weight < min_score {
+                    to_remove.extend(seen_kmers);
+                    bad_paths += 1;
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad paths specific to color {} ({} kmers)", bad_paths, color, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    pub fn clean_branches(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
             .cloned()
@@ -1201,30 +1674,29 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        self.infer_edges();
+        crate::elog!(" -- Removed {} bad paths ({} kmers)", bad_paths, to_remove.len());
 
-        self.cleaned_path_kmers = to_remove.len();
-        self.cleaned_paths = bad_paths;
+        self.infer_edges();
 
         self
     }
 
-    pub fn clean_tips(mut self, max_tip_length: usize) -> Self {
+    pub fn clean_tips(mut self, limit: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
 
+        let stopping_condition = |kmer: &[u8], _: usize, g: &LdBG| { g.prev_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 };
+
         for cn_kmer in self.kmers.keys() {
-            if self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
-                let next_kmers = self.next_kmers(cn_kmer);
+            if self.kmers.get(cn_kmer).unwrap().in_degree() == 0 && self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
+                let mut fw_contig = cn_kmer.to_vec();
+                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, cn_kmer.clone(), limit, stopping_condition) {
+                    let score_sum = fw_contig.kmers(self.kmer_size as u8)
+                        .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                        .sum::<f32>();
+                    let weight = score_sum / (fw_contig.len() - self.kmer_size + 1) as f32;
 
-                for cur_kmer in next_kmers {
-                    let mut fw_contig = cur_kmer.to_vec();
-                    self.assemble_forward(&mut fw_contig, cur_kmer.clone());
-
-                    let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
-                    let num_next = self.next_kmers(last_kmer).len();
-
-                    if fw_contig.len() <= max_tip_length && num_next == 0 {
+                    if weight < min_score {
                         for kmer in fw_contig.kmers(self.kmer_size as u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
@@ -1234,17 +1706,15 @@ impl LdBG {
                 }
             }
 
-            if self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
-                let prev_kmers = self.prev_kmers(cn_kmer);
+            if self.kmers.get(cn_kmer).unwrap().out_degree() == 0 && self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
+                let mut rv_contig = cn_kmer.to_vec();
+                if let Ok(_) = self.assemble_backward_until_condition(&mut rv_contig, cn_kmer.clone(), limit, stopping_condition) {
+                    let score_sum = rv_contig.kmers(self.kmer_size as u8)
+                        .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                        .sum::<f32>();
+                    let weight = score_sum / (rv_contig.len() - self.kmer_size + 1) as f32;
 
-                for cur_kmer in prev_kmers {
-                    let mut rv_contig = cur_kmer.to_vec();
-                    self.assemble_backward(&mut rv_contig, cur_kmer.clone());
-
-                    let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
-                    let num_prev = self.prev_kmers(first_kmer).len();
-
-                    if rv_contig.len() <= max_tip_length && num_prev == 0 {
+                    if weight < min_score {
                         for kmer in rv_contig.kmers(self.kmer_size as u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }
@@ -1260,63 +1730,296 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        self.infer_edges();
+        crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
 
-        self.cleaned_tip_kmers = to_remove.len();
-        self.cleaned_tips = bad_paths;
+        self.infer_edges();
 
         self
     }
 
-    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
-        let mut graph = DiGraph::new();
-        let mut visited = HashMap::new();
+    pub fn clean_contigs(mut self, min_contig_length: usize) -> Self {
+        let mut to_remove = HashSet::new();
+        let mut bad_contigs: usize = 0;
 
-        let start_node = graph.add_node(String::from_utf8_lossy(&start_kmer).to_string());
+        self.assemble_all().iter().for_each(|contig| {
+            if contig.len() < min_contig_length {
+                let mut process = true;
 
-        // Traverse forward
+                // Check if the first k-mer has no incoming edges
+                let first_kmer = contig.windows(self.kmer_size).next().unwrap();
+                let prev_kmers = self.prev_kmers(first_kmer);
+                if prev_kmers.len() > 0 {
+                    process = false;
+                }
+
+                // Check if the last k-mer has no outgoing edges
+                let last_kmer = contig.windows(self.kmer_size).last().unwrap();
+                let next_kmers = self.next_kmers(last_kmer);
+                if next_kmers.len() > 0 {
+                    process = false;
+                }
+
+                if process {
+                    for kmer in contig.windows(self.kmer_size) {
+                        to_remove.insert(crate::utils::canonicalize_kmer(kmer));
+                    }
+
+                    bad_contigs += 1;
+                }
+            }
+        });
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad contigs ({} kmers)", bad_contigs, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    pub fn identify_superbubbles(&self) -> Vec<Vec<NodeIndex>> {
+        let graph = self.traverse_all_kmers();
+        let mut superbubbles = Vec::new();
+    
+        // Perform topological sort
+        let topo_order = match petgraph::algo::toposort(&graph, None) {
+            Ok(order) => order,
+            Err(_) => return superbubbles, // Graph has cycles, return empty vector
+        };
+    
+        let mut visited = HashSet::new();
+        let mut seen = HashSet::new();
+    
+        for &s in &topo_order {
+            if visited.contains(&s) {
+                continue;
+            }
+    
+            let mut stack = vec![s];
+            seen.clear();
+            seen.insert(s);
+    
+            while let Some(v) = stack.pop() {
+                visited.insert(v);
+    
+                if graph.neighbors(v).count() == 0 {
+                    break;
+                }
+    
+                let mut all_children_seen = true;
+                for u in graph.neighbors(v) {
+                    if u == s {
+                        break;
+                    }
+    
+                    if !seen.contains(&u) {
+                        seen.insert(u);
+                        stack.push(u);
+                        all_children_seen = false;
+                    }
+                }
+    
+                if stack.len() == 1 {
+                    let t = stack[0];
+                    if !graph.contains_edge(s, t) {
+                        if let Some(superbubble) = self.validate_superbubble(&graph, s, t) {
+                            superbubbles.push(superbubble);
+                        }
+                    }
+                    break;
+                }
+    
+                if all_children_seen {
+                    break;
+                }
+            }
+        }
+    
+        superbubbles
+    }
+    
+    fn validate_superbubble(&self, graph: &DiGraph<String, f32>, s: NodeIndex, t: NodeIndex) -> Option<Vec<NodeIndex>> {
+        let mut superbubble = vec![t];
+        let mut current = t;
+    
+        while current != s {
+            let parents: Vec<_> = graph.neighbors_directed(current, petgraph::Incoming).collect();
+            if parents.len() != 1 {
+                return None; // Not a valid superbubble
+            }
+            current = parents[0];
+            superbubble.push(current);
+        }
+    
+        superbubble.reverse();
+        Some(superbubble)
+    }
+    
+    fn is_entrance(&self, graph: &DiGraph<String, f32>, v: NodeIndex) -> bool {
+        graph.neighbors_directed(v, petgraph::Incoming).count() <= 1 &&
+        graph.neighbors_directed(v, petgraph::Outgoing).count() > 1
+    }
+    
+    fn is_exit(&self, graph: &DiGraph<String, f32>, v: NodeIndex) -> bool {
+        graph.neighbors_directed(v, petgraph::Incoming).count() > 1 &&
+        graph.neighbors_directed(v, petgraph::Outgoing).count() <= 1
+    }
+
+    fn traverse_forward(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex) {
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-
+    
             for next_kmer in self.next_kmers(this_kmer) {
-                let next_node = graph.add_node(String::from_utf8_lossy(&next_kmer).to_string());
-                graph.add_edge(node, next_node, *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&1.0));
-
-                if !visited.contains_key(&next_kmer) {
-                    visited.insert(next_kmer.clone(), next_node);
-
-                    fwd_stack.push(next_node);
+                let next_label = String::from_utf8_lossy(&next_kmer).to_string();
+                let next_node = if let Some(&existing_node) = visited.get(&next_label) {
+                    existing_node
                 } else {
-                    for end_kmer in self.next_kmers(&next_kmer) {
-                        let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(next_node, *end_node, *self.scores.get(&crate::utils::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
+                    let new_node = graph.add_node(next_label.clone());
+                    visited.insert(next_label.clone(), new_node);
+                    fwd_stack.push(new_node);
+                    new_node
+                };
+    
+                if !graph.contains_edge(node, next_node) {
+                    graph.add_edge(
+                        node,
+                        next_node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer))
+                            .unwrap_or(&1.0),
+                    );
+                }
+            }
+        }
+    }
+
+    fn traverse_forward_until(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex, stop_node: &[u8]) -> Result<()> {
+        let mut found = false;
+
+        let mut fwd_stack = vec![start_node];
+        while let Some(node) = fwd_stack.pop() {
+            let this_kmer = graph.node_weight(node).unwrap().as_bytes();
+    
+            for next_kmer in self.next_kmers(this_kmer) {
+                let next_label = String::from_utf8_lossy(&next_kmer).to_string();
+                let next_node = if let Some(&existing_node) = visited.get(&next_label) {
+                    existing_node
+                } else {
+                    let new_node = graph.add_node(next_label.clone());
+                    visited.insert(next_label.clone(), new_node);
+
+                    if graph.node_weight(new_node).unwrap().as_bytes() != stop_node {
+                        fwd_stack.push(new_node);
+                    } else {
+                        found = true;
                     }
+
+                    new_node
+                };
+    
+                if !graph.contains_edge(node, next_node) {
+                    graph.add_edge(
+                        node,
+                        next_node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer))
+                            .unwrap_or(&1.0),
+                    );
                 }
             }
         }
 
-        // Traverse reverse
+        if found {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Stop node not found"))
+        }
+    }
+
+    fn traverse_backward(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex) {
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-
+    
             for prev_kmer in self.prev_kmers(this_kmer) {
-                let prev_node = graph.add_node(String::from_utf8_lossy(&prev_kmer).to_string());
-                graph.add_edge(prev_node, node, *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&1.0));
-
-                if !visited.contains_key(&prev_kmer) {
-                    visited.insert(prev_kmer.clone(), prev_node);
-
-                    rev_stack.push(prev_node);
+                let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
+                let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
+                    existing_node
                 } else {
-                    for end_kmer in self.prev_kmers(&prev_kmer) {
-                        let end_node = visited.get(&end_kmer).unwrap();
-                        graph.add_edge(*end_node, prev_node, *self.scores.get(&crate::utils::canonicalize_kmer(&end_kmer)).unwrap_or(&1.0));
-                    }
+                    let new_node = graph.add_node(prev_label.clone());
+                    visited.insert(prev_label.clone(), new_node);
+                    rev_stack.push(new_node);
+                    new_node
+                };
+    
+                if !graph.contains_edge(prev_node, node) {
+                    graph.add_edge(
+                        prev_node,
+                        node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer))
+                            .unwrap_or(&1.0),
+                    );
                 }
             }
         }
+    }
+
+    fn traverse_backward_until(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex, stop_node: &[u8]) -> Result<()> {
+        let mut found = false;
+
+        let mut rev_stack = vec![start_node];
+        while let Some(node) = rev_stack.pop() {
+            let this_kmer = graph.node_weight(node).unwrap().as_bytes();
+    
+            for prev_kmer in self.prev_kmers(this_kmer) {
+                let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
+                let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
+                    existing_node
+                } else {
+                    let new_node = graph.add_node(prev_label.clone());
+                    visited.insert(prev_label.clone(), new_node);
+
+                    if graph.node_weight(new_node).unwrap().as_bytes() != stop_node {
+                        rev_stack.push(new_node);
+                    } else {
+                        found = true;
+                    }
+
+                    new_node
+                };
+    
+                if !graph.contains_edge(prev_node, node) {
+                    graph.add_edge(
+                        prev_node,
+                        node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer))
+                            .unwrap_or(&1.0),
+                    );
+                }
+            }
+        }
+
+        if found {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Stop node not found"))
+        }
+    }
+
+    /// Traverse kmers starting from a given kmer and build a graph.
+    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+        let mut graph = DiGraph::new();
+        let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
+
+        let start_label = String::from_utf8_lossy(&start_kmer).to_string();
+        let start_node = graph.add_node(start_label.clone());
+        visited.insert(start_label.clone(), start_node);
+
+        self.traverse_forward(&mut graph, &mut visited, start_node);
+        self.traverse_backward(&mut graph, &mut visited, start_node);
 
         graph
     }
@@ -1324,64 +2027,85 @@ impl LdBG {
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
-
+    
         let start_contig = self.assemble(&start_kmer);
         let start_node = graph.add_node(String::from_utf8_lossy(&start_contig).to_string());
-
+        
+        // Mark all k-mers in the start contig as visited
+        for kmer in start_contig.windows(self.kmer_size) {
+            visited.insert(crate::utils::canonicalize_kmer(kmer), start_node);
+        }
+    
         // Traverse forward
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-
+    
             if let Some(last_kmer) = self.last_kmer(this_contig) {
                 for next_kmer in self.next_kmers(&last_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&next_kmer)) {
                         let mut next_contig = next_kmer.clone();
                         self.assemble_forward(&mut next_contig, next_kmer.clone());
-
-                        let weight = next_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
-
+    
+                        let weight = next_contig.windows(self.kmer_size)
+                            .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
+                            .fold(f32::INFINITY, |acc, x| acc.min(*x));
+    
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
-
-                        visited.insert(crate::utils::canonicalize_kmer(&next_kmer), next_node);
-
+    
+                        // Mark all k-mers in the new contig as visited
+                        for kmer in next_contig.windows(self.kmer_size) {
+                            visited.insert(crate::utils::canonicalize_kmer(kmer), next_node);
+                        }
+    
                         fwd_stack.push(next_node);
                     } else {
-                        let next_node = visited.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap();
-                        graph.add_edge(node, *next_node, 1.0);
+                        let next_node = *visited.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap();
+                        if !graph.contains_edge(node, next_node) {
+                            let weight = *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&1.0);
+                            graph.add_edge(node, next_node, weight);
+                        }
                     }
                 }
             }
         }
-
+    
         // Traverse backward
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-
+    
             if let Some(first_kmer) = self.first_kmer(this_contig) {
                 for prev_kmer in self.prev_kmers(&first_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&prev_kmer)) {
                         let mut prev_contig = prev_kmer.clone();
                         self.assemble_backward(&mut prev_contig, prev_kmer.clone());
-
-                        let weight = prev_contig.as_bytes().kmers(self.kmer_size as u8).into_iter().map(|x| self.scores.get(x).unwrap_or(&1.0)).fold(f32::INFINITY, |acc, x| acc.min(*x));
-
+    
+                        let weight = prev_contig.windows(self.kmer_size)
+                            .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
+                            .fold(f32::INFINITY, |acc, x| acc.min(*x));
+    
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
-                        graph.add_edge(node, prev_node, weight);
-
-                        visited.insert(crate::utils::canonicalize_kmer(&prev_kmer), prev_node);
-
+                        graph.add_edge(prev_node, node, weight);  // Note the reversed edge direction
+    
+                        // Mark all k-mers in the new contig as visited
+                        for kmer in prev_contig.windows(self.kmer_size) {
+                            visited.insert(crate::utils::canonicalize_kmer(kmer), prev_node);
+                        }
+    
                         rev_stack.push(prev_node);
                     } else {
-                        let prev_node = visited.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap();
-                        graph.add_edge(node, *prev_node, 1.0);
+                        let prev_node = *visited.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap();
+                        if !graph.contains_edge(prev_node, node) {
+                            let weight = *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&1.0);
+                            graph.add_edge(prev_node, node, weight);  // Note the reversed edge direction
+                        }
                     }
                 }
             }
         }
-
+    
         graph
     }
 
@@ -1394,36 +2118,39 @@ impl LdBG {
 
         let mut visited = HashSet::new();
         let mut graph = DiGraph::new();
+        let mut node_indices = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_kmers(cn_kmer);
+                let g = self.traverse_kmers(cn_kmer.clone());
 
-                g.node_weights().for_each(|node| {
-                    let cn_kmer = crate::utils::canonicalize_kmer(node.as_bytes());
+                // Mark kmers as visited
+                for node_label in g.node_weights() {
+                    let cn_kmer = crate::utils::canonicalize_kmer(node_label.as_bytes());
                     visited.insert(cn_kmer);
-                });
-
-                // Add all nodes from g to graph
-                for node_index in g.node_indices() {
-                    let node_weight = g.node_weight(node_index).unwrap();
-                    graph.add_node(node_weight.clone());
                 }
 
-                // Add all edges from g to graph
+                // Add nodes to the main graph, avoiding duplicates
+                for node_index in g.node_indices() {
+                    let node_label = g.node_weight(node_index).unwrap().clone();
+                    if !node_indices.contains_key(&node_label) {
+                        let new_node_idx = graph.add_node(node_label.clone());
+                        node_indices.insert(node_label.clone(), new_node_idx);
+                    }
+                }
+
+                // Add edges, mapping nodes correctly
                 for edge in g.edge_references() {
                     let (source, target) = (edge.source(), edge.target());
-                    let source_weight = g.node_weight(source).unwrap();
-                    let target_weight = g.node_weight(target).unwrap();
-                    
-                    let new_source = graph.node_indices()
-                        .find(|&i| graph[i] == *source_weight)
-                        .unwrap();
-                    let new_target = graph.node_indices()
-                        .find(|&i| graph[i] == *target_weight)
-                        .unwrap();
-                    
-                    graph.add_edge(new_source, new_target, *edge.weight());
+                    let source_label = g.node_weight(source).unwrap();
+                    let target_label = g.node_weight(target).unwrap();
+
+                    let new_source = *node_indices.get(source_label).expect("Source node should exist");
+                    let new_target = *node_indices.get(target_label).expect("Target node should exist");
+
+                    if !graph.contains_edge(new_source, new_target) {
+                        graph.add_edge(new_source, new_target, *edge.weight());
+                    }
                 }
             }
         }
@@ -1476,6 +2203,85 @@ impl LdBG {
         }
 
         graph
+    }
+}
+
+fn traverse_read_graph(graph: &petgraph::Graph<String, f64>, min_length: usize) -> Vec<Vec<u8>> {
+    // Populate corrected_seqs with all contiguous stretches of the graph more than 1 node long
+    let mut corrected_seqs = Vec::new();
+    let mut visited = HashSet::new();
+    for node in graph.node_indices() {
+        if !visited.contains(&node) {
+            let mut current_seq = Vec::new();
+            let mut current_node = node;
+        
+            loop {
+                visited.insert(current_node);
+                if current_seq.is_empty() {
+                    current_seq.push(graph[current_node].clone());
+                } else {
+                    current_seq.push(graph[current_node].chars().last().unwrap().to_string());
+                }
+            
+                let outgoing_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
+                if outgoing_edges.len() == 1 {
+                    let next_node = outgoing_edges[0].target();
+                    if !visited.contains(&next_node) {
+                        current_node = next_node;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        
+            if current_seq.len() > min_length {
+                let contig = current_seq.join("").as_bytes().to_vec();
+                corrected_seqs.push(contig);
+            }
+        }
+    }
+    corrected_seqs
+}
+
+fn navigate_backward(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
+    let mut current_node = node;
+    let mut steps_backward = 0;
+
+    while steps_backward < steps {
+        let incoming_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Incoming).collect();
+        if incoming_edges.is_empty() {
+            return None;
+        }
+        current_node = incoming_edges[0].source();
+        steps_backward += 1;
+    }
+
+    if steps_backward == steps {
+        Some(current_node)
+    } else {
+        None
+    }
+}
+
+fn navigate_forward(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, f64>) -> Option<NodeIndex> {
+    let mut current_node = node;
+    let mut steps_forward = 0;
+
+    while steps_forward < steps {
+        let outgoing_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
+        if outgoing_edges.is_empty() {
+            return None;
+        }
+        current_node = outgoing_edges[0].source();
+        steps_forward += 1;
+    }
+
+    if steps_forward == steps {
+        Some(current_node)
+    } else {
+        None
     }
 }
 
@@ -1745,8 +2551,8 @@ mod tests {
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
         // Check if the graph is consistent with the expected structure
-        assert_eq!(graph.node_count(), 22);
-        assert_eq!(graph.edge_count(), 22);
+        assert_eq!(graph.node_count(), 21);
+        assert_eq!(graph.edge_count(), 21);
 
         // Check specific nodes and their labels
         let node_labels: Vec<_> = graph.node_weights().cloned().collect();
@@ -1774,7 +2580,7 @@ mod tests {
 
         // Check specific edges
         let edges = graph.edge_indices().collect::<Vec<_>>();
-        assert_eq!(edges.len(), 22);
+        assert_eq!(edges.len(), 21);
 
         // Helper function to find node index by label
         let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
@@ -1831,6 +2637,8 @@ mod tests {
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
         let graph = g.traverse_contigs(b"CCACG".to_vec());
 
+        // Uncomment to manually verify structure of the graph
+        // use petgraph::dot::Dot;
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
         // Check if the graph is consistent with the expected structure
@@ -1851,9 +2659,9 @@ mod tests {
         let find_node = |label: &str| graph.node_indices().find(|&i| graph[i] == label).unwrap();
 
         // Check some specific edges
-        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("ACTGATTTCGAT")));
-        assert!(graph.contains_edge(find_node("CGATGCCACGGTGG"), find_node("CGATGCGAT")));
-        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("ACTGATTTCGAT")));
+        assert!(graph.contains_edge(find_node("ACTGATTTCGAT"), find_node("CGATGCCACGGTGG")));
+        assert!(graph.contains_edge(find_node("ACTGATTTCGAT"), find_node("CGATGCGAT")));
+        assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("CGATGCCACGGTGG")));
         assert!(graph.contains_edge(find_node("CGATGCGAT"), find_node("CGATGCGAT")));
     }
 
@@ -2066,11 +2874,11 @@ mod tests {
             .build_links(&fwd_seqs);
 
         let mut contig1 = b"ACTGA".to_vec();
-        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]));
+        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]), 100);
         assert_eq!(contig1, b"ACTGATTTCGA".to_vec());
 
         let mut contig2 = b"GGTGG".to_vec();
-        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]));
+        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]), 100);
         assert_eq!(contig2, b"TGCCACGGTGG".to_vec());
     }
 
