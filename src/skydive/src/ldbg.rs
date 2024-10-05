@@ -792,46 +792,110 @@ impl LdBG {
         }
 
         if graph.node_count() > 0 {
-            // Find nodes with more than one outgoing edge and prune short branches
-            let mut nodes_to_remove = HashSet::new();
-            for node in graph.node_indices() {
-                let out_degree = graph.edges_directed(node, petgraph::Outgoing).count();
-                if out_degree > 1 {
-                    for edge in graph.edges_directed(node, petgraph::Outgoing) {
-                        let mut branch = vec![edge.target()];
-                        let mut current = edge.target();
-                        let mut branch_length = 0;
-
-                        while branch_length < 2 * self.kmer_size {
-                            let out_edges: Vec<_> = graph.edges_directed(current, petgraph::Outgoing).collect();
-                            if out_edges.len() != 1 {
-                                break;
-                            }
-                            current = out_edges[0].target();
-                            branch.push(current);
-                            branch_length += 1;
-                        }
-
-                        if branch_length < 2 * self.kmer_size {
-                            nodes_to_remove.extend(branch);
-                        }
-                    }
-                }
-            }
-
-            // Remove the identified nodes from the graph
-            for node in nodes_to_remove {
-                graph.remove_node(node);
-            }
-
+            self.remove_short_branches(&mut graph, 2 * self.kmer_size);
+        
             let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
             let mut file = File::create("read_graph.dot").expect("Unable to create file");
             write!(file, "{:?}", dot).expect("Unable to write data");
         }
 
-        traverse_read_graph(&graph, self.kmer_size)
+        let corrected_segments = traverse_read_graph(&graph, self.kmer_size);
+
+        if corrected_segments.len() > 1 {
+            self.try_combinatorially_combining_sequences(&corrected_segments)
+        } else {
+            corrected_segments
+        }
     }
 
+    fn try_combinatorially_combining_sequences(&self, corrected_segments: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        let mut segments = corrected_segments.clone();
+        let mut combined = true;
+        
+        while combined {
+            combined = false;
+            let mut new_segments = Vec::new();
+        
+            while let Some(segment_i) = segments.pop() {
+                let mut combined_i = false;
+        
+                for j in 0..segments.len() {
+                    let segment_j = &segments[j];
+        
+                    let overlap_end = self.compute_overlap(&segment_i, segment_j, 9, self.kmer_size);
+                    let overlap_start = self.compute_overlap(segment_j, &segment_i, 9, self.kmer_size);
+            
+                    if overlap_end > 0 || overlap_start > 0 {
+                        let combined_seq = if overlap_end >= overlap_start {
+                            [&segment_i[..segment_i.len() - overlap_end], segment_j].concat()
+                        } else {
+                            [segment_j, &segment_i[overlap_start..]].concat()
+                        };
+        
+                        new_segments.push(combined_seq);
+                        segments.remove(j);
+                        combined = true;
+                        combined_i = true;
+
+                        break;
+                    }
+                }
+        
+                if !combined_i {
+                    new_segments.push(segment_i);
+                }
+            }
+        
+            segments = new_segments;
+        }
+        
+        segments
+    }
+    
+    fn compute_overlap(&self, seq1: &[u8], seq2: &[u8], min_len: usize, max_len: usize) -> usize {
+        for overlap_len in (min_len..=max_len).rev() {
+            if seq1[seq1.len() - overlap_len..] == seq2[..overlap_len] {
+                return overlap_len;
+            }
+        }
+        
+        0
+    }
+
+    fn remove_short_branches(&self, graph: &mut petgraph::Graph<String, f64>, min_size: usize) {
+        // Find nodes with more than one outgoing edge and prune short branches
+        let mut nodes_to_remove = HashSet::new();
+        for node in graph.node_indices() {
+            let out_degree = graph.edges_directed(node, petgraph::Outgoing).count();
+            if out_degree > 1 {
+                for edge in graph.edges_directed(node, petgraph::Outgoing) {
+                    let mut branch = vec![edge.target()];
+                    let mut current = edge.target();
+                    let mut branch_length = 0;
+    
+                    while branch_length < 2 * self.kmer_size {
+                        let out_edges: Vec<_> = graph.edges_directed(current, petgraph::Outgoing).collect();
+                        if out_edges.len() != 1 {
+                            break;
+                        }
+                        current = out_edges[0].target();
+                        branch.push(current);
+                        branch_length += 1;
+                    }
+    
+                    if branch_length < min_size {
+                        nodes_to_remove.extend(branch);
+                    }
+                }
+            }
+        }
+    
+        // Remove the identified nodes from the graph
+        for node in nodes_to_remove {
+            graph.remove_node(node);
+        }
+    }
+    
     fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
         let mut forward_contig = from_kmer.to_vec();
         let mut backward_contig = to_kmer.to_vec();
@@ -1156,6 +1220,41 @@ impl LdBG {
         Err(anyhow::anyhow!("No stopping k-mer found"))
     }
 
+    fn assemble_forward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let initial_contig_length = contig.len();
+
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+    
+        loop {
+            if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
+                return Ok(last_kmer);
+            }
+
+            if contig.len() - initial_contig_length >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
+            }
+    
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
+    
+            match self.next_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.push(this_kmer[this_kmer.len() - 1]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+    
+        Err(anyhow::anyhow!("Stopping condition not satisfied"))
+    }
+
     fn assemble_forward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
@@ -1254,6 +1353,41 @@ impl LdBG {
         }
 
         Err(anyhow::anyhow!("No stopping k-mer found"))
+    }
+
+    fn assemble_backward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let initial_contig_length = contig.len();
+
+        let mut links_in_scope: Vec<Link> = Vec::new();
+        let mut used_links = HashSet::new();
+        let mut last_kmer = start_kmer.clone();
+    
+        loop {
+            if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
+                return Ok(last_kmer);
+            }
+
+            if contig.len() - initial_contig_length >= limit {
+                return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
+            }
+    
+            self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
+
+            match self.prev_kmer(&last_kmer, &mut links_in_scope) {
+                Some(this_kmer) => {
+                    contig.insert(0, this_kmer[0]);
+                    last_kmer = this_kmer;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+    
+        Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
     fn assemble_backward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>>{
@@ -1506,7 +1640,7 @@ impl LdBG {
         self
     }
 
-    pub fn clean_paths(mut self, min_score: f32) -> Self {
+    pub fn clean_branches(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
             .cloned()
@@ -1575,7 +1709,7 @@ impl LdBG {
         self
     }
 
-    pub fn clean_tips(mut self, max_tip_length: usize) -> Self {
+    pub fn clean_tips_old(mut self, max_tip_length: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
 
@@ -1591,11 +1725,18 @@ impl LdBG {
                     let num_next = self.next_kmers(last_kmer).len();
 
                     if fw_contig.len() <= max_tip_length && num_next == 0 {
-                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
-                            to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
-                        }
+                        let score_sum = fw_contig.kmers(self.kmer_size as u8)
+                            .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                            .sum::<f32>();
+                        let weight = score_sum / (fw_contig.len() - self.kmer_size) as f32;
 
-                        bad_paths += 1;
+                        if weight < min_score {
+                            for kmer in fw_contig.kmers(self.kmer_size as u8) {
+                                to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
+                            }
+
+                            bad_paths += 1;
+                        }
                     }
                 }
             }
@@ -1611,6 +1752,77 @@ impl LdBG {
                     let num_prev = self.prev_kmers(first_kmer).len();
 
                     if rv_contig.len() <= max_tip_length && num_prev == 0 {
+                        let score_sum = rv_contig.kmers(self.kmer_size as u8)
+                            .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                            .sum::<f32>();
+                        let weight = score_sum / (rv_contig.len() - self.kmer_size) as f32;
+
+                        if weight < min_score {
+                            for kmer in rv_contig.kmers(self.kmer_size as u8) {
+                                to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
+                            }
+
+                            bad_paths += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    pub fn clean_tips(mut self, limit: usize, min_score: f32) -> Self {
+        let mut to_remove = HashSet::new();
+        let mut bad_paths: usize = 0;
+
+        for cn_kmer in self.kmers.keys() {
+            if cn_kmer == b"AAGGGAAACGGCCTCTG" {
+                crate::elog!(" -- Hello! {} {}", self.kmers.get(cn_kmer).unwrap().in_degree(), self.kmers.get(cn_kmer).unwrap().out_degree());
+            }
+
+            if self.kmers.get(cn_kmer).unwrap().in_degree() == 0 && self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
+                crate::elog!(" -- Cleaning forward tip starting at {}", String::from_utf8_lossy(&cn_kmer));
+
+                let start_kmer = cn_kmer.clone();
+                let mut fw_contig = cn_kmer.to_vec();
+                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, start_kmer, limit, |kmer, _, g| { g.prev_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 }) {
+                    let score_sum = fw_contig.kmers(self.kmer_size as u8)
+                        .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                        .sum::<f32>();
+                    let weight = score_sum / (fw_contig.len() - self.kmer_size + 1) as f32;
+
+                    if weight < min_score {
+                        for kmer in fw_contig.kmers(self.kmer_size as u8) {
+                            to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
+                        }
+
+                        bad_paths += 1;
+                    }
+                }
+            }
+
+            if self.kmers.get(cn_kmer).unwrap().out_degree() == 0 && self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
+                crate::elog!(" -- Cleaning reverse tip starting at {}", String::from_utf8_lossy(&cn_kmer));
+
+                let start_kmer = cn_kmer.clone();
+                let mut rv_contig = cn_kmer.to_vec();
+                if let Ok(_) = self.assemble_forward_until_condition(&mut rv_contig, start_kmer, limit, |kmer, _, g| { g.next_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 }) {
+                    let score_sum = rv_contig.kmers(self.kmer_size as u8)
+                        .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
+                        .sum::<f32>();
+                    let weight = score_sum / (rv_contig.len() - self.kmer_size + 1) as f32;
+
+                    if weight < min_score {
                         for kmer in rv_contig.kmers(self.kmer_size as u8) {
                             to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
                         }

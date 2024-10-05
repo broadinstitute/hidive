@@ -150,7 +150,7 @@ enum Commands {
         min_kmers_pct: usize,
 
         /// Restrict processing to these contigs.
-        #[clap(short, long, value_parser, required = true)]
+        #[clap(short, long, value_parser, required = false)]
         contigs: Vec<String>,
 
         /// FASTA files with reads to use as a filter for finding more reads.

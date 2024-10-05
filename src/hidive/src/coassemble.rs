@@ -210,8 +210,8 @@ pub fn start(
         .collect::<Vec<Vec<u8>>>();
 
     l3 = l3
-        .clean_paths(0.4)
-        .clean_tips(2 * kmer_size)
+        .clean_branches(0.4)
+        .clean_tips(2 * kmer_size, 0.4)
         .build_links(&all_lr_seqs2);
 
     skydive::elog!(
