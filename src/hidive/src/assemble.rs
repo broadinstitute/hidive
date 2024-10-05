@@ -2,9 +2,8 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
-
-use rayon::string;
-use std::ffi::{CStr, CString};
+use std::fs::File;
+use std::io::{Write, Result};
 use std::iter::SkipWhile;
 use std::path::PathBuf;
 
@@ -405,7 +404,7 @@ pub fn mip_optimization(
     assert_eq!(model.status().unwrap(), Status::Optimal);
 
     let least_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
-    println!("least_cost is  {:?}", least_cost);
+    // println!("least_cost is  {:?}", least_cost);
 
     // minimize most haplotypes that minimizes total cost
     let aux = model
@@ -417,13 +416,13 @@ pub fn mip_optimization(
     model.set_objective(var_num_haps, Minimize);
     model.optimize();
     let most_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
-    println!("most haplotype is {:?}", most_haps);
+    // println!("most haplotype is {:?}", most_haps);
 
     // minimize haplotypes
     model.remove(aux);
     model.optimize();
     let least_haps = model.get_obj_attr(grb::attr::X, &var_num_haps).unwrap();
-    println!("least haplotype is {:?}", least_haps);
+    // println!("least haplotype is {:?}", least_haps);
 
     // find most_cost that minimizes haplotypes
     let aux1 = model
@@ -433,7 +432,7 @@ pub fn mip_optimization(
     model.optimize();
     let most_cost = model.get_obj_attr(grb::attr::X, &var_total_cost).unwrap();
     model.remove(aux1);
-    println!("most_cost = {:?}", most_cost);
+    // println!("most_cost = {:?}", most_cost);
 
     // final solution
     let range_cost = most_cost - least_cost;
@@ -480,20 +479,40 @@ pub fn mip_optimization(
     (var_sample_hap_values, var_flow_values, unique_paths)
 }
 
-pub fn start(
-    output: &PathBuf,
-    graph_path: &PathBuf,
-    read_path: &PathBuf,
-    k_nearest_neighbor: usize,
-) {
+fn write_fasta(outputfile: &PathBuf, sequences: Vec<String>, sample: &str, genename: &str) -> Result<()>{
+    let mut index = 0;
+    let mut file = File::create(outputfile)?;
+    for seq in sequences.iter(){
+        index += 1;
+        let header = format!(">{} {}, haplotype sequences {}\n", sample, genename, index);
+        file.write_all(header.as_bytes())?;
+
+        let chars_per_line = 60;
+        let sequence_len = seq.len();
+        let full_lines = sequence_len / chars_per_line;
+
+        for i in 0..full_lines {
+            let start = i * chars_per_line;
+            let end = start + chars_per_line;
+            writeln!(file, "{}", &seq[start..end])?;
+        }
+
+        // Write any remaining characters that didn't make up a full line
+        if sequence_len % chars_per_line != 0 {
+            writeln!(file, "{}", &seq[full_lines * chars_per_line..])?;
+        }
+    }
+    Ok(())
+}
+
+pub fn start(output: &PathBuf, graph_path: &PathBuf, read_path:&PathBuf, k_nearest_neighbor: usize, sample: &str ) {
     let graph = skydive::agg::GraphicalGenome::load_graph(graph_path.to_str().unwrap()).unwrap();
     let (vector_matrix, sorted_read_names) = construct_anchor_table(&graph);
     // println!("The answer is {:?} {:?}!", output, sorted_read_names);
-    println!("columns:\n{:?}", sorted_read_names.len());
+    // println!("columns:\n{:?}", sorted_read_names.len());
     let d = vector_matrix.len();
-    println!("The dimensino of vector_matrix is {}", d);
-    let vector_matrix_f64: Vec<Vec<f64>> = vector_matrix
-        .iter()
+    // println!("The dimensino of vector_matrix is {}", d);
+    let vector_matrix_f64: Vec<Vec<f64>> = vector_matrix.iter()
         .map(|row| row.iter().map(|&x| x.unwrap_or(f64::NAN)).collect())
         .collect();
 
@@ -513,13 +532,12 @@ pub fn start(
     // Create the KNN imputer
     let data_t = data.t().to_owned();
     let imputed_data = knn_impute(&data_t, k_nearest_neighbor);
-    println!("Input Data:\n{:?}", data);
-    println!("Imputed Data:\n{:?}", imputed_data);
+    // println!("Input Data:\n{:?}", data);
+    // println!("Imputed Data:\n{:?}", imputed_data);
 
     //  find single sample matrix from the imputed data
-    let sample = "HG002";
-    let row_index: Vec<usize> = sorted_read_names
-        .iter()
+    // let sample = "HG002";
+    let row_index: Vec<usize> = sorted_read_names.iter()
         .enumerate()
         .filter_map(|(index, readname)| {
             if readname.split('|').last().unwrap_or("") == sample {
@@ -533,14 +551,14 @@ pub fn start(
         .iter()
         .map(|&i| sorted_read_names[i].clone())
         .collect();
-    println!("Read_sets {:?}", read_sets);
+    // println!("Read_sets {:?}", read_sets);
     let vector_single_sample = imputed_data.select(Axis(0), &row_index);
     // println!("Single sample Matrix:\n{:?}", vector_single_sample);
 
     // get anchorlist and start end anchor sequences
     let mut anchorlist: Vec<String> = graph.anchor.keys().cloned().collect();
     anchorlist.sort();
-    println!("{:?}", anchorlist.last());
+    // println!("{:?}", anchorlist.last());
     let source_node_name = anchorlist.first().unwrap();
     let source = if let Some(anchor_data) = graph.anchor.get(source_node_name) {
         if let Some(serde_json::Value::String(seq)) = anchor_data.get("seq") {
@@ -607,14 +625,16 @@ pub fn start(
                 .push(read_path_id.clone());
         }
     }
-    println!("{:?}", path_read_pair);
+    // println!("{:?}", path_read_pair);
 
     // get read sequences
     let reader = Reader::from_file(read_path).unwrap();
     let all_reads: Vec<Record> = reader.records().map(|r| r.unwrap()).collect();
 
     // calculate consensus
-    for (sample_hap_id, var) in var_sample_hap_values.iter() {
+    let mut consensus_sequences = Vec::new();
+    for (sample_hap_id, var) in var_sample_hap_values.iter(){
+        
         let hap_id = sample_hap_id.split("_").last().unwrap();
         let haplotype = path_dict
             .get(hap_id)
@@ -624,7 +644,7 @@ pub fn start(
 
         if *var == 1.0 {
             let path_seq = skydive::agg::reconstruct_path_seq(&single_sample_graph, &path_absolute);
-            println!("{:?}, {:?}, {:?}", sample_hap_id, hap_id, path_seq.len());
+            // println!("{:?}, {:?}, {:?}", sample_hap_id, hap_id, path_seq.len());
             input_seq.push(path_seq);
             let readlist = path_read_pair.get(hap_id).expect("haplotype not found");
             for read in readlist.iter() {
@@ -658,7 +678,20 @@ pub fn start(
             }
 
             let consensus = graph.consensus();
-            println!("{:?}", consensus)
+            
+            consensus_sequences.push(consensus)
+            
         }
     }
+
+    println!("{:?}", consensus_sequences);
+    // let outputfile = PathBuf::from("haplotype.fasta");
+    let genename = graph_path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string()).unwrap();
+    let consensus_sequences: Vec<String> = consensus_sequences.iter()
+    .map(|c_str| c_str.to_str().unwrap().to_string())
+    .collect();
+    write_fasta(&output, consensus_sequences, sample, &genename);
+
 }

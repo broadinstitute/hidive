@@ -250,7 +250,7 @@ enum Commands {
     #[clap(arg_required_else_help = true)]
     Assemble {
         /// Output path for assembled long-read sequences.
-        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        #[clap(short, long, value_parser)]
         output: PathBuf,
 
         /// Series-parallel graph.
