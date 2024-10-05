@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::Write;
 
@@ -1542,34 +1542,6 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
-    pub fn find_a_superbubble(&self, g: &petgraph::Graph<String, f32>) -> Vec<String> {
-        let start = g.node_indices().find(|&n| g[n] == "TCCCTCGAATACTGATG".to_string());
-        let end = g.node_indices().find(|&n| g[n] == "CGTGACTTTTCCTCTCA".to_string());
-
-        crate::elog!("Superbubble nodes: {:?} {:?}", start, end);
-
-        // List all paths from start_node to end_node
-        let contigs = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, start.unwrap(), end.unwrap(), 0, Some(500)).map(|path| {
-            // Convert the path to labels
-            let path_labels: Vec<&String> = path.iter().map(|&n| &g[n]).collect();
-
-            // Create the full contig from the path_labels
-            let mut new_contig = String::new();
-            for kmer in path_labels.iter() {
-                if new_contig.is_empty() {
-                    new_contig.push_str(kmer);
-                } else {
-                    new_contig.push_str(&kmer.chars().last().unwrap().to_string());
-                }
-            }
-
-            new_contig
-        })
-        .collect::<Vec<String>>();
-
-        contigs
-    }
-
     pub fn clean_color_specific_paths(mut self, color: usize, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1807,6 +1779,94 @@ impl LdBG {
         self.infer_edges();
 
         self
+    }
+
+    pub fn identify_superbubbles(&self) -> Vec<Vec<NodeIndex>> {
+        let graph = self.traverse_all_kmers();
+        let mut superbubbles = Vec::new();
+    
+        // Perform topological sort
+        let topo_order = match petgraph::algo::toposort(&graph, None) {
+            Ok(order) => order,
+            Err(_) => return superbubbles, // Graph has cycles, return empty vector
+        };
+    
+        let mut visited = HashSet::new();
+        let mut seen = HashSet::new();
+    
+        for &s in &topo_order {
+            if visited.contains(&s) {
+                continue;
+            }
+    
+            let mut stack = vec![s];
+            seen.clear();
+            seen.insert(s);
+    
+            while let Some(v) = stack.pop() {
+                visited.insert(v);
+    
+                if graph.neighbors(v).count() == 0 {
+                    break;
+                }
+    
+                let mut all_children_seen = true;
+                for u in graph.neighbors(v) {
+                    if u == s {
+                        break;
+                    }
+    
+                    if !seen.contains(&u) {
+                        seen.insert(u);
+                        stack.push(u);
+                        all_children_seen = false;
+                    }
+                }
+    
+                if stack.len() == 1 {
+                    let t = stack[0];
+                    if !graph.contains_edge(s, t) {
+                        if let Some(superbubble) = self.validate_superbubble(&graph, s, t) {
+                            superbubbles.push(superbubble);
+                        }
+                    }
+                    break;
+                }
+    
+                if all_children_seen {
+                    break;
+                }
+            }
+        }
+    
+        superbubbles
+    }
+    
+    fn validate_superbubble(&self, graph: &DiGraph<String, f32>, s: NodeIndex, t: NodeIndex) -> Option<Vec<NodeIndex>> {
+        let mut superbubble = vec![t];
+        let mut current = t;
+    
+        while current != s {
+            let parents: Vec<_> = graph.neighbors_directed(current, petgraph::Incoming).collect();
+            if parents.len() != 1 {
+                return None; // Not a valid superbubble
+            }
+            current = parents[0];
+            superbubble.push(current);
+        }
+    
+        superbubble.reverse();
+        Some(superbubble)
+    }
+    
+    fn is_entrance(&self, graph: &DiGraph<String, f32>, v: NodeIndex) -> bool {
+        graph.neighbors_directed(v, petgraph::Incoming).count() <= 1 &&
+        graph.neighbors_directed(v, petgraph::Outgoing).count() > 1
+    }
+    
+    fn is_exit(&self, graph: &DiGraph<String, f32>, v: NodeIndex) -> bool {
+        graph.neighbors_directed(v, petgraph::Incoming).count() > 1 &&
+        graph.neighbors_directed(v, petgraph::Outgoing).count() <= 1
     }
 
     fn traverse_forward(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex) {

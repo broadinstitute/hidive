@@ -35,8 +35,12 @@ pub fn start(
         .clean_branches(0.01)
         .clean_tips(3*kmer_size, 0.01)
         .clean_contigs(100)
-        // .build_links(&all_lr_seqs)
-        ;
+        .build_links(&all_lr_seqs);
+
+    // let superbubbles = m.identify_superbubbles();
+    // for superbubble in superbubbles {
+    //     skydive::elog!("Superbubble: {:?}", superbubble);
+    // }
 
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
@@ -57,6 +61,7 @@ pub fn start(
     }
 
     let g = m.traverse_all_kmers();
+    // let g = m.traverse_all_contigs();
 
     let _ = write_gfa(&mut File::create(output).unwrap(), &g);
 
