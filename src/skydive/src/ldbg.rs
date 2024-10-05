@@ -1709,93 +1709,16 @@ impl LdBG {
         self
     }
 
-    pub fn clean_tips_old(mut self, max_tip_length: usize, min_score: f32) -> Self {
-        let mut to_remove = HashSet::new();
-        let mut bad_paths: usize = 0;
-
-        for cn_kmer in self.kmers.keys() {
-            if self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
-                let next_kmers = self.next_kmers(cn_kmer);
-
-                for cur_kmer in next_kmers {
-                    let mut fw_contig = cur_kmer.to_vec();
-                    let _ = self.assemble_forward_limit(&mut fw_contig, cur_kmer.clone(), max_tip_length + 1);
-
-                    let last_kmer = fw_contig.kmers(self.kmer_size as u8).last().unwrap();
-                    let num_next = self.next_kmers(last_kmer).len();
-
-                    if fw_contig.len() <= max_tip_length && num_next == 0 {
-                        let score_sum = fw_contig.kmers(self.kmer_size as u8)
-                            .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
-                            .sum::<f32>();
-                        let weight = score_sum / (fw_contig.len() - self.kmer_size) as f32;
-
-                        if weight < min_score {
-                            for kmer in fw_contig.kmers(self.kmer_size as u8) {
-                                to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
-                            }
-
-                            bad_paths += 1;
-                        }
-                    }
-                }
-            }
-
-            if self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
-                let prev_kmers = self.prev_kmers(cn_kmer);
-
-                for cur_kmer in prev_kmers {
-                    let mut rv_contig = cur_kmer.to_vec();
-                    let _ = self.assemble_backward_limit(&mut rv_contig, cur_kmer.clone(), max_tip_length + 1);
-
-                    let first_kmer = rv_contig.kmers(self.kmer_size as u8).next().unwrap();
-                    let num_prev = self.prev_kmers(first_kmer).len();
-
-                    if rv_contig.len() <= max_tip_length && num_prev == 0 {
-                        let score_sum = rv_contig.kmers(self.kmer_size as u8)
-                            .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
-                            .sum::<f32>();
-                        let weight = score_sum / (rv_contig.len() - self.kmer_size) as f32;
-
-                        if weight < min_score {
-                            for kmer in rv_contig.kmers(self.kmer_size as u8) {
-                                to_remove.insert(crate::utils::canonicalize_kmer(&kmer));
-                            }
-
-                            bad_paths += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        for cn_kmer in &to_remove {
-            self.kmers.remove(cn_kmer);
-            self.scores.remove(cn_kmer);
-        }
-
-        crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
-
-        self.infer_edges();
-
-        self
-    }
-
     pub fn clean_tips(mut self, limit: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
 
+        let stopping_condition = |kmer: &[u8], _: usize, g: &LdBG| { g.prev_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 };
+
         for cn_kmer in self.kmers.keys() {
-            if cn_kmer == b"AAGGGAAACGGCCTCTG" {
-                crate::elog!(" -- Hello! {} {}", self.kmers.get(cn_kmer).unwrap().in_degree(), self.kmers.get(cn_kmer).unwrap().out_degree());
-            }
-
             if self.kmers.get(cn_kmer).unwrap().in_degree() == 0 && self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
-                crate::elog!(" -- Cleaning forward tip starting at {}", String::from_utf8_lossy(&cn_kmer));
-
-                let start_kmer = cn_kmer.clone();
                 let mut fw_contig = cn_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, start_kmer, limit, |kmer, _, g| { g.prev_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 }) {
+                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, cn_kmer.clone(), limit, stopping_condition) {
                     let score_sum = fw_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
                         .sum::<f32>();
@@ -1812,11 +1735,8 @@ impl LdBG {
             }
 
             if self.kmers.get(cn_kmer).unwrap().out_degree() == 0 && self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
-                crate::elog!(" -- Cleaning reverse tip starting at {}", String::from_utf8_lossy(&cn_kmer));
-
-                let start_kmer = cn_kmer.clone();
                 let mut rv_contig = cn_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until_condition(&mut rv_contig, start_kmer, limit, |kmer, _, g| { g.next_kmers(kmer).len() > 1 || g.next_kmers(kmer).len() > 1 }) {
+                if let Ok(_) = self.assemble_backward_until_condition(&mut rv_contig, cn_kmer.clone(), limit, stopping_condition) {
                     let score_sum = rv_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
                         .sum::<f32>();
