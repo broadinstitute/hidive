@@ -1,6 +1,8 @@
 // Import necessary standard library modules
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ffi::CStr;
+use std::ffi::CString;
 use std::hash::Hash;
 use std::fs::File;
 use std::io::{Write, Result};

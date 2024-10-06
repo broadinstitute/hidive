@@ -263,6 +263,10 @@ enum Commands {
         ///K nearest _neighbor
         #[clap(required = true, value_parser, default_value_t = 3)]
         k_nearest_neighbor: usize,
+
+        /// Sample name
+        #[clap(required = true, value_parser)]
+        sample: String,
     },
 
     /// Correct reads.
@@ -416,8 +420,9 @@ fn main() {
             graph,
             reads,
             k_nearest_neighbor,
+            sample,
         } => {
-            assemble::start(&output, &graph, &reads, k_nearest_neighbor);
+            assemble::start(&output, &graph, &reads, k_nearest_neighbor, &sample);
         }
         Commands::Correct {
             output,
