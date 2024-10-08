@@ -1681,6 +1681,50 @@ impl LdBG {
         self
     }
 
+    pub fn clean_tangles(mut self, color: usize, limit: usize, min_score: f32) -> Self {
+        let mut to_remove = HashSet::new();
+        let mut bad_tangles: usize = 0;
+
+        let mut visited = HashSet::new();
+
+        let stopping_condition = |kmer: &[u8], _: usize, g: &LdBG| {
+            g.scores.get(&crate::utils::canonicalize_kmer(kmer)).unwrap_or(&1.0) < &min_score
+        };
+
+        for cn_kmer in self.kmers.keys() {
+            if !visited.contains(cn_kmer) && self.sources.get(cn_kmer).unwrap_or(&vec![]) == &vec![color] && self.scores.get(cn_kmer).unwrap_or(&1.0) < &min_score && self.kmers.get(cn_kmer).unwrap().in_degree() + self.kmers.get(cn_kmer).unwrap().out_degree() >= 4 {
+                let g = self.traverse_kmers_until_condition(cn_kmer.to_vec(), color, limit, stopping_condition);
+
+                visited.insert(cn_kmer.clone());
+                for node in g.node_indices() {
+                    let current_kmer = g.node_weight(node).unwrap().as_bytes();
+                    let current_cn_kmer = crate::utils::canonicalize_kmer(current_kmer);
+
+                    to_remove.insert(current_cn_kmer.clone());
+
+                    // Mark k-mers as visited, but avoid marking k-mers that are new potential starting points for tangles.
+                    if !(self.scores.get(&current_cn_kmer).unwrap_or(&1.0) < &min_score && self.kmers.get(&current_cn_kmer).unwrap().in_degree() + self.kmers.get(&current_cn_kmer).unwrap().out_degree() >= 4) {
+                        visited.insert(current_cn_kmer.clone());
+                    }
+
+                }
+
+                bad_tangles += 1;
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} tangles ({} kmers)", bad_tangles, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
     pub fn clean_tips(mut self, limit: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
@@ -1939,6 +1983,62 @@ impl LdBG {
         }
     }
 
+    fn traverse_forward_until_condition<F>(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, color: usize, start_node: NodeIndex, limit: usize, stopping_condition: F) -> Result<()>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let mut found = false;
+    
+        // Use a vector of tuples (node, depth) instead of just nodes
+        let mut fwd_stack = vec![(start_node, 0)];
+        while let Some((node, depth)) = fwd_stack.pop() {
+            if depth >= limit {
+                continue; // Skip this node if we've reached the depth limit
+            }
+    
+            let this_kmer = graph.node_weight(node).unwrap().as_bytes();
+    
+            for next_kmer in self.next_kmers(this_kmer) {
+                let same_color = self.sources.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&vec![]) == &vec![color];
+                if !same_color {
+                    continue;
+                }
+
+                let next_label = String::from_utf8_lossy(&next_kmer).to_string();
+                let next_node = if let Some(&existing_node) = visited.get(&next_label) {
+                    existing_node
+                } else {
+                    let new_node = graph.add_node(next_label.clone());
+                    visited.insert(next_label.clone(), new_node);
+    
+                    if !stopping_condition(&next_kmer, depth + 1, self) {
+                        // Push the new node with an incremented depth
+                        fwd_stack.push((new_node, depth + 1));
+                    } else {
+                        found = true;
+                    }
+    
+                    new_node
+                };
+    
+                if !graph.contains_edge(node, next_node) {
+                    graph.add_edge(
+                        node,
+                        next_node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&next_kmer))
+                            .unwrap_or(&1.0),
+                    );
+                }
+            }
+        }
+    
+        if found {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Stop condition not met within depth limit"))
+        }
+    }
+
     fn traverse_backward(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, start_node: NodeIndex) {
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
@@ -2007,6 +2107,79 @@ impl LdBG {
         } else {
             Err(anyhow::anyhow!("Stop node not found"))
         }
+    }
+
+    fn traverse_backward_until_condition<F>(&self, graph: &mut petgraph::Graph<String, f32>, visited: &mut HashMap<String, NodeIndex>, color: usize, start_node: NodeIndex, limit: usize, stopping_condition: F) -> Result<()>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let mut found = false;
+    
+        // Use a vector of tuples (node, depth) instead of just nodes
+        let mut rev_stack = vec![(start_node, 0)];
+        while let Some((node, depth)) = rev_stack.pop() {
+            if depth >= limit {
+                continue; // Skip this node if we've reached the depth limit
+            }
+    
+            let this_kmer = graph.node_weight(node).unwrap().as_bytes();
+    
+            for prev_kmer in self.prev_kmers(this_kmer) {
+                let same_color = self.sources.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&vec![]) == &vec![color];
+                if !same_color {
+                    continue;
+                }
+
+                let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
+                let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
+                    existing_node
+                } else {
+                    let new_node = graph.add_node(prev_label.clone());
+                    visited.insert(prev_label.clone(), new_node);
+    
+                    if !stopping_condition(&prev_kmer, depth + 1, self) {
+                        // Push the new node with an incremented depth
+                        rev_stack.push((new_node, depth + 1));
+                    } else {
+                        found = true;
+                    }
+    
+                    new_node
+                };
+    
+                if !graph.contains_edge(prev_node, node) {
+                    graph.add_edge(
+                        prev_node,
+                        node,
+                        *self.scores.get(&crate::utils::canonicalize_kmer(&prev_kmer))
+                            .unwrap_or(&1.0),
+                    );
+                }
+            }
+        }
+    
+        if found {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Stop condition not met within depth limit"))
+        }
+    }
+
+    pub fn traverse_kmers_until_condition<F>(&self, start_kmer: Vec<u8>, color: usize, limit: usize, stopping_condition: F) -> DiGraph<String, f32>
+    where
+        F: Fn(&[u8], usize, &Self) -> bool,
+    {
+        let mut graph = DiGraph::new();
+        let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
+
+        let start_label = String::from_utf8_lossy(&start_kmer).to_string();
+        let start_node = graph.add_node(start_label.clone());
+        visited.insert(start_label.clone(), start_node);
+
+        let _ = self.traverse_forward_until_condition(&mut graph, &mut visited, color, start_node, limit, &stopping_condition);
+        let _ = self.traverse_backward_until_condition(&mut graph, &mut visited, color, start_node, limit, &stopping_condition);
+
+        graph
     }
 
     /// Traverse kmers starting from a given kmer and build a graph.

@@ -32,10 +32,14 @@ pub fn start(
         .score_kmers(model_path)
         .collapse()
         .clean_color_specific_paths(1, 0.2)
+        .clean_tangles(1, 100, 0.2)
         .clean_branches(0.01)
         .clean_tips(3*kmer_size, 0.01)
         .clean_contigs(100)
-        .build_links(&all_lr_seqs);
+        // .build_links(&all_lr_seqs);
+        ;
+
+    skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
     // let superbubbles = m.identify_superbubbles();
     // for superbubble in superbubbles {
