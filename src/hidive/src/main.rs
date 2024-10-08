@@ -62,6 +62,7 @@ mod fetch;
 mod filter;
 mod impute;
 mod rescue;
+mod recruit;
 mod train;
 mod trim;
 
@@ -158,6 +159,30 @@ enum Commands {
         fasta_paths: Vec<PathBuf>,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(required = true, value_parser)]
+        seq_paths: Vec<PathBuf>,
+    },
+
+    /// From rescued reads, recruit subset reads that are similar to input long reads.
+    #[clap(arg_required_else_help = true)]
+    Recruit {
+        /// Output path for FASTA file with reads spanning locus of interest.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum percentage of k-mers to require before examining a read more carefully.
+        #[clap(short, long, value_parser, default_value_t = 70)]
+        min_kmers_pct: usize,
+
+        /// FASTA files with reads to use as a filter for finding more reads.
+        #[clap(short, long, value_parser, required = true)]
+        fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
     },
@@ -381,6 +406,15 @@ fn main() {
             seq_paths,
         } => {
             rescue::start(&output, kmer_size, min_kmers, &contigs, &fasta_paths, &seq_paths);
+        }
+        Commands::Recruit {
+            output,
+            kmer_size,
+            min_kmers_pct: min_kmers,
+            fasta_paths,
+            seq_paths,
+        } => {
+            recruit::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
         }
         Commands::Filter {
             output,
