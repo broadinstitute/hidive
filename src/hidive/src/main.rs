@@ -52,7 +52,6 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod assemble;
 mod build;
 mod cluster;
 mod coassemble;
@@ -270,29 +269,6 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Assemble target locus from long-read data in anchor-based series-parallel graph.
-    #[clap(arg_required_else_help = true)]
-    Assemble {
-        /// Output path for assembled long-read sequences.
-        #[clap(short, long, value_parser)]
-        output: PathBuf,
-
-        /// Series-parallel graph.
-        #[clap(required = true, value_parser)]
-        graph: PathBuf,
-
-        #[clap(required = true, value_parser)]
-        reads: PathBuf,
-
-        ///K nearest _neighbor
-        #[clap(required = true, value_parser, default_value_t = 3)]
-        k_nearest_neighbor: usize,
-
-        /// Sample name
-        #[clap(required = true, value_parser)]
-        sample: String,
-    },
-
     /// Correct reads.
     #[clap(arg_required_else_help = true)]
     Correct {
@@ -439,15 +415,6 @@ fn main() {
         }
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
-        }
-        Commands::Assemble {
-            output,
-            graph,
-            reads,
-            k_nearest_neighbor,
-            sample,
-        } => {
-            assemble::start(&output, &graph, &reads, k_nearest_neighbor, &sample);
         }
         Commands::Correct {
             output,
