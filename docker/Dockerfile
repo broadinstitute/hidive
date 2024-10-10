@@ -1,4 +1,5 @@
-FROM gurobi/optimizer:10.0.3 AS builder
+FROM python:3.9-slim AS builder
+#FROM gurobi/optimizer:10.0.3 AS builder
 
 MAINTAINER Kiran V Garimella
 
