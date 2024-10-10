@@ -47,8 +47,7 @@ pub fn start(
         .clean_branches(0.01)
         .clean_tips(3*kmer_size, 0.01)
         .clean_contigs(100)
-        // .build_links(&all_lr_seqs)
-        ;
+        .build_links(&all_lr_seqs, false);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
@@ -62,7 +61,6 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    // let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -10, -4);
     let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
 
     let mut sg = spoa::Graph::new();
