@@ -57,7 +57,6 @@ mod build;
 mod cluster;
 mod coassemble;
 mod correct;
-mod poa_assemble;
 mod fetch;
 mod filter;
 mod impute;
@@ -322,22 +321,6 @@ enum Commands {
         long_read_fasta_paths: Vec<PathBuf>,
     },
 
-    /// Assemble target locus from long-read data using POA.
-    #[clap(arg_required_else_help = true)]
-    POAAssemble {
-        /// Output path for corrected reads.
-        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
-        output: PathBuf,
-
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(short, long, required = false, value_parser)]
-        short_read_fasta_paths: Vec<PathBuf>,
-
-        /// FASTA files with long-read sequences (may contain one or more samples).
-        #[clap(required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
-    },
-
     /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
@@ -475,13 +458,6 @@ fn main() {
             short_read_fasta_paths,
         } => {
             correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_paths, &short_read_fasta_paths);
-        }
-        Commands::POAAssemble {
-            output,
-            long_read_fasta_paths,
-            short_read_fasta_paths,
-        } => {
-            poa_assemble::start(&output, &long_read_fasta_paths, &short_read_fasta_paths);
         }
         Commands::Coassemble {
             output,
