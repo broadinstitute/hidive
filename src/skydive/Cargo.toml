@@ -48,6 +48,7 @@ serde = "1.0.204"
 serde_derive = "1.0.204"
 serde_json = "1.0.120"
 sprs = "0.11.1"
+spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}
 sys-info = "0.9.1"
 tokio = "1.39.1"
 unzip-n = "0.1.2"

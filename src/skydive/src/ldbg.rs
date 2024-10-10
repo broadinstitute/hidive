@@ -264,7 +264,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A map of links.
-    pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>) -> Self {
+    pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>, correct: bool) -> Self {
         let progress_bar = if self.verbose {
             crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64)
         } else {
@@ -274,7 +274,7 @@ impl LdBG {
         let links: Links = fwd_seqs
             .par_iter()
             .progress_with(progress_bar)
-            .map(|fwd_seq| self.correct_seq(fwd_seq))
+            .map(|fwd_seq| if correct { self.correct_seq(fwd_seq) } else { vec![fwd_seq.clone()] })
             .flatten()
             .map(|fwd_seq| {
                 let mut local_links = Links::new();
@@ -791,21 +791,69 @@ impl LdBG {
             }
         }
 
-        if graph.node_count() > 0 {
-            self.remove_short_branches(&mut graph, 2 * self.kmer_size);
+        // if graph.node_count() > 0 {
+        //     self.remove_short_branches(&mut graph, 2 * self.kmer_size);
         
-            let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
-            let mut file = File::create("read_graph.dot").expect("Unable to create file");
-            write!(file, "{:?}", dot).expect("Unable to write data");
-        }
+        //     let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+        //     let mut file = File::create("read_graph.dot").expect("Unable to create file");
+        //     write!(file, "{:?}", dot).expect("Unable to write data");
+        // }
 
         let corrected_segments = traverse_read_graph(&graph, self.kmer_size);
 
         if corrected_segments.len() > 1 {
-            self.try_combinatorially_combining_sequences(&corrected_segments)
+            vec![self.combine_read_segments(seq, &corrected_segments)]
         } else {
             corrected_segments
         }
+    }
+
+    fn combine_read_segments(&self, seq: &[u8], corrected_segments: &Vec<Vec<u8>>) -> Vec<u8> {
+        use spoa::AlignmentType;
+        let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
+
+        let mut sg = spoa::Graph::new();
+        for lr_seq in vec![seq.to_vec()].iter().chain(corrected_segments.iter()) {
+            let seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
+            let seq_qual = std::ffi::CString::new(vec![b'I'; lr_seq.len()]).unwrap();
+            let a = la.align(seq_cstr.as_ref(), &sg);
+
+            sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+        }
+
+        let msa_cstrs = sg.multiple_sequence_alignment(false);
+        let msa_strings = msa_cstrs
+            .iter()
+            .map(|cstr| cstr.to_str().unwrap().to_string())
+            .map(|msa_string| {
+                let leading_dashes = msa_string.chars().take_while(|&c| c == '-').count();
+                let trailing_dashes = msa_string.chars().rev().take_while(|&c| c == '-').count();
+                let middle = &msa_string[leading_dashes..msa_string.len() - trailing_dashes];
+                format!("{}{}{}", 
+                    " ".repeat(leading_dashes), 
+                    middle, 
+                    " ".repeat(trailing_dashes)
+                )
+            })
+            .collect::<Vec<String>>();
+
+        let mut combined_seq = vec![];
+        for column in 0..msa_strings[0].len() {
+            let mut pileup = vec![];
+            for msa_string in msa_strings.iter().skip(1).chain(msa_strings.iter().take(1)) {
+                let char_at_column = msa_string.chars().nth(column).unwrap();
+
+                if char_at_column != ' ' {
+                    pileup.push(char_at_column);
+                }
+            }
+
+            combined_seq.push(pileup[0] as u8);
+        }
+
+        combined_seq.retain(|&x| x != b'-');
+
+        combined_seq
     }
 
     fn try_combinatorially_combining_sequences(&self, corrected_segments: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
@@ -942,7 +990,7 @@ impl LdBG {
                     let mut backward_contig = new_to_kmer.to_vec();
 
                     let seqs = vec![forward_contig.clone(), backward_contig.clone()];
-                    let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs);
+                    let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs, false);
 
                     if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
                         return Ok((forward_contig, true));
@@ -3022,7 +3070,7 @@ mod tests {
         let fwd_seqs = vec![fw_genome.clone()];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs)
-            .build_links(&fwd_seqs);
+            .build_links(&fwd_seqs, false);
 
         // assembly outside cycle should recapitulate entire genome
         assert!(fw_genome == g.assemble(b"ACTGA"));
@@ -3044,7 +3092,7 @@ mod tests {
         let fwd_seqs = vec![fw_genome.clone()];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs)
-            .build_links(&fwd_seqs);
+            .build_links(&fwd_seqs, false);
 
         let mut contig1 = b"ACTGA".to_vec();
         let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]), 100);
@@ -3070,9 +3118,6 @@ mod tests {
         uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCATCGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
         uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCGGTGG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGTGG".to_vec()]);
 
-        // Things that should not get corrected successfully.
-        uncorrected_seq_map.insert(b"ACTGATTTCGATGCGATGCGATGCCACGGTAG".to_vec(), vec![b"ACTGATTTCGATGCGATGCGATGCCACGGT".to_vec(), b"GGTAG".to_vec()]);
-
         for (uncorrected_seq, expected_seqs) in uncorrected_seq_map.iter() {
             let corrected_seqs = g.correct_seq(&uncorrected_seq);
 
@@ -3093,7 +3138,7 @@ mod tests {
             let random_genome = generate_genome_with_tandem_repeats(500, repeat_length, num_repeats, 0);
 
             let g = LdBG::from_sequences(String::from("test"), k, &vec!(random_genome.clone()))
-                .build_links(&vec!(random_genome.clone()));
+                .build_links(&vec!(random_genome.clone()), false);
 
             let hd_links = g.links.clone();
 
