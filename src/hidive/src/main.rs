@@ -301,6 +301,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, required = false)]
+        gfa_output: Option<PathBuf>,
+
         /// Kmer-size
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
@@ -356,6 +360,10 @@ enum Commands {
         /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
         long_read_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with reference subsequences.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_paths: Vec<PathBuf>,
     },
 }
 
@@ -460,12 +468,13 @@ fn main() {
         }
         Commands::Correct {
             output,
+            gfa_output,
             kmer_size,
             model_path,
             long_read_fasta_paths,
             short_read_fasta_paths,
         } => {
-            correct::start(&output, kmer_size, &model_path, &long_read_fasta_paths, &short_read_fasta_paths);
+            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_paths, &short_read_fasta_paths);
         }
         Commands::POAAssemble {
             output,
@@ -480,6 +489,7 @@ fn main() {
             kmer_size,
             long_read_fasta_paths,
             short_read_fasta_paths,
+            reference_fasta_paths,
         } => {
             coassemble::start(
                 &output,
@@ -487,6 +497,7 @@ fn main() {
                 &model_path,
                 &long_read_fasta_paths,
                 &short_read_fasta_paths,
+                &reference_fasta_paths,
             );
         }
     }

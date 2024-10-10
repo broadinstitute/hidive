@@ -802,10 +802,58 @@ impl LdBG {
         let corrected_segments = traverse_read_graph(&graph, self.kmer_size);
 
         if corrected_segments.len() > 1 {
-            self.try_combinatorially_combining_sequences(&corrected_segments)
+            vec![self.combine_read_segments(seq, &corrected_segments)]
         } else {
             corrected_segments
         }
+    }
+
+    fn combine_read_segments(&self, seq: &[u8], corrected_segments: &Vec<Vec<u8>>) -> Vec<u8> {
+        use spoa::AlignmentType;
+        let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
+
+        let mut sg = spoa::Graph::new();
+        for lr_seq in vec![seq.to_vec()].iter().chain(corrected_segments.iter()) {
+            let seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
+            let seq_qual = std::ffi::CString::new(vec![b'I'; lr_seq.len()]).unwrap();
+            let a = la.align(seq_cstr.as_ref(), &sg);
+
+            sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+        }
+
+        let msa_cstrs = sg.multiple_sequence_alignment(false);
+        let msa_strings = msa_cstrs
+            .iter()
+            .map(|cstr| cstr.to_str().unwrap().to_string())
+            .map(|msa_string| {
+                let leading_dashes = msa_string.chars().take_while(|&c| c == '-').count();
+                let trailing_dashes = msa_string.chars().rev().take_while(|&c| c == '-').count();
+                let middle = &msa_string[leading_dashes..msa_string.len() - trailing_dashes];
+                format!("{}{}{}", 
+                    " ".repeat(leading_dashes), 
+                    middle, 
+                    " ".repeat(trailing_dashes)
+                )
+            })
+            .collect::<Vec<String>>();
+
+        let mut combined_seq = vec![];
+        for column in 0..msa_strings[0].len() {
+            let mut pileup = vec![];
+            for msa_string in msa_strings.iter().skip(1).chain(msa_strings.iter().take(1)) {
+                let char_at_column = msa_string.chars().nth(column).unwrap();
+
+                if char_at_column != ' ' {
+                    pileup.push(char_at_column);
+                }
+            }
+
+            combined_seq.push(pileup[0] as u8);
+        }
+
+        combined_seq.retain(|&x| x != b'-');
+
+        combined_seq
     }
 
     fn try_combinatorially_combining_sequences(&self, corrected_segments: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {

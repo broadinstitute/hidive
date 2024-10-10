@@ -9,6 +9,7 @@ use skydive::utils::*;
 
 pub fn start(
     output: &PathBuf,
+    gfa_output: Option<PathBuf>,
     kmer_size: usize,
     model_path: &PathBuf,
     long_read_fasta_paths: &Vec<PathBuf>,
@@ -36,23 +37,14 @@ pub fn start(
         .clean_branches(0.01)
         .clean_tips(3*kmer_size, 0.01)
         .clean_contigs(100)
-        // .build_links(&all_lr_seqs);
+        // .build_links(&all_lr_seqs)
         ;
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
-    // let superbubbles = m.identify_superbubbles();
-    // for superbubble in superbubbles {
-    //     skydive::elog!("Superbubble: {:?}", superbubble);
-    // }
-
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
-    // let read = b"GAACAGCTCAGGTGGAGAAGGGGTGAAGGGTGGGGTCTGAGATTTCTTGTCTCACTGAGGGTTCCAAGGCCCCAGCTAGAAATGTGCCCTGTCTCATTACTGGGAAGCACCATCCACAATCATGGGCCGACCCAGCCTGGGCCCTGTGTGCCAGCACTTACTCTTTTGTAAAGCACCTGAGCAATGAAGGACAGATTTATCACCTTGATTATGGCGGTGATGGGACCTGATCCCAGCAGTCACAAGTCACAGGGGAAGGTCCCTGACGACAGATCTCAGGAGGGCGATTGGTCCAGGGCCCACATCTGCTTTCTTCATGTTTCCTGATCCTGCCCTGGGTCTGCAGTCACACATTTCTGGAAACTTCTCTGGGGTCCAAGACTAGGAGGTTCCTCTAGGACCTTAAGGCCCTGGCTCCTTTCTGTATCTCACAGGACATTTTCTTCCCACAGATAGAAAAGGAGGGAGCTACTCTCAGGCTGCAAGTAAGTATGAAGGAGGCTGATGCCTGAGGTCCTTGGGATATTGTGTTTGGGAGCCCATGGGGGAGCT";
-
     let corrected_seqs =
-        // vec![read.to_vec()]
-        // .iter()
         all_lr_seqs
         .par_iter()
         .progress_with(progress_bar)
@@ -60,32 +52,40 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
+    skydive::elog!("Writing reads to {}", output.display());
+
+    let mut fa_file = File::create(&output).unwrap();
     for (i, corrected_seq) in corrected_seqs.iter().enumerate() {
-        println!(">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());
+        let _ = writeln!(fa_file, ">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());
     }
 
-    let g = m.traverse_all_kmers();
-    // let g = m.traverse_all_contigs();
+    if let Some(gfa_output) = gfa_output {
+        skydive::elog!("Writing GFA to {}", gfa_output.display());
 
-    let _ = write_gfa(&mut File::create(output).unwrap(), &g);
+        let g = m.traverse_all_kmers();
 
-    let csv_output = output.with_extension("csv");
-    let mut csv_file = File::create(&csv_output).unwrap();
+        let _ = write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g);
 
-    for (node_index, node_label) in g.node_indices().zip(g.node_weights()) {
-        let kmer = node_label.as_bytes();
-        let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
-        let score = (100.0 * *m.scores.get(&cn_kmer).unwrap()) as u32;
-        let sources = m.sources.get(&cn_kmer).unwrap();
+        let csv_output = gfa_output.with_extension("csv");
+        let mut csv_file = File::create(&csv_output).unwrap();
 
-        let source = if sources.len() == 1 { sources[0] } else { 2 };
+        writeln!(csv_file, "node,label").unwrap();
 
-        writeln!(
-            csv_file,
-            "{},{}",
-            node_index.index(),
-            format!("{} ({})", source, score)
-        )
-        .unwrap();
+        for (node_index, node_label) in g.node_indices().zip(g.node_weights()) {
+            let kmer = node_label.as_bytes();
+            let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
+            let score = (100.0 * *m.scores.get(&cn_kmer).unwrap()) as u32;
+            let sources = m.sources.get(&cn_kmer).unwrap();
+
+            let source = if sources.len() == 1 { sources[0] } else { 2 };
+
+            writeln!(
+                csv_file,
+                "{},{}",
+                node_index.index(),
+                format!("{} ({})", source, score)
+            )
+            .unwrap();
+        }
     }
 }
