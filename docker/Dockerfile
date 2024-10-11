@@ -18,7 +18,10 @@ RUN apt-get update --allow-releaseinfo-change && \
 #RUN curl https://sdk.cloud.google.com | bash
 
 # Reduced gcloud installation (from framegrace: https://github.com/GoogleCloudPlatform/gsutil/issues/1732#issuecomment-2029591598)
-RUN ARCH=`arch` && CLOUD_SDK_VERSION="496.0.0" && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
+ENV CLOUD_SDK_VERSION="496.0.0"
+ENV ARCH="x86_64"
+
+RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
     tar xzf google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
     rm google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
     gcloud config set core/disable_usage_reporting true && \
