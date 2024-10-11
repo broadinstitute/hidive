@@ -14,15 +14,11 @@ RUN apt-get update --allow-releaseinfo-change && \
     libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
-# Install gcloud
-#RUN curl https://sdk.cloud.google.com | bash
-
 # Reduced gcloud installation (from framegrace: https://github.com/GoogleCloudPlatform/gsutil/issues/1732#issuecomment-2029591598)
 ENV PATH /google-cloud-sdk/bin:$PATH
 ENV CLOUD_SDK_VERSION=496.0.0
 ENV ARCH=x86_64
 
-# Download and install cloud sdk. Review the components I install, you may not need them.
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
     tar xzf google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
     rm google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
