@@ -18,29 +18,25 @@ RUN apt-get update --allow-releaseinfo-change && \
 #RUN curl https://sdk.cloud.google.com | bash
 
 # Reduced gcloud installation (from framegrace: https://github.com/GoogleCloudPlatform/gsutil/issues/1732#issuecomment-2029591598)
-#ENV CLOUD_SDK_VERSION="496.0.0"
-#ENV ARCH="x86_64"
+ENV PATH /google-cloud-sdk/bin:$PATH
+ENV CLOUD_SDK_VERSION=496.0.0
+ENV ARCH=x86_64
 
-RUN wget https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-496.0.0-linux-x86_64.tar.gz && \
-    tar xzf google-cloud-cli-496.0.0-linux-x86_64.tar.gz && \
-    rm google-cloud-cli-496.0.0-linux-x86_64.tar.gz && \
+# Download and install cloud sdk. Review the components I install, you may not need them.
+RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
+    tar xzf google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
+    rm google-cloud-cli-${CLOUD_SDK_VERSION}-linux-${ARCH}.tar.gz && \
+    rm -rf /google-cloud-sdk/platform/bundledpythonunix && \
     gcloud config set core/disable_usage_reporting true && \
     gcloud config set component_manager/disable_update_check true && \
     gcloud config set metrics/environment github_docker_image && \
-    gcloud components update && \
+    gcloud components remove -q bq && \
+    gcloud components install -q beta && \
+    gcloud components install -q gke-gcloud-auth-plugin && \
     rm -rf $(find google-cloud-sdk/ -regex ".*/__pycache__") && \
     rm -rf google-cloud-sdk/.install/.backup && \
+    rm -rf google-cloud-sdk/bin/anthoscli && \
     gcloud --version
-
-    # gcloud components remove bq app-engine-go appctl package-go-module \
-    #     cbt bigtable cloud-datastore-emulator cloud-firestore-emulator \
-    #     pubsub-emulator cloud-run-proxy cloud-sql-proxy kustomize \
-    #     log-streaming managed-flink-client minikube nomos local-extract \
-    #     skaffold terraform-tools anthos-auth config-connector enterprise-certificate-proxy \
-    #     alpha beta app-engine-java app-engine-python app-engine-python-extras \
-    #     gke-gcloud-auth-plugin istioctl kpt kubectl kubectl-oidc pkg && \
-
-RUN git config --system credential.'https://source.developers.google.com'.helper gcloud.sh
 
 # Setup crcmodc for gsutil
 RUN pip3 uninstall -y crcmod && \
@@ -84,10 +80,10 @@ COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Copy gcloud utilities from builder stage
-COPY --from=builder /root/google-cloud-sdk /root/google-cloud-sdk
+COPY --from=builder /google-cloud-sdk /google-cloud-sdk
 
 # Set environment variables
-ENV PATH="/root/.cargo/bin:/root/google-cloud-sdk/bin:${PATH}"
+ENV PATH="/root/.cargo/bin:/google-cloud-sdk/bin:${PATH}"
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 
 # We want this to be interactive
