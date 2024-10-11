@@ -31,8 +31,6 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
     gcloud config set component_manager/disable_update_check true && \
     gcloud config set metrics/environment github_docker_image && \
     gcloud components remove -q bq && \
-    gcloud components install -q beta && \
-    gcloud components install -q gke-gcloud-auth-plugin && \
     rm -rf $(find google-cloud-sdk/ -regex ".*/__pycache__") && \
     rm -rf google-cloud-sdk/.install/.backup && \
     rm -rf google-cloud-sdk/bin/anthoscli && \
