@@ -14,7 +14,7 @@ RUN apt-get update --allow-releaseinfo-change && \
     libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
-# Install gsutil
+# Install gcloud
 RUN curl https://sdk.cloud.google.com | bash
 
 # Setup crcmodc for gsutil
@@ -33,7 +33,6 @@ RUN mkdir -p ~/.ssh && \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-
 # Install hidive
 RUN git clone https://github.com/broadinstitute/hidive.git && \
     cd hidive && \
@@ -43,16 +42,27 @@ RUN git clone https://github.com/broadinstitute/hidive.git && \
     cd .. && \
     rm -rf hidive
 
+# Install minimap2
+RUN git clone https://github.com/lh3/minimap2 && \
+    cd minimap2 && \
+    make && \
+    cp minimap2 /usr/local/bin/ && \
+    cd .. && \
+    rm -rf minimap2
+
 # Final stage
 FROM python:3.9-slim
 
 # Copy necessary files from builder stage
 COPY --from=builder /usr/local/bin/hidive /usr/local/bin/hidive
-#COPY --from=builder /root/.cargo /root/.cargo
+COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
+# Copy gcloud utilities from builder stage
+COPY --from=builder /root/google-cloud-sdk /root/google-cloud-sdk
+
 # Set environment variables
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.cargo/bin:/root/google-cloud-sdk/bin:${PATH}"
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 
 # We want this to be interactive
