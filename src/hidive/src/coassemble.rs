@@ -7,7 +7,6 @@ use indicatif::ParallelProgressIterator;
 
 use skydive::ldbg::LdBG;
 use skydive::mldbg::MLdBG;
-use skydive::utils::*;
 
 use skydive::wmec::*;
 use spoa::AlignmentType;
@@ -16,21 +15,21 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     model_path: &PathBuf,
-    long_read_fasta_paths: &Vec<PathBuf>,
-    short_read_fasta_paths: &Vec<PathBuf>,
     reference_fasta_paths: &Vec<PathBuf>,
+    long_read_fasta_path: PathBuf,
+    short_read_fasta_path: PathBuf,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
-    let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
+    let long_read_seq_urls = skydive::parse::parse_file_names(&[long_read_fasta_path.clone()]);
+    let short_read_seq_urls = skydive::parse::parse_file_names(&[short_read_fasta_path.clone()]);
     let reference_seq_urls = skydive::parse::parse_file_names(reference_fasta_paths);
 
     // Read all long reads.
     skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    let all_lr_seqs = skydive::utils::read_fasta(long_read_fasta_paths);
+    let all_lr_seqs = skydive::utils::read_fasta(&vec![long_read_fasta_path.clone()]);
 
     // Read all short reads.
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    let all_sr_seqs = skydive::utils::read_fasta(short_read_fasta_paths);
+    let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path]);
 
     // Read all reference subsequences.
     skydive::elog!("Processing reference {:?}...", reference_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
@@ -47,7 +46,7 @@ pub fn start(
         .clean_branches(0.01)
         .clean_tips(3*kmer_size, 0.01)
         .clean_contigs(100)
-        .build_links(&all_lr_seqs, false);
+        .build_links(&all_lr_seqs, true);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
@@ -60,6 +59,8 @@ pub fn start(
         .map(|seq| m.correct_seq(seq))
         .flatten()
         .collect::<Vec<Vec<u8>>>();
+
+    // let contigs = m.assemble_all();
 
     let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
 
@@ -87,6 +88,10 @@ pub fn start(
             )
         })
         .collect::<Vec<String>>();
+
+    // for msa_string in &msa_strings {
+    //     println!("{}", msa_string);
+    // }
 
     let matrix = create_read_allele_matrix(&msa_strings);
     let wmec = create_wmec_matrix(&matrix);

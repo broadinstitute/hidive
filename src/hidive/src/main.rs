@@ -77,7 +77,7 @@ const DEFAULT_KMER_SIZE: usize = 17;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Train a graph-cleaning model using long- and (optionally) short-read data with ground truth assemblies.
+    /// Train a error correction model with reads and ground truth assemblies.
     #[clap(arg_required_else_help = true)]
     Train {
         /// Output path for trained model.
@@ -113,7 +113,7 @@ enum Commands {
         debug: bool,
     },
 
-    /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
+    /// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
         /// Output path for FASTA file with reads spanning locus of interest.
@@ -185,7 +185,7 @@ enum Commands {
         seq_paths: Vec<PathBuf>,
     },
 
-    /// Optionally further filter rescued reads to those most closely matching a long-read draft assembly.
+    /// Further filter rescued reads to those most closely matching a long-read draft assembly.
     #[clap(arg_required_else_help = true)]
     Filter {
         /// Output path for filtered short-read sequences.
@@ -269,7 +269,7 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Correct reads.
+    /// Error-correct long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Correct {
         /// Output path for corrected reads.
@@ -297,7 +297,7 @@ enum Commands {
         long_read_fasta_paths: Vec<PathBuf>,
     },
 
-    /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
+    /// Co-assemble target locus from long- and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
         /// Output path for assembled short-read sequences.
@@ -312,17 +312,17 @@ enum Commands {
         #[clap(short, long, required = true, value_parser)]
         model_path: PathBuf,
 
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(short, long, required = false, value_parser)]
-        short_read_fasta_paths: Vec<PathBuf>,
-
-        /// FASTA files with long-read sequences (may contain one or more samples).
-        #[clap(required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
-
         /// FASTA files with reference subsequences.
         #[clap(short, long, required = true, value_parser)]
         reference_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = false, value_parser)]
+        short_read_fasta_path: PathBuf,
     },
 }
 
@@ -428,19 +428,19 @@ fn main() {
         }
         Commands::Coassemble {
             output,
-            model_path,
             kmer_size,
-            long_read_fasta_paths,
-            short_read_fasta_paths,
+            model_path,
             reference_fasta_paths,
+            long_read_fasta_path,
+            short_read_fasta_path,
         } => {
             coassemble::start(
                 &output,
                 kmer_size,
                 &model_path,
-                &long_read_fasta_paths,
-                &short_read_fasta_paths,
                 &reference_fasta_paths,
+                long_read_fasta_path,
+                short_read_fasta_path
             );
         }
     }

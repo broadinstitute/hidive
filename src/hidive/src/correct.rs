@@ -41,6 +41,15 @@ pub fn start(
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
+    /*
+    let contigs = m.assemble_all();
+
+    let mut fa_file = File::create(&output).unwrap();
+    for (i, contig) in contigs.iter().enumerate() {
+        let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    }
+    */
+
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
     let corrected_seqs =
