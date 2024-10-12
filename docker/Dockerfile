@@ -8,7 +8,7 @@ ARG branch
 # Install dependencies
 RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-    curl wget bzip2 make gcc cmake g++ build-essential zlib1g-dev libssl-dev lbzip2 libbz2-dev \
+    curl wget bzip2 make gcc cmake g++ keychain build-essential zlib1g-dev libssl-dev lbzip2 libbz2-dev \
     libcurl4-gnutls-dev libncurses5-dev libstdc++6 libncursesw5-dev liblzma-dev clang libclang-dev \
     pkg-config libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
