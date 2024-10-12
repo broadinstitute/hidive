@@ -8,9 +8,9 @@ ARG branch
 # Install dependencies
 RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-    curl wget bzip2 make gcc cmake g++ keychain build-essential zlib1g-dev libssl-dev lbzip2 libbz2-dev \
-    libcurl4-gnutls-dev libncurses5-dev libstdc++6 libncursesw5-dev liblzma-dev clang libclang-dev \
-    pkg-config libtcmalloc-minimal4 python3-dev python3-setuptools && \
+    curl wget bzip2 make gcc cmake g++ keychain git build-essential zlib1g-dev libssl-dev lbzip2 \
+    libbz2-dev libcurl4-gnutls-dev libncurses5-dev libstdc++6 libncursesw5-dev liblzma-dev clang \
+    libclang-dev pkg-config libtcmalloc-minimal4 python3-dev python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
 # Reduced gcloud installation (from framegrace: https://github.com/GoogleCloudPlatform/gsutil/issues/1732#issuecomment-2029591598)
