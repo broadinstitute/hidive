@@ -58,12 +58,22 @@ RUN git clone https://github.com/broadinstitute/hidive.git && \
     rm -rf hidive
 
 # Install minimap2
-RUN git clone https://github.com/lh3/minimap2 && \
-    cd minimap2 && \
+RUN wget -O minimap2-2.28.tar.bz2 https://github.com/lh3/minimap2/releases/download/v2.28/minimap2-2.28.tar.bz2 && \
+    tar -vxjf minimap2-2.28.tar.bz2 && \
+    cd minimap2-2.28 && \
     make && \
     cp minimap2 /usr/local/bin/ && \
     cd .. && \
-    rm -rf minimap2
+    rm -rf minimap2-2.28 minimap2-2.28.tar.bz2
+
+# Install samtools
+RUN wget -O samtools-1.21.tar.bz2 https://github.com/samtools/samtools/releases/download/1.21/samtools-1.21.tar.bz2 && \
+    tar -vxjf samtools-1.21.tar.bz2 && \
+    cd samtools-1.21 && \
+    make && \
+    cp samtools /usr/local/bin/ && \
+    cd .. && \
+    rm -rf samtools-1.21 samtools-1.21.tar.bz2
 
 # Final stage
 FROM python:3.9-slim
@@ -71,6 +81,7 @@ FROM python:3.9-slim
 # Copy necessary files from builder stage
 COPY --from=builder /usr/local/bin/hidive /usr/local/bin/hidive
 COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
+COPY --from=builder /usr/local/bin/samtools /usr/local/bin/samtools
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Copy gcloud utilities from builder stage
