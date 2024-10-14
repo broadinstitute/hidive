@@ -288,13 +288,13 @@ enum Commands {
         #[clap(short, long, required = true, value_parser)]
         model_path: PathBuf,
 
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(short, long, required = false, value_parser)]
-        short_read_fasta_paths: Vec<PathBuf>,
-
         /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
     },
 
     /// Co-assemble target locus from long- and short-read data using a linked de Bruijn graph.
@@ -421,10 +421,10 @@ fn main() {
             gfa_output,
             kmer_size,
             model_path,
-            long_read_fasta_paths,
-            short_read_fasta_paths,
+            long_read_fasta_path,
+            short_read_fasta_path,
         } => {
-            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_paths, &short_read_fasta_paths);
+            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
         }
         Commands::Coassemble {
             output,

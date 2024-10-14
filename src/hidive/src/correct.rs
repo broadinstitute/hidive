@@ -12,19 +12,19 @@ pub fn start(
     gfa_output: Option<PathBuf>,
     kmer_size: usize,
     model_path: &PathBuf,
-    long_read_fasta_paths: &Vec<PathBuf>,
-    short_read_fasta_paths: &Vec<PathBuf>,
+    long_read_fasta_path: &PathBuf,
+    short_read_fasta_path: &PathBuf,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
-    let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
+    let long_read_seq_urls = skydive::parse::parse_file_names(&[long_read_fasta_path.clone()]);
+    let short_read_seq_urls = skydive::parse::parse_file_names(&[short_read_fasta_path.clone()]);
 
     // Read all long reads.
     skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    let all_lr_seqs = skydive::utils::read_fasta(long_read_fasta_paths);
+    let all_lr_seqs = skydive::utils::read_fasta(&vec![long_read_fasta_path.clone()]);
 
     // Read all short reads.
     skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    let all_sr_seqs = skydive::utils::read_fasta(short_read_fasta_paths);
+    let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path.clone()]);
 
     let l1 = LdBG::from_sequences("lr".to_string(), kmer_size, &all_lr_seqs);
     let s1 = LdBG::from_sequences("sr".to_string(), kmer_size, &all_sr_seqs);
@@ -70,7 +70,9 @@ pub fn start(
     if let Some(gfa_output) = gfa_output {
         skydive::elog!("Writing GFA to {}", gfa_output.display());
 
-        let g = m.traverse_all_kmers();
+        let mut g = m.traverse_all_kmers();
+
+        // m.detect_superbubbles();
 
         let _ = write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g);
 
