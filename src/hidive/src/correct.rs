@@ -32,12 +32,9 @@ pub fn start(
     let m = MLdBG::from_ldbgs(vec![l1, s1])
         .score_kmers(model_path)
         .collapse()
-        .clean_color_specific_paths(1, 0.2)
-        .clean_tangles(1, 100, 0.2)
-        .clean_branches(0.01)
-        .clean_tips(3*kmer_size, 0.01)
-        .clean_contigs(100)
-        .build_links(&all_lr_seqs, false);
+        .clean(0.2, 0.01)
+        .build_links(&all_lr_seqs, true)
+        ;
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
@@ -52,8 +49,7 @@ pub fn start(
 
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
-    let corrected_seqs =
-        all_lr_seqs
+    let corrected_seqs = all_lr_seqs
         .par_iter()
         .progress_with(progress_bar)
         .map(|seq| m.correct_seq(seq))
@@ -70,9 +66,7 @@ pub fn start(
     if let Some(gfa_output) = gfa_output {
         skydive::elog!("Writing GFA to {}", gfa_output.display());
 
-        let mut g = m.traverse_all_kmers();
-
-        // m.detect_superbubbles();
+        let g = m.traverse_all_kmers();
 
         let _ = write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g);
 

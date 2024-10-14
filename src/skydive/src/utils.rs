@@ -171,43 +171,6 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     Ok(())
 }
 
-// pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
-//     let file = File::open(path)?;
-//     let reader = BufReader::new(file);
-//     let mut graph = DiGraph::new();
-//     let mut node_map = HashMap::new();
-
-//     for line in reader.lines() {
-//         let line = line?;
-//         let fields: Vec<&str> = line.split('\t').collect();
-        
-//         match fields[0] {
-//             "S" => {
-//                 let id = fields[1];
-//                 let sequence = fields[2].to_string();
-//                 let node_index = graph.add_node(sequence);
-//                 node_map.insert(id.to_string(), node_index);
-//             },
-//             "L" => {
-//                 let from_id = fields[1];
-//                 let to_id = fields[3];
-//                 let weight = fields[5]
-//                     .split(':')
-//                     .last()
-//                     .and_then(|s| s.parse::<f32>().ok())
-//                     .unwrap_or(1.0) / 100.0;
-
-//                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
-//                     graph.add_edge(from, to, weight);
-//                 }
-//             },
-//             _ => {} // Ignore other lines
-//         }
-//     }
-
-//     Ok(graph)
-// }
-
 pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -230,17 +193,16 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                     continue; // Skip malformed lines
                 }
                 let from_id = fields[1];
-                let from_orient = fields[2];
+                // let from_orient = fields[2];
                 let to_id = fields[3];
-                let to_orient = fields[4];
+                // let to_orient = fields[4];
+
                 let weight = fields.get(5)
                     .and_then(|s| s.split(':').last())
                     .and_then(|s| s.parse::<f32>().ok())
                     .unwrap_or(1.0);
 
                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
-                    // For simplicity, we're ignoring orientation here. In a real implementation,
-                    // you might want to handle + and - orientations differently.
                     graph.add_edge(from, to, weight);
                 }
             },

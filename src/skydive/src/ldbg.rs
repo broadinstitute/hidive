@@ -1545,6 +1545,18 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    pub fn clean(self, lenient_threshold: f32, strict_threshold: f32) -> Self {
+        let kmer_size = self.kmer_size;
+
+        self
+            .clean_color_specific_paths(1, lenient_threshold)
+            .clean_tangles(1, 100, lenient_threshold)
+            .clean_branches(strict_threshold)
+            .clean_tips(3*kmer_size, strict_threshold)
+            .clean_bubbles(2.0*lenient_threshold)
+            .clean_contigs(100)
+    }
+
     pub fn clean_color_specific_paths(mut self, color: usize, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1778,6 +1790,82 @@ impl LdBG {
         }
 
         crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    pub fn clean_bubbles(mut self, min_score: f32) -> Self {
+        let mut to_remove = HashSet::new();
+        let mut bad_bubbles: usize = 0;
+
+        let g = self.traverse_all_kmers();
+        let bubbles = find_all_superbubbles(&g);
+
+        for (i, ((in_node, out_node), interior)) in bubbles.iter().enumerate() {
+            let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
+            let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
+
+            let mut paths = paths_fwd
+                .chain(paths_rev)
+                .map(|path| {
+                    let score = path.iter()
+                        .map(|node| {
+                            let kmer = g.node_weight(*node).unwrap().as_bytes();
+                            let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+                            *self.scores.get(&cn_kmer).unwrap_or(&1.0)
+                        })
+                        .sum::<f32>() / path.len() as f32;
+
+                    (path, score)
+                })
+                .collect::<Vec<(Vec<NodeIndex>, f32)>>();
+
+            paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+            if paths.len() > 2 {
+                let mut to_keep = HashSet::new();
+                let mut cleaned_bubble = false;
+
+                for (j, (path, total_score)) in paths.iter().enumerate() {
+                    // let mut contig = String::new();
+
+                    for node in path {
+                        let kmer = g.node_weight(*node).unwrap().as_bytes();
+                        let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                        if j < 2 {
+                            to_keep.insert(cn_kmer.clone());
+                        } else if !to_keep.contains(&cn_kmer) && *total_score < min_score {
+                            to_remove.insert(cn_kmer.clone());
+                            cleaned_bubble = true;
+                        }
+
+                        // if contig.is_empty() {
+                        //     contig = String::from_utf8_lossy(kmer).to_string();
+                        // } else {
+                        //     contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                        // }
+                    }
+
+                    // crate::elog!(" -- Bubble {}: {} (score: {}) (remove: {})", i, contig, total_score, num_remove);
+                }
+
+                // crate::elog!("");
+
+                if cleaned_bubble {
+                    bad_bubbles += paths.len() - 2;
+                }
+            }
+        }
+
+        for cn_kmer in &to_remove {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed {} bad bubbles ({} kmers)", bad_bubbles, to_remove.len());
 
         self.infer_edges();
 
@@ -2469,6 +2557,7 @@ mod tests {
     use super::*;
     use crate::edges::Edges;
 
+    use petgraph::data::DataMap;
     use rand::{Rng, SeedableRng};
 
     use std::collections::BTreeMap;
@@ -3205,14 +3294,14 @@ mod tests {
     #[test]
     fn test_find_all_superbubbles() {
         let graph = create_bubblegun_graph();
-        // let graph = crate::utils::read_gfa("/Users/kiran/repositories/bubble_gun/example/paper_example2.gfa").unwrap();
-        // let graph = crate::utils::read_gfa("/Users/kiran/repositories/hidive/test.gfa").unwrap();
 
         let expected_bubbles = HashMap::from([
             ((b"CCCAACAAGTG".to_vec(),      b"ACTCATTGACG".to_vec()),      2usize),
             // ((b"ACTCATTGACG".to_vec(),      b"CCCAACAAGTG".to_vec()),      2usize),
+
             ((b"ACTCATTGACG".to_vec(),      b"GGTGTCCATTGGGGTC".to_vec()), 7usize),
             // ((b"GGTGTCCATTGGGGTC".to_vec(), b"ACTCATTGACG".to_vec()),      7usize),
+
             ((b"GGTGTCCATTGGGGTC".to_vec(), b"GCACAAATTGCCA".to_vec()),    2usize),
             // ((b"GCACAAATTGCCA".to_vec(),    b"GGTGTCCATTGGGGTC".to_vec()), 2usize),
         ]);
@@ -3234,9 +3323,36 @@ mod tests {
             } else {
                 assert_eq!(expected_bubbles.get(&key_rev).unwrap(), &interior.len());
             }
-
-            // println!("{} {} {}", String::from_utf8(in_seq).unwrap(), String::from_utf8(out_seq).unwrap(), interior.len());
         }
+    }
 
+    #[test]
+    fn test_find_all_superbubbles_2() {
+        let graph = crate::utils::read_gfa("/Users/kiran/repositories/hidive/test.gfa").unwrap();
+
+        let bubbles = find_all_superbubbles(&graph);
+
+        let start = b"GAGGGAACAGCGACTTC".to_vec();
+        let end = b"TGGACACAGGCACCTGG".to_vec();
+        for ((in_node, out_node), interior) in bubbles {
+            let in_seq = graph.node_weight(in_node).unwrap().as_bytes().to_vec();
+            let out_seq = graph.node_weight(out_node).unwrap().as_bytes().to_vec();
+
+            if in_seq == start && out_seq == end {
+                println!("Found bubble: {}", interior.len());
+
+                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&graph, in_node, out_node, 0, Some(interior.len() + 10)) {
+                    println!("out path: {}", path.len());
+                }
+
+                for path in petgraph::algo::all_simple_paths::<Vec<_>, _>(&graph, out_node, in_node, 0, Some(interior.len() + 10)) {
+                    println!("in path:  {}", path.len());
+
+                    for node in path {
+                        println!(" - {}", graph.node_weight(node).unwrap());
+                    }
+                }
+            }
+        }
     }
 }
