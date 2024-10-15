@@ -7,6 +7,7 @@ workflow HLAAssociation {
         File reference_vcf
         String prefix
         String referenceprefix
+        String outputprefix
         Int makereferencememory
     }
 
@@ -19,6 +20,15 @@ workflow HLAAssociation {
         reference_vcf = reference_vcf,
         outputprefix = referenceprefix,
         memory = makereferencememory
+    }
+
+    call SNP2HLA { input:
+        genotype = FormatTransition.genotype_data,
+        genotype_prefix = prefix,
+        reference = MakeReference.reference_data,
+        reference_prefix = referenceprefix,
+        outputprefix = outputprefix
+
     }
 
     output {
@@ -99,25 +109,28 @@ task MakeReference {
 task SNP2HLA {
 
     input {
-        File joint_vcf
-        File joint_vcf_tbi
+        Array[File] genotype
+        String genotype_prefix
+        Array[File] reference
+        String reference_prefix
+        String outputprefix
         Int memory
     }
 
     command <<<
         set -euxo pipefail
-        mkdir output
-        bcftools +split -Oz -o output ~{joint_vcf}
-        # cd output
-        # for vcf in $(find . -name "*.vcf.gz"); do
-        #     tabix -p vcf "$vcf"
-        # done
-        # cd -
+        cd HLA-TAPAS
+        python -m SNP2HLA \
+        --target ~{genotype_prefix} \
+        --out ~{outputprefix} \
+        --reference ~{reference_prefix} \
+        --nthreads 2 \
+        --mem 4g
 
     >>>
 
     output {
-        Array[File] vcf_by_sample = glob("output/*vcf.gz")
+        Array[File] outputfiles = glob("~{outputprefix}*")
         # Array[File] vcf_by_sample_tbi = glob("output/*vcf.gz.tbi")
 
     }
