@@ -95,4 +95,4 @@ ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 CMD ["/bin/bash"]
 
 # Copy hidive binary from Github action artifact
-COPY ./target/release/hidive /usr/local/bin/hidive
+COPY --from=binary /hidive /usr/local/bin/hidive

@@ -107,3 +107,5 @@ jobs:
         cache-to: |
           type=local,dest=/tmp/.buildx-cache-new,mode=max
           type=gha,mode=max,scope=${{ github.workflow }}
+        build-contexts: |
+          binary=./target/release
