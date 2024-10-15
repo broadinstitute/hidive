@@ -1,9 +1,6 @@
 use anyhow::Result;
-use petgraph::Direction::Incoming;
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::fs::File;
-use std::io::Write;
+use std::collections::{HashMap, HashSet};
 
 use parquet::data_type::AsBytes;
 
@@ -13,8 +10,6 @@ use std::path::PathBuf;
 
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
-use petgraph::dot::{Dot, Config};
-use petgraph::visit::{Dfs, DfsEvent};
 
 use indicatif::{ProgressIterator, ParallelProgressIterator};
 use rayon::iter::IntoParallelRefIterator;
@@ -33,13 +28,6 @@ type KmerGraph = HashMap<Vec<u8>, Record>;
 type KmerScores = HashMap<Vec<u8>, f32>;
 type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
 type Sources = HashMap<Vec<u8>, Vec<usize>>;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NodeState {
-    NotVisited,
-    InProgress,
-    Done,
-}
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug, Clone)]
@@ -1481,6 +1469,54 @@ impl LdBG {
         contigs
     }
 
+    pub fn assemble_at_bubbles(&self) -> Vec<Vec<u8>> {
+        let g = self.traverse_all_kmers();
+        let bubbles = find_all_superbubbles(&g);
+
+        let mut all_contigs = Vec::new();
+        let mut visited = HashSet::new();
+
+        for ((in_node, out_node), interior) in bubbles {
+            let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, in_node, out_node, 0, Some(interior.len()));
+            let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, out_node, in_node, 0, Some(interior.len()));
+
+            let paths: Vec<Vec<NodeIndex>> = paths_fwd.chain(paths_rev).collect();
+
+            let mut unique_nodes = Vec::new();
+
+            for (i, path) in paths.iter().enumerate() {
+                let other_paths: HashSet<_> = paths.iter().enumerate()
+                    .filter(|&(j, _)| j != i)
+                    .flat_map(|(_, p)| p)
+                    .collect();
+
+                if let Some(unique_node) = path.iter().find(|&node| !other_paths.contains(node)) {
+                    let kmer = g.node_weight(*unique_node).unwrap().as_bytes().to_vec();
+                    let cn_kmer = crate::utils::canonicalize_kmer(&kmer);
+
+                    if !visited.contains(&cn_kmer) {
+                        unique_nodes.push(*unique_node);
+                    }
+                }
+            }
+
+            let contigs = unique_nodes.iter().map(|unique_node| {
+                let kmer = g.node_weight(*unique_node).unwrap().as_bytes().to_vec();
+                self.assemble(&kmer)
+            }).collect::<Vec<_>>();
+
+            all_contigs.extend(contigs.clone());
+
+            for contig in contigs {
+                for kmer in contig.windows(self.kmer_size) {
+                    visited.insert(crate::utils::canonicalize_kmer(kmer));
+                }
+            }
+        }
+
+        all_contigs
+    }
+
     /// Update links available to inform navigation during graph traversal.
     ///
     /// # Arguments
@@ -1553,7 +1589,7 @@ impl LdBG {
             .clean_tangles(1, 100, lenient_threshold)
             .clean_branches(strict_threshold)
             .clean_tips(3*kmer_size, strict_threshold)
-            .clean_bubbles(2.0*lenient_threshold)
+            // .clean_bubbles(2.0*lenient_threshold)
             .clean_contigs(100)
     }
 
