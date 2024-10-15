@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["start"]};
+window.SIDEBAR_ITEMS = {"fn":["allele_counts","allele_indices","create_fully_phased_haplotypes","create_read_allele_matrix","create_wmec_matrix","start"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["LdBG"]};
+window.SIDEBAR_ITEMS = {"fn":["find_all_superbubbles","find_superbubble"],"struct":["LdBG"]};

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/parse.rs`."><title>parse.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/parse.rs`."><title>parse.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c5d6553a23f1e5a6.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0 (eeb90cda1 2024-09-04)" data-channel="1.81.0" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -119,28 +119,132 @@
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
 <a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, io::BufRead, path::PathBuf};
 
 <span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>url::Url;
+<span class="kw">use </span>regex::Regex;
 
 <span class="kw">use </span>path_absolutize::Absolutize;
 
-<span class="kw">pub fn </span>parse_loci(loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;) -&gt; HashSet&lt;(String, u64, u64)&gt; {
+<span class="kw">pub fn </span>parse_loci(loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, padding: u64) -&gt; HashSet&lt;(String, u64, u64, String)&gt; {
     <span class="comment">// Initialize a HashSet to store unique loci after parsing
     </span><span class="kw">let </span><span class="kw-2">mut </span>loci = HashSet::new();
 
     <span class="comment">// Iterate over each locus in the provided list
     </span><span class="kw">for </span>locus <span class="kw">in </span>loci_list {
-        <span class="comment">// Attempt to parse the locus using a function from the skydive module
-        </span><span class="kw">match </span>parse_locus(locus.to_owned()) {
-            <span class="prelude-val">Ok</span>(l_fmt) =&gt; {
-                <span class="comment">// If parsing is successful, insert the formatted locus into the HashSet
-                </span>loci.insert(l_fmt);
+        <span class="comment">// Check if the locus represents a file on disk
+        </span><span class="kw">let </span>path = PathBuf::from(locus);
+        <span class="kw">if </span>path.is_file() {
+            <span class="comment">// If it's a file, read its contents and parse each line as a locus
+            </span><span class="kw">let </span>file = std::fs::File::open(<span class="kw-2">&amp;</span>path).expect(<span class="string">"Failed to open file"</span>);
+            <span class="kw">let </span>reader = std::io::BufReader::new(file);
+            <span class="kw">for </span>line <span class="kw">in </span>reader.lines() {
+                <span class="kw">let </span>line = line.expect(<span class="string">"Failed to read line"</span>);
+
+                <span class="comment">// Skip lines starting with '#'
+                </span><span class="kw">if </span>line.trim().starts_with(<span class="string">'#'</span>) {
+                    <span class="kw">continue</span>;
+                }
+
+                <span class="kw">match </span>parse_locus(line.to_owned(), padding) {
+                    <span class="prelude-val">Ok</span>(l_fmt) =&gt; {
+                        loci.insert(l_fmt);
+                    }
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                        <span class="macro">panic!</span>(<span class="string">"Could not parse locus '{}' from file '{}'."</span>, line, locus);
+                    }
+                }
             }
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="comment">// If parsing fails, panic and terminate the program, providing an error message
-                </span><span class="macro">panic!</span>(<span class="string">"Could not parse locus '{}'."</span>, locus);
+            <span class="comment">// Skip the rest of the loop iteration
+            </span><span class="kw">continue</span>;
+        } <span class="kw">else </span>{
+            <span class="comment">// Attempt to parse the locus
+            </span><span class="kw">match </span>parse_locus(locus.to_owned(), padding) {
+                <span class="prelude-val">Ok</span>(l_fmt) =&gt; {
+                    <span class="comment">// If parsing is successful, insert the formatted locus into the HashSet
+                    </span>loci.insert(l_fmt);
+                }
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                    <span class="comment">// If parsing fails, panic and terminate the program, providing an error message
+                    </span><span class="macro">panic!</span>(<span class="string">"Could not parse locus '{}'."</span>, locus);
+                }
             }
         }
     }
@@ -148,41 +252,35 @@
     loci
 }
 
-<span class="kw">pub fn </span>parse_locus(locus: String) -&gt; <span class="prelude-ty">Result</span>&lt;(String, u64, u64)&gt; {
-    <span class="kw">let </span>l_fmt = locus.replace(<span class="string">','</span>, <span class="string">""</span>);
-    <span class="kw">let </span>parts1: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = l_fmt.split(|c| c == <span class="string">':'</span>).collect();
-    <span class="kw">let </span>parts2: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = parts1[<span class="number">1</span>].split(|c| c == <span class="string">'-'</span>).collect();
+<span class="kw">pub fn </span>parse_locus(locus: String, padding: u64) -&gt; <span class="prelude-ty">Result</span>&lt;(String, u64, u64, String)&gt; {
+    <span class="comment">// Regex to capture the contig name, start position, stop position, and optional name.
+    // Accepts:
+    // - chr:start-stop
+    // - chr:start-stop|name
+    // - chr start stop
+    // - chr start stop name
+    </span><span class="kw">let </span>re = Regex::new(<span class="string">r"(.*)[:\s]+(\d+)[-\s]+(\d+)(?:[|\s+](.*))?"</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>chr = parts1[<span class="number">0</span>].to_string();
+    <span class="comment">// Remove commas from the locus string
+    </span><span class="kw">let </span>locus = locus.replace(<span class="string">","</span>, <span class="string">""</span>);
 
-    <span class="kw">if </span>parts2.len() == <span class="number">1 </span>{
-        <span class="kw">let </span>start = <span class="kw">match </span>parts2[<span class="number">0</span>].parse::&lt;u64&gt;() {
-            <span class="prelude-val">Ok</span>(val) =&gt; val,
-            <span class="prelude-val">Err</span>(e) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(anyhow::Error::new(e));
-            }
-        };
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(captures) = re.captures(<span class="kw-2">&amp;</span>locus) {
+        <span class="kw">let </span>chr = captures.get(<span class="number">1</span>).unwrap().as_str().to_string();
+        <span class="kw">let </span>start = captures.get(<span class="number">2</span>).unwrap().as_str().parse::&lt;u64&gt;()<span class="question-mark">? </span>- padding;
+        <span class="kw">let </span>stop = captures.get(<span class="number">3</span>).unwrap().as_str().parse::&lt;u64&gt;()<span class="question-mark">? </span>+ padding;
+        <span class="kw">let </span>name = captures.get(<span class="number">4</span>).map_or_else(
+            || <span class="macro">format!</span>(<span class="string">"{}:{}-{}"</span>, chr, start, stop),
+            |m| m.as_str().to_string()
+        );
 
-        <span class="prelude-val">Ok</span>((chr, start - <span class="number">1000</span>, start + <span class="number">1000</span>))
-    } <span class="kw">else if </span>parts2.len() == <span class="number">2 </span>{
-        <span class="kw">let </span>start = <span class="kw">match </span>parts2[<span class="number">0</span>].parse::&lt;u64&gt;() {
-            <span class="prelude-val">Ok</span>(val) =&gt; val,
-            <span class="prelude-val">Err</span>(e) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(anyhow::Error::new(e));
-            }
-        };
+        <span class="kw">if </span>start &gt; stop {
+            <span class="macro">anyhow::bail!</span>(<span class="string">"Locus format for '{}' is incorrect. Start position ({}) is greater than stop position ({})."</span>, locus, start, stop);
+        }
 
-        <span class="kw">let </span>stop = <span class="kw">match </span>parts2[<span class="number">1</span>].parse::&lt;u64&gt;() {
-            <span class="prelude-val">Ok</span>(val) =&gt; val,
-            <span class="prelude-val">Err</span>(e) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(anyhow::Error::new(e));
-            }
-        };
-
-        <span class="prelude-val">Ok</span>((chr, start, stop))
+        <span class="prelude-val">Ok</span>((chr, start, stop, name))
     } <span class="kw">else </span>{
         <span class="macro">anyhow::bail!</span>(
-            <span class="string">"Locus format for '{}' is incorrect. It should be 'chr:start[-stop]'."</span>,
+            <span class="string">"Locus format for '{}' is incorrect. It should be 'chr:start-stop', 'chr:start-stop|name', 'chr start stop', or 'chr start stop name'."</span>,
             locus
         );
     }
@@ -240,4 +338,58 @@
 
     reads_urls
 }
+
+<span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_parse_locus() {
+        <span class="comment">// Valid locus without padding
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr1:1000-2000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr1"</span>.to_string(), <span class="number">1000 </span><span class="kw">as </span>u64, <span class="number">2000 </span><span class="kw">as </span>u64, <span class="string">"chr1:1000-2000"</span>.to_string())));
+
+        <span class="comment">// Valid locus with padding
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr2:5000-6000"</span>.to_string(), <span class="number">100</span>);
+        <span class="macro">assert!</span>(result.is_ok());
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr2"</span>.to_string(), <span class="number">4900 </span><span class="kw">as </span>u64, <span class="number">6100 </span><span class="kw">as </span>u64, <span class="string">"chr2:4900-6100"</span>.to_string())));
+
+        <span class="comment">// Valid locus with name
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr3:10000-20000|gene1"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr3"</span>.to_string(), <span class="number">10000 </span><span class="kw">as </span>u64, <span class="number">20000 </span><span class="kw">as </span>u64, <span class="string">"gene1"</span>.to_string())));
+
+        <span class="comment">// Valid locus with commas
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr3:10,000-20,000|gene1"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr3"</span>.to_string(), <span class="number">10000 </span><span class="kw">as </span>u64, <span class="number">20000 </span><span class="kw">as </span>u64, <span class="string">"gene1"</span>.to_string())));
+
+        <span class="comment">// Combination of space and colon separators
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr4 30000-40000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr4"</span>.to_string(), <span class="number">30000 </span><span class="kw">as </span>u64, <span class="number">40000 </span><span class="kw">as </span>u64, <span class="string">"chr4:30000-40000"</span>.to_string())));
+
+        <span class="comment">// Invalid format (non-numeric start position)
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr5:start-50000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(result.is_err());
+
+        <span class="comment">// Invalid format (start position greater than end position)
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr6:60000-50000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(result.is_err());
+
+        <span class="comment">// Valid locus with tab-separated fields
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr7\t70000\t80000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr7"</span>.to_string(), <span class="number">70000 </span><span class="kw">as </span>u64, <span class="number">80000 </span><span class="kw">as </span>u64, <span class="string">"chr7:70000-80000"</span>.to_string())));
+
+        <span class="comment">// Valid locus with tab-separated fields and name
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr8\t90000\t100000\tgene2"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr8"</span>.to_string(), <span class="number">90000 </span><span class="kw">as </span>u64, <span class="number">100000 </span><span class="kw">as </span>u64, <span class="string">"gene2"</span>.to_string())));
+
+        <span class="comment">// Valid locus with mixed tab and colon separators
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr9:110000\t120000"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr9"</span>.to_string(), <span class="number">110000 </span><span class="kw">as </span>u64, <span class="number">120000 </span><span class="kw">as </span>u64, <span class="string">"chr9:110000-120000"</span>.to_string())));
+
+        <span class="comment">// Contig name with dash in it
+        </span><span class="kw">let </span>result = parse_locus(<span class="string">"chr10-A:130000-140000|chr10-A"</span>.to_string(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(result.ok(), <span class="prelude-val">Some</span>((<span class="string">"chr10-A"</span>.to_string(), <span class="number">130000 </span><span class="kw">as </span>u64, <span class="number">140000 </span><span class="kw">as </span>u64, <span class="string">"chr10-A"</span>.to_string())));
+    }
+}
+
 </code></pre></div></section></main></body></html>

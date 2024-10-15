@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_KMER_SIZE"],"enum":["Commands"],"fn":["elapsed_time","main"],"mod":["assemble","build","cluster","coassemble","fetch","filter","impute","rescue","train","trim"],"struct":["Cli"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_KMER_SIZE"],"enum":["Commands"],"fn":["elapsed_time","main"],"mod":["build","cluster","coassemble","correct","fetch","filter","impute","recruit","rescue","train","trim"],"struct":["Cli"]};

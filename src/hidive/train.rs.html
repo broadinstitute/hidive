@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/train.rs`."><title>train.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/train.rs`."><title>train.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c5d6553a23f1e5a6.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0 (eeb90cda1 2024-09-04)" data-channel="1.81.0" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -189,8 +189,48 @@
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
 <a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>num_format::{Locale, ToFormattedString};
 <span class="kw">use </span>rand::SeedableRng;
+<span class="kw">use </span>skydive::mldbg::MLdBG;
+<span class="kw">use </span>skydive::utils::canonicalize_kmer;
+<span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">use </span>gbdt::config::{loss2string, Config, Loss};
@@ -287,9 +327,19 @@
 
     <span class="kw">let </span>t1 = LdBG::from_sequences(String::from(<span class="string">"s1"</span>), kmer_size, <span class="kw-2">&amp;</span>all_truth_seqs);
 
+    <span class="comment">// let m = MLdBG::from_ldbgs(vec![l1.clone(), s1.clone()])
+    //     .collapse()
+    //     .assemble_all();
+
+    </span><span class="kw">let </span>lr_contigs = l1.assemble_all();
+    <span class="kw">let </span>lr_distances = distance_to_a_contig_end(<span class="kw-2">&amp;</span>lr_contigs, kmer_size);
+
+    <span class="kw">let </span>sr_contigs = s1.assemble_all();
+    <span class="kw">let </span>sr_distances = distance_to_a_contig_end(<span class="kw-2">&amp;</span>sr_contigs, kmer_size);
+
     <span class="comment">// Configure GBDT.
     </span><span class="kw">let </span><span class="kw-2">mut </span>cfg = Config::new();
-    cfg.set_feature_size(<span class="number">3</span>);
+    cfg.set_feature_size(<span class="number">7</span>);
     cfg.set_max_depth(<span class="number">4</span>);
     cfg.set_min_leaf_size(<span class="number">1</span>);
     cfg.set_loss(<span class="kw-2">&amp;</span>loss2string(<span class="kw-2">&amp;</span>Loss::BinaryLogitraw));
@@ -322,15 +372,25 @@
     <span class="kw">for </span>kmer <span class="kw">in </span>kmers {
         <span class="kw">let </span>compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
+        <span class="kw">let </span>compressed_len_diff = (kmer.len() - compressed_len) <span class="kw">as </span>f32;
+        <span class="kw">let </span>entropy = skydive::utils::shannon_entropy(kmer);
+        <span class="kw">let </span>gc_content = skydive::utils::gc_content(kmer);
+        <span class="kw">let </span>lr_distance = <span class="kw-2">*</span>lr_distances.get(kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) <span class="kw">as </span>f32;
+        <span class="kw">let </span>sr_distance = <span class="kw-2">*</span>sr_distances.get(kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) <span class="kw">as </span>f32;
+
         <span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |lr| lr.coverage());
         <span class="kw">let </span>scov = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.coverage());
         <span class="kw">let </span>tcov = t1.kmers.get(kmer).map_or(<span class="number">0</span>, |tr| tr.coverage());
 
         <span class="kw">let </span>data = Data::new_training_data(
             <span class="macro">vec!</span>[
-                lcov <span class="kw">as </span>f32,
+                <span class="kw">if </span>lcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},
                 scov <span class="kw">as </span>f32,
-                (kmer.len() - compressed_len) <span class="kw">as </span>f32,
+                compressed_len_diff,
+                entropy,
+                gc_content,
+                lr_distance,
+                sr_distance,
             ],
             <span class="number">1.0</span>,
             <span class="kw">if </span>tcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},
@@ -380,4 +440,17 @@
 
     <span class="macro">skydive::elog!</span>(<span class="string">"Model saved to {}"</span>, output.to_str().unwrap());
 }
-</code></pre></div></section></main></body></html>
+
+<span class="kw">fn </span>distance_to_a_contig_end(contigs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, kmer_size: usize) -&gt; HashMap&lt;Vec&lt;u8&gt;, usize&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>distances = HashMap::new();
+
+    <span class="kw">for </span>contig <span class="kw">in </span>contigs {
+        <span class="kw">for </span>(distance_from_start, cn_kmer) <span class="kw">in </span>contig.windows(kmer_size).map(canonicalize_kmer).enumerate() {
+            <span class="kw">let </span>distance_from_end = contig.len() - distance_from_start - kmer_size;
+
+            distances.insert(cn_kmer, <span class="kw">if </span>distance_from_start &lt; distance_from_end { distance_from_start } <span class="kw">else </span>{ distance_from_end });
+        }
+    }
+
+    distances
+}</code></pre></div></section></main></body></html>

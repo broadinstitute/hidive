@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/stage.rs`."><title>stage.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/stage.rs`."><title>stage.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c5d6553a23f1e5a6.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0 (eeb90cda1 2024-09-04)" data-channel="1.81.0" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -441,6 +441,13 @@
 <a href="#441" id="441">441</a>
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import the Result type from the anyhow crate for error handling.
 </span><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>parquet::data_type::AsBytes;
@@ -578,6 +585,7 @@
     chr: <span class="kw-2">&amp;</span>str,
     start: <span class="kw-2">&amp;</span>u64,
     stop: <span class="kw-2">&amp;</span>u64,
+    name: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span>rg_sm_map = get_rg_to_sm_mapping(bam);
 
@@ -595,7 +603,7 @@
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>),
                 };
 
-                <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{}|{}"</span>, qname, sm);
+                <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{}|{}|{}"</span>, qname, name, sm);
 
                 <span class="kw">if </span>!bmap.contains_key(<span class="kw-2">&amp;</span>seq_name) {
                     bmap.insert(seq_name.to_owned(), String::new());
@@ -665,21 +673,26 @@
     chr: <span class="kw-2">&amp;</span>String,
     start: <span class="kw-2">&amp;</span>u64,
     stop: <span class="kw-2">&amp;</span>u64,
+    name: <span class="kw-2">&amp;</span>String,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
-    <span class="kw">let </span>id = <span class="macro">format!</span>(<span class="string">"{}:{}-{}|{}"</span>, chr, start, stop, basename);
+    <span class="kw">let </span>id = <span class="macro">format!</span>(<span class="string">"{}:{}-{}|{}|{}"</span>, chr, start, stop, name, basename);
     <span class="kw">let </span>seq = fasta
         .fetch_seq_string(chr, <span class="kw-2">*</span>start <span class="kw">as </span>usize, (<span class="kw-2">*</span>stop - <span class="number">1</span>) <span class="kw">as </span>usize)
         .unwrap();
 
-    <span class="kw">let </span>records = <span class="macro">vec!</span>[fasta::Record::with_attrs(id.as_str(), <span class="prelude-val">None</span>, seq.as_bytes())];
+    <span class="kw">if </span>seq.len() &gt; <span class="number">0 </span>{
+        <span class="kw">let </span>records = <span class="macro">vec!</span>[fasta::Record::with_attrs(id.as_str(), <span class="prelude-val">None</span>, seq.as_bytes())];
 
-    <span class="prelude-val">Ok</span>(records)
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(records);
+    }
+
+    <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"No sequence found for locus: {}"</span>, id))
 }
 
 <span class="comment">// Function to stage data from a single file.
 </span><span class="kw">fn </span>stage_data_from_one_file(
     seqs_url: <span class="kw-2">&amp;</span>Url,
-    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
+    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64, String)&gt;,
     unmapped: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>all_seqs = Vec::new();
@@ -702,9 +715,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>bam = open_bam(seqs_url)<span class="question-mark">?</span>;
 
         <span class="comment">// Extract seqs for the current locus.
-        </span><span class="kw">for </span>(chr, start, stop) <span class="kw">in </span>loci.iter() {
+        </span><span class="kw">for </span>(chr, start, stop, name) <span class="kw">in </span>loci.iter() {
             <span class="kw">let </span>aligned_seqs =
-                extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop).unwrap();
+                extract_aligned_bam_reads(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>bam, chr, start, stop, name).unwrap();
             all_seqs.extend(aligned_seqs);
         }
 
@@ -727,9 +740,10 @@
             .to_string();
         <span class="kw">let </span><span class="kw-2">mut </span>fasta = open_fasta(seqs_url)<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>(chr, start, stop) <span class="kw">in </span>loci.iter() {
+        <span class="kw">for </span>(chr, start, stop, name) <span class="kw">in </span>loci.iter() {
             <span class="comment">// Extract seqs for the current locus.
-            </span><span class="kw">let </span>seqs = extract_fasta_seqs(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>fasta, chr, start, stop).unwrap();
+            </span><span class="kw">let </span>seqs = extract_fasta_seqs(<span class="kw-2">&amp;</span>basename, <span class="kw-2">&amp;mut </span>fasta, chr, start, stop, name)
+                .map_or_else(|<span class="kw">_</span>| Vec::new(), |s| s);
 
             <span class="comment">// Extend the all_seqs vector with the seqs from the current locus.
             </span>all_seqs.extend(seqs);
@@ -745,7 +759,7 @@
 <span class="comment">// Function to stage data from multiple BAM files.
 </span><span class="kw">fn </span>stage_data_from_all_files(
     seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;,
-    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
+    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64, String)&gt;,
     unmapped: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;fasta::Record&gt;&gt; {
     <span class="comment">// Use a parallel iterator to process multiple BAM files concurrently.
@@ -783,7 +797,7 @@
 <span class="comment">// Public function to stage data from multiple BAM files and write to an output file.
 </span><span class="kw">pub fn </span>stage_data(
     output_path: <span class="kw-2">&amp;</span>PathBuf,
-    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64)&gt;,
+    loci: <span class="kw-2">&amp;</span>HashSet&lt;(String, u64, u64, String)&gt;,
     seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;,
     unmapped: bool,
     cache_path: <span class="kw-2">&amp;</span>PathBuf,
@@ -838,7 +852,7 @@
         <span class="kw">let </span>seqs_url = Url::parse(
             <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
-        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
+        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>, <span class="string">"test"</span>.to_string())]);
 
         <span class="kw">let </span>result = stage_data_from_one_file(<span class="kw-2">&amp;</span>seqs_url, <span class="kw-2">&amp;</span>loci, <span class="bool-val">false</span>);
 
@@ -850,7 +864,7 @@
         <span class="kw">let </span>cache_path = std::env::temp_dir();
         <span class="kw">let </span>output_path = cache_path.join(<span class="string">"test.bam"</span>);
 
-        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
+        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>, <span class="string">"test"</span>.to_string())]);
         <span class="kw">let </span>seqs_url = Url::parse(
             <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         </span>).unwrap();
@@ -874,7 +888,7 @@
         <span class="kw">let </span>seqs_url_2 = Url::parse(
             <span class="string">"gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         </span>).unwrap();
-        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>)]);
+        <span class="kw">let </span>loci = HashSet::from([(<span class="string">"chr15"</span>.to_string(), <span class="number">23960193</span>, <span class="number">23963918</span>, <span class="string">"test"</span>.to_string())]);
         <span class="kw">let </span>seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         <span class="kw">let </span>result = stage_data(<span class="kw-2">&amp;</span>output_path, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);

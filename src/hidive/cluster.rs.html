@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/cluster.rs`."><title>cluster.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/cluster.rs`."><title>cluster.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c5d6553a23f1e5a6.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0 (eeb90cda1 2024-09-04)" data-channel="1.81.0" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -60,104 +60,66 @@
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
 <a href="#62" id="62">62</a>
-<a href="#63" id="63">63</a>
-<a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a>
-<a href="#67" id="67">67</a>
-<a href="#68" id="68">68</a>
-<a href="#69" id="69">69</a>
-<a href="#70" id="70">70</a>
-<a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a>
-<a href="#75" id="75">75</a>
-<a href="#76" id="76">76</a>
-<a href="#77" id="77">77</a>
-<a href="#78" id="78">78</a>
-<a href="#79" id="79">79</a>
-<a href="#80" id="80">80</a>
-<a href="#81" id="81">81</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
-</span><span class="kw">use </span>std::collections::HashMap;
+</span><span class="kw">use </span>std::collections::{HashMap, HashSet};
 <span class="kw">use </span>std::io::Write;
 <span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">use </span>bio::io::fasta::{Reader, Record};
+<span class="kw">use </span>needletail::Sequence;
+
+<span class="kw">use </span>gaoya::minhash::{MinHashIndex, MinHasher, MinHasher32};
+
 <span class="comment">// Import the skydive module, which contains the necessary functions for building graphs
 // use skydive;
 
-</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, k: usize, fasta_path: <span class="kw-2">&amp;</span>PathBuf) {
+</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, k: usize, jaccard_threshold: f64, fasta_path: <span class="kw-2">&amp;</span>PathBuf) {
     <span class="comment">// Read the reads records (name and sequence) into a vector.
     </span><span class="kw">let </span>reader = Reader::from_file(fasta_path).unwrap();
     <span class="kw">let </span>all_reads: Vec&lt;Record&gt; = reader.records().map(|r| r.unwrap()).collect();
 
     <span class="comment">// Get and store sample name.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>sample_names = HashMap::new();
-    <span class="kw">let </span><span class="kw-2">mut </span>sample_index = <span class="number">0</span>;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>sample_names = Vec::new();
     <span class="kw">for </span>record <span class="kw">in </span><span class="kw-2">&amp;</span>all_reads {
         <span class="kw">let </span>id = record.id().to_string();
         <span class="kw">let </span>v: Vec&lt;String&gt; = id.split(<span class="string">'|'</span>).map(|s| s.to_string()).collect();
 
-        <span class="kw">if </span>!sample_names.contains_key(<span class="kw-2">&amp;</span>v[<span class="number">1</span>]) {
-            sample_names.insert(v[<span class="number">1</span>].clone(), sample_index);
-            sample_index += <span class="number">1</span>;
-        }
+        <span class="comment">// sample_names.push(v[1].clone());
+        </span>sample_names.push(id);
     }
 
-    <span class="comment">// Create a HashMap to store the k-mer presence/absence matrix.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>kmer_matrix: HashMap&lt;String, Vec&lt;bool&gt;&gt; = HashMap::new();
-
     <span class="comment">// Iterate over all reads.
-    </span><span class="kw">for </span>record <span class="kw">in </span><span class="kw-2">&amp;</span>all_reads {
-        <span class="comment">// Get the sample index of the current read.
-        </span><span class="kw">let </span>id = record.id().to_string();
-        <span class="kw">let </span>v: Vec&lt;String&gt; = id.split(<span class="string">'|'</span>).map(|s| s.to_string()).collect();
-        <span class="kw">let </span>sample_index = <span class="kw-2">*</span>sample_names.get(<span class="kw-2">&amp;</span>v[<span class="number">1</span>]).unwrap();
+    </span><span class="kw">let </span>sequences: Vec&lt;String&gt; = all_reads
+        .iter()
+        .map(|record| String::from_utf8_lossy(record.seq()).to_string().to_uppercase())
+        .collect();
 
-        <span class="comment">// Get the sequence of the current read.
-        </span><span class="kw">let </span>sequence = String::from_utf8_lossy(record.seq()).to_string();
-
-        <span class="comment">// Iterate over the sequence with a sliding window of size k.
-        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..sequence.len() - k + <span class="number">1 </span>{
-            <span class="comment">// Get the current k-mer.
-            </span><span class="kw">let </span>kmer = <span class="kw-2">&amp;</span>sequence[i..i + k];
-
-            <span class="comment">// Check if the k-mer is already in the matrix.
-            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(presence_vector) = kmer_matrix.get_mut(kmer) {
-                <span class="comment">// If the k-mer is already in the matrix, add a presence (true) for the current read.
-                </span>presence_vector[sample_index] = <span class="bool-val">true</span>;
-            } <span class="kw">else </span>{
-                <span class="comment">// If the k-mer is not in the matrix, create a new presence vector for it.
-                </span><span class="kw">let </span><span class="kw-2">mut </span>presence_vector = <span class="macro">vec!</span>[<span class="bool-val">false</span>; sample_names.len()];
-                presence_vector[sample_index] = <span class="bool-val">true</span>;
-                kmer_matrix.insert(kmer.to_string(), presence_vector);
-            }
-        }
+    <span class="kw">let </span>(num_bands, band_width) = (<span class="number">42</span>, <span class="number">3</span>);
+    <span class="kw">let </span>minhasher = MinHasher32::new(num_bands * band_width);
+    <span class="kw">let </span><span class="kw-2">mut </span>index = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
+    <span class="kw">for </span>(i, doc) <span class="kw">in </span>sequences.iter().enumerate() {
+        index.insert(i, minhasher.create_signature(doc.as_bytes().kmers(k <span class="kw">as </span>u8)));
     }
 
     <span class="comment">// Open a new file to write the k-mer matrix to.
     </span><span class="kw">let </span>file = std::fs::File::create(output).unwrap();
     <span class="kw">let </span><span class="kw-2">mut </span>writer = std::io::BufWriter::new(<span class="kw-2">&amp;</span>file);
 
-    <span class="comment">// Write the header row (sample names).
-    </span><span class="kw">let </span>header = sample_names.keys().cloned().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;().join(<span class="string">","</span>);
-    writer.write_all(<span class="string">b"kmer,"</span>).unwrap();
-    writer.write_all(header.as_bytes()).unwrap();
-    writer.write_all(<span class="string">b"\n"</span>).unwrap();
+    <span class="kw">let </span><span class="kw-2">mut </span>used = HashSet::new();
+    <span class="kw">for </span>(i, sequence) <span class="kw">in </span>sequences.iter().enumerate() {
+        <span class="kw">if </span>used.contains(<span class="kw-2">&amp;</span>i) {
+            <span class="kw">continue</span>;
+        }
 
-    <span class="comment">// Write the presence/absence matrix.
-    </span><span class="kw">for </span>(kmer, presence_vector) <span class="kw">in </span><span class="kw-2">&amp;</span>kmer_matrix {
-        <span class="kw">let </span>row_str = presence_vector
-            .iter()
-            .map(|b| <span class="kw">if </span><span class="kw-2">*</span>b { <span class="string">"1" </span>} <span class="kw">else </span>{ <span class="string">"0" </span>})
-            .collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;()
-            .join(<span class="string">","</span>);
-        writer.write_all(kmer.as_bytes()).unwrap();
-        writer.write_all(<span class="string">b","</span>).unwrap();
-        writer.write_all(row_str.as_bytes()).unwrap();
-        writer.write_all(<span class="string">b"\n"</span>).unwrap();
+        <span class="kw">let </span>indices = index.query_owned(<span class="kw-2">&amp;</span>minhasher.create_signature(sequence.as_bytes().kmers(k <span class="kw">as </span>u8)));
+
+        <span class="comment">// println!("{} {:?}", sample_names[i], a);
+        </span><span class="kw">for </span>index <span class="kw">in </span>indices {
+            <span class="comment">// println!("&gt;cluster_{}_sequence_{}\n{}", i, index, sequences[index]);
+            </span><span class="kw">let _ </span>= <span class="macro">writeln!</span>(writer, <span class="string">"&gt;cluster{}_sequence{}\n{}"</span>, i, index, sequences[index]);
+
+            used.insert(index);
+        }
     }
 }
 </code></pre></div></section></main></body></html>

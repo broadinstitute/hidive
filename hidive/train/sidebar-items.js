@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["start"]};
+window.SIDEBAR_ITEMS = {"fn":["distance_to_a_contig_end","start"]};

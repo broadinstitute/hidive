@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"macro":["elog"],"mod":["agg","edges","env","ldbg","link","mldbg","parse","record","stage","storage_gcs","storage_local","utils"]};
+window.SIDEBAR_ITEMS = {"macro":["elog"],"mod":["agg","edges","env","ldbg","link","mldbg","parse","record","stage","storage_gcs","storage_local","utils","wmec"]};

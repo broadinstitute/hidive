@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/coassemble.rs`."><title>coassemble.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/coassemble.rs`."><title>coassemble.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c5d6553a23f1e5a6.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0 (eeb90cda1 2024-09-04)" data-channel="1.81.0" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -166,172 +166,362 @@
 <a href="#166" id="166">166</a>
 <a href="#167" id="167">167</a>
 <a href="#168" id="168">168</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
-<span class="kw">use </span>std::path::PathBuf;
-<span class="kw">use </span>std::{
-    fs::File,
-    io::{BufWriter, Write},
-};
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::BTreeMap;
+<span class="kw">use </span>std::{fs::File, path::PathBuf, io::Write};
 
-<span class="kw">use </span>gbdt::config::{loss2string, Config, Loss};
-<span class="kw">use </span>gbdt::decision_tree::{Data, DataVec};
-<span class="kw">use </span>gbdt::gradient_boost::GBDT;
-
-<span class="kw">use </span>needletail::Sequence;
-<span class="kw">use </span>parquet::data_type::AsBytes;
-<span class="kw">use </span>petgraph::dot::Dot;
+<span class="kw">use </span>itertools::Itertools;
+<span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>indicatif::ParallelProgressIterator;
 
 <span class="kw">use </span>skydive::ldbg::LdBG;
 <span class="kw">use </span>skydive::mldbg::MLdBG;
+
+<span class="kw">use </span>skydive::wmec::<span class="kw-2">*</span>;
+<span class="kw">use </span>spoa::AlignmentType;
 
 <span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
     kmer_size: usize,
     model_path: <span class="kw-2">&amp;</span>PathBuf,
-    long_read_fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
-    short_read_fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
+    reference_fasta_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
+    long_read_fasta_path: PathBuf,
+    short_read_fasta_path: PathBuf,
 ) {
-    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(long_read_fasta_paths);
-    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
-
-    <span class="kw">let </span>m = MLdBG::new(kmer_size);
+    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[long_read_fasta_path.clone()]);
+    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[short_read_fasta_path.clone()]);
+    <span class="kw">let </span>reference_seq_urls = skydive::parse::parse_file_names(reference_fasta_paths);
 
     <span class="comment">// Read all long reads.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read samples {:?}..."</span>, long_read_seq_urls);
-    <span class="comment">// let l1 = LdBG::from_files(String::from("l1"), kmer_size, &amp;long_read_fasta_paths);
-    
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read samples {:?}..."</span>, long_read_seq_urls.iter().map(|url| url.as_str()).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;());
+    <span class="kw">let </span>all_lr_seqs = skydive::utils::read_fasta(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[long_read_fasta_path.clone()]);
 
-    // Read all short reads.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read samples {:?}..."</span>, short_read_seq_urls);
-    <span class="kw">let </span>s1 = LdBG::from_files(String::from(<span class="string">"s1"</span>), kmer_size, <span class="kw-2">&amp;</span>short_read_fasta_paths);
+    <span class="comment">// Read all short reads.
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read samples {:?}..."</span>, short_read_seq_urls.iter().map(|url| url.as_str()).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;());
+    <span class="kw">let </span>all_sr_seqs = skydive::utils::read_fasta(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[short_read_fasta_path]);
 
-    <span class="comment">/*
-    // Union of kmers from l1 and s1.
-    let kmers: HashSet&lt;_&gt; = l1.kmers.keys().chain(s1.kmers.keys()).cloned().collect();
-    for kmer in kmers {
-        let lr = l1.kmers.get(&amp;kmer);
-        let sr = s1.kmers.get(&amp;kmer);
+    <span class="comment">// Read all reference subsequences.
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing reference {:?}..."</span>, reference_seq_urls.iter().map(|url| url.as_str()).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;());
+    <span class="kw">let </span>all_ref_seqs = skydive::utils::read_fasta(reference_fasta_paths);
 
-        if lr.is_none() &amp;&amp; sr.is_some() {
-            s1.remove(&amp;kmer);
-        }
+    <span class="kw">let </span>l1 = LdBG::from_sequences(<span class="string">"lr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>all_lr_seqs);
+    <span class="kw">let </span>s1 = LdBG::from_sequences(<span class="string">"sr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>all_sr_seqs);
+
+    <span class="kw">let </span>m = MLdBG::from_ldbgs(<span class="macro">vec!</span>[l1, s1])
+        .score_kmers(model_path)
+        .collapse()
+        .clean(<span class="number">0.2</span>, <span class="number">0.01</span>)
+        .build_links(<span class="kw-2">&amp;</span>all_lr_seqs, <span class="bool-val">true</span>);
+
+    <span class="macro">skydive::elog!</span>(<span class="string">"Built MLdBG with {} k-mers."</span>, m.kmers.len());
+
+    <span class="kw">let </span>progress_bar = skydive::utils::default_bounded_progress_bar(<span class="string">"Correcting reads"</span>, all_lr_seqs.len() <span class="kw">as </span>u64);
+
+    <span class="kw">let </span>corrected_seqs =
+        all_lr_seqs
+        .par_iter()
+        .progress_with(progress_bar)
+        .map(|seq| m.correct_seq(seq))
+        .flatten()
+        .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+
+    <span class="comment">// let contigs = m.assemble_at_bubbles();
+
+    // let mut fa_file = File::create(&amp;output).unwrap();
+    // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
+    //     let _ = writeln!(fa_file, "&gt;contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    // }
+
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"Assembling diplotypes..."</span>);
+
+    <span class="kw">let </span><span class="kw-2">mut </span>la = spoa::AlignmentEngine::new(AlignmentType::kSW, <span class="number">5</span>, -<span class="number">10</span>, -<span class="number">16</span>, -<span class="number">12</span>, -<span class="number">20</span>, -<span class="number">8</span>);
+
+    <span class="kw">let </span><span class="kw-2">mut </span>sg = spoa::Graph::new();
+    <span class="kw">for </span>lr_seq <span class="kw">in </span>all_ref_seqs.iter().chain(corrected_seqs.iter()) {
+        <span class="kw">let </span>seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
+        <span class="kw">let </span>seq_qual = std::ffi::CString::new(<span class="macro">vec!</span>[<span class="string">b'I'</span>; lr_seq.len()]).unwrap();
+        <span class="kw">let </span>a = la.align(seq_cstr.as_ref(), <span class="kw-2">&amp;</span>sg);
+
+        sg.add_alignment(<span class="kw-2">&amp;</span>a, seq_cstr.as_ref(), seq_qual.as_ref());
     }
 
-    // Filter out the irrelevant short reads.
-    let filtered_sr_seqs = &amp;all_sr_seqs
+    <span class="kw">let </span>msa_cstrs = sg.multiple_sequence_alignment(<span class="bool-val">false</span>);
+    <span class="kw">let </span>msa_strings = msa_cstrs
         .iter()
-        .cloned()
-        .filter(|read| {
-            let num_contained = read
-                .windows(kmer_size)
-                .filter(|kmer| {
-                    s1.kmers
-                        .contains_key(&amp;skydive::ldbg::LdBG::canonicalize_kmer(kmer))
-                })
-                .count();
-
-            num_contained == read.len() - kmer_size + 1
+        .map(|cstr| cstr.to_str().unwrap().to_string())
+        .map(|msa_string| {
+            <span class="kw">let </span>leading_dashes = msa_string.chars().take_while(|<span class="kw-2">&amp;</span>c| c == <span class="string">'-'</span>).count();
+            <span class="kw">let </span>trailing_dashes = msa_string.chars().rev().take_while(|<span class="kw-2">&amp;</span>c| c == <span class="string">'-'</span>).count();
+            <span class="kw">let </span>middle = <span class="kw-2">&amp;</span>msa_string[leading_dashes..msa_string.len() - trailing_dashes];
+            <span class="macro">format!</span>(<span class="string">"{}{}{}"</span>, 
+                <span class="string">" "</span>.repeat(leading_dashes), 
+                middle, 
+                <span class="string">" "</span>.repeat(trailing_dashes)
+            )
         })
-        .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+        .collect::&lt;Vec&lt;String&gt;&gt;();
 
-    // Report some stats.
-    skydive::elog!("Long reads: {}", &amp;all_lr_seqs.len());
-    skydive::elog!("Short reads (before filtering): {}", &amp;all_sr_seqs.len());
-    skydive::elog!("Short reads (after filtering): {}", &amp;filtered_sr_seqs.len());
+    <span class="comment">// for msa_string in &amp;msa_strings {
+    //     println!("{}", msa_string);
+    // }
 
-    let all_seqs = &amp;all_lr_seqs
-        .into_iter()
-        .chain(filtered_sr_seqs.iter().cloned())
-        .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
-    skydive::elog!("Combined reads: {}", &amp;all_seqs.len());
+    </span><span class="kw">let </span>matrix = create_read_allele_matrix(<span class="kw-2">&amp;</span>msa_strings);
+    <span class="kw">let </span>wmec = create_wmec_matrix(<span class="kw-2">&amp;</span>matrix);
 
-    // Assemble contigs.
-    let mut l3 = LdBG::from_sequences(String::from("l3"), kmer_size, &amp;all_seqs);
+    <span class="kw">let </span>(h1, <span class="kw">_</span>) = skydive::wmec::phase(<span class="kw-2">&amp;</span>wmec);
+    <span class="kw">let </span>(hap1, hap2) = create_fully_phased_haplotypes(<span class="kw-2">&amp;</span>msa_strings, <span class="kw-2">&amp;</span>h1);
 
-    // Filter k-mers.
-    let mut eval_data: DataVec = Vec::new();
-    let graph_kmers = &amp;l3.kmers.keys().cloned().collect::&lt;Vec&lt;_&gt;&gt;();
-    for kmer in graph_kmers {
-        let lcov = l1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let scov = s1.kmers.get(kmer).map_or(0, |record| record.coverage());
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+    <span class="kw">let </span><span class="kw-2">mut </span>output = File::create(output).expect(<span class="string">"Failed to create output file"</span>);
+    <span class="macro">writeln!</span>(output, <span class="string">"&gt;hap1"</span>).expect(<span class="string">"Failed to write to output file"</span>);
+    <span class="macro">writeln!</span>(output, <span class="string">"{}"</span>, hap1.replace(<span class="string">"-"</span>, <span class="string">""</span>)).expect(<span class="string">"Failed to write to output file"</span>);
+    <span class="macro">writeln!</span>(output, <span class="string">"&gt;hap2"</span>).expect(<span class="string">"Failed to write to output file"</span>);
+    <span class="macro">writeln!</span>(output, <span class="string">"{}"</span>, hap2.replace(<span class="string">"-"</span>, <span class="string">""</span>)).expect(<span class="string">"Failed to write to output file"</span>);
+}
 
-        let data = Data::new_training_data(
-            vec![
-                lcov as f32,
-                scov as f32,
-                (kmer.len() - compressed_len) as f32,
-            ],
-            1.0,
-            0.0,
-            None,
-        );
+<span class="kw">fn </span>create_fully_phased_haplotypes(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, h1: <span class="kw-2">&amp;</span>Vec&lt;u8&gt;) -&gt; (String, String) {
+    <span class="kw">let </span><span class="kw-2">mut </span>index1 = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>hap_index = <span class="number">0</span>;
 
-        eval_data.push(data);
-    }
+    <span class="kw">let </span><span class="kw-2">mut </span>hap1 = String::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>hap2 = String::new();
 
-    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
-    let predictions = gbdt.predict(&amp;eval_data);
-    let mut num_below_threshold = 0;
-    let mut num_total = 0;
+    <span class="kw">while </span>index1 &lt; lr_msas[<span class="number">0</span>].len() {
+        <span class="kw">let </span>combined_base_counts = allele_counts(lr_msas, index1, index1+<span class="number">1</span>);
+        <span class="comment">// let bases = allele_indices(lr_msas, index1, index1+1);
 
-    for (p, cn_kmer) in predictions.iter().zip(graph_kmers.iter()) {
-        l3.scores.insert(cn_kmer.clone(), p.clamp(0.0, 1.0));
+        </span><span class="kw">if </span>combined_base_counts.len() == <span class="number">0 </span>{
+            index1 += <span class="number">1</span>;
+        } <span class="kw">else if </span>combined_base_counts.len() == <span class="number">1 </span>{
+            <span class="kw">let </span>base = combined_base_counts.keys().next().unwrap();
+            hap1.push(base.chars().next().unwrap());
+            hap2.push(base.chars().next().unwrap());
 
-        if *p &lt; 0.5 {
-            num_below_threshold += 1;
+            index1 += <span class="number">1</span>;
+        } <span class="kw">else </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>index2 = index1;
+            <span class="kw">let </span><span class="kw-2">mut </span>allele_base_counts = allele_counts(lr_msas, index2, index2+<span class="number">1</span>);
+
+            <span class="kw">while </span>index2 &lt; lr_msas[<span class="number">0</span>].len() &amp;&amp; allele_base_counts.len() &gt; <span class="number">1 </span>{
+                index2 += <span class="number">1</span>;
+                allele_base_counts = allele_counts(lr_msas, index2, index2+<span class="number">1</span>);
+            }
+
+            <span class="kw">let </span>allele_counts = allele_counts(lr_msas, index1, index2)
+                .into_iter()
+                .sorted_by(|a, b| b.<span class="number">1</span>.cmp(<span class="kw-2">&amp;</span>a.<span class="number">1</span>))
+                .take(<span class="number">2</span>)
+                .collect::&lt;BTreeMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
+
+            <span class="kw">if </span>allele_counts.len() == <span class="number">1 </span>{
+                <span class="kw">for </span>(allele, <span class="kw">_</span>) <span class="kw">in </span>allele_counts {
+                    hap1.extend(allele.chars());
+                    hap2.extend(allele.chars());
+                }
+            } <span class="kw">else </span>{
+                <span class="comment">// let alleles = get_allele_indices(lr_msas, sr_msas, index1, index2);
+
+                </span><span class="kw">if </span>hap_index &lt; h1.len() {
+                    <span class="kw">let </span><span class="kw-2">mut </span>phase = h1[hap_index] == <span class="number">1</span>;
+                    <span class="kw">for </span>(allele, <span class="kw">_</span>) <span class="kw">in </span>allele_counts {
+                        <span class="kw">if </span>!phase {
+                            hap1.extend(allele.chars());
+                        } <span class="kw">else </span>{
+                            hap2.extend(allele.chars());
+                        }
+
+                        phase = !phase;
+                    }
+
+                    hap_index += <span class="number">1</span>;
+                }
+            }
+
+            index1 = index2;
         }
-        num_total += 1;
     }
 
-    let (cleaned_kmers, cleaned_paths) = l3.clean_paths(0.4);
-    let (cleaned_tips_kmers, cleaned_tips_paths) = l3.clean_tips(2 * kmer_size);
+    (hap1, hap2)
+}
 
-    skydive::elog!(
-        "K-mers with p &lt; 0.5: {} / {} ({:.2}%)",
-        num_below_threshold,
-        num_total,
-        num_below_threshold as f32 / num_total as f32 * 100.0
-    );
-    skydive::elog!(
-        "Removed {} k-mers in {} paths",
-        cleaned_kmers,
-        cleaned_paths
-    );
-    skydive::elog!(
-        "Removed {} k-mers in {} tips",
-        cleaned_tips_kmers,
-        cleaned_tips_paths
-    );
+<span class="kw">fn </span>create_wmec_matrix(matrix: <span class="kw-2">&amp;</span>Vec&lt;BTreeMap&lt;usize, String&gt;&gt;) -&gt; WMECData {
+    <span class="kw">let </span>num_snps = matrix.len();
+    <span class="kw">let </span>num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) + <span class="number">1</span>).max().unwrap_or(<span class="number">0</span>);
 
-    let mut all_corrected_seqs = Vec::new();
-    for lr_seq in all_seqs {
-        let corrected_seqs = l3.correct_seq(lr_seq);
+    <span class="kw">let </span><span class="kw-2">mut </span>reads = <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="prelude-val">None</span>; num_snps]; num_reads];
+    <span class="kw">let </span><span class="kw-2">mut </span>confidences = <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="prelude-val">None</span>; num_snps]; num_reads];
 
-        all_corrected_seqs.extend(corrected_seqs);
+    <span class="kw">for </span>(snp_idx, column) <span class="kw">in </span>matrix.iter().enumerate() {
+        <span class="kw">for </span>(<span class="kw-2">&amp;</span>read_idx, allele) <span class="kw">in </span>column {
+            reads[read_idx][snp_idx] = <span class="prelude-val">Some</span>(allele.parse::&lt;u8&gt;().unwrap());
+            confidences[read_idx][snp_idx] = <span class="prelude-val">Some</span>(<span class="number">32</span>);
+        }
     }
 
-    skydive::elog!("Corrected sequences: {}", all_corrected_seqs.len());
+    WMECData::new(reads, confidences)
+}
 
-    // Assemble contigs.
-    l3.links = LdBG::build_links(kmer_size, &amp;all_corrected_seqs, &amp;l3.kmers);
-    let contigs = l3.assemble_all();
+<span class="kw">fn </span>create_read_allele_matrix(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;) -&gt; Vec&lt;BTreeMap&lt;usize, String&gt;&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>matrix = Vec::new();
 
-    // Write contigs to disk.
-    skydive::elog!("Writing {} contigs to disk...", &amp;contigs.len());
+    <span class="kw">let </span><span class="kw-2">mut </span>index1 = <span class="number">0</span>;
+    <span class="kw">while </span>index1 &lt; lr_msas[<span class="number">0</span>].len() {
+        <span class="kw">let </span>combined_base_counts = allele_counts(lr_msas, index1, index1+<span class="number">1</span>);
 
-    let output_file = File::create(output).unwrap();
-    let mut writer = BufWriter::new(output_file);
+        <span class="kw">if </span>combined_base_counts.len() &gt; <span class="number">1 </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>index2 = index1;
+            <span class="kw">let </span><span class="kw-2">mut </span>allele_base_counts = allele_counts(lr_msas, index2, index2+<span class="number">1</span>);
 
-    for (i, contig) in contigs.iter().enumerate() {
-        writeln!(
-            writer,
-            "&gt;contig_{}\n{}",
-            i,
-            String::from_utf8(contig.clone()).unwrap()
-        )
-        .unwrap();
+            <span class="kw">while </span>index2 &lt; lr_msas[<span class="number">0</span>].len() &amp;&amp; allele_base_counts.len() &gt; <span class="number">1 </span>{
+                index2 += <span class="number">1</span>;
+                allele_base_counts = allele_counts(lr_msas, index2, index2+<span class="number">1</span>);
+            }
+
+            <span class="kw">let </span>allele_counts = allele_counts(lr_msas, index1, index2)
+                .into_iter()
+                .sorted_by(|a, b| b.<span class="number">1</span>.cmp(<span class="kw-2">&amp;</span>a.<span class="number">1</span>))
+                .take(<span class="number">2</span>)
+                .collect::&lt;BTreeMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
+
+            <span class="comment">// println!("{} {} {:?}", index1, index2, allele_counts);
+
+            </span><span class="kw">if </span>allele_counts.len() == <span class="number">2 </span>{
+                <span class="kw">let </span><span class="kw-2">mut </span>column = BTreeMap::new();
+
+                <span class="kw">let </span>alleles = allele_indices(lr_msas, index1, index2);
+
+                <span class="kw">let </span><span class="kw-2">mut </span>allele_index = <span class="number">0</span>;
+                <span class="kw">for </span>(allele, <span class="kw">_</span>) <span class="kw">in </span><span class="kw-2">&amp;</span>allele_counts {
+                    alleles.iter().enumerate().for_each(|(i, a)| {
+                        <span class="kw">if </span><span class="kw-2">*</span>a == <span class="kw-2">*</span>allele {
+                            <span class="comment">// column.insert(i, allele.clone());
+                            </span>column.insert(i, String::from(allele_index.to_string()));
+                        }
+                    });
+
+                    allele_index += <span class="number">1</span>;
+                }
+
+                matrix.push(column);
+            }
+
+            index1 = index2;
+        } <span class="kw">else </span>{
+            index1 += <span class="number">1</span>;
+        }
     }
-    */
-</span>}
+
+    matrix
+}
+
+<span class="kw">fn </span>allele_indices(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, index1: usize, index2: usize) -&gt; Vec&lt;String&gt; {
+    <span class="kw">let </span>alleles = lr_msas.iter()
+        .map(|msa| msa[index1..index2].to_string().replace(<span class="string">" "</span>, <span class="string">""</span>))
+        .collect::&lt;Vec&lt;String&gt;&gt;();
+    alleles
+}
+
+<span class="kw">fn </span>allele_counts(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, index1: usize, index2: usize) -&gt; BTreeMap&lt;String, i32&gt; {
+    <span class="kw">let </span>combined_allele_counts = lr_msas.iter()
+        .map(|msa| msa[index1..index2].to_string().replace(<span class="string">" "</span>, <span class="string">""</span>))
+        .filter(|allele| allele.len() &gt; <span class="number">0</span>)
+        .fold(BTreeMap::new(), |<span class="kw-2">mut </span>counts, base| {
+            <span class="kw-2">*</span>counts.entry(base).or_insert(<span class="number">0</span>) += <span class="number">1</span>;
+            counts
+        });
+    combined_allele_counts
+}
 </code></pre></div></section></main></body></html>
