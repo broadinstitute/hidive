@@ -15,11 +15,7 @@ use rayon::prelude::*;
 use minimap2::Aligner;
 use tempfile::NamedTempFile;
 
-pub fn start(
-    output: &PathBuf,
-    gfa_path: &PathBuf,
-    short_read_fasta_paths: &Vec<PathBuf>,
-) {
+pub fn start(output: &PathBuf, gfa_path: &PathBuf, short_read_fasta_paths: &Vec<PathBuf>) {
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_fasta_paths);
 
     let g = skydive::utils::read_gfa(gfa_path).unwrap();
@@ -35,11 +31,17 @@ pub fn start(
 
         for (index, node) in g.node_indices().enumerate() {
             let node_str = format!(">contig_{}\n{}\n", index, g[node]);
-            writer.write_all(node_str.as_bytes()).expect("Failed to write to temporary file");
+            writer
+                .write_all(node_str.as_bytes())
+                .expect("Failed to write to temporary file");
         }
     }
 
-    skydive::elog!("Wrote {} nodes to temporary file: {:?}", g.node_count(), temp_path);
+    skydive::elog!(
+        "Wrote {} nodes to temporary file: {:?}",
+        g.node_count(),
+        temp_path
+    );
 
     let aligner = Aligner::builder()
         .short()
@@ -122,7 +124,12 @@ pub fn start(
         // Write filtered short read sequences to output
         let mut writer = std::io::BufWriter::new(std::fs::File::create(output).unwrap());
         for (i, seq) in filtered_sr_seqs.iter().enumerate() {
-            let _ = writeln!(writer, ">filtered_read_{}\n{}", i, String::from_utf8(seq.to_vec()).unwrap());
+            let _ = writeln!(
+                writer,
+                ">filtered_read_{}\n{}",
+                i,
+                String::from_utf8(seq.to_vec()).unwrap()
+            );
         }
 
         // Final update to ensure the last counts are displayed

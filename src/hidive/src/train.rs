@@ -1,5 +1,8 @@
 use num_format::{Locale, ToFormattedString};
 use rand::SeedableRng;
+use skydive::mldbg::MLdBG;
+use skydive::utils::canonicalize_kmer;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -16,6 +19,7 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     iterations: usize,
+    test_split: f32,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
@@ -43,6 +47,16 @@ pub fn start(
     let all_truth_seqs: Vec<Vec<u8>> = process_reads(&truth_seq_urls, "truth");
     let t1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_truth_seqs);
 
+    // let m = MLdBG::from_ldbgs(vec![l1.clone(), s1.clone()])
+    //     .collapse()
+    //     .assemble_all();
+
+    let lr_contigs = l1.assemble_all();
+    let lr_distances = distance_to_a_contig_end(&lr_contigs, kmer_size);
+
+    let sr_contigs = s1.assemble_all();
+    let sr_distances = distance_to_a_contig_end(&sr_contigs, kmer_size);
+
     // Read all test long reads.
     let all_test_lr_seqs: Vec<Vec<u8>> = process_reads(&test_long_read_seq_urls, "test long");
     let test_l1 = LdBG::from_sequences(String::from("test_l1"), kmer_size, &all_test_lr_seqs);
@@ -57,7 +71,7 @@ pub fn start(
 
     // Configure GBDT.
     let mut cfg = Config::new();
-    cfg.set_feature_size(3);
+    cfg.set_feature_size(7);
     cfg.set_max_depth(4);
     cfg.set_min_leaf_size(1);
     cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
@@ -90,15 +104,25 @@ pub fn start(
     for kmer in kmers {
         let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
+        let compressed_len_diff = (kmer.len() - compressed_len) as f32;
+        let entropy = skydive::utils::shannon_entropy(kmer);
+        let gc_content = skydive::utils::gc_content(kmer);
+        let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
+        let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
+
         let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
         let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
         let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
 
         let data = Data::new_training_data(
             vec![
-                lcov as f32,
+                if lcov > 0 { 1.0 } else { 0.0 },
                 scov as f32,
-                (kmer.len() - compressed_len) as f32,
+                compressed_len_diff,
+                entropy,
+                gc_content,
+                lr_distance,
+                sr_distance,
             ],
             1.0,
             if tcov > 0 { 1.0 } else { 0.0 },
@@ -197,6 +221,19 @@ pub fn start(
     skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }
 
+fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
+    let mut distances = HashMap::new();
+
+    for contig in contigs {
+        for (distance_from_start, cn_kmer) in contig.windows(kmer_size).map(canonicalize_kmer).enumerate() {
+            let distance_from_end = contig.len() - distance_from_start - kmer_size;
+
+            distances.insert(cn_kmer, if distance_from_start < distance_from_end { distance_from_start } else { distance_from_end });
+        }
+    }
+
+    distances
+}
 pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<u8>>{
     let mut all_seqs: Vec<Vec<u8>> = Vec::new();
     for read_seq_url in read_seq_urls {

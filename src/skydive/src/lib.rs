@@ -10,6 +10,8 @@ pub mod agg;
 
 pub mod mldbg;
 
+pub mod wmec;
+
 pub mod env;
 pub mod parse;
 pub mod utils;

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 
 use needletail::Sequence;
@@ -48,6 +48,25 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     }
 
     basename
+}
+
+pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
+    paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>()
+}
+
+pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
+    indicatif::ProgressBar::hidden()
 }
 
 pub fn default_bounded_progress_bar(
@@ -114,6 +133,25 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
+pub fn shannon_entropy(seq: &[u8]) -> f32 {
+    let mut freq = HashMap::new();
+    let len = seq.len() as f32;
+
+    for &base in seq {
+        *freq.entry(base).or_insert(0) += 1;
+    }
+
+    -freq.values().map(|&count| {
+        let p = count as f32 / len;
+        p * p.log2()
+    }).sum::<f32>()
+}
+
+pub fn gc_content(seq: &[u8]) -> f32 {
+    let gc_count = seq.iter().filter(|&&base| base == b'G' || base == b'C').count();
+    gc_count as f32 / seq.len() as f32
+}
+
 pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
@@ -151,13 +189,18 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                 node_map.insert(id.to_string(), node_index);
             },
             "L" => {
+                if fields.len() < 6 {
+                    continue; // Skip malformed lines
+                }
                 let from_id = fields[1];
+                // let from_orient = fields[2];
                 let to_id = fields[3];
-                let weight = fields[5]
-                    .split(':')
-                    .last()
+                // let to_orient = fields[4];
+
+                let weight = fields.get(5)
+                    .and_then(|s| s.split(':').last())
                     .and_then(|s| s.parse::<f32>().ok())
-                    .unwrap_or(1.0) / 100.0;
+                    .unwrap_or(1.0);
 
                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
                     graph.add_edge(from, to, weight);
