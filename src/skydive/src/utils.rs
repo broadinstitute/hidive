@@ -189,13 +189,18 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                 node_map.insert(id.to_string(), node_index);
             },
             "L" => {
+                if fields.len() < 6 {
+                    continue; // Skip malformed lines
+                }
                 let from_id = fields[1];
+                // let from_orient = fields[2];
                 let to_id = fields[3];
-                let weight = fields[5]
-                    .split(':')
-                    .last()
+                // let to_orient = fields[4];
+
+                let weight = fields.get(5)
+                    .and_then(|s| s.split(':').last())
                     .and_then(|s| s.parse::<f32>().ok())
-                    .unwrap_or(1.0) / 100.0;
+                    .unwrap_or(1.0);
 
                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
                     graph.add_edge(from, to, weight);
