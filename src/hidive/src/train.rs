@@ -1,17 +1,16 @@
-use std::collections::HashSet;
 use num_format::{Locale, ToFormattedString};
 use rand::SeedableRng;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
-use rayon::iter;
-use skydive::ldbg::LdBG;
 use plotters::prelude::*;
-use url::Url;
+use skydive::ldbg::LdBG;
 use std::io::Write;
+use url::Url;
 
 pub fn start(
     output: &PathBuf,

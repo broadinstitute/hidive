@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{self, Write};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::Write;
 
 use indicatif::ProgressIterator;
 use itertools::Itertools;
@@ -16,11 +16,10 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
 use indicatif::ParallelProgressIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
 use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge};
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
 
 use crate::edges::Edges;
