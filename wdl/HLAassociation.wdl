@@ -6,12 +6,19 @@ workflow HLAAssociation {
         File genotype_vcf
         File reference_vcf
         String prefix
-        String outputdirectory
+        String referenceprefix
+        Int makereferencememory
     }
 
     call FormatTransition { input:
         vcf = genotype_vcf,
         outputprefix = prefix
+    }
+
+    call MakeReference { input:
+        reference_vcf = reference_vcf,
+        outputprefix = referenceprefix,
+        memory = makereferencememory
     }
 
     output {
@@ -65,14 +72,16 @@ task MakeReference {
     >>>
 
     output {
-        File bed = "~{outputprefix}.bed"
-        File bim = "~{outputprefix}.bim"
-        File fam = "~{outputprefix}.fam"
-        File log = "~{outputprefix}.log"
-        File nosex = "~{outputprefix}.nosex"
-        File hwe = "~{outputprefix}.miss.frq.diff.hwe"
-        File freq = "~{outputprefix}.miss.frq.diff.hwe.freq"
-        File pos_allele = "~{outputprefix}.Ref.Frq.chr_pos_allele"
+        # File bed = "~{outputprefix}.bed"
+        # File bim = "~{outputprefix}.bim"
+        # File fam = "~{outputprefix}.fam"
+        # File log = "~{outputprefix}.log"
+        # File nosex = "~{outputprefix}.nosex"
+        # File hwe = "~{outputprefix}.miss.frq.diff.hwe"
+        # File freq = "~{outputprefix}.miss.frq.diff.hwe.freq"
+        # File pos_allele = "~{outputprefix}.Ref.Frq.chr_pos_allele"
+
+        Array[File] reference_data = glob("~{outputprefix}.*")
     }
     ###################
     runtime {
