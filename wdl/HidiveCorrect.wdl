@@ -71,7 +71,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.73"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.74"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -110,7 +110,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.73"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.74"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -141,7 +141,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.73"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.74"
         memory: "4 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -171,7 +171,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.73"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.74"
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
