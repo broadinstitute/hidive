@@ -68,10 +68,9 @@ jobs:
         tags: us.gcr.io/broad-dsp-lrma/lr-hidive:${{ steps.version-bump.outputs.new_ver }}
         build-args: |
           branch=v${{ steps.version-bump.outputs.new_ver }}
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        cache-from: |
+          type=local,src=/tmp/.buildx-cache
+          type=gha,scope=${{ github.workflow }}
+        cache-to: |
+          type=local,dest=/tmp/.buildx-cache-new,mode=max
+          type=gha,mode=max,scope=${{ github.workflow }}
