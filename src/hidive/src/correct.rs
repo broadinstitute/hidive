@@ -38,14 +38,12 @@ pub fn start(
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
-    /*
-    let contigs = m.assemble_all();
+    // let contigs = m.assemble_at_bubbles();
 
-    let mut fa_file = File::create(&output).unwrap();
-    for (i, contig) in contigs.iter().enumerate() {
-        let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
-    }
-    */
+    // let mut fa_file = File::create(&output).unwrap();
+    // for (i, contig) in contigs.iter().enumerate() {
+    //     let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    // }
 
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
@@ -57,7 +55,7 @@ pub fn start(
         .collect::<Vec<Vec<u8>>>();
 
     skydive::elog!("Writing reads to {}", output.display());
-
+    
     let mut fa_file = File::create(&output).unwrap();
     for (i, corrected_seq) in corrected_seqs.iter().enumerate() {
         let _ = writeln!(fa_file, ">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());

@@ -41,18 +41,14 @@ pub fn start(
     let m = MLdBG::from_ldbgs(vec![l1, s1])
         .score_kmers(model_path)
         .collapse()
-        .clean_color_specific_paths(1, 0.2)
-        .clean_tangles(1, 100, 0.2)
-        .clean_branches(0.01)
-        .clean_tips(3*kmer_size, 0.01)
-        .clean_contigs(100)
+        .clean(0.2, 0.01)
         .build_links(&all_lr_seqs, true);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
     let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
 
-    let contigs =
+    let corrected_seqs =
         all_lr_seqs
         .par_iter()
         .progress_with(progress_bar)
@@ -60,12 +56,19 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    // let contigs = m.assemble_all();
+    // let contigs = m.assemble_at_bubbles();
+
+    // let mut fa_file = File::create(&output).unwrap();
+    // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
+    //     let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    // }
+
+    skydive::elog!("Assembling diplotypes...");
 
     let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
 
     let mut sg = spoa::Graph::new();
-    for lr_seq in all_ref_seqs.iter().chain(contigs.iter()) {
+    for lr_seq in all_ref_seqs.iter().chain(corrected_seqs.iter()) {
         let seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
         let seq_qual = std::ffi::CString::new(vec![b'I'; lr_seq.len()]).unwrap();
         let a = la.align(seq_cstr.as_ref(), &sg);
@@ -96,7 +99,7 @@ pub fn start(
     let matrix = create_read_allele_matrix(&msa_strings);
     let wmec = create_wmec_matrix(&matrix);
 
-    let (h1, h2) = skydive::wmec::phase(&wmec);
+    let (h1, _) = skydive::wmec::phase(&wmec);
     let (hap1, hap2) = create_fully_phased_haplotypes(&msa_strings, &h1);
 
     let mut output = File::create(output).expect("Failed to create output file");
@@ -115,7 +118,7 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
 
     while index1 < lr_msas[0].len() {
         let combined_base_counts = allele_counts(lr_msas, index1, index1+1);
-        let bases = allele_indices(lr_msas, index1, index1+1);
+        // let bases = allele_indices(lr_msas, index1, index1+1);
 
         if combined_base_counts.len() == 0 {
             index1 += 1;

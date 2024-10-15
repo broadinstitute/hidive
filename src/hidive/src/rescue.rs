@@ -169,9 +169,14 @@ pub fn start(
         .expect("Could not write to file");
     }
 
-    skydive::elog!(
-        "Wrote {} reads to {}.",
-        all_records.len().to_formatted_string(&Locale::en),
-        output.to_str().unwrap()
-    );
+    if !all_records.is_empty() {
+        skydive::elog!(
+            "Wrote {} reads to {}.",
+            all_records.len().to_formatted_string(&Locale::en),
+            output.to_str().unwrap()
+        );
+    } else {
+        skydive::elog!("No reads were found in the CRAM files. Aborting.");
+        std::process::exit(1);
+    }
 }
