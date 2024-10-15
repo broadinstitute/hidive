@@ -119,7 +119,7 @@ task SNP2HLA {
 
     command <<<
         set -euxo pipefail
-        cd HLA-TAPAS
+        
         python -m SNP2HLA \
         --target ~{genotype_prefix} \
         --out ~{outputprefix} \
