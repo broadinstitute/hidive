@@ -89,8 +89,9 @@ task Rescue {
         File ref_cache_tar_gz
 
         String prefix = "out"
+        String? contig
 
-        Int num_cpus = 4
+        Int num_cpus = 16
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
@@ -102,12 +103,16 @@ task Rescue {
         mv ~{ref_fai_with_alt} Homo_sapiens_assembly38.fasta.fai 
         mv ~{ref_cache_tar_gz} Homo_sapiens_assembly38.ref_cache.tar.gz
 
-        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz
+        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz >/dev/null 2>&1
 
         export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
-        hidive rescue -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
+        hidive rescue \
+            ~{true='-c' false='' defined(contig)} ~{select_first([contig, ""])} \
+            -f ~{long_reads_fasta} \
+            ~{short_reads_cram} \
+            > ~{prefix}.fa
     >>>
 
     output {
@@ -116,7 +121,7 @@ task Rescue {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
-        memory: "2 GB"
+        memory: "~{num_cpus} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
     }
@@ -138,7 +143,7 @@ task Correct {
     command <<<
         set -euxo pipefail
 
-        hidive correct -m ~{model} -s ~{short_read_fasta} ~{long_read_fasta} > ~{prefix}.fa
+        hidive correct -m ~{model} ~{short_read_fasta} ~{long_read_fasta} > ~{prefix}.fa
     >>>
 
     output {
@@ -146,7 +151,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.78"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.85"
         memory: "4 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
