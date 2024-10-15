@@ -86,18 +86,26 @@ task Rescue {
 
         File ref_fa_with_alt
         File ref_fai_with_alt
+        File ref_cache_tar_gz
 
         String prefix = "out"
 
         Int num_cpus = 4
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai], "GB"))
+    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
 
     command <<<
         set -euxo pipefail
 
-        export REF_PATH="$(dirname ~{ref_fa_with_alt})"
+        mv ~{ref_fa_with_alt} Homo_sapiens_assembly38.fasta
+        mv ~{ref_fai_with_alt} Homo_sapiens_assembly38.fasta.fai 
+        mv ~{ref_cache_tar_gz} Homo_sapiens_assembly38.ref_cache.tar.gz
+
+        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz
+
+        export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
+        export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
         hidive rescue -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
     >>>
