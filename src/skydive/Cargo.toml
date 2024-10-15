@@ -1,6 +1,6 @@
 [package]
 name = "skydive"
-version = "0.1.80"
+version = "0.1.79"
 edition = "2021"
 resolver = "2"
 
@@ -69,3 +69,7 @@ enum_glob_use = "deny"
 pedantic = { level = "deny", priority = -1 }
 # nursery = { level = "deny", priority = -1 }
 # unwrap_used = "deny"
+
+[profile.release]
+opt-level = 2
+codegen-units = 16
