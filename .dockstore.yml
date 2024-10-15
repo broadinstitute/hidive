@@ -3,3 +3,6 @@ workflows:
 - name: HidiveCorrect
   subclass: wdl
   primaryDescriptorPath: /wdl/HidiveCorrect.wdl
+- name: HLAassociation
+  subclass: wdl
+  primaryDescriptorPath: /wdl/HLAassociation.wdl
