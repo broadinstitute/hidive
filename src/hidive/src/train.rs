@@ -1,10 +1,12 @@
 use num_format::{Locale, ToFormattedString};
-use rand::SeedableRng;
-use skydive::mldbg::MLdBG;
+// use rand::SeedableRng;
+// use skydive::mldbg::MLdBG;
 use skydive::utils::canonicalize_kmer;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::iter::Chain;
+use std::collections::hash_map::Keys;
 
 use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
@@ -12,6 +14,7 @@ use gbdt::gradient_boost::GBDT;
 
 use plotters::prelude::*;
 use skydive::ldbg::LdBG;
+use skydive::record::Record;
 use std::io::Write;
 use url::Url;
 
@@ -19,7 +22,7 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     iterations: usize,
-    test_split: f32,
+    // test_split: f32,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
@@ -69,6 +72,13 @@ pub fn start(
     let all_test_truth_seqs: Vec<Vec<u8>> = process_reads(&test_truth_seq_urls, "test truth");
     let test_t1 = LdBG::from_sequences(String::from("test_t1"), kmer_size, &all_test_truth_seqs);
 
+    let test_lr_contigs = test_l1.assemble_all();
+    let test_lr_distances = distance_to_a_contig_end(&test_lr_contigs, kmer_size);
+
+    let test_sr_contigs = test_s1.assemble_all();
+    let test_sr_distances = distance_to_a_contig_end(&test_sr_contigs, kmer_size);
+
+
     // Configure GBDT.
     let mut cfg = Config::new();
     cfg.set_feature_size(7);
@@ -91,46 +101,56 @@ pub fn start(
     // Initialize GBDT algorithm.
     let mut gbdt = GBDT::new(&cfg);
 
-    let mut training_data: DataVec = Vec::new();
-    let mut test_data: DataVec = Vec::new();
+    // let mut training_data: DataVec = Vec::new();
+    // let mut test_data: DataVec = Vec::new();
 
-    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+    // let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
     let kmers = l1
         .kmers
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
-    for kmer in kmers {
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
-        let compressed_len_diff = (kmer.len() - compressed_len) as f32;
-        let entropy = skydive::utils::shannon_entropy(kmer);
-        let gc_content = skydive::utils::gc_content(kmer);
-        let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
-        let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
+    let mut training_data: DataVec = create_dataset_for_model(
+        kmers,
+        &lr_distances,
+        &sr_distances,
+        &l1,
+        &s1,
+        &t1,
+    );
 
-        let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-        let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
-        let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
-
-        let data = Data::new_training_data(
-            vec![
-                if lcov > 0 { 1.0 } else { 0.0 },
-                scov as f32,
-                compressed_len_diff,
-                entropy,
-                gc_content,
-                lr_distance,
-                sr_distance,
-            ],
-            1.0,
-            if tcov > 0 { 1.0 } else { 0.0 },
-            None,
-        );
-
-        training_data.push(data);
-    }
+        // for kmer in kmers {
+    //     let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+    //
+    //     let compressed_len_diff = (kmer.len() - compressed_len) as f32;
+    //     let entropy = skydive::utils::shannon_entropy(kmer);
+    //     let gc_content = skydive::utils::gc_content(kmer);
+    //     let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
+    //     let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
+    //
+    //     let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
+    //     let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
+    //     let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
+    //
+    //     let data = Data::new_training_data(
+    //         vec![
+    //             if lcov > 0 { 1.0 } else { 0.0 },
+    //             scov as f32,
+    //             compressed_len_diff,
+    //             entropy,
+    //             gc_content,
+    //             lr_distance,
+    //             sr_distance,
+    //         ],
+    //         1.0,
+    //         if tcov > 0 { 1.0 } else { 0.0 },
+    //         None,
+    //     );
+    //
+    //     training_data.push(data);
+    // }
 
     // Train the decision trees.
     skydive::elog!(
@@ -145,26 +165,35 @@ pub fn start(
         .keys()
         .chain(test_s1.kmers.keys())
         .chain(test_t1.kmers.keys());
-    for kmer in test_kmers {
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
 
-        let lcov = test_l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-        let scov = test_s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
-        let tcov = test_t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
-
-        let data = Data::new_training_data(
-            vec![
-                lcov as f32,
-                scov as f32,
-                (kmer.len() - compressed_len) as f32,
-            ],
-            1.0,
-            if tcov > 0 { 1.0 } else { 0.0 },
-            None,
-        );
-
-        test_data.push(data);
-    }
+    let mut test_data: DataVec = create_dataset_for_model(
+        test_kmers,
+        &test_lr_distances,
+        &test_sr_distances,
+        &test_l1,
+        &test_s1,
+        &test_t1,
+    );
+    // for kmer in test_kmers {
+    //     let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+    //
+    //     let lcov = test_l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
+    //     let scov = test_s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
+    //     let tcov = test_t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
+    //
+    //     let data = Data::new_training_data(
+    //         vec![
+    //             lcov as f32,
+    //             scov as f32,
+    //             (kmer.len() - compressed_len) as f32,
+    //         ],
+    //         1.0,
+    //         if tcov > 0 { 1.0 } else { 0.0 },
+    //         None,
+    //     );
+    //
+    //     test_data.push(data);
+    // }
 
 
     // Predict the test data.
@@ -364,4 +393,48 @@ pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_thres
     let f1_score = 2.0 * precision * recall / (precision + recall);
 
     (precision, recall, f1_score)
+}
+/// Creates a dataset for the ML model.
+
+pub fn create_dataset_for_model(
+    kmers: Chain<Chain<Keys<Vec<u8>, Record>, Keys<Vec<u8>, Record>>, Keys<Vec<u8>, Record>>,
+    lr_distances: &HashMap<Vec<u8>, usize>,
+    sr_distances: &HashMap<Vec<u8>, usize>,
+    l1: &LdBG,
+    s1: &LdBG,
+    t1: &LdBG,
+) -> Vec<Data> {
+    let mut dataset = Vec::new();
+
+    for kmer in kmers {
+        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+        let compressed_len_diff = (kmer.len() - compressed_len) as f32;
+        let entropy = skydive::utils::shannon_entropy(kmer);
+        let gc_content = skydive::utils::gc_content(kmer);
+        let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
+        let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
+
+        let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
+        let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
+        let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
+
+        let data = Data::new_training_data(
+            vec![
+                if lcov > 0 { 1.0 } else { 0.0 },
+                scov as f32,
+                compressed_len_diff,
+                entropy,
+                gc_content,
+                lr_distance,
+                sr_distance,
+            ],
+            1.0,
+            if tcov > 0 { 1.0 } else { 0.0 },
+            None,
+        );
+
+        dataset.push(data);
+    }
+
+    dataset
 }
