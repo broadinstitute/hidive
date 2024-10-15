@@ -143,11 +143,12 @@ task Correct {
     command <<<
         set -euxo pipefail
 
-        hidive correct -m ~{model} ~{short_read_fasta} ~{long_read_fasta} > ~{prefix}.fa
+        hidive correct -m ~{model} -g {prefix}.gfa ~{long_read_fasta} ~{short_read_fasta} > ~{prefix}.fa
     >>>
 
     output {
         File fasta = "~{prefix}.fa"
+        File gfa = "~{prefix}.gfa"
     }
 
     runtime {
