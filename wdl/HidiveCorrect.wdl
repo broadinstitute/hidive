@@ -97,7 +97,7 @@ task Rescue {
     command <<<
         set -euxo pipefail
 
-        export REF_PATH="~{basename(ref_fa_with_alt)}"
+        export REF_PATH="$(dirname ~{ref_fa_with_alt})"
 
         hidive rescue -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
     >>>
@@ -138,7 +138,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:latest"
         memory: "4 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -168,7 +168,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:latest"
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
