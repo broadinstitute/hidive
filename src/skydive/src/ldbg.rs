@@ -226,6 +226,10 @@ impl LdBG {
 
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
+            // Skip sequences shorter than k
+            if fwd_seq.len() < k {
+                continue;
+            }
             // Iterate over k-mers
             for i in 0..fwd_seq.len() - k + 1 {
                 let fw_kmer = &fwd_seq[i..i + k];

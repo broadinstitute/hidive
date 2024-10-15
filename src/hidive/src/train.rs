@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use num_format::{Locale, ToFormattedString};
 use rand::SeedableRng;
 use std::path::PathBuf;
@@ -7,94 +8,53 @@ use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 
 use rayon::iter;
-// Import the skydive module, which contains the necessary functions for staging data
 use skydive::ldbg::LdBG;
+use plotters::prelude::*;
+use url::Url;
+use std::io::Write;
 
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     iterations: usize,
-    test_split: f32,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
+    test_long_read_seq_paths: &Vec<PathBuf>,
+    test_short_read_seq_paths: &Vec<PathBuf>,
+    test_truth_seq_paths: &Vec<PathBuf>,
     debug: bool,
 ) {
     let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
     let truth_seq_urls = skydive::parse::parse_file_names(&truth_seq_paths);
+    let test_long_read_seq_urls = skydive::parse::parse_file_names(&test_long_read_seq_paths);
+    let test_short_read_seq_urls = skydive::parse::parse_file_names(&test_short_read_seq_paths);
+    let test_truth_seq_urls = skydive::parse::parse_file_names(&test_truth_seq_paths);
 
     // Read all long reads.
-    let mut all_lr_seqs: Vec<Vec<u8>> = Vec::new();
-    for long_read_seq_url in &long_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(
-            &long_read_seq_url,
-            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
-        );
-        let fasta_path = long_read_seq_url.to_file_path().unwrap();
-
-        skydive::elog!("Processing long-read sample {}...", basename);
-
-        let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
-        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
-
-        all_lr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::<Vec<Vec<u8>>>(),
-        );
-    }
-
+    let all_lr_seqs: Vec<Vec<u8>> = process_reads(&long_read_seq_urls, "long");
     let l1 = LdBG::from_sequences(String::from("l1"), kmer_size, &all_lr_seqs);
 
     // Read all short reads.
-    let mut all_sr_seqs: Vec<Vec<u8>> = Vec::new();
-    for short_read_seq_url in &short_read_seq_urls {
-        let basename = skydive::utils::basename_without_extension(
-            &short_read_seq_url,
-            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
-        );
-        let fasta_path = short_read_seq_url.to_file_path().unwrap();
-
-        skydive::elog!("Processing short-read sample {}...", basename);
-
-        let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
-        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
-
-        all_sr_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::<Vec<Vec<u8>>>(),
-        );
-    }
-
+    let all_sr_seqs: Vec<Vec<u8>> = process_reads(&short_read_seq_urls, "short");
     let s1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_sr_seqs);
 
     // Read all truth sequences.
-    let mut all_truth_seqs: Vec<Vec<u8>> = Vec::new();
-    for truth_seq_url in &truth_seq_urls {
-        let basename = skydive::utils::basename_without_extension(
-            &truth_seq_url,
-            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
-        );
-        let fasta_path = truth_seq_url.to_file_path().unwrap();
-
-        skydive::elog!("Processing truth sample {}...", basename);
-
-        let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
-        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
-
-        all_truth_seqs.extend(
-            all_reads
-                .iter()
-                .map(|r| r.seq().to_vec())
-                .collect::<Vec<Vec<u8>>>(),
-        );
-    }
-
+    let all_truth_seqs: Vec<Vec<u8>> = process_reads(&truth_seq_urls, "truth");
     let t1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_truth_seqs);
+
+    // Read all test long reads.
+    let all_test_lr_seqs: Vec<Vec<u8>> = process_reads(&test_long_read_seq_urls, "test long");
+    let test_l1 = LdBG::from_sequences(String::from("test_l1"), kmer_size, &all_test_lr_seqs);
+
+    // Read all test short reads.
+    let all_test_sr_seqs: Vec<Vec<u8>> = process_reads(&test_short_read_seq_urls, "test short");
+    let test_s1 = LdBG::from_sequences(String::from("test_s1"), kmer_size, &all_test_sr_seqs);
+
+    // Read all test truth sequences.
+    let all_test_truth_seqs: Vec<Vec<u8>> = process_reads(&test_truth_seq_urls, "test truth");
+    let test_t1 = LdBG::from_sequences(String::from("test_t1"), kmer_size, &all_test_truth_seqs);
 
     // Configure GBDT.
     let mut cfg = Config::new();
@@ -113,7 +73,7 @@ pub fn start(
     skydive::elog!(" - loss={}", loss2string(&cfg.loss));
     skydive::elog!(" - shrinkage={}", cfg.shrinkage);
     skydive::elog!(" - iterations={}", cfg.iterations);
-    skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split);
+    // skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
 
     // Initialize GBDT algorithm.
     let mut gbdt = GBDT::new(&cfg);
@@ -146,12 +106,7 @@ pub fn start(
             None,
         );
 
-        // Save 20% of the data for testing, remaining for training.
-        if rand::Rng::gen::<f32>(&mut rng) < test_split {
-            test_data.push(data);
-        } else {
-            training_data.push(data);
-        }
+        training_data.push(data);
     }
 
     // Train the decision trees.
@@ -161,21 +116,74 @@ pub fn start(
     );
     gbdt.fit(&mut training_data);
 
+    // Prepare test data.
+    let test_kmers = test_l1
+        .kmers
+        .keys()
+        .chain(test_s1.kmers.keys())
+        .chain(test_t1.kmers.keys());
+    for kmer in test_kmers {
+        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+
+        let lcov = test_l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
+        let scov = test_s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
+        let tcov = test_t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
+
+        let data = Data::new_training_data(
+            vec![
+                lcov as f32,
+                scov as f32,
+                (kmer.len() - compressed_len) as f32,
+            ],
+            1.0,
+            if tcov > 0 { 1.0 } else { 0.0 },
+            None,
+        );
+
+        test_data.push(data);
+    }
+
+
     // Predict the test data.
     skydive::elog!("Computing accuracy on test data...");
-    let p = gbdt.predict(&test_data);
+    let prediction = gbdt.predict(&test_data);
+    let pred_threshold: f32 = 0.5;
 
     // Evaluate accuracy of the model on the test data.
     let mut num_correct = 0u32;
     let mut num_total = 0u32;
-    for (data, pred) in test_data.iter().zip(p.iter()) {
+    for (data, pred) in test_data.iter().zip(prediction.iter()) {
         let truth = data.label;
-        let call = if *pred > 0.5 { 1.0 } else { 0.0 };
+        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
         if (call - truth).abs() < f32::EPSILON {
             num_correct += 1;
         }
         num_total += 1;
     }
+
+    // Precision, Recall, and F1 score calculations.
+    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
+    skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
+    skydive::elog!("Precision: {:.2}%", 100.0 * precision);
+    skydive::elog!("Recall: {:.2}%", 100.0 * recall);
+    skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
+
+    // TPR and FPR calculations at various thresholds.
+    skydive::elog!("Computing TPR and FPR at various thresholds...");
+    let fpr_tpr: Vec<(f32, f32)> = compute_fpr_tpr(&test_data, &prediction);
+
+    // Save TPR and FPR at various thresholds to a file.
+    let csv_output = output.with_extension("csv");
+    let mut writer = std::fs::File::create(csv_output).expect("Unable to create file");
+    for (tpr, fpr) in &fpr_tpr {
+        writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
+    }
+    skydive::elog!("TPR and FPR at various thresholds saved to {}", output.to_str().unwrap());
+
+    // Create a ROC curve.
+    let png_output = output.with_extension("png");
+    plot_roc_curve(&png_output, &fpr_tpr).expect("Unable to plot ROC curve");
+    skydive::elog!("ROC curve saved to {}", png_output.to_str().unwrap());
 
     skydive::elog!(
         "Predicted accuracy: {}/{} ({:.2}%)",
@@ -188,4 +196,136 @@ pub fn start(
         .expect("Unable to save model");
 
     skydive::elog!("Model saved to {}", output.to_str().unwrap());
+}
+
+pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<u8>>{
+    let mut all_seqs: Vec<Vec<u8>> = Vec::new();
+    for read_seq_url in read_seq_urls {
+        let basename = skydive::utils::basename_without_extension(
+            &read_seq_url,
+            &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
+        );
+        let fasta_path = read_seq_url.to_file_path().unwrap();
+
+        skydive::elog!("Processing {}-read sample {}...", read_type, basename);
+
+        let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
+        let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
+
+        all_seqs.extend(
+            all_reads
+                .iter()
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>(),
+        );
+    }
+
+    all_seqs
+}
+
+pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(), Box<dyn std::error::Error>> {
+    let root = BitMapBackend::new(output, (640, 480)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("ROC Curve", ("sans-serif", 50).into_font())
+        .margin(10)
+        .x_label_area_size(30)
+        .y_label_area_size(50)
+        .build_cartesian_2d(0.0..1.0, 0.0..1.0)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("False Positive Rate")
+        .y_desc("True Positive Rate")
+        .draw()?;
+
+    chart.draw_series(LineSeries::new(
+        roc_points.iter().map(|(fpr, tpr)| (*fpr as f64, *tpr as f64)),
+        &RED,
+    ))?
+        .label("ROC Curve")
+        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], &RED));
+
+    // Draw a diagonal dotted line for reference.
+    chart.draw_series(LineSeries::new(
+        [(0.0, 0.0), (1.0, 1.0)].iter().cloned(),
+        &BLACK,
+    ))?
+        .label("Random")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLACK));
+
+    chart.configure_series_labels().background_style(&WHITE).draw()?;
+
+    Ok(())
+}
+
+
+/// Computes FPR and TPR at various thresholds.
+pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
+    skydive::elog!("Computing FPR and TPR at various thresholds...");
+    let mut fpr_tpr: Vec<(f32, f32)> = Vec::new();
+
+    // Iterate over different thresholds
+    for threshold in 0..100 {
+        let pred_threshold = threshold as f32 / 100.0;
+        let (mut num_true_positives, mut num_false_positives, mut num_false_negatives, mut num_true_negatives) = (0u32, 0u32, 0u32, 0u32);
+
+        // Iterate over test data and predictions
+        for (data, pred) in test_data.iter().zip(p.iter()) {
+            let truth = data.label;
+            let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+
+            if (call - truth).abs() < f32::EPSILON {
+                // Correct classification
+                if truth > 0.5 { num_true_positives += 1; }  // True Positive
+                else { num_true_negatives += 1; }  // True Negative
+            } else {
+                // Incorrect classification
+                if truth < 0.5 { num_false_positives += 1; }  // False Positive
+                if truth > 0.5 { num_false_negatives += 1; }  // False Negative
+            }
+        }
+
+        // Calculate FPR (False Positive Rate)
+        let fpr = if num_false_positives + num_true_negatives > 0 {
+            num_false_positives as f32 / (num_false_positives + num_true_negatives) as f32
+        } else {
+            0.0
+        };
+
+        // Calculate TPR (True Positive Rate)
+        let tpr = if num_true_positives + num_false_negatives > 0 {
+            num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32
+        } else {
+            0.0
+        };
+
+        fpr_tpr.push((fpr, tpr));
+    }
+
+    fpr_tpr
+}
+
+/// Computes precision, recall, and F1 score on test data.
+pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
+    skydive::elog!("Computing precision, recall, and F1 score on test data...");
+    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
+
+    for (data, pred) in test_data.iter().zip(p.iter()) {
+        let truth = data.label;
+        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+        if (call - truth).abs() < f32::EPSILON {
+            if truth > 0.5 { num_true_positives += 1; }
+        } else {
+            if truth < 0.5 { num_false_positives += 1; }
+            if truth > 0.5 { num_false_negatives += 1; }
+        }
+    }
+
+    let precision = num_true_positives as f32 / (num_true_positives + num_false_positives) as f32;
+    let recall = num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32;
+    let f1_score = 2.0 * precision * recall / (precision + recall);
+
+    (precision, recall, f1_score)
 }
