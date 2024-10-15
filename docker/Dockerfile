@@ -38,24 +38,6 @@ RUN pip3 uninstall -y crcmod && \
 # Fix python malloc bug
 RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"' >> ~/.bashrc
 
-# # Create known hosts for github ssh info
-# RUN mkdir -p ~/.ssh && \
-#     touch ~/.ssh/known_hosts && \
-#     ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-# # Install cargo
-# RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-# ENV PATH="/root/.cargo/bin:${PATH}"
-
-# # Install hidive
-# RUN git clone https://github.com/broadinstitute/hidive.git && \
-#     cd hidive && \
-#     git checkout $branch && \
-#     cargo build --release && \
-#     cp target/release/hidive /usr/local/bin/ && \
-#     cd .. && \
-#     rm -rf hidive
-
 # Install minimap2
 RUN wget -O minimap2-2.28.tar.bz2 https://github.com/lh3/minimap2/releases/download/v2.28/minimap2-2.28.tar.bz2 && \
     tar -vxjf minimap2-2.28.tar.bz2 && \
@@ -78,8 +60,6 @@ RUN wget -O samtools-1.21.tar.bz2 https://github.com/samtools/samtools/releases/
 FROM python:3.9-slim
 
 # Copy necessary files from builder stage
-#COPY --from=builder /usr/local/bin/hidive /usr/local/bin/hidive
-
 COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
 COPY --from=builder /usr/local/bin/samtools /usr/local/bin/samtools
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4

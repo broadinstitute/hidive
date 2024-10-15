@@ -45,11 +45,11 @@ jobs:
         strip target/release/hidive
         sccache --show-stats
 
-    - name: Upload binary as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: hidive-${{ steps.version-bump.outputs.new_ver }}
-        path: target/release/hidive
+    # - name: Upload binary as artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: hidive-${{ steps.version-bump.outputs.new_ver }}
+    #     path: target/release/hidive
 
     - name: Create Github release
       id: create_release
@@ -63,15 +63,15 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/hidive
-        asset_name: hidive-${{ steps.version-bump.outputs.new_ver }}
-        asset_content_type: application/octet-stream
+    # - name: Upload Release Asset
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+    #     asset_path: ./target/release/hidive
+    #     asset_name: hidive-${{ steps.version-bump.outputs.new_ver }}
+    #     asset_content_type: application/octet-stream
 
     - name: Authenticate to Google Cloud
       id: 'auth'
