@@ -84,6 +84,9 @@ task Rescue {
         File short_reads_cram
         File short_reads_crai
 
+        File ref_fa_with_alt
+        File ref_fai_with_alt
+
         String prefix = "out"
 
         Int num_cpus = 4
@@ -94,13 +97,7 @@ task Rescue {
     command <<<
         set -euxo pipefail
 
-        wget https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
-        wget https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai 
-        wget https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.ref_cache.tar.gz
-
-        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz
-        export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
-        export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
+        export REF_PATH="~{basename(ref_fa_with_alt)}"
 
         hidive rescue -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
     >>>
