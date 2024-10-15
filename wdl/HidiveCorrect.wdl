@@ -138,7 +138,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:latest"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.78"
         memory: "4 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -168,7 +168,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:latest"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.78"
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
