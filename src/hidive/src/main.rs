@@ -140,10 +140,6 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
-        /// Number of training iterations.
-        #[clap(short, long, value_parser, default_value_t = 50)]
-        iterations: usize,
-
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(short, long, value_parser, required = true)]
         long_read_seq_paths: Vec<PathBuf>,
@@ -159,10 +155,6 @@ enum Commands {
         /// Path to trained model.
         #[clap(short, long, value_parser, required = true)]
         model_path: PathBuf,
-
-        /// Turn on debug mode.
-        #[clap(short, long, value_parser)]
-        debug: bool,
     },
 
     /// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
@@ -417,22 +409,18 @@ fn main() {
         Commands::EvalModel {
             output,
             kmer_size,
-            iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
             model_path,
-            debug,
         } => {
             eval_model::start(
                 &output,
                 kmer_size,
-                iterations,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,
                 &model_path,
-                debug,
             );
         }
         Commands::Fetch {
