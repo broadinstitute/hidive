@@ -63,6 +63,7 @@ mod rescue;
 mod recruit;
 mod train;
 mod trim;
+mod eval_model;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -88,9 +89,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
-        /// Test split.
-        #[clap(short, long, value_parser, default_value_t = 0.2)]
-        test_split: f32,
+        // /// Test split.
+        // #[clap(short, long, value_parser, default_value_t = 0.2)]
+        // test_split: f32,
 
         /// Number of training iterations.
         #[clap(short, long, value_parser, default_value_t = 50)]
@@ -105,12 +106,55 @@ enum Commands {
         short_read_seq_paths: Vec<PathBuf>,
 
         /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
-        #[clap(value_parser, required = true)]
+        #[clap(long, value_parser, required = true, num_args = 2)]
         truth_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false)]
+        test_long_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false)]
+        test_short_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false, num_args = 2)]
+        test_truth_seq_paths: Vec<PathBuf>,
 
         /// Turn on debug mode.
         #[clap(short, long, value_parser)]
         debug: bool,
+    },
+
+    /// Evaluate a trained model using long- and (optionally) short-read data with ground truth assemblies.
+    #[clap(arg_required_else_help = true)]
+    EvalModel {
+        /// Output path for trained model.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = true)]
+        long_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = false)]
+        short_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        #[clap(long, value_parser, required = true, num_args = 2)]
+        truth_seq_paths: Vec<PathBuf>,
+
+        /// Path to trained model.
+        #[clap(short, long, value_parser, required = true)]
+        model_path: PathBuf,
     },
 
     /// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
@@ -338,22 +382,45 @@ fn main() {
         Commands::Train {
             output,
             kmer_size,
-            test_split,
+            // test_split,
             iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
+            test_long_read_seq_paths,
+            test_short_read_seq_paths,
+            test_truth_seq_paths,
             debug,
         } => {
             train::start(
                 &output,
                 kmer_size,
                 iterations,
-                test_split,
+                // test_split,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,
+                &test_long_read_seq_paths,
+                &test_short_read_seq_paths,
+                &test_truth_seq_paths,
                 debug,
+            );
+        }
+        Commands::EvalModel {
+            output,
+            kmer_size,
+            long_read_seq_paths,
+            short_read_seq_paths,
+            truth_seq_paths,
+            model_path,
+        } => {
+            eval_model::start(
+                &output,
+                kmer_size,
+                &long_read_seq_paths,
+                &short_read_seq_paths,
+                &truth_seq_paths,
+                &model_path,
             );
         }
         Commands::Fetch {

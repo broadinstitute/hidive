@@ -45,6 +45,7 @@ spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}
 skydive = { path = "../skydive" }
 tempfile = "3.6.1"
 url = "2.5.2"
+plotters = "0.3.7"
 #xgboost = "0.1.4"
 # cmake = "0.1"
 

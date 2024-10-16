@@ -1,6 +1,7 @@
 use anyhow::Result;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::Write;
 
 use parquet::data_type::AsBytes;
 
@@ -790,7 +791,7 @@ impl LdBG {
 
         // if graph.node_count() > 0 {
         //     self.remove_short_branches(&mut graph, 2 * self.kmer_size);
-        
+
         //     let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
         //     let mut file = File::create("read_graph.dot").expect("Unable to create file");
         //     write!(file, "{:?}", dot).expect("Unable to write data");
@@ -826,9 +827,9 @@ impl LdBG {
                 let leading_dashes = msa_string.chars().take_while(|&c| c == '-').count();
                 let trailing_dashes = msa_string.chars().rev().take_while(|&c| c == '-').count();
                 let middle = &msa_string[leading_dashes..msa_string.len() - trailing_dashes];
-                format!("{}{}{}", 
-                    " ".repeat(leading_dashes), 
-                    middle, 
+                format!("{}{}{}",
+                    " ".repeat(leading_dashes),
+                    middle,
                     " ".repeat(trailing_dashes)
                 )
             })
@@ -863,7 +864,7 @@ impl LdBG {
                     let mut branch = vec![edge.target()];
                     let mut current = edge.target();
                     let mut branch_length = 0;
-    
+
                     while branch_length < 2 * self.kmer_size {
                         let out_edges: Vec<_> = graph.edges_directed(current, petgraph::Outgoing).collect();
                         if out_edges.len() != 1 {
@@ -873,20 +874,20 @@ impl LdBG {
                         branch.push(current);
                         branch_length += 1;
                     }
-    
+
                     if branch_length < min_size {
                         nodes_to_remove.extend(branch);
                     }
                 }
             }
         }
-    
+
         // Remove the identified nodes from the graph
         for node in nodes_to_remove {
             graph.remove_node(node);
         }
     }
-    
+
     fn try_simple_paths(&self, from_kmer: &[u8], to_kmer: &[u8]) -> Result<(Vec<u8>, bool)> {
         let mut forward_contig = from_kmer.to_vec();
         let mut backward_contig = to_kmer.to_vec();
@@ -1052,7 +1053,7 @@ impl LdBG {
 
         return Err(anyhow::anyhow!("No connecting path found"));
     }
-    
+
     fn find_read_substring(&self, seq: &[u8], from_kmer: &[u8], to_kmer: &[u8]) -> Option<Vec<u8>> {
         seq.windows(from_kmer.len())
             .position(|window| window == from_kmer)
@@ -1079,38 +1080,38 @@ impl LdBG {
         for i in (0..backward_contig.len() - self.kmer_size).rev() {
             let current_kmer = &backward_contig[i..i + self.kmer_size];
             let prev_kmer = &backward_contig[i + 1..i + 1 + self.kmer_size];
-    
+
             let prev_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
             let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
-    
+
             if !graph.contains_edge(prev_node, current_node) {
                 graph.add_edge(prev_node, current_node, 1.0);
             }
         }
     }
-    
+
     fn add_to_read_graph_forward(&self, forward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
         // If forward assembly succeeded, add path to graph
         for i in 0..forward_contig.len() - self.kmer_size {
             let current_kmer = &forward_contig[i..i + self.kmer_size];
             let next_kmer = &forward_contig[i + 1..i + 1 + self.kmer_size];
-    
+
             let current_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(current_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
             let next_node = graph.node_indices().find(|&n| *graph[n] == String::from_utf8_lossy(next_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
-    
+
             if !graph.contains_edge(current_node, next_node) {
                 graph.add_edge(current_node, next_node, 1.0);
             }
         }
     }
-    
+
     fn initialize_read_graph(&self, seq: &[u8]) -> (petgraph::Graph<String, f64>, Vec<NodeIndex>) {
         let mut graph = DiGraph::<String, f64>::new();
-    
+
         let mut node_indices = Vec::new();
         for kmer in seq.windows(self.kmer_size) {
             if self.kmers.contains_key(&crate::utils::canonicalize_kmer(kmer)) {
@@ -1120,7 +1121,7 @@ impl LdBG {
         }
         (graph, node_indices)
     }
-    
+
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let progress_bar = if self.verbose {
             crate::utils::default_bounded_progress_bar("Correcting reads", seqs.len() as u64)
@@ -1220,7 +1221,7 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
-    
+
         loop {
             if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
                 return Ok(last_kmer);
@@ -1229,9 +1230,9 @@ impl LdBG {
             if contig.len() - initial_contig_length >= limit {
                 return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
             }
-    
+
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, true);
-    
+
             match self.next_kmer(&last_kmer, &mut links_in_scope) {
                 Some(this_kmer) => {
                     contig.push(this_kmer[this_kmer.len() - 1]);
@@ -1242,7 +1243,7 @@ impl LdBG {
                 }
             }
         }
-    
+
         Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
@@ -1355,7 +1356,7 @@ impl LdBG {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
         let mut last_kmer = start_kmer.clone();
-    
+
         loop {
             if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
                 return Ok(last_kmer);
@@ -1364,7 +1365,7 @@ impl LdBG {
             if contig.len() - initial_contig_length >= limit {
                 return Err(anyhow::anyhow!("Reached limit without finding a stopping k-mer"));
             }
-    
+
             self.update_links(&mut links_in_scope, &last_kmer, &mut used_links, false);
 
             match self.prev_kmer(&last_kmer, &mut links_in_scope) {
@@ -1377,7 +1378,7 @@ impl LdBG {
                 }
             }
         }
-    
+
         Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
@@ -1956,7 +1957,7 @@ impl LdBG {
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for next_kmer in self.next_kmers(this_kmer) {
                 let next_label = String::from_utf8_lossy(&next_kmer).to_string();
                 let next_node = if let Some(&existing_node) = visited.get(&next_label) {
@@ -1967,7 +1968,7 @@ impl LdBG {
                     fwd_stack.push(new_node);
                     new_node
                 };
-    
+
                 if !graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -1986,7 +1987,7 @@ impl LdBG {
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for next_kmer in self.next_kmers(this_kmer) {
                 let next_label = String::from_utf8_lossy(&next_kmer).to_string();
                 let next_node = if let Some(&existing_node) = visited.get(&next_label) {
@@ -2003,7 +2004,7 @@ impl LdBG {
 
                     new_node
                 };
-    
+
                 if !graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -2027,16 +2028,16 @@ impl LdBG {
         F: Fn(&[u8], usize, &Self) -> bool,
     {
         let mut found = false;
-    
+
         // Use a vector of tuples (node, depth) instead of just nodes
         let mut fwd_stack = vec![(start_node, 0)];
         while let Some((node, depth)) = fwd_stack.pop() {
             if depth >= limit {
                 continue; // Skip this node if we've reached the depth limit
             }
-    
+
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for next_kmer in self.next_kmers(this_kmer) {
                 let same_color = self.sources.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap_or(&vec![]) == &vec![color];
                 if !same_color {
@@ -2049,17 +2050,17 @@ impl LdBG {
                 } else {
                     let new_node = graph.add_node(next_label.clone());
                     visited.insert(next_label.clone(), new_node);
-    
+
                     if !stopping_condition(&next_kmer, depth + 1, self) {
                         // Push the new node with an incremented depth
                         fwd_stack.push((new_node, depth + 1));
                     } else {
                         found = true;
                     }
-    
+
                     new_node
                 };
-    
+
                 if !graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -2070,7 +2071,7 @@ impl LdBG {
                 }
             }
         }
-    
+
         if found {
             Ok(())
         } else {
@@ -2082,7 +2083,7 @@ impl LdBG {
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for prev_kmer in self.prev_kmers(this_kmer) {
                 let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
                 let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
@@ -2093,7 +2094,7 @@ impl LdBG {
                     rev_stack.push(new_node);
                     new_node
                 };
-    
+
                 if !graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -2112,7 +2113,7 @@ impl LdBG {
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for prev_kmer in self.prev_kmers(this_kmer) {
                 let prev_label = String::from_utf8_lossy(&prev_kmer).to_string();
                 let prev_node = if let Some(&existing_node) = visited.get(&prev_label) {
@@ -2129,7 +2130,7 @@ impl LdBG {
 
                     new_node
                 };
-    
+
                 if !graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -2153,16 +2154,16 @@ impl LdBG {
         F: Fn(&[u8], usize, &Self) -> bool,
     {
         let mut found = false;
-    
+
         // Use a vector of tuples (node, depth) instead of just nodes
         let mut rev_stack = vec![(start_node, 0)];
         while let Some((node, depth)) = rev_stack.pop() {
             if depth >= limit {
                 continue; // Skip this node if we've reached the depth limit
             }
-    
+
             let this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             for prev_kmer in self.prev_kmers(this_kmer) {
                 let same_color = self.sources.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap_or(&vec![]) == &vec![color];
                 if !same_color {
@@ -2175,17 +2176,17 @@ impl LdBG {
                 } else {
                     let new_node = graph.add_node(prev_label.clone());
                     visited.insert(prev_label.clone(), new_node);
-    
+
                     if !stopping_condition(&prev_kmer, depth + 1, self) {
                         // Push the new node with an incremented depth
                         rev_stack.push((new_node, depth + 1));
                     } else {
                         found = true;
                     }
-    
+
                     new_node
                 };
-    
+
                 if !graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -2196,7 +2197,7 @@ impl LdBG {
                 }
             }
         }
-    
+
         if found {
             Ok(())
         } else {
@@ -2239,38 +2240,38 @@ impl LdBG {
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
-    
+
         let start_contig = self.assemble(&start_kmer);
         let start_node = graph.add_node(String::from_utf8_lossy(&start_contig).to_string());
-        
+
         // Mark all k-mers in the start contig as visited
         for kmer in start_contig.windows(self.kmer_size) {
             visited.insert(crate::utils::canonicalize_kmer(kmer), start_node);
         }
-    
+
         // Traverse forward
         let mut fwd_stack = vec![start_node];
         while let Some(node) = fwd_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-    
+
             if let Some(last_kmer) = self.last_kmer(this_contig) {
                 for next_kmer in self.next_kmers(&last_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&next_kmer)) {
                         let mut next_contig = next_kmer.clone();
                         self.assemble_forward(&mut next_contig, next_kmer.clone());
-    
+
                         let weight = next_contig.windows(self.kmer_size)
                             .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
                             .fold(f32::INFINITY, |acc, x| acc.min(*x));
-    
+
                         let next_node = graph.add_node(String::from_utf8_lossy(&next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
-    
+
                         // Mark all k-mers in the new contig as visited
                         for kmer in next_contig.windows(self.kmer_size) {
                             visited.insert(crate::utils::canonicalize_kmer(kmer), next_node);
                         }
-    
+
                         fwd_stack.push(next_node);
                     } else {
                         let next_node = *visited.get(&crate::utils::canonicalize_kmer(&next_kmer)).unwrap();
@@ -2282,30 +2283,30 @@ impl LdBG {
                 }
             }
         }
-    
+
         // Traverse backward
         let mut rev_stack = vec![start_node];
         while let Some(node) = rev_stack.pop() {
             let this_contig = graph.node_weight(node).unwrap().as_bytes();
-    
+
             if let Some(first_kmer) = self.first_kmer(this_contig) {
                 for prev_kmer in self.prev_kmers(&first_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&prev_kmer)) {
                         let mut prev_contig = prev_kmer.clone();
                         self.assemble_backward(&mut prev_contig, prev_kmer.clone());
-    
+
                         let weight = prev_contig.windows(self.kmer_size)
                             .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
                             .fold(f32::INFINITY, |acc, x| acc.min(*x));
-    
+
                         let prev_node = graph.add_node(String::from_utf8_lossy(&prev_contig).to_string());
                         graph.add_edge(prev_node, node, weight);  // Note the reversed edge direction
-    
+
                         // Mark all k-mers in the new contig as visited
                         for kmer in prev_contig.windows(self.kmer_size) {
                             visited.insert(crate::utils::canonicalize_kmer(kmer), prev_node);
                         }
-    
+
                         rev_stack.push(prev_node);
                     } else {
                         let prev_node = *visited.get(&crate::utils::canonicalize_kmer(&prev_kmer)).unwrap();
@@ -2317,7 +2318,7 @@ impl LdBG {
                 }
             }
         }
-    
+
         graph
     }
 
@@ -2426,7 +2427,7 @@ fn traverse_read_graph(graph: &petgraph::Graph<String, f64>, min_length: usize) 
         if !visited.contains(&node) {
             let mut current_seq = Vec::new();
             let mut current_node = node;
-        
+
             loop {
                 visited.insert(current_node);
                 if current_seq.is_empty() {
@@ -2434,7 +2435,7 @@ fn traverse_read_graph(graph: &petgraph::Graph<String, f64>, min_length: usize) 
                 } else {
                     current_seq.push(graph[current_node].chars().last().unwrap().to_string());
                 }
-            
+
                 let outgoing_edges: Vec<_> = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
                 if outgoing_edges.len() == 1 {
                     let next_node = outgoing_edges[0].target();
@@ -2447,7 +2448,7 @@ fn traverse_read_graph(graph: &petgraph::Graph<String, f64>, min_length: usize) 
                     break;
                 }
             }
-        
+
             if current_seq.len() > min_length {
                 let contig = current_seq.join("").as_bytes().to_vec();
                 corrected_seqs.push(contig);
@@ -3273,10 +3274,10 @@ mod tests {
     fn create_bubblegun_graph() -> petgraph::Graph<String, f32> {
         // Create a new directed graph
         let mut graph = petgraph::Graph::<String, f32>::new();
-        
+
         // Create a HashMap to store node indices
         let mut node_indices = std::collections::HashMap::new();
-    
+
         // Add nodes to the graph
         let gfa_nodes = vec![
             ("1", "CCCAACAAGTG"),
@@ -3295,12 +3296,12 @@ mod tests {
             ("311", "AGGCACCCCTGCATTAG"),
             ("427", "CATTGACGCAACCGGCATTGAATACACAGGGTGT"),
         ];
-    
+
         for (id, seq) in gfa_nodes {
             let node_index = graph.add_node(seq.to_string());
             node_indices.insert(id.to_string(), node_index);
         }
-    
+
         // Add edges to the graph
         let gfa_edges = vec![
             ("1", "7"), ("1", "271"),
@@ -3318,7 +3319,7 @@ mod tests {
             ("311", "197"),
             ("427", "215"),
         ];
-    
+
         for (from, to) in gfa_edges {
             if let (Some(&from_index), Some(&to_index)) = (node_indices.get(from), node_indices.get(to)) {
                 graph.add_edge(from_index, to_index, 1.0);

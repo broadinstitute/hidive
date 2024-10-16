@@ -2,16 +2,32 @@
 
 set -euxo pipefail
 
-#LOCUS="chr6:25,726,063-33,410,226"
-#NAME="MHC"
+
+#TRAIN_LOCUS="chr6:25,726,063-33,410,226"
+#TRAIN_NAME="MHC"
+
+#TRAIN_LOCUS="chr20:40,000,000-60,000,000"
+#TRAIN_NAME="chr20"
+
+TRAIN_LOCUS="chr19:54,000,000-55,000,000"
+TRAIN_NAME="KIR"
+
+#TRAIN_LOCUS="chr6:27,100,000-30,500,000"
+#TRAIN_NAME="MHC" # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-017-1207-1
+
+#TRAIN_LOCUS="chr6:29,941,260-29,949,572"
+#TRAIN_NAME="HLA-A"
+
+TEST_LOCUS="chr6:29,941,260-29,949,572"
+TEST_NAME="HLA-A"
 
 #LOCUS="chr6:29,941,260-29,949,572"
 #NAME="HLA-A"
 
-LOCUS="chr20:40,000,000-60,000,000"
-NAME="chr20_v3"
 
-OUTPUT="scratch/training/$NAME"
+SAMPLE="HG00438"
+
+OUTPUT="scratch/training/per_sample_model/$SAMPLE/$TRAIN_NAME"
 
 export GCS_REQUESTER_PAYS_PROJECT="broad-dsp-lrma"
 
@@ -19,51 +35,91 @@ cargo build --release
 
 mkdir -p $OUTPUT
 
-# maternal haplotype
+# maternal haplotype training
+if [ ! -f $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam ]; then
+  gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.maternal.GRCh38_no_alt.bam $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam
+  gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.maternal.GRCh38_no_alt.bam.bai $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam.bai
+fi
+# if file not in folder fetch
+if [ ! -f $OUTPUT/$SAMPLE.maternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TRAIN_LOCUS \
+    -o $OUTPUT/$SAMPLE.maternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta \
+    $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam
+fi
 
-#gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/HG00438/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/HG00438.maternal.GRCh38_no_alt.bam $OUTPUT/HG00438.maternal.GRCh38_no_alt.bam
-#gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/HG00438/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/HG00438.maternal.GRCh38_no_alt.bam.bai $OUTPUT/HG00438.maternal.GRCh38_no_alt.bam.bai
+# maternal haplotype testing
 
-#./target/release/hidive fetch \
-#	-l $LOCUS \
-#	-o $OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta \
-#	$OUTPUT/HG00438.maternal.GRCh38_no_alt.bam
+if [ ! -f $OUTPUT/$SAMPLE.maternal.test.GRCh38_no_alt.$TEST_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TEST_LOCUS \
+    -o $OUTPUT/$SAMPLE.maternal.test.GRCh38_no_alt.$TEST_NAME.fasta \
+    $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam
+fi
 
-# paternal haplotype
+# paternal haplotype train
+if [ ! -f $OUTPUT/$SAMPLE.paternal.GRCh38_no_alt.bam ]; then
+  gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.paternal.GRCh38_no_alt.bam $OUTPUT/$SAMPLE.paternal.GRCh38_no_alt.bam
+  gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.paternal.GRCh38_no_alt.bam.bai $OUTPUT/$SAMPLE.paternal.GRCh38_no_alt.bam.bai
+fi
 
-gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/HG00438/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/HG00438.paternal.GRCh38_no_alt.bam $OUTPUT/HG00438.paternal.GRCh38_no_alt.bam
-gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/HG00438/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/HG00438.paternal.GRCh38_no_alt.bam.bai $OUTPUT/HG00438.paternal.GRCh38_no_alt.bam.bai
+if [ ! -f $OUTPUT/$SAMPLE.paternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TRAIN_LOCUS \
+    -o $OUTPUT/$SAMPLE.paternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta \
+    $OUTPUT/$SAMPLE.paternal.GRCh38_no_alt.bam
+fi
 
-./target/release/hidive fetch \
-	-l $LOCUS \
-	-o $OUTPUT/HG00438.paternal.GRCh38_no_alt.$NAME.fasta \
-	$OUTPUT/HG00438.paternal.GRCh38_no_alt.bam
+# paternal haplotype testing
 
-# fetch long reads
+if [ ! -f $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TEST_LOCUS \
+    -o $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta \
+    $OUTPUT/$SAMPLE.paternal.GRCh38_no_alt.bam
+fi
 
-./target/release/hidive fetch \
-	-l $LOCUS \
-	-o $OUTPUT/HG00438.LR.$NAME.fasta \
-	gs://fc-bb12940d-f7ba-4515-8a98-42de84f63c34/HPRC_grch38/PBCCSWholeGenome/HG00438/alignments/HG00438.bam
+# fetch long reads training
 
-# fetch short reads
+if [ ! -f $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TRAIN_LOCUS \
+    -o $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
+    gs://fc-bb12940d-f7ba-4515-8a98-42de84f63c34/HPRC_grch38/$SAMPLE/$SAMPLE.bam
+fi
 
-./target/release/hidive fetch \
-	-l $LOCUS \
-	-o $OUTPUT/HG00438.SR.$NAME.fasta \
-	HG00438.final.cram
+# fetch long reads testing
+if [ ! -f $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TEST_LOCUS \
+    -o $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta \
+    gs://fc-bb12940d-f7ba-4515-8a98-42de84f63c34/HPRC_grch38/$SAMPLE/$SAMPLE.bam
+fi
+
+# fetch short reads training
+if [ ! -f $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TRAIN_LOCUS \
+    -o $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta \
+    gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
+fi
+
+# fetch short reads testing
+if [ ! -f $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta ]; then
+  ./target/release/hidive fetch \
+    -l $TEST_LOCUS \
+    -o $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta \
+    gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
+fi
 
 # train
 
 ./target/release/hidive train \
-	-o $OUTPUT/training.long_and_short_reads.$NAME.json \
-	-l $OUTPUT/HG00438.LR.$NAME.fasta \
-	-s $OUTPUT/HG00438.SR.$NAME.fasta \
-	$OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta \
-	$OUTPUT/HG00438.paternal.GRCh38_no_alt.$NAME.fasta
+	-o $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json \
+	--long-read-seq-paths $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
+	--short-read-seq-paths $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta \
+  --truth-seq-paths	$OUTPUT/$SAMPLE.maternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta $OUTPUT/$SAMPLE.paternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta \
+	--test-long-read-seq-paths $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta \
+	--test-short-read-seq-paths $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta \
+	--test-truth-seq-paths $OUTPUT/$SAMPLE.maternal.test.GRCh38_no_alt.$TEST_NAME.fasta $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta \
 
-./target/release/hidive train \
-	-o $OUTPUT/training.long_reads.$NAME.json \
-	-l $OUTPUT/HG00438.LR.$NAME.fasta \
-	$OUTPUT/HG00438.maternal.GRCh38_no_alt.$NAME.fasta \
-	$OUTPUT/HG00438.paternal.GRCh38_no_alt.$NAME.fasta
