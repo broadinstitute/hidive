@@ -119,13 +119,15 @@ task SNP2HLA {
 
     command <<<
         set -euxo pipefail
-        
+        cd /HLA-TAPAS
         python -m SNP2HLA \
         --target ~{genotype_prefix} \
         --out ~{outputprefix} \
         --reference ~{reference_prefix} \
         --nthreads 2 \
         --mem 4g
+
+        cp "~{outputprefix}*" "/cromwell_root"
 
     >>>
 
