@@ -52,4 +52,3 @@ plotters = "0.3.7"
 [profile.release]
 opt-level = 2
 codegen-units = 16
-plotters = "0.3.7"

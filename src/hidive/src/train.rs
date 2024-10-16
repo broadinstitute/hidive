@@ -121,37 +121,6 @@ pub fn start(
         &t1,
     );
 
-        // for kmer in kmers {
-    //     let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
-    //
-    //     let compressed_len_diff = (kmer.len() - compressed_len) as f32;
-    //     let entropy = skydive::utils::shannon_entropy(kmer);
-    //     let gc_content = skydive::utils::gc_content(kmer);
-    //     let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
-    //     let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
-    //
-    //     let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-    //     let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
-    //     let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
-    //
-    //     let data = Data::new_training_data(
-    //         vec![
-    //             if lcov > 0 { 1.0 } else { 0.0 },
-    //             scov as f32,
-    //             compressed_len_diff,
-    //             entropy,
-    //             gc_content,
-    //             lr_distance,
-    //             sr_distance,
-    //         ],
-    //         1.0,
-    //         if tcov > 0 { 1.0 } else { 0.0 },
-    //         None,
-    //     );
-    //
-    //     training_data.push(data);
-    // }
-
     // Train the decision trees.
     skydive::elog!(
         "Training GBDT model with {} training points...",
@@ -174,27 +143,6 @@ pub fn start(
         &test_s1,
         &test_t1,
     );
-    // for kmer in test_kmers {
-    //     let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
-    //
-    //     let lcov = test_l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-    //     let scov = test_s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
-    //     let tcov = test_t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
-    //
-    //     let data = Data::new_training_data(
-    //         vec![
-    //             lcov as f32,
-    //             scov as f32,
-    //             (kmer.len() - compressed_len) as f32,
-    //         ],
-    //         1.0,
-    //         if tcov > 0 { 1.0 } else { 0.0 },
-    //         None,
-    //     );
-    //
-    //     test_data.push(data);
-    // }
-
 
     // Predict the test data.
     skydive::elog!("Computing accuracy on test data...");
