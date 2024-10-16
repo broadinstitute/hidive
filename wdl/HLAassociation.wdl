@@ -63,7 +63,7 @@ task FormatTransition {
         bootDiskSizeGb: 10
         preemptible_tries:     1
         max_retries:           0
-        docker:"hangsuunc/hla_tapas:v1"
+        docker:"hangsuunc/hla-tapas:v1"
     }
 }
 
@@ -101,7 +101,7 @@ task MakeReference {
         bootDiskSizeGb: 10
         preemptible_tries:     1
         max_retries:           0
-        docker:"hangsuunc/hla_tapas:v1"
+        docker:"hangsuunc/hla-tapas:v1"
     }
 }
 
@@ -158,6 +158,6 @@ task SNP2HLA {
         bootDiskSizeGb: 10
         preemptible_tries:     1
         max_retries:           0
-        docker:"hangsuunc/hla_tapas:v1"
+        docker:"hangsuunc/hla-tapas:v1"
     }
 }
