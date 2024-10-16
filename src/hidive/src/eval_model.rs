@@ -2,8 +2,8 @@ use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
 
 
-use crate::train::plot_roc_curve;
-use gbdt::decision_tree::{Data, DataVec};
+use crate::train::{create_dataset_for_model, distance_to_a_contig_end, plot_roc_curve, process_reads};
+use gbdt::decision_tree::DataVec;
 use gbdt::gradient_boost::GBDT;
 use skydive::ldbg::LdBG;
 use std::io::Write;
@@ -11,12 +11,10 @@ use std::io::Write;
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
-    iterations: usize,
     long_read_seq_paths: &Vec<PathBuf>,
     short_read_seq_paths: &Vec<PathBuf>,
     truth_seq_paths: &Vec<PathBuf>,
     model_path: &PathBuf,
-    debug: bool,
 ) {
     let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
@@ -24,23 +22,27 @@ pub fn start(
 
 
     // Read all long reads.
-    let all_lr_seqs: Vec<Vec<u8>> = crate::train::process_reads(&long_read_seq_urls, "long");
+    let all_lr_seqs: Vec<Vec<u8>> = process_reads(&long_read_seq_urls, "long");
     let l1 = LdBG::from_sequences(String::from("l1"), kmer_size, &all_lr_seqs);
 
     // Read all short reads.
-    let all_sr_seqs: Vec<Vec<u8>> = crate::train::process_reads(&short_read_seq_urls, "short");
+    let all_sr_seqs: Vec<Vec<u8>> = process_reads(&short_read_seq_urls, "short");
     let s1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_sr_seqs);
 
     // Read all truth sequences.
-    let all_truth_seqs: Vec<Vec<u8>> = crate::train::process_reads(&truth_seq_urls, "truth");
+    let all_truth_seqs: Vec<Vec<u8>> = process_reads(&truth_seq_urls, "truth");
     let t1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_truth_seqs);
+
+    let lr_contigs = l1.assemble_all();
+    let lr_distances = distance_to_a_contig_end(&lr_contigs, kmer_size);
+
+    let sr_contigs = s1.assemble_all();
+    let sr_distances = distance_to_a_contig_end(&sr_contigs, kmer_size);
 
 
     // load model
     skydive::elog!("Loading GBDT model from {}...", model_path.to_str().unwrap());
     let mut gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect("Unable to load model");
-
-    let mut test_data: DataVec = Vec::new();
 
     // Prepare test data.
     let test_kmers = l1
@@ -48,27 +50,14 @@ pub fn start(
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
-    for kmer in test_kmers {
-        let compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
-
-        let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-        let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
-        let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
-
-        let data = Data::new_training_data(
-            vec![
-                lcov as f32,
-                scov as f32,
-                (kmer.len() - compressed_len) as f32,
-            ],
-            1.0,
-            if tcov > 0 { 1.0 } else { 0.0 },
-            None,
-        );
-
-        test_data.push(data);
-    }
-
+    let mut test_data: DataVec = create_dataset_for_model(
+        test_kmers,
+        &lr_distances,
+        &sr_distances,
+        &l1,
+        &s1,
+        &t1,
+    );
 
     // Predict the test data.
     skydive::elog!("Computing accuracy on test data...");

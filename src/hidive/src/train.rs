@@ -198,7 +198,7 @@ pub fn start(
     skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }
 
-fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
+pub fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
     let mut distances = HashMap::new();
 
     for contig in contigs {
