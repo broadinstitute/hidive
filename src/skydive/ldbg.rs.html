@@ -3392,9 +3392,11 @@
 <a href="#3392" id="3392">3392</a>
 <a href="#3393" id="3393">3393</a>
 <a href="#3394" id="3394">3394</a>
+<a href="#3395" id="3395">3395</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
 
-<span class="kw">use </span>std::collections::{HashMap, HashSet};
+<span class="kw">use </span>std::collections::{BTreeMap, HashMap, HashSet};
+<span class="kw">use </span>std::io::Write;
 
 <span class="kw">use </span>parquet::data_type::AsBytes;
 
@@ -4184,7 +4186,7 @@
 
         <span class="comment">// if graph.node_count() &gt; 0 {
         //     self.remove_short_branches(&amp;mut graph, 2 * self.kmer_size);
-        
+
         //     let dot = Dot::with_config(&amp;graph, &amp;[Config::EdgeNoLabel]);
         //     let mut file = File::create("read_graph.dot").expect("Unable to create file");
         //     write!(file, "{:?}", dot).expect("Unable to write data");
@@ -4220,9 +4222,9 @@
                 <span class="kw">let </span>leading_dashes = msa_string.chars().take_while(|<span class="kw-2">&amp;</span>c| c == <span class="string">'-'</span>).count();
                 <span class="kw">let </span>trailing_dashes = msa_string.chars().rev().take_while(|<span class="kw-2">&amp;</span>c| c == <span class="string">'-'</span>).count();
                 <span class="kw">let </span>middle = <span class="kw-2">&amp;</span>msa_string[leading_dashes..msa_string.len() - trailing_dashes];
-                <span class="macro">format!</span>(<span class="string">"{}{}{}"</span>, 
-                    <span class="string">" "</span>.repeat(leading_dashes), 
-                    middle, 
+                <span class="macro">format!</span>(<span class="string">"{}{}{}"</span>,
+                    <span class="string">" "</span>.repeat(leading_dashes),
+                    middle,
                     <span class="string">" "</span>.repeat(trailing_dashes)
                 )
             })
@@ -4257,7 +4259,7 @@
                     <span class="kw">let </span><span class="kw-2">mut </span>branch = <span class="macro">vec!</span>[edge.target()];
                     <span class="kw">let </span><span class="kw-2">mut </span>current = edge.target();
                     <span class="kw">let </span><span class="kw-2">mut </span>branch_length = <span class="number">0</span>;
-    
+
                     <span class="kw">while </span>branch_length &lt; <span class="number">2 </span>* <span class="self">self</span>.kmer_size {
                         <span class="kw">let </span>out_edges: Vec&lt;<span class="kw">_</span>&gt; = graph.edges_directed(current, petgraph::Outgoing).collect();
                         <span class="kw">if </span>out_edges.len() != <span class="number">1 </span>{
@@ -4267,20 +4269,20 @@
                         branch.push(current);
                         branch_length += <span class="number">1</span>;
                     }
-    
+
                     <span class="kw">if </span>branch_length &lt; min_size {
                         nodes_to_remove.extend(branch);
                     }
                 }
             }
         }
-    
+
         <span class="comment">// Remove the identified nodes from the graph
         </span><span class="kw">for </span>node <span class="kw">in </span>nodes_to_remove {
             graph.remove_node(node);
         }
     }
-    
+
     <span class="kw">fn </span>try_simple_paths(<span class="kw-2">&amp;</span><span class="self">self</span>, from_kmer: <span class="kw-2">&amp;</span>[u8], to_kmer: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;u8&gt;, bool)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>forward_contig = from_kmer.to_vec();
         <span class="kw">let </span><span class="kw-2">mut </span>backward_contig = to_kmer.to_vec();
@@ -4446,7 +4448,7 @@
 
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"No connecting path found"</span>));
     }
-    
+
     <span class="kw">fn </span>find_read_substring(<span class="kw-2">&amp;</span><span class="self">self</span>, seq: <span class="kw-2">&amp;</span>[u8], from_kmer: <span class="kw-2">&amp;</span>[u8], to_kmer: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt; {
         seq.windows(from_kmer.len())
             .position(|window| window == from_kmer)
@@ -4473,38 +4475,38 @@
         </span><span class="kw">for </span>i <span class="kw">in </span>(<span class="number">0</span>..backward_contig.len() - <span class="self">self</span>.kmer_size).rev() {
             <span class="kw">let </span>current_kmer = <span class="kw-2">&amp;</span>backward_contig[i..i + <span class="self">self</span>.kmer_size];
             <span class="kw">let </span>prev_kmer = <span class="kw-2">&amp;</span>backward_contig[i + <span class="number">1</span>..i + <span class="number">1 </span>+ <span class="self">self</span>.kmer_size];
-    
+
             <span class="kw">let </span>prev_node = graph.node_indices().find(|<span class="kw-2">&amp;</span>n| <span class="kw-2">*</span>graph[n] == String::from_utf8_lossy(current_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
             <span class="kw">let </span>current_node = graph.node_indices().find(|<span class="kw-2">&amp;</span>n| <span class="kw-2">*</span>graph[n] == String::from_utf8_lossy(prev_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(prev_kmer).to_string()));
-    
+
             <span class="kw">if </span>!graph.contains_edge(prev_node, current_node) {
                 graph.add_edge(prev_node, current_node, <span class="number">1.0</span>);
             }
         }
     }
-    
+
     <span class="kw">fn </span>add_to_read_graph_forward(<span class="kw-2">&amp;</span><span class="self">self</span>, forward_contig: Vec&lt;u8&gt;, graph: <span class="kw-2">&amp;mut </span>petgraph::Graph&lt;String, f64&gt;) {
         <span class="comment">// If forward assembly succeeded, add path to graph
         </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..forward_contig.len() - <span class="self">self</span>.kmer_size {
             <span class="kw">let </span>current_kmer = <span class="kw-2">&amp;</span>forward_contig[i..i + <span class="self">self</span>.kmer_size];
             <span class="kw">let </span>next_kmer = <span class="kw-2">&amp;</span>forward_contig[i + <span class="number">1</span>..i + <span class="number">1 </span>+ <span class="self">self</span>.kmer_size];
-    
+
             <span class="kw">let </span>current_node = graph.node_indices().find(|<span class="kw-2">&amp;</span>n| <span class="kw-2">*</span>graph[n] == String::from_utf8_lossy(current_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(current_kmer).to_string()));
             <span class="kw">let </span>next_node = graph.node_indices().find(|<span class="kw-2">&amp;</span>n| <span class="kw-2">*</span>graph[n] == String::from_utf8_lossy(next_kmer).to_string())
                 .unwrap_or_else(|| graph.add_node(String::from_utf8_lossy(next_kmer).to_string()));
-    
+
             <span class="kw">if </span>!graph.contains_edge(current_node, next_node) {
                 graph.add_edge(current_node, next_node, <span class="number">1.0</span>);
             }
         }
     }
-    
+
     <span class="kw">fn </span>initialize_read_graph(<span class="kw-2">&amp;</span><span class="self">self</span>, seq: <span class="kw-2">&amp;</span>[u8]) -&gt; (petgraph::Graph&lt;String, f64&gt;, Vec&lt;NodeIndex&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::&lt;String, f64&gt;::new();
-    
+
         <span class="kw">let </span><span class="kw-2">mut </span>node_indices = Vec::new();
         <span class="kw">for </span>kmer <span class="kw">in </span>seq.windows(<span class="self">self</span>.kmer_size) {
             <span class="kw">if </span><span class="self">self</span>.kmers.contains_key(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(kmer)) {
@@ -4514,7 +4516,7 @@
         }
         (graph, node_indices)
     }
-    
+
     <span class="kw">pub fn </span>correct_seqs(<span class="kw-2">&amp;</span><span class="self">self</span>, seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
         <span class="kw">let </span>progress_bar = <span class="kw">if </span><span class="self">self</span>.verbose {
             <span class="kw">crate</span>::utils::default_bounded_progress_bar(<span class="string">"Correcting reads"</span>, seqs.len() <span class="kw">as </span>u64)
@@ -4614,7 +4616,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>links_in_scope: Vec&lt;Link&gt; = Vec::new();
         <span class="kw">let </span><span class="kw-2">mut </span>used_links = HashSet::new();
         <span class="kw">let </span><span class="kw-2">mut </span>last_kmer = start_kmer.clone();
-    
+
         <span class="kw">loop </span>{
             <span class="kw">if </span>stopping_condition(<span class="kw-2">&amp;</span>last_kmer, contig.len() - initial_contig_length, <span class="self">self</span>) {
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(last_kmer);
@@ -4623,9 +4625,9 @@
             <span class="kw">if </span>contig.len() - initial_contig_length &gt;= limit {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Reached limit without finding a stopping k-mer"</span>));
             }
-    
+
             <span class="self">self</span>.update_links(<span class="kw-2">&amp;mut </span>links_in_scope, <span class="kw-2">&amp;</span>last_kmer, <span class="kw-2">&amp;mut </span>used_links, <span class="bool-val">true</span>);
-    
+
             <span class="kw">match </span><span class="self">self</span>.next_kmer(<span class="kw-2">&amp;</span>last_kmer, <span class="kw-2">&amp;mut </span>links_in_scope) {
                 <span class="prelude-val">Some</span>(this_kmer) =&gt; {
                     contig.push(this_kmer[this_kmer.len() - <span class="number">1</span>]);
@@ -4636,7 +4638,7 @@
                 }
             }
         }
-    
+
         <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Stopping condition not satisfied"</span>))
     }
 
@@ -4749,7 +4751,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>links_in_scope: Vec&lt;Link&gt; = Vec::new();
         <span class="kw">let </span><span class="kw-2">mut </span>used_links = HashSet::new();
         <span class="kw">let </span><span class="kw-2">mut </span>last_kmer = start_kmer.clone();
-    
+
         <span class="kw">loop </span>{
             <span class="kw">if </span>stopping_condition(<span class="kw-2">&amp;</span>last_kmer, contig.len() - initial_contig_length, <span class="self">self</span>) {
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(last_kmer);
@@ -4758,7 +4760,7 @@
             <span class="kw">if </span>contig.len() - initial_contig_length &gt;= limit {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Reached limit without finding a stopping k-mer"</span>));
             }
-    
+
             <span class="self">self</span>.update_links(<span class="kw-2">&amp;mut </span>links_in_scope, <span class="kw-2">&amp;</span>last_kmer, <span class="kw-2">&amp;mut </span>used_links, <span class="bool-val">false</span>);
 
             <span class="kw">match </span><span class="self">self</span>.prev_kmer(<span class="kw-2">&amp;</span>last_kmer, <span class="kw-2">&amp;mut </span>links_in_scope) {
@@ -4771,7 +4773,7 @@
                 }
             }
         }
-    
+
         <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Stopping condition not satisfied"</span>))
     }
 
@@ -5350,7 +5352,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = fwd_stack.pop() {
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(this_kmer) {
                 <span class="kw">let </span>next_label = String::from_utf8_lossy(<span class="kw-2">&amp;</span>next_kmer).to_string();
                 <span class="kw">let </span>next_node = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>existing_node) = visited.get(<span class="kw-2">&amp;</span>next_label) {
@@ -5361,7 +5363,7 @@
                     fwd_stack.push(new_node);
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -5380,7 +5382,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = fwd_stack.pop() {
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(this_kmer) {
                 <span class="kw">let </span>next_label = String::from_utf8_lossy(<span class="kw-2">&amp;</span>next_kmer).to_string();
                 <span class="kw">let </span>next_node = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>existing_node) = visited.get(<span class="kw-2">&amp;</span>next_label) {
@@ -5397,7 +5399,7 @@
 
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -5421,16 +5423,16 @@
         </span>F: Fn(<span class="kw-2">&amp;</span>[u8], usize, <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool,
     {
         <span class="kw">let </span><span class="kw-2">mut </span>found = <span class="bool-val">false</span>;
-    
+
         <span class="comment">// Use a vector of tuples (node, depth) instead of just nodes
         </span><span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[(start_node, <span class="number">0</span>)];
         <span class="kw">while let </span><span class="prelude-val">Some</span>((node, depth)) = fwd_stack.pop() {
             <span class="kw">if </span>depth &gt;= limit {
                 <span class="kw">continue</span>; <span class="comment">// Skip this node if we've reached the depth limit
             </span>}
-    
+
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(this_kmer) {
                 <span class="kw">let </span>same_color = <span class="self">self</span>.sources.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[]) == <span class="kw-2">&amp;</span><span class="macro">vec!</span>[color];
                 <span class="kw">if </span>!same_color {
@@ -5443,17 +5445,17 @@
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>new_node = graph.add_node(next_label.clone());
                     visited.insert(next_label.clone(), new_node);
-    
+
                     <span class="kw">if </span>!stopping_condition(<span class="kw-2">&amp;</span>next_kmer, depth + <span class="number">1</span>, <span class="self">self</span>) {
                         <span class="comment">// Push the new node with an incremented depth
                         </span>fwd_stack.push((new_node, depth + <span class="number">1</span>));
                     } <span class="kw">else </span>{
                         found = <span class="bool-val">true</span>;
                     }
-    
+
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(node, next_node) {
                     graph.add_edge(
                         node,
@@ -5464,7 +5466,7 @@
                 }
             }
         }
-    
+
         <span class="kw">if </span>found {
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else </span>{
@@ -5476,7 +5478,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = rev_stack.pop() {
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(this_kmer) {
                 <span class="kw">let </span>prev_label = String::from_utf8_lossy(<span class="kw-2">&amp;</span>prev_kmer).to_string();
                 <span class="kw">let </span>prev_node = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>existing_node) = visited.get(<span class="kw-2">&amp;</span>prev_label) {
@@ -5487,7 +5489,7 @@
                     rev_stack.push(new_node);
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -5506,7 +5508,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = rev_stack.pop() {
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(this_kmer) {
                 <span class="kw">let </span>prev_label = String::from_utf8_lossy(<span class="kw-2">&amp;</span>prev_kmer).to_string();
                 <span class="kw">let </span>prev_node = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>existing_node) = visited.get(<span class="kw-2">&amp;</span>prev_label) {
@@ -5523,7 +5525,7 @@
 
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -5547,16 +5549,16 @@
         </span>F: Fn(<span class="kw-2">&amp;</span>[u8], usize, <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool,
     {
         <span class="kw">let </span><span class="kw-2">mut </span>found = <span class="bool-val">false</span>;
-    
+
         <span class="comment">// Use a vector of tuples (node, depth) instead of just nodes
         </span><span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[(start_node, <span class="number">0</span>)];
         <span class="kw">while let </span><span class="prelude-val">Some</span>((node, depth)) = rev_stack.pop() {
             <span class="kw">if </span>depth &gt;= limit {
                 <span class="kw">continue</span>; <span class="comment">// Skip this node if we've reached the depth limit
             </span>}
-    
+
             <span class="kw">let </span>this_kmer = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(this_kmer) {
                 <span class="kw">let </span>same_color = <span class="self">self</span>.sources.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)).unwrap_or(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[]) == <span class="kw-2">&amp;</span><span class="macro">vec!</span>[color];
                 <span class="kw">if </span>!same_color {
@@ -5569,17 +5571,17 @@
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>new_node = graph.add_node(prev_label.clone());
                     visited.insert(prev_label.clone(), new_node);
-    
+
                     <span class="kw">if </span>!stopping_condition(<span class="kw-2">&amp;</span>prev_kmer, depth + <span class="number">1</span>, <span class="self">self</span>) {
                         <span class="comment">// Push the new node with an incremented depth
                         </span>rev_stack.push((new_node, depth + <span class="number">1</span>));
                     } <span class="kw">else </span>{
                         found = <span class="bool-val">true</span>;
                     }
-    
+
                     new_node
                 };
-    
+
                 <span class="kw">if </span>!graph.contains_edge(prev_node, node) {
                     graph.add_edge(
                         prev_node,
@@ -5590,7 +5592,7 @@
                 }
             }
         }
-    
+
         <span class="kw">if </span>found {
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else </span>{
@@ -5633,38 +5635,38 @@
     <span class="kw">pub fn </span>traverse_contigs(<span class="kw-2">&amp;</span><span class="self">self</span>, start_kmer: Vec&lt;u8&gt;) -&gt; DiGraph&lt;String, f32&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();
         <span class="kw">let </span><span class="kw-2">mut </span>visited = HashMap::new();
-    
+
         <span class="kw">let </span>start_contig = <span class="self">self</span>.assemble(<span class="kw-2">&amp;</span>start_kmer);
         <span class="kw">let </span>start_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>start_contig).to_string());
-        
+
         <span class="comment">// Mark all k-mers in the start contig as visited
         </span><span class="kw">for </span>kmer <span class="kw">in </span>start_contig.windows(<span class="self">self</span>.kmer_size) {
             visited.insert(<span class="kw">crate</span>::utils::canonicalize_kmer(kmer), start_node);
         }
-    
+
         <span class="comment">// Traverse forward
         </span><span class="kw">let </span><span class="kw-2">mut </span>fwd_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = fwd_stack.pop() {
             <span class="kw">let </span>this_contig = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">if let </span><span class="prelude-val">Some</span>(last_kmer) = <span class="self">self</span>.last_kmer(this_contig) {
                 <span class="kw">for </span>next_kmer <span class="kw">in </span><span class="self">self</span>.next_kmers(<span class="kw-2">&amp;</span>last_kmer) {
                     <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)) {
                         <span class="kw">let </span><span class="kw-2">mut </span>next_contig = next_kmer.clone();
                         <span class="self">self</span>.assemble_forward(<span class="kw-2">&amp;mut </span>next_contig, next_kmer.clone());
-    
+
                         <span class="kw">let </span>weight = next_contig.windows(<span class="self">self</span>.kmer_size)
                             .map(|x| <span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(x)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>))
                             .fold(f32::INFINITY, |acc, x| acc.min(<span class="kw-2">*</span>x));
-    
+
                         <span class="kw">let </span>next_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>next_contig).to_string());
                         graph.add_edge(node, next_node, weight);
-    
+
                         <span class="comment">// Mark all k-mers in the new contig as visited
                         </span><span class="kw">for </span>kmer <span class="kw">in </span>next_contig.windows(<span class="self">self</span>.kmer_size) {
                             visited.insert(<span class="kw">crate</span>::utils::canonicalize_kmer(kmer), next_node);
                         }
-    
+
                         fwd_stack.push(next_node);
                     } <span class="kw">else </span>{
                         <span class="kw">let </span>next_node = <span class="kw-2">*</span>visited.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>next_kmer)).unwrap();
@@ -5676,30 +5678,30 @@
                 }
             }
         }
-    
+
         <span class="comment">// Traverse backward
         </span><span class="kw">let </span><span class="kw-2">mut </span>rev_stack = <span class="macro">vec!</span>[start_node];
         <span class="kw">while let </span><span class="prelude-val">Some</span>(node) = rev_stack.pop() {
             <span class="kw">let </span>this_contig = graph.node_weight(node).unwrap().as_bytes();
-    
+
             <span class="kw">if let </span><span class="prelude-val">Some</span>(first_kmer) = <span class="self">self</span>.first_kmer(this_contig) {
                 <span class="kw">for </span>prev_kmer <span class="kw">in </span><span class="self">self</span>.prev_kmers(<span class="kw-2">&amp;</span>first_kmer) {
                     <span class="kw">if </span>!visited.contains_key(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)) {
                         <span class="kw">let </span><span class="kw-2">mut </span>prev_contig = prev_kmer.clone();
                         <span class="self">self</span>.assemble_backward(<span class="kw-2">&amp;mut </span>prev_contig, prev_kmer.clone());
-    
+
                         <span class="kw">let </span>weight = prev_contig.windows(<span class="self">self</span>.kmer_size)
                             .map(|x| <span class="self">self</span>.scores.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(x)).unwrap_or(<span class="kw-2">&amp;</span><span class="number">1.0</span>))
                             .fold(f32::INFINITY, |acc, x| acc.min(<span class="kw-2">*</span>x));
-    
+
                         <span class="kw">let </span>prev_node = graph.add_node(String::from_utf8_lossy(<span class="kw-2">&amp;</span>prev_contig).to_string());
                         graph.add_edge(prev_node, node, weight);  <span class="comment">// Note the reversed edge direction
-    
+
                         // Mark all k-mers in the new contig as visited
                         </span><span class="kw">for </span>kmer <span class="kw">in </span>prev_contig.windows(<span class="self">self</span>.kmer_size) {
                             visited.insert(<span class="kw">crate</span>::utils::canonicalize_kmer(kmer), prev_node);
                         }
-    
+
                         rev_stack.push(prev_node);
                     } <span class="kw">else </span>{
                         <span class="kw">let </span>prev_node = <span class="kw-2">*</span>visited.get(<span class="kw-2">&amp;</span><span class="kw">crate</span>::utils::canonicalize_kmer(<span class="kw-2">&amp;</span>prev_kmer)).unwrap();
@@ -5711,7 +5713,7 @@
                 }
             }
         }
-    
+
         graph
     }
 
@@ -5820,7 +5822,7 @@
         <span class="kw">if </span>!visited.contains(<span class="kw-2">&amp;</span>node) {
             <span class="kw">let </span><span class="kw-2">mut </span>current_seq = Vec::new();
             <span class="kw">let </span><span class="kw-2">mut </span>current_node = node;
-        
+
             <span class="kw">loop </span>{
                 visited.insert(current_node);
                 <span class="kw">if </span>current_seq.is_empty() {
@@ -5828,7 +5830,7 @@
                 } <span class="kw">else </span>{
                     current_seq.push(graph[current_node].chars().last().unwrap().to_string());
                 }
-            
+
                 <span class="kw">let </span>outgoing_edges: Vec&lt;<span class="kw">_</span>&gt; = graph.edges_directed(current_node, petgraph::Direction::Outgoing).collect();
                 <span class="kw">if </span>outgoing_edges.len() == <span class="number">1 </span>{
                     <span class="kw">let </span>next_node = outgoing_edges[<span class="number">0</span>].target();
@@ -5841,7 +5843,7 @@
                     <span class="kw">break</span>;
                 }
             }
-        
+
             <span class="kw">if </span>current_seq.len() &gt; min_length {
                 <span class="kw">let </span>contig = current_seq.join(<span class="string">""</span>).as_bytes().to_vec();
                 corrected_seqs.push(contig);
@@ -6667,10 +6669,10 @@
     </span><span class="kw">fn </span>create_bubblegun_graph() -&gt; petgraph::Graph&lt;String, f32&gt; {
         <span class="comment">// Create a new directed graph
         </span><span class="kw">let </span><span class="kw-2">mut </span>graph = petgraph::Graph::&lt;String, f32&gt;::new();
-        
+
         <span class="comment">// Create a HashMap to store node indices
         </span><span class="kw">let </span><span class="kw-2">mut </span>node_indices = std::collections::HashMap::new();
-    
+
         <span class="comment">// Add nodes to the graph
         </span><span class="kw">let </span>gfa_nodes = <span class="macro">vec!</span>[
             (<span class="string">"1"</span>, <span class="string">"CCCAACAAGTG"</span>),
@@ -6689,12 +6691,12 @@
             (<span class="string">"311"</span>, <span class="string">"AGGCACCCCTGCATTAG"</span>),
             (<span class="string">"427"</span>, <span class="string">"CATTGACGCAACCGGCATTGAATACACAGGGTGT"</span>),
         ];
-    
+
         <span class="kw">for </span>(id, seq) <span class="kw">in </span>gfa_nodes {
             <span class="kw">let </span>node_index = graph.add_node(seq.to_string());
             node_indices.insert(id.to_string(), node_index);
         }
-    
+
         <span class="comment">// Add edges to the graph
         </span><span class="kw">let </span>gfa_edges = <span class="macro">vec!</span>[
             (<span class="string">"1"</span>, <span class="string">"7"</span>), (<span class="string">"1"</span>, <span class="string">"271"</span>),
@@ -6712,7 +6714,7 @@
             (<span class="string">"311"</span>, <span class="string">"197"</span>),
             (<span class="string">"427"</span>, <span class="string">"215"</span>),
         ];
-    
+
         <span class="kw">for </span>(from, to) <span class="kw">in </span>gfa_edges {
             <span class="kw">if let </span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>from_index), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>to_index)) = (node_indices.get(from), node_indices.get(to)) {
                 graph.add_edge(from_index, to_index, <span class="number">1.0</span>);

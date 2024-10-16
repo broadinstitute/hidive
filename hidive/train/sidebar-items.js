@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["distance_to_a_contig_end","start"]};
+window.SIDEBAR_ITEMS = {"fn":["compute_fpr_tpr","compute_precision_recall_f1","create_dataset_for_model","distance_to_a_contig_end","plot_roc_curve","process_reads","start"]};
