@@ -119,11 +119,20 @@ task SNP2HLA {
 
     command <<<
         set -euxo pipefail
+
+        # we do single-sample phased VCFs localization ourselves
+        time \
+        gcloud storage cp ~{sep=" " genotype} /cromwell_root/
+
+        time \
+        gcloud storage cp ~{sep=" " reference} /cromwell_root/
+
+
         cd /HLA-TAPAS
         python -m SNP2HLA \
-        --target ~{genotype_prefix} \
+        --target "/cromwell_root/~{genotype_prefix}" \
         --out ~{outputprefix} \
-        --reference ~{reference_prefix} \
+        --reference "/cromwell_root/~{reference_prefix}" \
         --nthreads 2 \
         --mem 4g
 
