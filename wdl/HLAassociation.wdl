@@ -74,7 +74,10 @@ task MakeReference {
         Int memory
     }
     command <<<
-        plink --vcf ~{reference_vcf} --make-bed --out ~{outputprefix}
+        
+        plink --vcf ~{reference_vcf} --keep-allele-order --make-bed --out ~{outputprefix}
+        plink --bfile ~{outputprefix} --freq --out ~{outputprefix}.FRQ
+        zcat ~{reference_vcf} | grep -v "#" | awk '{print $3,$2,$4,$5}' > ~{outputprefix}.markers
         plink --bfile ~{outputprefix} --hardy --allow-no-sex --out ~{outputprefix}.miss.frq.diff
         cat ~{outputprefix}.miss.frq.diff.hwe | awk '/ALL/{split($6,V,"/"); if(V[1]+V[2]+V[3]==0){Freq=0}else{Freq=(V[2]/2+V[1])/(V[1]+V[2]+V[3])}print $2, $4, $5, Freq}' > ~{outputprefix}.miss.frq.diff.hwe.freq 
         cat ~{outputprefix}.miss.frq.diff.hwe.freq | sort -k1,1 | join - <(cat ~{outputprefix}.bim | awk '{print $2, $1 "_" $4}' | sort -k1,1) | awk '{print $5, $2, $3, $4}' | sort -k1,1 > ~{outputprefix}.Ref.Frq.chr_pos_allele
