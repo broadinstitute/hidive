@@ -117,6 +117,11 @@ task SNP2HLA {
         Int memory
     }
 
+    parameter_meta {
+        genotype: {localization_optional: true}
+        reference: {localization_optional: true}
+    }
+
     command <<<
         set -euxo pipefail
 
