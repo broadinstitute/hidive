@@ -182,12 +182,20 @@ task SNP2HLA {
 
 
         cd /HLA-TAPAS
-        python -m SNP2HLA \
-        --target "/cromwell_root/~{genotype_prefix}" \
-        --out ~{outputprefix} \
-        --reference "/cromwell_root/~{reference_prefix}" \
-        --nthreads 2 \
-        --mem 4g
+
+        python /HLA-TAPAS/dependency/SNP2HLA.py \
+        -i "/cromwell_root/~{genotype_prefix}" \
+        -o ~{outputprefix} \
+        -rf "/cromwell_root/~{reference_prefix}" \
+        --nthreads 10 \
+        --java-mem=80g --tolerated-diff=0.5
+        
+        # python -m SNP2HLA \
+        # --target "/cromwell_root/~{genotype_prefix}" \
+        # --out ~{outputprefix} \
+        # --reference "/cromwell_root/~{reference_prefix}" \
+        # --nthreads 2 \
+        # --mem 4g
 
         cp "~{outputprefix}*" "/cromwell_root"
 
