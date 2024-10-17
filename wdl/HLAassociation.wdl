@@ -146,9 +146,15 @@ task SNP2HLA {
         genotype: {localization_optional: true}
         reference: {localization_optional: true}
     }
-
+    
+    String docker_dir = "/"
+    String work_dir = "/cromwell_root/"
+    
     command <<<
         set -euxo pipefail
+
+        cp ~{docker_dir}/rename_bim.py ~{work_dir}/rename_bim.py
+        cd ~{work_dir}
 
         # we do single-sample phased VCFs localization ourselves
         time \
@@ -159,7 +165,7 @@ task SNP2HLA {
 
 
         mv ~{genotype_prefix}.bim ~{genotype_prefix}.bim.old
-        python /rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
+        python rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
 
 
         cd /HLA-TAPAS
