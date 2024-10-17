@@ -159,7 +159,7 @@ task SNP2HLA {
 
 
         mv ~{genotype_prefix}.bim ~{genotype_prefix}.bim.old
-        python rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
+        python /rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
 
 
         cd /HLA-TAPAS
