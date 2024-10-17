@@ -60,8 +60,21 @@ task FormatTransition {
         String outputprefix
         Int memory
     }
+
+    String docker_dir = "/"
+    String work_dir = "/cromwell_root/"
+
     command <<<
+
+        cp ~{docker_dir}/get_duprem_var.py ~{work_dir}/get_duprem_var.py
+        cd ~{work_dir}
+
         plink --vcf ~{vcf} --make-bed --out ~{outputprefix} --vcf-half-call m 
+        # remove duplicated SNPs
+        plink --bfile ~{outputprefix} --missing --out ~{outputprefix}
+        python get_duprem_var.py ~{outputprefix}
+        plink --bfile ~{outputprefix}  --exclude ~{outputprefix}.remdup.snp --make-bed --out ~{outputprefix}
+
     >>>
 
     output {
