@@ -5,6 +5,7 @@ workflow HLAAssociation {
     input {
         File genotype_vcf
         File reference_vcf
+        File reference_vcf_tbi
         String prefix
         String referenceprefix
         String outputprefix
@@ -18,6 +19,7 @@ workflow HLAAssociation {
 
     call MakeReference { input:
         reference_vcf = reference_vcf,
+        reference_vcf_tbi = reference_vcf_tbi,
         outputprefix = referenceprefix,
         memory = makereferencememory
     }
@@ -70,6 +72,7 @@ task FormatTransition {
 task MakeReference {
     input {
         File reference_vcf
+        File reference_vcf_tbi
         String outputprefix
         Int memory
     }
@@ -79,6 +82,7 @@ task MakeReference {
         plink --bfile ~{outputprefix} --freq --out ~{outputprefix}.FRQ
         zcat ~{reference_vcf} | grep -v "#" | awk '{print $3,$2,$4,$5}' > ~{outputprefix}.markers
         mv ~{reference_vcf} ~{outputprefix}.bglv4.bgl.phased.vcf.gz
+        mv ~{reference_vcf_tbi} ~{outputprefix}.bglv4.bgl.phased.vcf.gz.tbi
 
         plink --bfile ~{outputprefix} --hardy --allow-no-sex --out ~{outputprefix}.miss.frq.diff
         cat ~{outputprefix}.miss.frq.diff.hwe | awk '/ALL/{split($6,V,"/"); if(V[1]+V[2]+V[3]==0){Freq=0}else{Freq=(V[2]/2+V[1])/(V[1]+V[2]+V[3])}print $2, $4, $5, Freq}' > ~{outputprefix}.miss.frq.diff.hwe.freq 
