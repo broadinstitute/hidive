@@ -158,6 +158,10 @@ task SNP2HLA {
         gcloud storage cp ~{sep=" " reference} /cromwell_root/
 
 
+        mv ~{genotype_prefix}.bim ~{genotype_prefix}.bim.old
+        python rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
+
+
         cd /HLA-TAPAS
         python -m SNP2HLA \
         --target "/cromwell_root/~{genotype_prefix}" \
