@@ -231,6 +231,9 @@ task Association {
     command <<<
         set -euxo pipefail
 
+        time \
+        gcloud storage cp ~{sep=" " imputed_data} /cromwell_root/
+
         # Created ${imputed}.{psam, pgen, pvar}
         plink2 \
             --vcf ~{prefix}.bgl.phased.vcf.gz dosage=DS \
