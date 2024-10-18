@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 use needletail::Sequence;
 use parquet::data_type::AsBytes;
-use petgraph::graph::DiGraph;
-use petgraph::visit::{EdgeRef};
+use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
 /// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
 /// without any of the provided extensions. It does this by first extracting the last segment of the URL path,
@@ -31,11 +31,6 @@ use petgraph::visit::{EdgeRef};
 /// let basename = basename_without_extension(&url, &extensions);
 /// assert_eq!(basename, "file");
 /// ```
-/// # Panics
-///
-/// * The URL path segments are empty (`path_segments().is_empty()`)
-/// * There is no last segment in the path segments (`last().is_none()`)
-#[must_use]
 pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> String {
     let mut basename = seq_url
         .path_segments()
@@ -55,16 +50,25 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     basename
 }
 
-/// Displays a progress bar with defined total length
-///
-/// # Argument
-///
-/// * 'msg' - a message to display
-/// * 'len' - length of tasks
-///
-/// # Panics
-///
-/// If the template creation for the progress bar style fails.
+pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
+    paths
+        .iter()
+        .map(|p| {
+            let reader = bio::io::fasta::Reader::from_file(p).expect("Failed to open file");
+            reader
+                .records()
+                .filter_map(|r| r.ok())
+                .map(|r| r.seq().to_vec())
+                .collect::<Vec<Vec<u8>>>()
+        })
+        .flatten()
+        .collect::<Vec<Vec<u8>>>()
+}
+
+pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
+    indicatif::ProgressBar::hidden()
+}
+
 pub fn default_bounded_progress_bar(
     msg: impl Into<Cow<'static, str>>,
     len: u64,
@@ -83,15 +87,6 @@ pub fn default_bounded_progress_bar(
     progress_bar
 }
 
-/// Displays a spinner without a defined total length
-///
-/// # Argument
-///
-/// * 'msg' - a message to display
-///
-/// # Panics
-///
-/// If the template creation for the progress bar style fails.
 pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indicatif::ProgressBar {
     let progress_bar_style = indicatif::ProgressStyle::default_bar()
         .template("{msg} ... [{elapsed_precise}] {human_pos}")
@@ -115,7 +110,6 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
 ///
 /// A vector containing the canonical k-mer.
 #[inline(always)]
-#[must_use]
 pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     let rc_kmer = kmer.reverse_complement();
     if kmer < rc_kmer.as_bytes() {
@@ -125,7 +119,6 @@ pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     }
 }
 
-#[must_use]
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
@@ -140,26 +133,25 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
-/// Writes the contents of a directed graph (graph) in the Genome File Format (GFA)
-/// to a specified writer (writer). GFA is a text-based format for
-/// representing graphs commonly used in genomics.
-///
-/// # Arguments
-///
-/// * `writer` - A mutable reference to a writer object.
-/// * `graph` - A reference to a directed graph object.
-///
-/// # Returns
-///
-/// An `io::Result` object.
-///
-/// # Errors
-///
-/// If the writer encounters an error while writing to the output stream.
-///
-/// # Panics
-///
-/// If the writer encounters an error while writing to the output stream.
+pub fn shannon_entropy(seq: &[u8]) -> f32 {
+    let mut freq = HashMap::new();
+    let len = seq.len() as f32;
+
+    for &base in seq {
+        *freq.entry(base).or_insert(0) += 1;
+    }
+
+    -freq.values().map(|&count| {
+        let p = count as f32 / len;
+        p * p.log2()
+    }).sum::<f32>()
+}
+
+pub fn gc_content(seq: &[u8]) -> f32 {
+    let gc_count = seq.iter().filter(|&&base| base == b'G' || base == b'C').count();
+    gc_count as f32 / seq.len() as f32
+}
+
 pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
@@ -173,31 +165,12 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     for edge in graph.edge_references() {
         let (from, to) = (edge.source().index(), edge.target().index());
         let weight = edge.weight();
-
-        #[allow(clippy::cast_possible_truncation)]
-        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, u8::try_from((100.0 * weight).round() as i32).unwrap_or_default())?;
+        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, (100.0*weight).round() as u8)?;
     }
 
     Ok(())
 }
 
-/// Reads a directed graph in the Genome File Format (GFA) from a specified file path.
-///
-/// # Arguments
-///
-/// * `path` - A reference to a path object representing the file path.
-///
-/// # Returns
-///
-/// A `Result` object containing a directed graph object.
-///
-/// # Errors
-///
-/// If the file cannot be opened or read.
-///
-/// # Panics
-///
-/// If the file cannot be opened or read.
 pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -216,13 +189,18 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                 node_map.insert(id.to_string(), node_index);
             },
             "L" => {
+                if fields.len() < 6 {
+                    continue; // Skip malformed lines
+                }
                 let from_id = fields[1];
+                // let from_orient = fields[2];
                 let to_id = fields[3];
-                let weight = fields[5]
-                    .split(':')
-                    .last()
+                // let to_orient = fields[4];
+
+                let weight = fields.get(5)
+                    .and_then(|s| s.split(':').last())
                     .and_then(|s| s.parse::<f32>().ok())
-                    .unwrap_or(1.0) / 100.0;
+                    .unwrap_or(1.0);
 
                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
                     graph.add_edge(from, to, weight);

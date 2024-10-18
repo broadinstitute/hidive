@@ -167,6 +167,7 @@ fn extract_aligned_bam_reads(
     chr: &str,
     start: &u64,
     stop: &u64,
+    name: &str,
 ) -> Result<Vec<fasta::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
@@ -184,7 +185,7 @@ fn extract_aligned_bam_reads(
                     Err(_) => String::from("unknown"),
                 };
 
-                let seq_name = format!("{}|{}", qname, sm);
+                let seq_name = format!("{}|{}|{}", qname, name, sm);
 
                 if !bmap.contains_key(&seq_name) {
                     bmap.insert(seq_name.to_owned(), String::new());
@@ -254,20 +255,25 @@ fn extract_fasta_seqs(
     chr: &String,
     start: &u64,
     stop: &u64,
+    name: &String,
 ) -> Result<Vec<fasta::Record>> {
-    let id = format!("{}:{}-{}|{}", chr, start, stop, basename);
+    let id = format!("{}:{}-{}|{}|{}", chr, start, stop, name, basename);
     let seq = fasta
         .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
-    let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
+    if seq.len() > 0 {
+        let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
 
-    Ok(records)
+        return Ok(records);
+    }
+
+    Err(anyhow::anyhow!("No sequence found for locus: {}", id))
 }
 
 // Function to stage data from a single file.
 fn stage_data_from_one_file(
     seqs_url: &Url,
-    loci: &HashSet<(String, u64, u64)>,
+    loci: &HashSet<(String, u64, u64, String)>,
     unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
     let mut all_seqs = Vec::new();
@@ -290,9 +296,9 @@ fn stage_data_from_one_file(
         let mut bam = open_bam(seqs_url)?;
 
         // Extract seqs for the current locus.
-        for (chr, start, stop) in loci.iter() {
+        for (chr, start, stop, name) in loci.iter() {
             let aligned_seqs =
-                extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop).unwrap();
+                extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop, name).unwrap();
             all_seqs.extend(aligned_seqs);
         }
 
@@ -315,9 +321,10 @@ fn stage_data_from_one_file(
             .to_string();
         let mut fasta = open_fasta(seqs_url)?;
 
-        for (chr, start, stop) in loci.iter() {
+        for (chr, start, stop, name) in loci.iter() {
             // Extract seqs for the current locus.
-            let seqs = extract_fasta_seqs(&basename, &mut fasta, chr, start, stop).unwrap();
+            let seqs = extract_fasta_seqs(&basename, &mut fasta, chr, start, stop, name)
+                .map_or_else(|_| Vec::new(), |s| s);
 
             // Extend the all_seqs vector with the seqs from the current locus.
             all_seqs.extend(seqs);
@@ -333,7 +340,7 @@ fn stage_data_from_one_file(
 // Function to stage data from multiple BAM files.
 fn stage_data_from_all_files(
     seq_urls: &HashSet<Url>,
-    loci: &HashSet<(String, u64, u64)>,
+    loci: &HashSet<(String, u64, u64, String)>,
     unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
@@ -395,7 +402,7 @@ pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>
 ///
 pub fn stage_data(
     output_path: &PathBuf,
-    loci: &HashSet<(String, u64, u64)>,
+    loci: &HashSet<(String, u64, u64, String)>,
     seq_urls: &HashSet<Url>,
     unmapped: bool,
     cache_path: &PathBuf,
@@ -450,7 +457,7 @@ mod tests {
         let seqs_url = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
+        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
 
         let result = stage_data_from_one_file(&seqs_url, &loci, false);
 
@@ -462,7 +469,7 @@ mod tests {
         let cache_path = std::env::temp_dir();
         let output_path = cache_path.join("test.bam");
 
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
+        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
         let seqs_url = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
@@ -486,7 +493,7 @@ mod tests {
         let seqs_url_2 = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         ).unwrap();
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918)]);
+        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
         let seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         let result = stage_data(&output_path, &loci, &seq_urls, false, &cache_path);

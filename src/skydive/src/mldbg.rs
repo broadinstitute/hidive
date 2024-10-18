@@ -1,110 +1,74 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
-use crate::ldbg::LdBG;
+use gbdt::{decision_tree::Data, gradient_boost::GBDT};
+use itertools::Itertools;
+
+use crate::{ldbg::LdBG, record::Record};
 
 /// Represents a multi-color linked de Bruijn graph, all built with same k-mer size.
 #[derive(Debug)]
 pub struct MLdBG {
     pub kmer_size: usize,
     pub ldbgs: Vec<LdBG>,
+    pub scores: HashMap<Vec<u8>, f32>,
 }
 
 impl MLdBG {
-    /// Create an empty multi-color `LdBG`.
-    #[must_use]
+    /// Create an empty multi-color LdBG.
     pub fn new(kmer_size: usize) -> Self {
         MLdBG {
             kmer_size,
             ldbgs: Vec::new(),
+            scores: HashMap::new(),
         }
     }
 
-    /// Create an `MLdBG` from a vector of `LdBGs`.
-    ///
-    /// # Arguments
-    ///
-    /// * `ldbgs` - A vector of `LdBGs`.
-    ///
-    /// # Returns
-    ///
-    /// A multi-color `LdBG`.
-    ///
-    /// # Panics
-    ///
-    /// If the k-mer size of the `LdBGs` do not match.
-    #[must_use]
+    /// Create an MLdBG from a vector of LdBGs.
     pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
         let kmer_size = ldbgs[0].kmer_size;
 
         for ldbg in &ldbgs {
             assert!(
                 ldbg.kmer_size == kmer_size,
-                "The k-mer size of the `LdBG` does not match the k-mer size of the MLdBG."
+                "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
             );
         }
 
         MLdBG {
             kmer_size,
             ldbgs,
+            scores: HashMap::new(),
         }
     }
 
-    /// Add a `LdBG` to the `MLdBG`.
-    ///
-    /// # Arguments
-    ///
-    /// * `ldbg` - The `LdBG` to add.
-    ///
-    /// # Panics
-    ///
-    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
+    /// Add a LdBG to the MLdBG.
     pub fn push(&mut self, ldbg: LdBG) {
         assert!(
             ldbg.kmer_size == self.kmer_size,
-            "The k-mer size of the `LdBG` does not match the k-mer size of the MLdBG."
+            "The k-mer size of the LdBG does not match the k-mer size of the MLdBG."
         );
 
         self.ldbgs.push(ldbg);
     }
 
-    /// Insert a `LdBG` at a specific position in the `MLdBG`.
+    /// Insert a LdBG at a specific position in the MLdBG.
     pub fn insert(&mut self, index: usize, ldbg: LdBG) {
         if index <= self.ldbgs.len() {
             self.ldbgs.insert(index, ldbg);
         }
     }
 
-    /// Append a `LdBG` to the end of the `MLdBG`.
+    /// Append a LdBG to the end of the MLdBG.
     pub fn append(&mut self, ldbg: LdBG) {
         self.ldbgs.push(ldbg);
     }
 
-    /// Append an `LdBG` to the end of the `MLdBG`, created anew from a fasta file.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the `LdBG`.
-    /// * `seq_path` - The path to the fasta file.
-    ///
-    /// # Panics
-    ///
-    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
+    /// Append an LdBG to the end of the MLdBG, created anew from a fasta file.
     pub fn append_from_file(&mut self, name: String, seq_path: &PathBuf) {
         let l = LdBG::from_file(name, self.kmer_size, seq_path);
         self.ldbgs.push(l);
     }
 
-    /// Append an `LdBG` to the end of the `MLdBG`, created anew from a fasta file, with a filter.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the `LdBG`.
-    /// * `seq_path` - The path to the fasta file.
-    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
-    ///
-    /// # Panics
-    ///
-    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
     pub fn append_from_filtered_file<F>(&mut self, name: String, seq_path: &PathBuf, filter: F)
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
@@ -128,21 +92,59 @@ impl MLdBG {
         self.ldbgs.push(l);
     }
 
-    /// Filter reads from a fasta file based on a closure and return the filtered reads.
-    /// The closure takes a fasta record and a set of kmers and returns a boolean.
-    ///
-    /// # Arguments
-    ///
-    /// * `seq_path` - The path to the fasta file.
-    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
-    ///
-    /// # Returns
-    ///
-    /// A vector of byte vectors representing the filtered reads.
-    ///
-    /// # Panics
-    ///
-    /// If the k-mer size of the `LdBG` does not match the k-mer size of the `MLdBG`.
+    pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
+        let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
+
+        self.scores = self.union_of_kmers().iter().map(|cn_kmer| {
+            let mut features = vec![];
+
+            for ldbg in &self.ldbgs {
+                let cov = ldbg.kmers.get(cn_kmer).map_or(0, |record| record.coverage());
+                features.push(cov as f32);
+            }
+
+            let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
+            features.push(compressed_len as f32);
+
+            let data = Data::new_test_data(features, Some(0.0));
+            let prediction = *gbdt.predict(&vec![data]).first().unwrap_or(&0.0);
+
+            (cn_kmer.clone(), prediction)
+        }).collect();
+
+        self
+    }
+
+    pub fn collapse(&mut self) -> LdBG {
+        let mut ldbg = LdBG::new(self.ldbgs[0].name.clone(), self.kmer_size);
+
+        for cn_kmer in self.union_of_kmers() {
+            let coverage = self.ldbgs
+                .iter()
+                .map(|ldbg|
+                    ldbg.kmers
+                        .get(&cn_kmer)
+                        .map_or(0, |record| record.coverage())
+                )
+                .sum::<u16>();
+
+            let sources = self.ldbgs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, ldbg)| if ldbg.kmers.contains_key(&cn_kmer) { Some(index) } else { None })
+                .collect::<Vec<_>>();
+
+            ldbg.kmers.insert(cn_kmer.clone(), Record::new(coverage, None));
+            ldbg.sources.insert(cn_kmer.clone(), sources);
+        }
+
+        ldbg.scores = self.scores.clone();
+
+        ldbg.infer_edges();
+
+        ldbg
+    }
+
     pub fn filter_reads<F>(&mut self, seq_path: &PathBuf, filter: F) -> Vec<Vec<u8>>
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
@@ -161,8 +163,7 @@ impl MLdBG {
         filtered_reads
     }
 
-    /// Get the union of kmers from all `LdBGs` in the `MLdBG`.
-    #[must_use]
+    /// Get the union of kmers from all LdBGs in the MLdBG.
     pub fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
         let mut kmer_union = HashSet::new();
 
@@ -175,28 +176,27 @@ impl MLdBG {
         kmer_union
     }
 
-    /// Get a reference to the `LdBG` at a specific index.
-    #[must_use]
+    /// Get a reference to the LdBG at a specific index.
     pub fn get(&self, index: usize) -> Option<&LdBG> {
         self.ldbgs.get(index)
     }
 
-    /// Returns an iterator over the `LdBGs` in the `MLdBG`.
+    /// Returns an iterator over the LdBGs in the MLdBG.
     pub fn iter(&self) -> std::slice::Iter<LdBG> {
         self.ldbgs.iter()
     }
 
-    /// Returns a mutable iterator over the `LdBGs` in the `MLdBG`.
+    /// Returns a mutable iterator over the LdBGs in the MLdBG.
     pub fn iter_mut(&mut self) -> std::slice::IterMut<LdBG> {
         self.ldbgs.iter_mut()
     }
 
-    /// Clear all `LdBGs` from the `MLdBG`.
+    /// Clear all LdBGs from the MLdBG.
     pub fn clear(&mut self) {
         self.ldbgs.clear();
     }
 
-    /// Remove a `LdBG` from the `MLdBG` by index.
+    /// Remove a LdBG from the MLdBG by index.
     pub fn remove(&mut self, index: usize) -> Option<LdBG> {
         if index < self.ldbgs.len() {
             Some(self.ldbgs.remove(index))
@@ -205,24 +205,22 @@ impl MLdBG {
         }
     }
 
-    /// Returns the number of `LdBGs` in the `MLdBG`.
-    #[must_use]
+    /// Returns the number of LdBGs in the MLdBG.
     pub fn len(&self) -> usize {
         self.ldbgs.len()
     }
 
-    /// Check if the `MLdBG` is empty.
-    #[must_use]
+    /// Check if the MLdBG is empty.
     pub fn is_empty(&self) -> bool {
         self.ldbgs.is_empty()
     }
 
-    /// Remove and return the last `LdBG` from the `MLdBG`.
+    /// Remove and return the last LdBG from the MLdBG.
     pub fn pop(&mut self) -> Option<LdBG> {
         self.ldbgs.pop()
     }
 
-    /// Remove and return the `LdBG` from the `MLdBG` if it matches a certain condition.
+    /// Remove and return the LdBG from the MLdBG if it matches a certain condition.
     pub fn pop_if<F>(&mut self, condition: F) -> Option<LdBG>
     where
         F: Fn(&LdBG) -> bool,

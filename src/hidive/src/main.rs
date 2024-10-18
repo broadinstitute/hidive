@@ -52,16 +52,18 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod assemble;
 mod build;
 mod cluster;
 mod coassemble;
+mod correct;
 mod fetch;
 mod filter;
 mod impute;
 mod rescue;
+mod recruit;
 mod train;
 mod trim;
+mod eval_model;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -76,7 +78,7 @@ const DEFAULT_KMER_SIZE: usize = 17;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Train a graph-cleaning model using long- and (optionally) short-read data with ground truth assemblies.
+    /// Train a error correction model with reads and ground truth assemblies.
     #[clap(arg_required_else_help = true)]
     Train {
         /// Output path for trained model.
@@ -87,9 +89,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
 
-        /// Test split.
-        #[clap(short, long, value_parser, default_value_t = 0.2)]
-        test_split: f32,
+        // /// Test split.
+        // #[clap(short, long, value_parser, default_value_t = 0.2)]
+        // test_split: f32,
 
         /// Number of training iterations.
         #[clap(short, long, value_parser, default_value_t = 50)]
@@ -104,28 +106,71 @@ enum Commands {
         short_read_seq_paths: Vec<PathBuf>,
 
         /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
-        #[clap(value_parser, required = true)]
+        #[clap(long, value_parser, required = true, num_args = 2)]
         truth_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false)]
+        test_long_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false)]
+        test_short_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        /// for testing
+        #[clap(long, value_parser, required = false, num_args = 2)]
+        test_truth_seq_paths: Vec<PathBuf>,
 
         /// Turn on debug mode.
         #[clap(short, long, value_parser)]
         debug: bool,
     },
 
-    /// Stream selected loci from FASTA and long-read WGS BAM files stored locally or in Google Cloud Storage.
+    /// Evaluate a trained model using long- and (optionally) short-read data with ground truth assemblies.
+    #[clap(arg_required_else_help = true)]
+    EvalModel {
+        /// Output path for trained model.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = true)]
+        long_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        #[clap(short, long, value_parser, required = false)]
+        short_read_seq_paths: Vec<PathBuf>,
+
+        /// Indexed BAM files to use as ground truth (usually from ultra-high-quality assemblies).
+        #[clap(long, value_parser, required = true, num_args = 2)]
+        truth_seq_paths: Vec<PathBuf>,
+
+        /// Path to trained model.
+        #[clap(short, long, value_parser, required = true)]
+        model_path: PathBuf,
+    },
+
+    /// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
         /// Output path for FASTA file with reads spanning locus of interest.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Zero or more genomic loci ("contig:start-stop") to extract from WGS BAM files.
-        #[clap(short, long, value_parser, required = false)]
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
 
         /// Include unmapped reads.
-        #[clap(short, long, value_parser)]
-        unmapped: bool,
+        #[clap(short, long, value_parser, default_value_t = 0)]
+        padding: u64,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
@@ -147,6 +192,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
+        /// Restrict processing to these contigs.
+        #[clap(short, long, value_parser, required = false)]
+        contigs: Vec<String>,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -156,15 +205,39 @@ enum Commands {
         seq_paths: Vec<PathBuf>,
     },
 
-    /// Optionally further filter rescued reads to those most closely matching a long-read draft assembly.
+    /// From rescued reads, recruit subset reads that are similar to input long reads.
+    #[clap(arg_required_else_help = true)]
+    Recruit {
+        /// Output path for FASTA file with reads spanning locus of interest.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Minimum percentage of k-mers to require before examining a read more carefully.
+        #[clap(short, long, value_parser, default_value_t = 70)]
+        min_kmers_pct: usize,
+
+        /// FASTA files with reads to use as a filter for finding more reads.
+        #[clap(short, long, value_parser, required = true)]
+        fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files from which to extract relevant sequences.
+        #[clap(required = true, value_parser)]
+        seq_paths: Vec<PathBuf>,
+    },
+
+    /// Further filter rescued reads to those most closely matching a long-read draft assembly.
     #[clap(arg_required_else_help = true)]
     Filter {
         /// Output path for filtered short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// GFA file with pre-assembled long-read sequences (e.g. from miniasm).
-        #[clap(short, long, value_parser, required = true)]
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(short, long, value_parser)]
         gfa_path: PathBuf,
 
         /// FASTA files with short-read sequences (may contain one or more samples).
@@ -182,6 +255,10 @@ enum Commands {
         /// Kmer-size
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
+
+        /// Jaccard threshold
+        #[clap(short, long, value_parser, default_value_t = 0.9)]
+        jaccard_threshold: f64,
 
         /// Multi-sample FASTA file with reads spanning locus of interest.
         #[clap(required = true, value_parser)]
@@ -236,30 +313,35 @@ enum Commands {
         graph: PathBuf,
     },
 
-    /// Assemble target locus from long-read data in anchor-based series-parallel graph.
+    /// Error-correct long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
-    Assemble {
-        /// Output path for assembled long-read sequences.
-        #[clap(short, long, value_parser)]
+    Correct {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Series-parallel graph.
-        #[clap(required = true, value_parser)]
-        graph: PathBuf,
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, required = false)]
+        gfa_output: Option<PathBuf>,
 
-        #[clap(required = true, value_parser)]
-        reads: PathBuf,
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
 
-        ///K nearest _neighbor
-        #[clap(required = true, value_parser, default_value_t = 3)]
-        k_nearest_neighbor: usize,
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
 
-        ///Sample_ID
+        /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        sample: String
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
     },
 
-    /// Co-assemble target locus from long-read and short-read data using a linked de Bruijn graph.
+    /// Co-assemble target locus from long- and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
         /// Output path for assembled short-read sequences.
@@ -274,13 +356,17 @@ enum Commands {
         #[clap(short, long, required = true, value_parser)]
         model_path: PathBuf,
 
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(short, long, required = false, value_parser)]
-        short_read_fasta_paths: Vec<PathBuf>,
+        /// FASTA files with reference subsequences.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_paths: Vec<PathBuf>,
 
         /// FASTA files with long-read sequences (may contain one or more samples).
         #[clap(required = true, value_parser)]
-        long_read_fasta_paths: Vec<PathBuf>,
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = false, value_parser)]
+        short_read_fasta_path: PathBuf,
     },
 }
 
@@ -296,58 +382,88 @@ fn main() {
         Commands::Train {
             output,
             kmer_size,
-            test_split,
+            // test_split,
             iterations,
             long_read_seq_paths,
             short_read_seq_paths,
             truth_seq_paths,
+            test_long_read_seq_paths,
+            test_short_read_seq_paths,
+            test_truth_seq_paths,
             debug,
         } => {
             train::start(
                 &output,
                 kmer_size,
                 iterations,
-                test_split,
+                // test_split,
                 &long_read_seq_paths,
                 &short_read_seq_paths,
                 &truth_seq_paths,
+                &test_long_read_seq_paths,
+                &test_short_read_seq_paths,
+                &test_truth_seq_paths,
                 debug,
+            );
+        }
+        Commands::EvalModel {
+            output,
+            kmer_size,
+            long_read_seq_paths,
+            short_read_seq_paths,
+            truth_seq_paths,
+            model_path,
+        } => {
+            eval_model::start(
+                &output,
+                kmer_size,
+                &long_read_seq_paths,
+                &short_read_seq_paths,
+                &truth_seq_paths,
+                &model_path,
             );
         }
         Commands::Fetch {
             output,
             loci,
-            unmapped,
+            padding,
             seq_paths,
         } => {
-            fetch::start(&output, &loci, unmapped, &seq_paths);
+            fetch::start(&output, &loci, padding, &seq_paths);
         }
         Commands::Rescue {
+            output,
+            kmer_size,
+            min_kmers_pct: min_kmers,
+            contigs,
+            fasta_paths,
+            seq_paths,
+        } => {
+            rescue::start(&output, kmer_size, min_kmers, &contigs, &fasta_paths, &seq_paths);
+        }
+        Commands::Recruit {
             output,
             kmer_size,
             min_kmers_pct: min_kmers,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+            recruit::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
         }
         Commands::Filter {
             output,
             gfa_path,
             short_read_fasta_paths,
         } => {
-            filter::start(
-                &output,
-                &gfa_path,
-                &short_read_fasta_paths,
-            );
+            filter::start(&output, &gfa_path, &short_read_fasta_paths);
         }
         Commands::Cluster {
             output,
             kmer_size,
+            jaccard_threshold,
             fasta_path,
         } => {
-            cluster::start(&output, kmer_size, &fasta_path);
+            cluster::start(&output, kmer_size, jaccard_threshold, &fasta_path);
         }
         Commands::Trim {
             output,
@@ -367,22 +483,31 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Assemble { output, graph, reads, k_nearest_neighbor , sample} => {
-            assemble::start(&output, &graph, &reads, k_nearest_neighbor, &sample);
+        Commands::Correct {
+            output,
+            gfa_output,
+            kmer_size,
+            model_path,
+            long_read_fasta_path,
+            short_read_fasta_path,
+        } => {
+            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
         }
         Commands::Coassemble {
             output,
-            model_path,
             kmer_size,
-            long_read_fasta_paths,
-            short_read_fasta_paths,
+            model_path,
+            reference_fasta_paths,
+            long_read_fasta_path,
+            short_read_fasta_path,
         } => {
             coassemble::start(
                 &output,
                 kmer_size,
                 &model_path,
-                &long_read_fasta_paths,
-                &short_read_fasta_paths,
+                &reference_fasta_paths,
+                long_read_fasta_path,
+                short_read_fasta_path
             );
         }
     }

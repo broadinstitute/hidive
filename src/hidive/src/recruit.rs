@@ -18,19 +18,17 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, Read};
 
 // Import the skydive module, which contains the necessary functions for staging data
+use skydive;
 
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
-    contigs: &Vec<String>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
 ) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
-
-    let contigs = contigs.iter().map(|c| c.to_string()).collect::<HashSet<String>>();
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
@@ -54,10 +52,10 @@ pub fn start(
         }
     }
 
-    // Read the CRAM files and search for the k-mers in each read.
+    // Read the FASTA files and search for the k-mers in each read.
     let mut all_records = Vec::new();
     for seq_url in seq_urls {
-        let mut reader = skydive::stage::open_bam(&seq_url).unwrap();
+        let mut reader = Reader::from_file(seq_url.to_file_path().unwrap()).unwrap();
 
         let progress_bar =
             skydive::utils::default_unbounded_progress_bar("Searching for similar reads (0 found)");
@@ -69,48 +67,25 @@ pub fn start(
 
         const UPDATE_FREQUENCY: usize = 1_000_000;
 
-        // Create an immutable map of tid to chromosome name
-        let tid_to_chrom: HashMap<i32, String> = reader
-            .header()
-            .target_names()
-            .iter()
-            .enumerate()
-            .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
-            .collect();
-
-        let fetch_definition = if !contigs.is_empty() {
-            FetchDefinition::String(contigs.iter().next().unwrap().as_bytes())
-        } else {
-            FetchDefinition::All
-        };
-
-        // Iterate over the records in parallel.
-        reader
-            // .fetch(FetchDefinition::All)
-            .fetch(fetch_definition)
-            .expect("Failed to fetch reads");
-
         let records: Vec<_> = reader
             .records()
+            .flatten()
             .par_bridge()
-            .flat_map(|record| record.ok())
             .filter_map(|read| {
                 // Increment progress counters and update the progress bar every once in a while.
                 let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
                 if current_processed % UPDATE_FREQUENCY == 0 {
                     progress_bar.set_message(format!(
-                        "Searching for similar reads ({} found, most recent at {}:{})",
+                        "Searching for similar reads ({} found)",
                         found_items
                             .load(Ordering::Relaxed)
                             .to_formatted_string(&Locale::en),
-                        tid_to_chrom.get(&read.tid()).unwrap(),
-                        read.reference_start().to_formatted_string(&Locale::en)
                     ));
                     progress_bar.inc(UPDATE_FREQUENCY as u64);
                 }
 
                 // Count the number of k-mers found in our hashset from the long reads.
-                let fw_seq = read.seq().as_bytes();
+                let fw_seq = read.seq();
                 let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
 
                 let num_kmers = rl_seq
@@ -124,10 +99,8 @@ pub fn start(
                     let current_found = found_items.fetch_add(1, Ordering::Relaxed);
                     if current_found % UPDATE_FREQUENCY == 0 {
                         progress_bar.set_message(format!(
-                            "Searching for similar reads ({} found, most recent at {}:{})",
-                            (current_found + 1).to_formatted_string(&Locale::en),
-                            tid_to_chrom.get(&read.tid()).unwrap(),
-                            read.reference_start().to_formatted_string(&Locale::en)
+                            "Searching for similar reads ({} found)",
+                            (current_found + 1).to_formatted_string(&Locale::en)
                         ));
                     }
                     Some(read)
@@ -163,19 +136,14 @@ pub fn start(
         writeln!(
             writer,
             "{}",
-            String::from_utf8_lossy(&record.seq().as_bytes())
+            String::from_utf8_lossy(&record.seq())
         )
         .expect("Could not write to file");
     }
 
-    if !all_records.is_empty() {
-        skydive::elog!(
-            "Wrote {} reads to {}.",
-            all_records.len().to_formatted_string(&Locale::en),
-            output.to_str().unwrap()
-        );
-    } else {
-        skydive::elog!("No reads were found in the CRAM files. Aborting.");
-        std::process::exit(1);
-    }
+    skydive::elog!(
+        "Wrote {} reads to {}.",
+        all_records.len().to_formatted_string(&Locale::en),
+        output.to_str().unwrap()
+    );
 }
