@@ -197,7 +197,7 @@ task SNP2HLA {
         # --nthreads 2 \
         # --mem 4g
 
-        cp "~{outputprefix}*" "/cromwell_root"
+        # cp "~{outputprefix}*" "/cromwell_root"
 
     >>>
 
