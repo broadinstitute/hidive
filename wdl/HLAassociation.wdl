@@ -227,7 +227,9 @@ task Association {
         String outputprefix
         Int memory
     }
-
+    parameter_meta {
+        imputed_data: {localization_optional: true}
+    }
     command <<<
         set -euxo pipefail
         cd /cromwell_root
