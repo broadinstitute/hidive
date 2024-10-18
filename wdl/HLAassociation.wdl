@@ -230,6 +230,7 @@ task Association {
 
     command <<<
         set -euxo pipefail
+        cd /cromwell_root
 
         time \
         gcloud storage cp ~{sep=" " imputed_data} /cromwell_root/
