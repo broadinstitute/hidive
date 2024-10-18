@@ -37,20 +37,20 @@ workflow HLAAssociation {
 
     }
 
-    # call Association { input:
-    #     prefix = imputationprefix,
-    #     imputed_data = SNP2HLA.outputfiles,
-    #     phenotype = phenotype,
-    #     covariate = covariate,
-    #     pheno_name = trait_name,
-    #     outputprefix = association_prefix,
-    #     memory = 4
+    call Association { input:
+        prefix = imputationprefix,
+        imputed_data = SNP2HLA.outputfiles,
+        phenotype = phenotype,
+        covariate = covariate,
+        pheno_name = trait_name,
+        outputprefix = association_prefix,
+        memory = 4
 
-    # }
+    }
 
     output {
         Array[File] imputed_data = SNP2HLA.outputfiles
-        # Array[File] association_results = Association.outputfiles
+        Array[File] association_results = Association.outputfiles
     }
 }
 
