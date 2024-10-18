@@ -233,7 +233,7 @@ task Association {
 
         # Created ${imputed}.{psam, pgen, pvar}
         plink2 \
-            --vcf ~{prefix}.vcf.gz dosage=DS \
+            --vcf ~{prefix}.bgl.phased.vcf.gz dosage=DS \
             --make-pgen --out ~{prefix}
 
         plink2 --pfile ${imputed} \
