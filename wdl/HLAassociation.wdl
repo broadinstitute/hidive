@@ -180,6 +180,8 @@ task SNP2HLA {
         mv ~{genotype_prefix}.bim ~{genotype_prefix}.bim.old
         python rename_bim.py ~{reference_prefix}.bim ~{genotype_prefix}.bim
 
+        cd /HLA-TAPAS
+
         python /HLA-TAPAS/SNP2HLA.py \
         -i "/cromwell_root/~{genotype_prefix}" \
         -o ~{outputprefix} \
@@ -194,7 +196,7 @@ task SNP2HLA {
         # --nthreads 2 \
         # --mem 4g
 
-        # cp "~{outputprefix}*" "/cromwell_root"
+        cp "/HLA-TAPAS/~{outputprefix}*" "/cromwell_root/"
 
     >>>
 
