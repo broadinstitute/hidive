@@ -185,7 +185,7 @@ task SNP2HLA {
         -o ~{outputprefix} \
         -rf "/cromwell_root/~{reference_prefix}" \
         --nthreads 10 \
-        --java-mem=80g --tolerated-diff=0.5 --dependency "./dependency"
+        --java-mem=80g --tolerated-diff=0.5 --dependency "/HLA-TAPAS/dependency"
 
         # python -m SNP2HLA \
         # --target "/cromwell_root/~{genotype_prefix}" \
