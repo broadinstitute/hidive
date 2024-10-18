@@ -236,7 +236,7 @@ task Association {
             --vcf ~{prefix}.bgl.phased.vcf.gz dosage=DS \
             --make-pgen --out ~{prefix}
 
-        plink2 --pfile ${imputed} \
+        plink2 --pfile ~{prefix} \
             --pheno ~{phenotype} \
             --covar ~{covariate} \
             --pheno-name ~{pheno_name} \
