@@ -28,6 +28,17 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         tags: true
 
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -90,11 +101,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-buildx-
 
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.repository }}-${{ hashFiles('docker/**') }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-${{ github.repository }}-
+          ${{ runner.os }}-buildx-
+
     - name: Configure Docker to use gcloud credentials
       run: gcloud auth configure-docker us.gcr.io -q
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         context: ./docker
         push: true
@@ -109,3 +129,8 @@ jobs:
           type=gha,mode=max,scope=${{ github.workflow }}
         build-contexts: |
           binary=./target/release
+
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
