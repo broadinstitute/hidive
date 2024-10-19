@@ -47,7 +47,12 @@ impl WMECData {
         let (w0_r, w1_r) = self.compute_costs(snp, r);
         let (w0_s, w1_s) = self.compute_costs(snp, s);
 
+        // Given a bipartition (R, S) of F(j), the minimum cost to make position j conflict-free is:
         std::cmp::min(w0_r, w1_r) + std::cmp::min(w0_s, w1_s)
+
+        // Alternatively, under the all heterozygous assumption, where one wants to enforce all SNPs
+        // to be heterozygous, the equation becomes:
+        // std::cmp::min(w0_r + w1_r, w0_s + w1_s)
     }
 }
 

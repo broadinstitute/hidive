@@ -177,7 +177,7 @@ enum Commands {
         seq_paths: Vec<PathBuf>,
     },
 
-    /// Find more sequences (aligned or unaligned) overlapping previously fetched reads.
+    /// Find more sequences (both aligned and unaligned) overlapping previously fetched reads.
     #[clap(arg_required_else_help = true)]
     Rescue {
         /// Output path for FASTA file with reads spanning locus of interest.
@@ -192,9 +192,13 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
-        /// Restrict processing to these contigs.
+        /// For aligned reads, restrict processing to these contigs.
         #[clap(short, long, value_parser, required = false)]
         contigs: Vec<String>,
+
+        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        #[clap(short, long, value_parser, required = true)]
+        ref_path: Option<PathBuf>,
 
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
@@ -434,21 +438,22 @@ fn main() {
         Commands::Rescue {
             output,
             kmer_size,
-            min_kmers_pct: min_kmers,
+            min_kmers_pct,
             contigs,
+            ref_path,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers, &contigs, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, &contigs, ref_path, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,
             kmer_size,
-            min_kmers_pct: min_kmers,
+            min_kmers_pct,
             fasta_paths,
             seq_paths,
         } => {
-            recruit::start(&output, kmer_size, min_kmers, &fasta_paths, &seq_paths);
+            recruit::start(&output, kmer_size, min_kmers_pct, &fasta_paths, &seq_paths);
         }
         Commands::Filter {
             output,
