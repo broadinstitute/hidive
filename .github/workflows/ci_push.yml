@@ -39,6 +39,12 @@ jobs:
         strip target/release/hidive
         sccache --show-stats
 
+    - name: Configure access to Namespace
+      uses: namespacelabs/nscloud-setup@v0
+ 
+    - name: Configure buildx
+      uses: namespacelabs/nscloud-setup-buildx-action@v0
+
     - name: Authenticate to Google Cloud
       id: 'auth'
       uses: 'google-github-actions/auth@v1'
@@ -60,7 +66,7 @@ jobs:
       run: gcloud auth configure-docker us.gcr.io -q
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         context: ./docker
         push: true
