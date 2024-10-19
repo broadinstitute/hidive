@@ -39,12 +39,6 @@ jobs:
         strip target/release/hidive
         sccache --show-stats
 
-    - name: Configure access to Namespace
-      uses: namespacelabs/nscloud-setup@v0
- 
-    - name: Configure buildx
-      uses: namespacelabs/nscloud-setup-buildx-action@v0
-
     - name: Authenticate to Google Cloud
       id: 'auth'
       uses: 'google-github-actions/auth@v1'
