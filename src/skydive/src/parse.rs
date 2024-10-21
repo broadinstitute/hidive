@@ -6,6 +6,35 @@ use regex::Regex;
 
 use path_absolutize::Absolutize;
 
+/// Parse a list of loci strings into a HashSet of formatted loci.
+/// If a locus string is a file on disk, read its contents and parse each line as a locus.
+///
+/// # Arguments
+///
+/// * `loci_list` - A list of strings representing loci.
+/// * `padding` - A u64 representing the amount to extend the start and stop positions by.
+///
+/// # Returns
+///
+/// A HashSet of formatted loci.
+///
+/// # Example
+///
+/// ```
+/// let loci_list = vec![
+///     "chr1:1000-2000".to_string(),
+///     "chr2:3000-4000".to_string(),
+///     "chr3:5000-6000".to_string(),
+/// ];
+/// let padding = 0;
+/// let loci = parse_loci(&loci_list, padding);
+/// ```
+///
+/// # Panics
+///
+/// This function will panic if it cannot parse a given locus.
+/// It will also panic if it cannot read a given file path.
+///
 pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64, u64, String)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();
@@ -55,6 +84,35 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
     loci
 }
 
+/// Parse a locus string into a tuple of contig name, start position, stop position, and optional name.
+/// The locus string can be in the following formats:
+/// - chr:start-stop
+/// - chr:start-stop|name
+/// - chr start stop
+/// - chr start stop name
+///
+/// The start and stop positions are 1-based and inclusive.
+/// The optional padding parameter can be used to extend the start and stop positions by a specified amount.
+///
+/// # Arguments
+///
+/// * `locus` - A string representing a locus.
+/// * `padding` - A u64 representing the amount to extend the start and stop positions by.
+///
+/// # Returns
+///
+/// A tuple containing the contig name, start position, stop position, and optional name.
+///
+/// # Example
+/// ```
+/// let locus = "chr1:1000-2000".to_string();
+/// let padding = 0;
+/// let result = parse_locus(locus, padding);
+/// ```
+///
+/// # Panics
+///
+/// This function will panic if the locus format is incorrect.
 pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, String)> {
     // Regex to capture the contig name, start position, stop position, and optional name.
     // Accepts:
@@ -89,6 +147,31 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
     }
 }
 
+/// Parse a list of BAM file paths into a HashSet of URLs.
+/// If any of the files are a local file ending in .txt, assume it's a file of filenames.
+///
+/// # Arguments
+///
+/// * `bam_paths` - A list of BAM file paths.
+///
+/// # Returns
+///
+/// A HashSet of URLs.
+///
+/// # Example
+///
+/// ```
+/// let bam_paths = vec![
+///    PathBuf::from("gs://bucket/file1.bam"),
+///    PathBuf::from("gs://bucket/file2.bam"),
+///    PathBuf::from("gs://bucket/file3.txt"),
+/// ];
+/// let urls = parse_file_names(&bam_paths);
+/// ```
+///
+/// # Panics
+///
+/// This function will panic if it cannot parse a given file path.
 pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     // Convert the list of BAM file paths into a HashSet of URLs
     let mut reads_urls: HashSet<Url> = bam_paths

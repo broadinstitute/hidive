@@ -24,6 +24,20 @@ impl MLdBG {
     }
 
     /// Create an MLdBG from a vector of LdBGs.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbgs` - A vector of LdBGs.
+    ///
+    /// # Returns
+    ///
+    /// A new MLdBG.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `kmer_size` of the `LdBG` being added does not match the
+    /// `kmer_size` of the `MLdBG`. Specifically, it will panic at the `assert!` statement if the
+    /// condition `ldbg.kmer_size == self.kmer_size` is not met.
     pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
         let kmer_size = ldbgs[0].kmer_size;
 
@@ -42,6 +56,16 @@ impl MLdBG {
     }
 
     /// Add a LdBG to the MLdBG.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbg` - The LdBG to add.
+    ///
+    /// # Panics
+    ///
+    /// The `push` function will panic if the `kmer_size` of the `ldbg` being added does not match
+    /// the `kmer_size` of the `MLdBG`. Specifically, it will panic at the `assert!` statement if
+    /// the condition `ldbg.kmer_size == self.kmer_size` is not met.
     pub fn push(&mut self, ldbg: LdBG) {
         assert!(
             ldbg.kmer_size == self.kmer_size,
@@ -69,6 +93,23 @@ impl MLdBG {
         self.ldbgs.push(l);
     }
 
+    /// Append an LdBG to the end of the MLdBG, created from a filtered set of
+    /// sequences in a fasta file.
+    ///
+    /// This function reads sequences from a specified fasta file, filters them based on a provided
+    /// condition, and then creates an LdBG from the filtered sequences. The new LdBG is appended to
+    /// the MLdBG.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string representing the name of the new LdBG.
+    /// * `seq_path` - A reference to a `PathBuf` representing the path to the fasta file containing the sequences.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean indicating
+    ///              whether the record should be included.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it cannot read the fasta file.
     pub fn append_from_filtered_file<F>(&mut self, name: String, seq_path: &PathBuf, filter: F)
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,
@@ -92,6 +133,24 @@ impl MLdBG {
         self.ldbgs.push(l);
     }
 
+    /// Scores the k-mers in the MLdBG using a pre-trained Gradient Boosting
+    /// Decision Tree (GBDT) model.
+    ///
+    /// This function loads a GBDT model from the specified path and uses it to predict scores
+    /// for each k-mer in the union of k-mers from all LdBGs in the MLdBG. The scores are stored
+    /// in the `scores` field of the MLdBG.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_path` - A path to the file containing the pre-trained GBDT model.
+    ///
+    /// # Returns
+    ///
+    /// An updated MLdBG with the k-mer scores populated.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the model file cannot be loaded or if the prediction fails.
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
@@ -145,6 +204,20 @@ impl MLdBG {
         ldbg
     }
 
+    /// Filter reads from a fasta file based on a condition.
+    ///
+    /// # Arguments
+    ///
+    /// * `seq_path` - A path to the fasta file containing the reads.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
+    ///
+    /// # Returns
+    ///
+    /// A vector of the kept reads.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it cannot read the fasta file.
     pub fn filter_reads<F>(&mut self, seq_path: &PathBuf, filter: F) -> Vec<Vec<u8>>
     where
         F: Fn(&bio::io::fasta::Record, &HashSet<Vec<u8>>) -> bool,

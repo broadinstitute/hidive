@@ -31,6 +31,11 @@ use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 /// let basename = basename_without_extension(&url, &extensions);
 /// assert_eq!(basename, "file");
 /// ```
+/// # Panics
+/// This function will panic:
+/// 1. If `seq_url.path_segments()` returns `None`, indicating that the URL does not have a path.
+/// 2. If `seq_url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap().last()` returns `None`,
+/// indicating that the path does not have any segments.
 pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> String {
     let mut basename = seq_url
         .path_segments()
@@ -50,6 +55,17 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
     basename
 }
 
+/// Given fasta files this function will read and return a list of lists containing the contents
+/// of the fasta files
+///
+/// # Arguments
+/// * `path`: paths to fasta files
+///
+/// # Returns
+/// A list of lists containing the contents of the fasta files
+///
+/// # Panics
+/// This function will panic if it cannot read a given file path
 pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
     paths
         .iter()
@@ -69,6 +85,27 @@ pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
     indicatif::ProgressBar::hidden()
 }
 
+/// Create a new bounded progress bar with the specified message and length.
+/// The progress bar will be a bar with a spinner.
+/// The progress bar will display the elapsed time, the progress bar, the current position,
+/// the total length, and the estimated time remaining.
+///
+/// # Arguments
+/// * `msg`: The message to display on the progress bar.
+/// * `len`: The total length of the progress bar.
+///
+/// # Returns
+/// A new bounded progress bar.
+///
+/// # Example
+/// ```
+/// let progress_bar = default_bounded_progress_bar("Processing sequences", 100);
+/// ```
+/// This will create a new bounded progress bar with the message "Processing sequences" and a total length of 100.
+/// The progress bar will be a bar with a spinner.
+///
+/// # Panics
+/// This function will panic if the progress bar style cannot be created.
 pub fn default_bounded_progress_bar(
     msg: impl Into<Cow<'static, str>>,
     len: u64,
@@ -87,6 +124,25 @@ pub fn default_bounded_progress_bar(
     progress_bar
 }
 
+/// Create a new unbounded progress bar with the specified message.
+///
+/// # Arguments
+/// `msg`: The message to display on the progress bar.
+///
+/// # Returns
+/// A new unbounded progress bar.
+///
+/// # Example
+/// ```
+/// let progress_bar = default_unbounded_progress_bar("Processing sequences");
+/// ```
+///
+/// This will create a new unbounded progress bar with the message "Processing sequences".
+/// The progress bar will be a spinner.
+///
+/// # Panics
+/// This function will panic if the progress bar style cannot be created.
+///
 pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indicatif::ProgressBar {
     let progress_bar_style = indicatif::ProgressStyle::default_bar()
         .template("{msg} ... [{elapsed_precise}] {human_pos}")
