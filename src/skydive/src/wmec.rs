@@ -1,6 +1,6 @@
-//! This module implements the WhatsHap phasing algorithm as described in:
+//! This module implements the `WhatsHap` phasing algorithm as described in:
 //! Murray Patterson, Tobias Marschall, Nadia Pisanti, Leo van Iersel, Leen Stougie, et al.
-//! WhatsHap: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
+//! `WhatsHap`: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
 //! Journal of Computational Biology, 2015, 22 (6), pp.498-509.
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988

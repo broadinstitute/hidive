@@ -6,7 +6,7 @@ use regex::Regex;
 
 use path_absolutize::Absolutize;
 
-/// Parse a list of loci strings into a HashSet of formatted loci.
+/// Parse a list of loci strings into a `HashSet` of formatted loci.
 /// If a locus string is a file on disk, read its contents and parse each line as a locus.
 ///
 /// # Arguments
@@ -16,7 +16,7 @@ use path_absolutize::Absolutize;
 ///
 /// # Returns
 ///
-/// A HashSet of formatted loci.
+/// A `HashSet` of formatted loci.
 ///
 /// # Example
 ///
@@ -147,7 +147,7 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
     }
 }
 
-/// Parse a list of BAM file paths into a HashSet of URLs.
+/// Parse a list of BAM file paths into a `HashSet` of URLs.
 /// If any of the files are a local file ending in .txt, assume it's a file of filenames.
 ///
 /// # Arguments
@@ -156,7 +156,7 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
 ///
 /// # Returns
 ///
-/// A HashSet of URLs.
+/// A `HashSet` of URLs.
 ///
 /// # Example
 ///

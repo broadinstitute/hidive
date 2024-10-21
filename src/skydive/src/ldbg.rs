@@ -1215,7 +1215,7 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmers` - A HashSet of k-mers to stop at.
+    /// * `stop_kmers` - A `HashSet` of k-mers to stop at.
     /// * `limit` - The maximum number of nodes to traverse before giving up.
     fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
@@ -1350,7 +1350,7 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    /// * `stop_kmers` - A HashSet of vectors representing the stopping k-mers.
+    /// * `stop_kmers` - A `HashSet` of vectors representing the stopping k-mers.
     /// * `limit` - The maximum number of nodes to traverse before giving up.
     fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
@@ -1482,7 +1482,7 @@ impl LdBG {
     /// # Panics
     ///
     /// - This function will panic if the node weight for a unique node cannot be retrieved.
-    /// - If self.kmers.get(cn_kmer).unwrap() returns None.
+    /// - If `self.kmers.get(cn_kmer).unwrap()` returns None.
     pub fn assemble_all(&self) -> Vec<Vec<u8>> {
         let mut contigs = Vec::new();
 
@@ -1528,7 +1528,7 @@ impl LdBG {
     /// # Panics
     ///
     /// - This function will panic if the node weight for a unique node cannot be retrieved.
-    /// - if g.node_weight(*unique_node).unwrap().as_bytes() returns None.
+    /// - if `g.node_weight(*unique_node).unwrap().as_bytes()` returns None.
     pub fn assemble_at_bubbles(&self) -> Vec<Vec<u8>> {
         let g = self.traverse_all_kmers();
         let bubbles = find_all_superbubbles(&g);
