@@ -24,9 +24,8 @@ TEST_NAME="HLA-A"
 #LOCUS="chr6:29,941,260-29,949,572"
 #NAME="HLA-A"
 
-
 SAMPLE="HG00438"
-
+REF="Homo_sapiens_assembly38.fasta"
 OUTPUT="scratch/training/per_sample_model/$SAMPLE/$TRAIN_NAME"
 
 export GCS_REQUESTER_PAYS_PROJECT="broad-dsp-lrma"
@@ -80,7 +79,6 @@ if [ ! -f $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta ]; then
 fi
 
 # fetch long reads training
-
 if [ ! -f $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta ]; then
   ./target/release/hidive fetch \
     -l $TRAIN_LOCUS \
@@ -98,17 +96,19 @@ fi
 
 # fetch short reads training
 if [ ! -f $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta ]; then
-  ./target/release/hidive fetch \
-    -l $TRAIN_LOCUS \
+  ./target/release/hidive rescue \
     -o $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta \
+    -r $REF \
+    -f $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
     gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
 fi
 
 # fetch short reads testing
 if [ ! -f $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta ]; then
-  ./target/release/hidive fetch \
-    -l $TEST_LOCUS \
+  ./target/release/hidive rescue \
     -o $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta \
+    -r $REF \
+    -f $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta \
     gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
 fi
 

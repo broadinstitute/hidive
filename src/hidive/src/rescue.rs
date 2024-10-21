@@ -9,6 +9,7 @@ use bio::io::fasta::Reader;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use minimap2::Aligner;
+use needletail::Sequence;
 use num_format::{Locale, ToFormattedString};
 
 use rayon::iter::ParallelBridge;
@@ -17,6 +18,8 @@ use rayon::prelude::*;
 
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, Read};
+
+use needletail::sequence::complement;
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -32,8 +35,6 @@ pub fn start(
 ) {
     let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
-
-    // let contigs = contigs.iter().map(|c| c.to_string()).collect::<HashSet<String>>();
 
     // Get the system's temporary directory path
     let cache_path = std::env::temp_dir();
@@ -64,43 +65,18 @@ pub fn start(
 
         if let Some(ref ref_path) = ref_path {
             skydive::elog!("Searching for relevant loci in reference genome...");
-
-            let aligner = Aligner::builder()
-                .sr()
-                .with_sam_hit_only()
-                .with_index(ref_path, None)
-                .expect("Unable to build index");
-
-            let mappings = reads
-                .par_iter()
-                .map(|seq| {
-                    seq
-                        .windows(150)
-                        .map(|window| {
-                            aligner.map(window, false, false, None, None).unwrap()
-                        })
-                        .flatten()
-                        .collect::<Vec<_>>()
-                })
-                .flatten()
-                .collect::<Vec<_>>();
-
-            let sub_fetches = mappings.iter().filter_map(|m| {
-                if let Some(target_name) = &m.target_name {
-                    Some(target_name.to_string().as_bytes().to_vec())
-                } else {
-                    None
-                }
-            }).collect::<HashSet<_>>();
-
-            fetches.extend(sub_fetches);
+            guess_relevant_contigs(ref_path, reads, &mut fetches);
         } else {
             skydive::elog!("Searching for relevant loci in {:?}...", contigs);
-
             fetches.extend(contigs.iter().map(|c| c.as_bytes().to_vec()));
         }
 
         fetches.insert("*".as_bytes().to_vec());
+
+        skydive::elog!(" -- will search:");
+        for fetch in &fetches {
+            skydive::elog!("    {}", String::from_utf8_lossy(fetch));
+        }
     }
 
     // Read the CRAM files and search for the k-mers in each read.
@@ -161,8 +137,9 @@ pub fn start(
                     }
 
                     // Count the number of k-mers found in our hashset from the long reads.
-                    let fw_seq = read.seq().as_bytes();
-                    let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
+                    // let read_seq = if read.is_reverse() { read.seq().as_bytes().reverse_complement() } else { read.seq().as_bytes() };
+                    let read_seq = read.seq().as_bytes();
+                    let rl_seq = skydive::utils::homopolymer_compressed(&read_seq);
 
                     let num_kmers = rl_seq
                         .par_windows(kmer_size)
@@ -211,11 +188,14 @@ pub fn start(
     };
 
     for record in all_records.iter() {
+        let fw_seq = record.seq().as_bytes();
+        let rc_seq = fw_seq.reverse_complement();
+
         writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap(), record.reference_start(), record.reference_end()).expect("Could not write to file");
         writeln!(
             writer,
             "{}",
-            String::from_utf8_lossy(&record.seq().as_bytes())
+            if record.is_reverse() { String::from_utf8_lossy(&rc_seq) } else { String::from_utf8_lossy(&fw_seq) }
         )
         .expect("Could not write to file");
     }
@@ -230,4 +210,45 @@ pub fn start(
         skydive::elog!("No reads were found in the CRAM files. Aborting.");
         std::process::exit(1);
     }
+}
+
+fn guess_relevant_contigs(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut HashSet<Vec<u8>>) {
+    let aligner = Aligner::builder()
+        .sr()
+        .with_sam_hit_only()
+        .with_index(ref_path, None)
+        .expect("Unable to build index");
+
+    let mappings = reads
+        .par_iter()
+        .map(|seq| {
+            seq
+                .windows(150)
+                .map(|window| {
+                    aligner.map(window, false, false, None, None).unwrap()
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    let loci = mappings.iter().filter_map(|m| {
+        if let Some(target_name) = &m.target_name {
+            Some((target_name.to_string().as_bytes().to_vec(), m.target_start, m.target_end))
+        } else {
+            None
+        }
+    }).collect::<HashSet<_>>();
+
+    for (seq, start, end) in &loci {
+        skydive::elog!("{}:{}..{}", String::from_utf8_lossy(&seq), start, end);
+    }
+
+    let sub_fetches = loci
+        .iter()
+        .map(|(seq, _, _)| seq.clone())
+        .collect::<HashSet<_>>();
+
+    fetches.extend(sub_fetches);
 }
