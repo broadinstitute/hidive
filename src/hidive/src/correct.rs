@@ -56,7 +56,7 @@ pub fn start(
 
     skydive::elog!("Writing reads to {}", output.display());
     
-    let mut fa_file = File::create(&output).unwrap();
+    let mut fa_file = File::create(output).unwrap();
     for (i, corrected_seq) in corrected_seqs.iter().enumerate() {
         let _ = writeln!(fa_file, ">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());
     }
