@@ -19,7 +19,7 @@ use rayon::iter::ParallelIterator;
 use gbdt::decision_tree::Data;
 use gbdt::gradient_boost::GBDT;
 
-use bio::alignment::distance::*;
+use bio::alignment::distance::levenshtein;
 
 use crate::edges::Edges;
 use crate::link::Link;

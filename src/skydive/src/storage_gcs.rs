@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use chrono::{DateTime, Utc};
-use cloud_storage::{object::ObjectList, sync::*, ListRequest};
+use cloud_storage::{object::ObjectList, sync::Client, ListRequest};
 
 /// Split a GCS path into a bucket name and a prefix.
 /// The GCS path should be in the format `gs://bucket_name/prefix`.
