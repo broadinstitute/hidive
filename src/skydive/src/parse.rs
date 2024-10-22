@@ -56,7 +56,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
                     continue;
                 }
 
-                match parse_locus(&line.to_owned(), padding) {
+                match parse_locus(&line.clone(), padding) {
                     Ok(l_fmt) => {
                         loci.insert(l_fmt);
                     }

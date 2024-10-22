@@ -137,7 +137,7 @@ fn get_rg_to_sm_mapping(bam: &IndexedReader) -> HashMap<String, String> {
         .into_iter()
         .flat_map(|(_, records)| records)
         .filter(|record| record.contains_key("ID") && record.contains_key("SM"))
-        .map(|record| (record["ID"].to_owned(), record["SM"].to_owned()))
+        .map(|record| (record["ID"].clone(), record["SM"].clone()))
         .collect();
 
     rg_sm_map
@@ -188,7 +188,7 @@ fn extract_aligned_bam_reads(
                 let seq_name = format!("{qname}|{name}|{sm}");
 
                 if !bmap.contains_key(&seq_name) {
-                    bmap.insert(seq_name.to_owned(), String::new());
+                    bmap.insert(seq_name.clone(), String::new());
                 }
 
                 if !alignment.is_del() && !alignment.is_refskip() {

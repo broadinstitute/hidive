@@ -500,7 +500,7 @@ impl LdBG {
     }
 
     fn next_kmers(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).clone();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -528,7 +528,7 @@ impl LdBG {
     }
 
     fn prev_kmers(&self, kmer: &[u8]) -> Vec<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).clone();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -566,7 +566,7 @@ impl LdBG {
     ///
     /// An optional vector containing the next k-mer.
     fn next_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Link>) -> Option<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).clone();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -644,7 +644,7 @@ impl LdBG {
     ///
     /// An optional vector containing the previous k-mer.
     fn prev_kmer(&self, kmer: &[u8], links_in_scope: &mut Vec<Link>) -> Option<Vec<u8>> {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).to_owned();
+        let cn_kmer_vec = crate::utils::canonicalize_kmer(kmer).clone();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         let ru = self.kmers.get(cn_kmer);
@@ -1085,14 +1085,14 @@ impl LdBG {
         let end_kmers = segment2.windows(self.kmer_size).take(10).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
 
         for start_kmer in start_kmers.iter() {
-            let mut forward_contig = start_kmer.to_vec();
+            let mut forward_contig = start_kmer.clone();
             if let Ok(_) = self.assemble_forward_until(&mut forward_contig, &start_kmer, &end_kmers, 100) {
                 return Ok((forward_contig, true));
             }
         }
 
         for end_kmer in end_kmers.iter() {
-            let mut backward_contig = end_kmer.to_vec();
+            let mut backward_contig = end_kmer.clone();
             if let Ok(_) = self.assemble_backward_until(&mut backward_contig, &end_kmer, &start_kmers, 100) {
                 return Ok((backward_contig, false));
             }
@@ -1519,7 +1519,7 @@ impl LdBG {
                     }
                     contigs.push(contig);
                 } else if r.in_degree() == 0 && r.out_degree() == 0 {
-                    contigs.push(cn_kmer.to_vec());
+                    contigs.push(cn_kmer.clone());
                 }
 
                 used_kmers.insert(cn_kmer.clone());
@@ -1606,7 +1606,7 @@ impl LdBG {
         used_links: &mut HashSet<Link>,
         forward: bool,
     ) {
-        let cn_kmer_vec = crate::utils::canonicalize_kmer(last_kmer.as_bytes()).to_owned();
+        let cn_kmer_vec = crate::utils::canonicalize_kmer(last_kmer.as_bytes()).clone();
         let cn_kmer = cn_kmer_vec.as_bytes();
 
         if self.links.contains_key(cn_kmer.as_bytes()) {
@@ -1927,7 +1927,7 @@ impl LdBG {
 
         for cn_kmer in self.kmers.keys() {
             if self.kmers.get(cn_kmer).unwrap().in_degree() == 0 && self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
-                let mut fw_contig = cn_kmer.to_vec();
+                let mut fw_contig = cn_kmer.clone();
                 if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, &cn_kmer, limit, stopping_condition) {
                     let score_sum = fw_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
@@ -1945,7 +1945,7 @@ impl LdBG {
             }
 
             if self.kmers.get(cn_kmer).unwrap().out_degree() == 0 && self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
-                let mut rv_contig = cn_kmer.to_vec();
+                let mut rv_contig = cn_kmer.clone();
                 if let Ok(_) = self.assemble_backward_until_condition(&mut rv_contig, &cn_kmer, limit, stopping_condition) {
                     let score_sum = rv_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
