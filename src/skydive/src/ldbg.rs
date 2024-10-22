@@ -277,6 +277,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A map of links.
+    #[must_use]
     pub fn build_links(mut self, fwd_seqs: &Vec<Vec<u8>>, correct: bool) -> Self {
         let progress_bar = if self.verbose {
             crate::utils::default_bounded_progress_bar("Building links", fwd_seqs.len() as u64)
