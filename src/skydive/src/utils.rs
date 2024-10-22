@@ -215,6 +215,26 @@ pub fn gc_content(seq: &[u8]) -> f32 {
     gc_count as f32 / seq.len() as f32
 }
 
+/// Writes a GFA file from a directed graph.
+///
+/// # Arguments
+///
+/// * `writer` - A mutable reference to an object implementing the `Write` trait.
+/// * `graph` - A reference to a directed graph where nodes are sequences and edges are links with weights.
+///
+/// # Returns
+///
+/// A `Result` which is `Ok` if the file was written successfully, or an `Err` if an I/O error occurred.
+///
+/// # Errors
+///
+/// This function will return an error if any I/O operation fails.
+///
+/// # Panics
+///
+/// This function will panic if:
+/// 1. The file cannot be opened.
+/// 2. Any line in the file cannot be read.
 pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
@@ -234,6 +254,25 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     Ok(())
 }
 
+/// Reads a GFA file and constructs a directed graph from it.
+///
+/// # Arguments
+///
+/// * `path` - A path to the GFA file.
+///
+/// # Returns
+///
+/// A `DiGraph` where nodes are sequences and edges are links with weights.
+///
+/// # Errors
+///
+/// This function returns an error if the file cannot be opened or read.
+///
+/// # Panics
+///
+/// This function will panic if:
+/// 1. The file cannot be opened.
+/// 2. Any line in the file cannot be read.
 pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);

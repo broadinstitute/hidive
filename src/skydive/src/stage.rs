@@ -370,6 +370,25 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
+/// Checks if a given genomic range spans any of the loci in the provided set.
+///
+/// # Arguments
+///
+/// * `start` - The start position of the genomic range.
+/// * `end` - The end position of the genomic range.
+/// * `loci` - A reference to a `HashSet` of tuples representing the loci.
+///
+/// # Returns
+///
+/// A `Result` containing `true` if the range spans any loci, `false` otherwise. Returns an error if the positions are negative.
+///
+/// # Errors
+///
+/// Returns an error if the start or end positions are negative.
+///
+/// # Panics
+///
+/// This function does not panic.
 pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>) -> Result<bool, String> {
     if start < 0 || end < 0 {
         return Err("Error: Negative genomic positions are not allowed.".to_string());

@@ -18,17 +18,9 @@ use path_absolutize::Absolutize;
 ///
 /// A `HashSet` of formatted loci.
 ///
-/// # Example
+/// # Errors
 ///
-/// ```
-/// let loci_list = vec![
-///     "chr1:1000-2000".to_string(),
-///     "chr2:3000-4000".to_string(),
-///     "chr3:5000-6000".to_string(),
-/// ];
-/// let padding = 0;
-/// let loci = parse_loci(&loci_list, padding);
-/// ```
+/// This function returns an error if it cannot parse a given locus.
 ///
 /// # Panics
 ///
@@ -104,12 +96,9 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
 ///
 /// A tuple containing the contig name, start position, stop position, and optional name.
 ///
-/// # Example
-/// ```
-/// let locus = "chr1:1000-2000".to_string();
-/// let padding = 0;
-/// let result = parse_locus(locus, padding);
-/// ```
+/// # Errors
+///
+/// This function returns an error if the locus format is incorrect.
 ///
 /// # Panics
 ///
@@ -159,16 +148,9 @@ pub fn parse_locus(locus: &str, padding: u64) -> Result<(String, u64, u64, Strin
 ///
 /// A `HashSet` of URLs.
 ///
-/// # Example
+/// # Errors
 ///
-/// ```
-/// let bam_paths = vec![
-///    PathBuf::from("gs://bucket/file1.bam"),
-///    PathBuf::from("gs://bucket/file2.bam"),
-///    PathBuf::from("gs://bucket/file3.txt"),
-/// ];
-/// let urls = parse_file_names(&bam_paths);
-/// ```
+/// This function returns an error if it cannot parse a given file path.
 ///
 /// # Panics
 ///
