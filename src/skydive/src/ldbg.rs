@@ -3092,7 +3092,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_kmers(b"ATTTC".to_vec());
+        let graph = g.traverse_kmers(b"ATTTC");
 
         // println!("{}", Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]));
 
@@ -3181,7 +3181,7 @@ mod tests {
         let fwd_seqs = vec![genome];
 
         let g = LdBG::from_sequences(String::from("test"), 5, &fwd_seqs);
-        let graph = g.traverse_contigs(b"CCACG".to_vec());
+        let graph = g.traverse_contigs(b"CCACG");
 
         // Uncomment to manually verify structure of the graph
         // use petgraph::dot::Dot;
@@ -3261,87 +3261,87 @@ mod tests {
         let mut exp_graph = KmerGraph::new();
         exp_graph.insert(
             b"AAATC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"AATCA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a.....G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("a.....G."))),
         );
         exp_graph.insert(
             b"ACCGT".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c....G.".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c....G."))),
         );
         exp_graph.insert(
             b"ACTGA".to_vec(),
-            Record::new(1, Some(Edges::from_string(".......T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".......T"))),
         );
         exp_graph.insert(
             b"ATCAG".to_vec(),
-            Record::new(1, Some(Edges::from_string("a......T".to_string()))),
+            Record::new(1, Some(Edges::from_string("a......T"))),
         );
         exp_graph.insert(
             b"ATCGA".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c..A...".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c..A..."))),
         );
         exp_graph.insert(
             b"ATCGC".to_vec(),
-            Record::new(2, Some(Edges::from_string(".c..A...".to_string()))),
+            Record::new(2, Some(Edges::from_string(".c..A..."))),
         );
         exp_graph.insert(
             b"ATGCC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"ATGCG".to_vec(),
-            Record::new(2, Some(Edges::from_string("..g.A...".to_string()))),
+            Record::new(2, Some(Edges::from_string("..g.A..."))),
         );
         exp_graph.insert(
             b"ATTTC".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g...G."))),
         );
         exp_graph.insert(
             b"CACCG".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c.....T"))),
         );
         exp_graph.insert(
             b"CACGG".to_vec(),
-            Record::new(1, Some(Edges::from_string(".c.....T".to_string()))),
+            Record::new(1, Some(Edges::from_string(".c.....T"))),
         );
         exp_graph.insert(
             b"CATCG".to_vec(),
-            Record::new(3, Some(Edges::from_string("..g.AC..".to_string()))),
+            Record::new(3, Some(Edges::from_string("..g.AC.."))),
         );
         exp_graph.insert(
             b"CCACC".to_vec(),
-            Record::new(1, Some(Edges::from_string("......G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("......G."))),
         );
         exp_graph.insert(
             b"CCACG".to_vec(),
-            Record::new(1, Some(Edges::from_string("..g...G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("..g...G."))),
         );
         exp_graph.insert(
             b"CGAAA".to_vec(),
-            Record::new(1, Some(Edges::from_string("...t...T".to_string()))),
+            Record::new(1, Some(Edges::from_string("...t...T"))),
         );
         exp_graph.insert(
             b"GATGC".to_vec(),
-            Record::new(3, Some(Edges::from_string(".c...CG.".to_string()))),
+            Record::new(3, Some(Edges::from_string(".c...CG."))),
         );
         exp_graph.insert(
             b"GCCAC".to_vec(),
-            Record::new(1, Some(Edges::from_string("...t..G.".to_string()))),
+            Record::new(1, Some(Edges::from_string("...t..G."))),
         );
         exp_graph.insert(
             b"TCGAA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a...A...".to_string()))),
+            Record::new(1, Some(Edges::from_string("a...A..."))),
         );
         exp_graph.insert(
             b"TCGCA".to_vec(),
-            Record::new(2, Some(Edges::from_string("a......T".to_string()))),
+            Record::new(2, Some(Edges::from_string("a......T"))),
         );
         exp_graph.insert(
             b"TGCCA".to_vec(),
-            Record::new(1, Some(Edges::from_string("a....C..".to_string()))),
+            Record::new(1, Some(Edges::from_string("a....C.."))),
         );
 
         let mut exp_links = Links::new();
@@ -3420,11 +3420,11 @@ mod tests {
             .build_links(&fwd_seqs, false);
 
         let mut contig1 = b"ACTGA".to_vec();
-        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA".to_vec(), HashSet::from([b"TTCGA".to_vec()]), 100);
+        let _ = g.assemble_forward_until(&mut contig1, b"ACTGA", &HashSet::from([b"TTCGA".to_vec()]), 100);
         assert_eq!(contig1, b"ACTGATTTCGA".to_vec());
 
         let mut contig2 = b"GGTGG".to_vec();
-        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG".to_vec(), HashSet::from([b"TGCCA".to_vec()]), 100);
+        let _ = g.assemble_backward_until(&mut contig2, b"GGTGG", &HashSet::from([b"TGCCA".to_vec()]), 100);
         assert_eq!(contig2, b"TGCCACGGTGG".to_vec());
     }
 

@@ -23,14 +23,6 @@ use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 ///
 /// * A `String` containing the base name of the file without any of the specified extensions.
 ///
-/// # Example
-///
-/// ```
-/// let url = url::Url::parse("http://example.com/path/to/file.fasta.gz").unwrap();
-/// let extensions = [".fasta.gz", ".fa.gz", ".fasta", ".fa"];
-/// let basename = basename_without_extension(&url, &extensions);
-/// assert_eq!(basename, "file");
-/// ```
 /// # Panics
 /// This function will panic:
 /// 1. If `seq_url.path_segments()` returns `None`, indicating that the URL does not have a path.
@@ -100,10 +92,6 @@ pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
 /// # Returns
 /// A new bounded progress bar.
 ///
-/// # Example
-/// ```
-/// let progress_bar = default_bounded_progress_bar("Processing sequences", 100);
-/// ```
 /// This will create a new bounded progress bar with the message "Processing sequences" and a total length of 100.
 /// The progress bar will be a bar with a spinner.
 ///
@@ -134,11 +122,6 @@ pub fn default_bounded_progress_bar(
 ///
 /// # Returns
 /// A new unbounded progress bar.
-///
-/// # Example
-/// ```
-/// let progress_bar = default_unbounded_progress_bar("Processing sequences");
-/// ```
 ///
 /// This will create a new unbounded progress bar with the message "Processing sequences".
 /// The progress bar will be a spinner.
