@@ -233,16 +233,101 @@
 <a href="#233" id="233">233</a>
 <a href="#234" id="234">234</a>
 <a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 
+<span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::{BufRead, BufReader};
 <span class="kw">use </span>std::path::{Path, PathBuf};
-<span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>needletail::Sequence;
 <span class="kw">use </span>parquet::data_type::AsBytes;
-<span class="kw">use </span>petgraph::graph::{DiGraph, NodeIndex};
+<span class="kw">use </span>petgraph::graph::DiGraph;
 <span class="kw">use </span>petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
 <span class="doccomment">/// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
@@ -258,14 +343,12 @@
 ///
 /// * A `String` containing the base name of the file without any of the specified extensions.
 ///
-/// # Example
-///
-/// ```
-/// let url = url::Url::parse("http://example.com/path/to/file.fasta.gz").unwrap();
-/// let extensions = [".fasta.gz", ".fa.gz", ".fasta", ".fa"];
-/// let basename = basename_without_extension(&amp;url, &amp;extensions);
-/// assert_eq!(basename, "file");
-/// ```
+/// # Panics
+/// This function will panic:
+/// 1. If `seq_url.path_segments()` returns `None`, indicating that the URL does not have a path.
+/// 2. If `seq_url.path_segments().map(|c| c.collect::&lt;Vec&lt;_&gt;&gt;()).unwrap().last()` returns `None`,
+/// indicating that the path does not have any segments.
+</span><span class="attr">#[must_use]
 </span><span class="kw">pub fn </span>basename_without_extension(seq_url: <span class="kw-2">&amp;</span>url::Url, extensions: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str]) -&gt; String {
     <span class="kw">let </span><span class="kw-2">mut </span>basename = seq_url
         .path_segments()
@@ -285,7 +368,19 @@
     basename
 }
 
-<span class="kw">pub fn </span>read_fasta(paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+<span class="doccomment">/// Given fasta files this function will read and return a list of lists containing the contents
+/// of the fasta files
+///
+/// # Arguments
+/// * `path`: paths to fasta files
+///
+/// # Returns
+/// A list of lists containing the contents of the fasta files
+///
+/// # Panics
+/// This function will panic if it cannot read a given file path
+</span><span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>read_fasta(paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
     paths
         .iter()
         .map(|p| {
@@ -300,11 +395,29 @@
         .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;()
 }
 
-<span class="kw">pub fn </span>default_hidden_progress_bar() -&gt; indicatif::ProgressBar {
+<span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>default_hidden_progress_bar() -&gt; indicatif::ProgressBar {
     indicatif::ProgressBar::hidden()
 }
 
-<span class="kw">pub fn </span>default_bounded_progress_bar(
+<span class="doccomment">/// Create a new bounded progress bar with the specified message and length.
+/// The progress bar will be a bar with a spinner.
+/// The progress bar will display the elapsed time, the progress bar, the current position,
+/// the total length, and the estimated time remaining.
+///
+/// # Arguments
+/// * `msg`: The message to display on the progress bar.
+/// * `len`: The total length of the progress bar.
+///
+/// # Returns
+/// A new bounded progress bar.
+///
+/// This will create a new bounded progress bar with the message "Processing sequences" and a total length of 100.
+/// The progress bar will be a bar with a spinner.
+///
+/// # Panics
+/// This function will panic if the progress bar style cannot be created.
+</span><span class="kw">pub fn </span>default_bounded_progress_bar(
     msg: <span class="kw">impl </span>Into&lt;Cow&lt;<span class="lifetime">'static</span>, str&gt;&gt;,
     len: u64,
 ) -&gt; indicatif::ProgressBar {
@@ -322,7 +435,21 @@
     progress_bar
 }
 
-<span class="kw">pub fn </span>default_unbounded_progress_bar(msg: <span class="kw">impl </span>Into&lt;Cow&lt;<span class="lifetime">'static</span>, str&gt;&gt;) -&gt; indicatif::ProgressBar {
+<span class="doccomment">/// Create a new unbounded progress bar with the specified message.
+///
+/// # Arguments
+/// `msg`: The message to display on the progress bar.
+///
+/// # Returns
+/// A new unbounded progress bar.
+///
+/// This will create a new unbounded progress bar with the message "Processing sequences".
+/// The progress bar will be a spinner.
+///
+/// # Panics
+/// This function will panic if the progress bar style cannot be created.
+///
+</span><span class="kw">pub fn </span>default_unbounded_progress_bar(msg: <span class="kw">impl </span>Into&lt;Cow&lt;<span class="lifetime">'static</span>, str&gt;&gt;) -&gt; indicatif::ProgressBar {
     <span class="kw">let </span>progress_bar_style = indicatif::ProgressStyle::default_bar()
         .template(<span class="string">"{msg} ... [{elapsed_precise}] {human_pos}"</span>)
         .unwrap()
@@ -345,6 +472,7 @@
 ///
 /// A vector containing the canonical k-mer.
 </span><span class="attr">#[inline(always)]
+#[must_use]
 </span><span class="kw">pub fn </span>canonicalize_kmer(kmer: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;u8&gt; {
     <span class="kw">let </span>rc_kmer = kmer.reverse_complement();
     <span class="kw">if </span>kmer &lt; rc_kmer.as_bytes() {
@@ -354,7 +482,8 @@
     }
 }
 
-<span class="kw">pub fn </span>homopolymer_compressed(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;u8&gt; {
+<span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>homopolymer_compressed(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; Vec&lt;u8&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>compressed = Vec::new();
     <span class="kw">let </span><span class="kw-2">mut </span>prev = <span class="prelude-val">None</span>;
 
@@ -368,7 +497,8 @@
     compressed
 }
 
-<span class="kw">pub fn </span>shannon_entropy(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; f32 {
+<span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>shannon_entropy(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; f32 {
     <span class="kw">let </span><span class="kw-2">mut </span>freq = HashMap::new();
     <span class="kw">let </span>len = seq.len() <span class="kw">as </span>f32;
 
@@ -382,12 +512,33 @@
     }).sum::&lt;f32&gt;()
 }
 
-<span class="kw">pub fn </span>gc_content(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; f32 {
+<span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>gc_content(seq: <span class="kw-2">&amp;</span>[u8]) -&gt; f32 {
     <span class="kw">let </span>gc_count = seq.iter().filter(|&amp;&amp;base| base == <span class="string">b'G' </span>|| base == <span class="string">b'C'</span>).count();
     gc_count <span class="kw">as </span>f32 / seq.len() <span class="kw">as </span>f32
 }
 
-<span class="kw">pub fn </span>write_gfa&lt;W: std::io::Write&gt;(writer: <span class="kw-2">&amp;mut </span>W, graph: <span class="kw-2">&amp;</span>DiGraph&lt;String, f32&gt;) -&gt; std::io::Result&lt;()&gt; {
+<span class="doccomment">/// Writes a GFA file from a directed graph.
+///
+/// # Arguments
+///
+/// * `writer` - A mutable reference to an object implementing the `Write` trait.
+/// * `graph` - A reference to a directed graph where nodes are sequences and edges are links with weights.
+///
+/// # Returns
+///
+/// A `Result` which is `Ok` if the file was written successfully, or an `Err` if an I/O error occurred.
+///
+/// # Errors
+///
+/// This function will return an error if any I/O operation fails.
+///
+/// # Panics
+///
+/// This function will panic if:
+/// 1. The file cannot be opened.
+/// 2. Any line in the file cannot be read.
+</span><span class="kw">pub fn </span>write_gfa&lt;W: std::io::Write&gt;(writer: <span class="kw-2">&amp;mut </span>W, graph: <span class="kw-2">&amp;</span>DiGraph&lt;String, f32&gt;) -&gt; std::io::Result&lt;()&gt; {
     <span class="comment">// Write header
     </span><span class="macro">writeln!</span>(writer, <span class="string">"H\tVN:Z:1.0"</span>)<span class="question-mark">?</span>;
 
@@ -406,7 +557,26 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">pub fn </span>read_gfa&lt;P: AsRef&lt;Path&gt;&gt;(path: P) -&gt; std::io::Result&lt;DiGraph&lt;String, f32&gt;&gt; {
+<span class="doccomment">/// Reads a GFA file and constructs a directed graph from it.
+///
+/// # Arguments
+///
+/// * `path` - A path to the GFA file.
+///
+/// # Returns
+///
+/// A `DiGraph` where nodes are sequences and edges are links with weights.
+///
+/// # Errors
+///
+/// This function returns an error if the file cannot be opened or read.
+///
+/// # Panics
+///
+/// This function will panic if:
+/// 1. The file cannot be opened.
+/// 2. Any line in the file cannot be read.
+</span><span class="kw">pub fn </span>read_gfa&lt;P: AsRef&lt;Path&gt;&gt;(path: P) -&gt; std::io::Result&lt;DiGraph&lt;String, f32&gt;&gt; {
     <span class="kw">let </span>file = File::open(path)<span class="question-mark">?</span>;
     <span class="kw">let </span>reader = BufReader::new(file);
     <span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::new();

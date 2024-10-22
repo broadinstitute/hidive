@@ -383,7 +383,7 @@
         <span class="kw">let </span>combined_base_counts = allele_counts(lr_msas, index1, index1+<span class="number">1</span>);
         <span class="comment">// let bases = allele_indices(lr_msas, index1, index1+1);
 
-        </span><span class="kw">if </span>combined_base_counts.len() == <span class="number">0 </span>{
+        </span><span class="kw">if </span>combined_base_counts.is_empty() {
             index1 += <span class="number">1</span>;
         } <span class="kw">else if </span>combined_base_counts.len() == <span class="number">1 </span>{
             <span class="kw">let </span>base = combined_base_counts.keys().next().unwrap();
@@ -408,8 +408,8 @@
 
             <span class="kw">if </span>allele_counts.len() == <span class="number">1 </span>{
                 <span class="kw">for </span>(allele, <span class="kw">_</span>) <span class="kw">in </span>allele_counts {
-                    hap1.extend(allele.chars());
-                    hap2.extend(allele.chars());
+                    hap1.push_str(<span class="kw-2">&amp;</span>allele);
+                    hap2.push_str(<span class="kw-2">&amp;</span>allele);
                 }
             } <span class="kw">else </span>{
                 <span class="comment">// let alleles = get_allele_indices(lr_msas, sr_msas, index1, index2);
@@ -418,9 +418,9 @@
                     <span class="kw">let </span><span class="kw-2">mut </span>phase = h1[hap_index] == <span class="number">1</span>;
                     <span class="kw">for </span>(allele, <span class="kw">_</span>) <span class="kw">in </span>allele_counts {
                         <span class="kw">if </span>!phase {
-                            hap1.extend(allele.chars());
+                            hap1.push_str(<span class="kw-2">&amp;</span>allele);
                         } <span class="kw">else </span>{
-                            hap2.extend(allele.chars());
+                            hap2.push_str(<span class="kw-2">&amp;</span>allele);
                         }
 
                         phase = !phase;
@@ -488,7 +488,7 @@
                     alleles.iter().enumerate().for_each(|(i, a)| {
                         <span class="kw">if </span><span class="kw-2">*</span>a == <span class="kw-2">*</span>allele {
                             <span class="comment">// column.insert(i, allele.clone());
-                            </span>column.insert(i, String::from(allele_index.to_string()));
+                            </span>column.insert(i, allele_index.to_string());
                         }
                     });
 
@@ -517,7 +517,7 @@
 <span class="kw">fn </span>allele_counts(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, index1: usize, index2: usize) -&gt; BTreeMap&lt;String, i32&gt; {
     <span class="kw">let </span>combined_allele_counts = lr_msas.iter()
         .map(|msa| msa[index1..index2].to_string().replace(<span class="string">" "</span>, <span class="string">""</span>))
-        .filter(|allele| allele.len() &gt; <span class="number">0</span>)
+        .filter(|allele| !allele.is_empty())
         .fold(BTreeMap::new(), |<span class="kw-2">mut </span>counts, base| {
             <span class="kw-2">*</span>counts.entry(base).or_insert(<span class="number">0</span>) += <span class="number">1</span>;
             counts

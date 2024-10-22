@@ -42,7 +42,6 @@
 <a href="#42" id="42">42</a>
 <a href="#43" id="43">43</a>
 <a href="#44" id="44">44</a>
-<a href="#45" id="45">45</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
 </span><span class="kw">use </span>std::path::PathBuf;
 
@@ -50,9 +49,8 @@
 </span><span class="kw">use </span>path_absolutize::Absolutize;
 
 <span class="comment">// Import the skydive module, which contains the necessary functions for staging data
-</span><span class="kw">use </span>skydive;
 
-<span class="doccomment">/// Starts the data fetching process.
+</span><span class="doccomment">/// Starts the data fetching process.
 ///
 /// # Arguments
 ///
@@ -73,7 +71,7 @@
 
     <span class="comment">// Call the stage_data function from the skydive module to process and stage the data
     </span><span class="macro">skydive::elog!</span>(<span class="string">"Fetching data..."</span>);
-    <span class="kw">let </span>r = skydive::stage::stage_data(<span class="kw-2">&amp;</span>output, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
+    <span class="kw">let </span>r = skydive::stage::stage_data(output, <span class="kw-2">&amp;</span>loci, <span class="kw-2">&amp;</span>seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
 
     <span class="kw">match </span>r {
         <span class="prelude-val">Ok</span>(n) =&gt; {

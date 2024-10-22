@@ -131,9 +131,9 @@
     truth_seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
     model_path: <span class="kw-2">&amp;</span>PathBuf,
 ) {
-    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>long_read_seq_paths);
-    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>short_read_seq_paths);
-    <span class="kw">let </span>truth_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>truth_seq_paths);
+    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
+    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
+    <span class="kw">let </span>truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
 
 
     <span class="comment">// Read all long reads.
@@ -157,7 +157,7 @@
 
     <span class="comment">// load model
     </span><span class="macro">skydive::elog!</span>(<span class="string">"Loading GBDT model from {}..."</span>, model_path.to_str().unwrap());
-    <span class="kw">let </span><span class="kw-2">mut </span>gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect(<span class="string">"Unable to load model"</span>);
+    <span class="kw">let </span>gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect(<span class="string">"Unable to load model"</span>);
 
     <span class="comment">// Prepare test data.
     </span><span class="kw">let </span>test_kmers = l1
@@ -165,7 +165,7 @@
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
-    <span class="kw">let </span><span class="kw-2">mut </span>test_data: DataVec = create_dataset_for_model(
+    <span class="kw">let </span>test_data: DataVec = create_dataset_for_model(
         test_kmers,
         <span class="kw-2">&amp;</span>lr_distances,
         <span class="kw-2">&amp;</span>sr_distances,

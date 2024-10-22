@@ -61,7 +61,7 @@
 <a href="#61" id="61">61</a>
 <a href="#62" id="62">62</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
-</span><span class="kw">use </span>std::collections::{HashMap, HashSet};
+</span><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::io::Write;
 <span class="kw">use </span>std::path::PathBuf;
 
@@ -82,9 +82,9 @@
     </span><span class="kw">let </span><span class="kw-2">mut </span>sample_names = Vec::new();
     <span class="kw">for </span>record <span class="kw">in </span><span class="kw-2">&amp;</span>all_reads {
         <span class="kw">let </span>id = record.id().to_string();
-        <span class="kw">let </span>v: Vec&lt;String&gt; = id.split(<span class="string">'|'</span>).map(|s| s.to_string()).collect();
 
-        <span class="comment">// sample_names.push(v[1].clone());
+        <span class="comment">//let v: Vec&lt;String&gt; = id.split('|').map(|s| s.to_string()).collect();
+        // sample_names.push(v[1].clone());
         </span>sample_names.push(id);
     }
 

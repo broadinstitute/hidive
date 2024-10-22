@@ -141,8 +141,6 @@
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::io::Read;
 <span class="kw">use </span>std::path::PathBuf;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
@@ -197,7 +195,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>filtered_sr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>short_read_seq_url <span class="kw">in </span><span class="kw-2">&amp;</span>short_read_seq_urls {
         <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-            <span class="kw-2">&amp;</span>short_read_seq_url,
+            short_read_seq_url,
             <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
         );
         <span class="kw">let </span>fasta_path = short_read_seq_url.to_file_path().unwrap();
@@ -214,9 +212,7 @@
         <span class="kw">let </span>fasta_reader = bio::io::fasta::Reader::new(reader);
         <span class="kw">let </span>all_reads = fasta_reader.records().flatten().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>progress_bar = skydive::utils::default_unbounded_progress_bar(<span class="macro">format!</span>(
-            <span class="string">"Filtering short reads (0 retained)"</span>,
-        ));
+        <span class="kw">let </span>progress_bar = skydive::utils::default_unbounded_progress_bar(<span class="string">"Filtering short reads (0 retained)"</span>.to_string());
 
         <span class="comment">// Create some thread-safe counters.
         </span><span class="kw">let </span>found_items = Arc::new(AtomicUsize::new(<span class="number">0</span>));

@@ -1064,7 +1064,9 @@
     <span class="kw">let </span>elapsed_time = end_time.duration_since(start_time);
 
     <span class="kw">let </span>elapsed_secs = elapsed_time.as_secs_f64();
-    <span class="kw">let </span>elapsed_str = <span class="kw">if </span>elapsed_secs &lt; <span class="number">60.0 </span>{
+    
+
+    <span class="kw">if </span>elapsed_secs &lt; <span class="number">60.0 </span>{
         <span class="macro">format!</span>(<span class="string">"{:.2} seconds"</span>, elapsed_secs)
     } <span class="kw">else if </span>elapsed_secs &lt; <span class="number">3600.0 </span>{
         <span class="macro">format!</span>(<span class="string">"{:.2} minutes"</span>, elapsed_secs / <span class="number">60.0</span>)
@@ -1072,8 +1074,6 @@
         <span class="macro">format!</span>(<span class="string">"{:.2} hours"</span>, elapsed_secs / <span class="number">3600.0</span>)
     } <span class="kw">else </span>{
         <span class="macro">format!</span>(<span class="string">"{:.2} days"</span>, elapsed_secs / <span class="number">86400.0</span>)
-    };
-
-    elapsed_str
+    }
 }
 </code></pre></div></section></main></body></html>

@@ -419,12 +419,12 @@
     test_truth_seq_paths: <span class="kw-2">&amp;</span>Vec&lt;PathBuf&gt;,
     debug: bool,
 ) {
-    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>long_read_seq_paths);
-    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>short_read_seq_paths);
-    <span class="kw">let </span>truth_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>truth_seq_paths);
-    <span class="kw">let </span>test_long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>test_long_read_seq_paths);
-    <span class="kw">let </span>test_short_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>test_short_read_seq_paths);
-    <span class="kw">let </span>test_truth_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>test_truth_seq_paths);
+    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
+    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
+    <span class="kw">let </span>truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
+    <span class="kw">let </span>test_long_read_seq_urls = skydive::parse::parse_file_names(test_long_read_seq_paths);
+    <span class="kw">let </span>test_short_read_seq_urls = skydive::parse::parse_file_names(test_short_read_seq_paths);
+    <span class="kw">let </span>test_truth_seq_urls = skydive::parse::parse_file_names(test_truth_seq_paths);
 
     <span class="comment">// Read all long reads.
     </span><span class="kw">let </span>all_lr_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = process_reads(<span class="kw-2">&amp;</span>long_read_seq_urls, <span class="string">"long"</span>);
@@ -523,7 +523,7 @@
         .chain(test_s1.kmers.keys())
         .chain(test_t1.kmers.keys());
 
-    <span class="kw">let </span><span class="kw-2">mut </span>test_data: DataVec = create_dataset_for_model(
+    <span class="kw">let </span>test_data: DataVec = create_dataset_for_model(
         test_kmers,
         <span class="kw-2">&amp;</span>test_lr_distances,
         <span class="kw-2">&amp;</span>test_sr_distances,
@@ -603,7 +603,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>all_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>read_seq_url <span class="kw">in </span>read_seq_urls {
         <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-            <span class="kw-2">&amp;</span>read_seq_url,
+            read_seq_url,
             <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
         );
         <span class="kw">let </span>fasta_path = read_seq_url.to_file_path().unwrap();
@@ -646,7 +646,7 @@
         <span class="kw-2">&amp;</span>RED,
     ))<span class="question-mark">?
         </span>.label(<span class="string">"ROC Curve"</span>)
-        .legend(|(x, y)| PathElement::new([(x, y), (x + <span class="number">20</span>, y)], <span class="kw-2">&amp;</span>RED));
+        .legend(|(x, y)| PathElement::new([(x, y), (x + <span class="number">20</span>, y)], RED));
 
     <span class="comment">// Draw a diagonal dotted line for reference.
     </span>chart.draw_series(LineSeries::new(
@@ -654,9 +654,9 @@
         <span class="kw-2">&amp;</span>BLACK,
     ))<span class="question-mark">?
         </span>.label(<span class="string">"Random"</span>)
-        .legend(|(x, y)| PathElement::new(<span class="macro">vec!</span>[(x, y), (x + <span class="number">20</span>, y)], <span class="kw-2">&amp;</span>BLACK));
+        .legend(|(x, y)| PathElement::new(<span class="macro">vec!</span>[(x, y), (x + <span class="number">20</span>, y)], BLACK));
 
-    chart.configure_series_labels().background_style(<span class="kw-2">&amp;</span>WHITE).draw()<span class="question-mark">?</span>;
+    chart.configure_series_labels().background_style(WHITE).draw()<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }

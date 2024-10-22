@@ -149,7 +149,7 @@
 
     <span class="macro">skydive::elog!</span>(<span class="string">"Writing reads to {}"</span>, output.display());
     
-    <span class="kw">let </span><span class="kw-2">mut </span>fa_file = File::create(<span class="kw-2">&amp;</span>output).unwrap();
+    <span class="kw">let </span><span class="kw-2">mut </span>fa_file = File::create(output).unwrap();
     <span class="kw">for </span>(i, corrected_seq) <span class="kw">in </span>corrected_seqs.iter().enumerate() {
         <span class="kw">let _ </span>= <span class="macro">writeln!</span>(fa_file, <span class="string">"&gt;corrected_{}\n{}"</span>, i, String::from_utf8(corrected_seq.clone()).unwrap());
     }

@@ -233,6 +233,86 @@
 <a href="#233" id="233">233</a>
 <a href="#234" id="234">234</a>
 <a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 <span class="kw">use </span>gbdt::{decision_tree::Data, gradient_boost::GBDT};
@@ -249,7 +329,8 @@
 }
 
 <span class="kw">impl </span>MLdBG {
-    <span class="doccomment">/// Create an empty multi-color LdBG.
+    <span class="doccomment">/// Create an empty multi-color `LdBG`.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>new(kmer_size: usize) -&gt; <span class="self">Self </span>{
         MLdBG {
             kmer_size,
@@ -258,7 +339,22 @@
         }
     }
 
-    <span class="doccomment">/// Create an MLdBG from a vector of LdBGs.
+    <span class="doccomment">/// Create an `MLdBG` from a vector of `LdBGs`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbgs` - A vector of `LdBGs`.
+    ///
+    /// # Returns
+    ///
+    /// A new `MLdBG`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `kmer_size` of the `LdBG` being added does not match the
+    /// `kmer_size` of the `MLdBG`. Specifically, it will panic at the `assert!` statement if the
+    /// condition `ldbg.kmer_size == self.kmer_size` is not met.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>from_ldbgs(ldbgs: Vec&lt;LdBG&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>kmer_size = ldbgs[<span class="number">0</span>].kmer_size;
 
@@ -276,7 +372,17 @@
         }
     }
 
-    <span class="doccomment">/// Add a LdBG to the MLdBG.
+    <span class="doccomment">/// Add a `LdBG` to the `MLdBG`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ldbg` - The `LdBG` to add.
+    ///
+    /// # Panics
+    ///
+    /// The `push` function will panic if the `kmer_size` of the `ldbg` being added does not match
+    /// the `kmer_size` of the `MLdBG`. Specifically, it will panic at the `assert!` statement if
+    /// the condition `ldbg.kmer_size == self.kmer_size` is not met.
     </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ldbg: LdBG) {
         <span class="macro">assert!</span>(
             ldbg.kmer_size == <span class="self">self</span>.kmer_size,
@@ -286,25 +392,42 @@
         <span class="self">self</span>.ldbgs.push(ldbg);
     }
 
-    <span class="doccomment">/// Insert a LdBG at a specific position in the MLdBG.
+    <span class="doccomment">/// Insert a `LdBG` at a specific position in the `MLdBG`.
     </span><span class="kw">pub fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize, ldbg: LdBG) {
         <span class="kw">if </span>index &lt;= <span class="self">self</span>.ldbgs.len() {
             <span class="self">self</span>.ldbgs.insert(index, ldbg);
         }
     }
 
-    <span class="doccomment">/// Append a LdBG to the end of the MLdBG.
+    <span class="doccomment">/// Append a `LdBG` to the end of the `MLdBG`.
     </span><span class="kw">pub fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ldbg: LdBG) {
         <span class="self">self</span>.ldbgs.push(ldbg);
     }
 
-    <span class="doccomment">/// Append an LdBG to the end of the MLdBG, created anew from a fasta file.
+    <span class="doccomment">/// Append an `LdBG` to the end of the `MLdBG`, created anew from a fasta file.
     </span><span class="kw">pub fn </span>append_from_file(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: String, seq_path: <span class="kw-2">&amp;</span>PathBuf) {
         <span class="kw">let </span>l = LdBG::from_file(name, <span class="self">self</span>.kmer_size, seq_path);
         <span class="self">self</span>.ldbgs.push(l);
     }
 
-    <span class="kw">pub fn </span>append_from_filtered_file&lt;F&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: String, seq_path: <span class="kw-2">&amp;</span>PathBuf, filter: F)
+    <span class="doccomment">/// Append an `LdBG` to the end of the `MLdBG`, created from a filtered set of
+    /// sequences in a fasta file.
+    ///
+    /// This function reads sequences from a specified fasta file, filters them based on a provided
+    /// condition, and then creates an `LdBG` from the filtered sequences. The new `LdBG` is appended to
+    /// the `MLdBG`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string representing the name of the new `LdBG`.
+    /// * `seq_path` - A reference to a `PathBuf` representing the path to the fasta file containing the sequences.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean indicating
+    ///              whether the record should be included.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it cannot read the fasta file.
+    </span><span class="kw">pub fn </span>append_from_filtered_file&lt;F&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: String, seq_path: <span class="kw-2">&amp;</span>PathBuf, filter: F)
     <span class="kw">where
         </span>F: Fn(<span class="kw-2">&amp;</span>bio::io::fasta::Record, <span class="kw-2">&amp;</span>HashSet&lt;Vec&lt;u8&gt;&gt;) -&gt; bool,
     {
@@ -327,7 +450,26 @@
         <span class="self">self</span>.ldbgs.push(l);
     }
 
-    <span class="kw">pub fn </span>score_kmers(<span class="kw-2">mut </span><span class="self">self</span>, model_path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Scores the k-mers in the `MLdBG` using a pre-trained Gradient Boosting
+    /// Decision Tree (`GBDT`) model.
+    ///
+    /// This function loads a `GBDT` model from the specified path and uses it to predict scores
+    /// for each k-mer in the union of k-mers from all `LdBGs` in the `MLdBG`. The scores are stored
+    /// in the `scores` field of the `MLdBG`.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_path` - A path to the file containing the pre-trained `GBDT` model.
+    ///
+    /// # Returns
+    ///
+    /// An updated `MLdBG` with the k-mer scores populated.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the model file cannot be loaded or if the prediction fails.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>score_kmers(<span class="kw-2">mut </span><span class="self">self</span>, model_path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
         <span class="self">self</span>.scores = <span class="self">self</span>.union_of_kmers().iter().map(|cn_kmer| {
@@ -380,7 +522,21 @@
         ldbg
     }
 
-    <span class="kw">pub fn </span>filter_reads&lt;F&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, seq_path: <span class="kw-2">&amp;</span>PathBuf, filter: F) -&gt; Vec&lt;Vec&lt;u8&gt;&gt;
+    <span class="doccomment">/// Filter reads from a fasta file based on a condition.
+    ///
+    /// # Arguments
+    ///
+    /// * `seq_path` - A path to the fasta file containing the reads.
+    /// * `filter` - A closure that takes a fasta record and a set of kmers and returns a boolean.
+    ///
+    /// # Returns
+    ///
+    /// A vector of the kept reads.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it cannot read the fasta file.
+    </span><span class="kw">pub fn </span>filter_reads&lt;F&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, seq_path: <span class="kw-2">&amp;</span>PathBuf, filter: F) -&gt; Vec&lt;Vec&lt;u8&gt;&gt;
     <span class="kw">where
         </span>F: Fn(<span class="kw-2">&amp;</span>bio::io::fasta::Record, <span class="kw-2">&amp;</span>HashSet&lt;Vec&lt;u8&gt;&gt;) -&gt; bool,
     {
@@ -398,7 +554,8 @@
         filtered_reads
     }
 
-    <span class="doccomment">/// Get the union of kmers from all LdBGs in the MLdBG.
+    <span class="doccomment">/// Get the union of kmers from all `LdBGs` in the `MLdBG`.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>union_of_kmers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashSet&lt;Vec&lt;u8&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>kmer_union = HashSet::new();
 
@@ -411,27 +568,28 @@
         kmer_union
     }
 
-    <span class="doccomment">/// Get a reference to the LdBG at a specific index.
+    <span class="doccomment">/// Get a reference to the `LdBG` at a specific index.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>LdBG&gt; {
         <span class="self">self</span>.ldbgs.get(index)
     }
 
-    <span class="doccomment">/// Returns an iterator over the LdBGs in the MLdBG.
+    <span class="doccomment">/// Returns an iterator over the `LdBGs` in the `MLdBG`.
     </span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; std::slice::Iter&lt;LdBG&gt; {
         <span class="self">self</span>.ldbgs.iter()
     }
 
-    <span class="doccomment">/// Returns a mutable iterator over the LdBGs in the MLdBG.
+    <span class="doccomment">/// Returns a mutable iterator over the `LdBGs` in the `MLdBG`.
     </span><span class="kw">pub fn </span>iter_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; std::slice::IterMut&lt;LdBG&gt; {
         <span class="self">self</span>.ldbgs.iter_mut()
     }
 
-    <span class="doccomment">/// Clear all LdBGs from the MLdBG.
+    <span class="doccomment">/// Clear all `LdBGs` from the `MLdBG`.
     </span><span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.ldbgs.clear();
     }
 
-    <span class="doccomment">/// Remove a LdBG from the MLdBG by index.
+    <span class="doccomment">/// Remove a `LdBG` from the `MLdBG` by index.
     </span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;LdBG&gt; {
         <span class="kw">if </span>index &lt; <span class="self">self</span>.ldbgs.len() {
             <span class="prelude-val">Some</span>(<span class="self">self</span>.ldbgs.remove(index))
@@ -440,22 +598,24 @@
         </span>}
     }
 
-    <span class="doccomment">/// Returns the number of LdBGs in the MLdBG.
+    <span class="doccomment">/// Returns the number of `LdBGs` in the `MLdBG`.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.ldbgs.len()
     }
 
-    <span class="doccomment">/// Check if the MLdBG is empty.
+    <span class="doccomment">/// Check if the `MLdBG` is empty.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.ldbgs.is_empty()
     }
 
-    <span class="doccomment">/// Remove and return the last LdBG from the MLdBG.
+    <span class="doccomment">/// Remove and return the last `LdBG` from the `MLdBG`.
     </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;LdBG&gt; {
         <span class="self">self</span>.ldbgs.pop()
     }
 
-    <span class="doccomment">/// Remove and return the LdBG from the MLdBG if it matches a certain condition.
+    <span class="doccomment">/// Remove and return the `LdBG` from the `MLdBG` if it matches a certain condition.
     </span><span class="kw">pub fn </span>pop_if&lt;F&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, condition: F) -&gt; <span class="prelude-ty">Option</span>&lt;LdBG&gt;
     <span class="kw">where
         </span>F: Fn(<span class="kw-2">&amp;</span>LdBG) -&gt; bool,

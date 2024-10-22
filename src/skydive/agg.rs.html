@@ -254,16 +254,74 @@
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>core::panic;
-<span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::collections::HashSet;
+<span class="kw">use </span>flate2::read::GzDecoder;
 <span class="kw">use </span>ndarray::Array2;
 <span class="kw">use </span>serde_json::Value;
-<span class="kw">use </span>std::io::{<span class="self">self</span>, BufRead, BufReader, Write};
-<span class="kw">use </span>std::path::PathBuf;
-<span class="kw">use </span>std::sync::Mutex;
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::fs::File;
-<span class="kw">use </span>flate2::read::GzDecoder;
+<span class="kw">use </span>std::io::{<span class="self">self</span>, BufRead, BufReader};
 
 
 <span class="attr">#[derive(Debug)]
@@ -279,7 +337,22 @@
         vec.push(item);
     }
 }
-<span class="kw">pub fn </span>reverse_complement(kmer: <span class="kw-2">&amp;</span>str) -&gt; String {
+
+<span class="doccomment">/// Reverse complement of a k-mer
+///
+/// # Arguments
+///
+/// * `kmer` - A string representing the k-mer.
+///
+/// # Returns
+///
+/// A string containing the reverse complement of the k-mer.
+///
+/// # Panics
+///
+/// If the k-mer contains an unexpected character.
+</span><span class="attr">#[must_use]
+</span><span class="kw">pub fn </span>reverse_complement(kmer: <span class="kw-2">&amp;</span>str) -&gt; String {
     kmer.chars()
         .rev()
         .map(|c| <span class="kw">match </span>c {
@@ -294,7 +367,28 @@
 }
 
 <span class="kw">impl </span>GraphicalGenome {
-    <span class="kw">pub fn </span>load_graph(filename: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;GraphicalGenome&gt; {
+    <span class="doccomment">/// Load a graphical genome from a file
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - A string slice that holds the name of the file to be loaded
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome if the file was successfully loaded
+    ///
+    /// # Errors
+    ///
+    /// * The file cannot be opened (e.g., permission issues, file not found).
+    /// * The file format is invalid (e.g., not a valid GZIP file or has unexpected content).
+    ///
+    /// # Panics
+    ///
+    /// - The file cannot be opened.
+    /// - The file is not a valid GZIP-compressed file.
+    /// - The annotation string is not valid JSON.
+    /// - There is a memory allocation error or other unexpected issue with the `HashMap` operations.
+    </span><span class="kw">pub fn </span>load_graph(filename: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;GraphicalGenome&gt; {
         <span class="kw">let </span>file = File::open(filename)<span class="question-mark">?</span>;
         <span class="kw">let </span>reader: Box&lt;<span class="kw">dyn </span>BufRead&gt; = <span class="kw">if </span>filename.ends_with(<span class="string">".gz"</span>) {
             Box::new(BufReader::new(GzDecoder::new(file)))
@@ -346,12 +440,35 @@
         })
     }
 
-    <span class="comment">// Method to extract a single sample graph
+    <span class="doccomment">/// Method to extract a single sample graph
+    ///
+    /// # Arguments
+    ///
+    /// * `df_single_sample` - A 2D array containing the imputed data matrix
+    /// * `anchorlist` - A vector of strings containing the anchor names
+    /// * `readset` - A vector of strings containing the read names
+    /// * `sample` - A string slice containing the sample name
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the graphical genome of the single sample
+    ///
+    /// # Errors
+    ///
+    /// * The `df_single_sample` array has an invalid shape.
+    /// * The anchor or read indices are invalid.
+    /// * There is a memory allocation error.
+    /// * The JSON data is invalid.
+    /// * There is an unexpected data structure or other internal error.
+    ///
+    /// # Panics
+    ///
+    /// If the edge do not have outgoing anchor
     </span><span class="kw">pub fn </span>extract_single_sample_graph(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         df_single_sample: <span class="kw-2">&amp;</span>Array2&lt;f64&gt;, 
-        anchorlist: Vec&lt;String&gt;,
-        readset:Vec&lt;String&gt;,
+        anchorlist: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+        readset:<span class="kw-2">&amp;</span>Vec&lt;String&gt;,
         sample: <span class="kw-2">&amp;</span>str,
     ) -&gt; io::Result&lt;GraphicalGenome&gt; {
 
@@ -374,19 +491,20 @@
 
             <span class="kw">for </span>(read_index, read) <span class="kw">in </span>readset.iter().enumerate(){
                 <span class="kw">let </span>edgeindex = df_single_sample[[read_index, anchorindex]].round() - <span class="number">1.0</span>;
-                <span class="kw">let </span>usize_index = edgeindex <span class="kw">as </span>usize;
+                <span class="attr">#[allow(clippy::cast_possible_truncation)]#[allow(clippy::cast_sign_loss)]
+                </span><span class="kw">let </span>usize_index = edgeindex <span class="kw">as </span>usize;
                 <span class="kw">let </span>edgename = d.get(<span class="kw-2">&amp;</span>usize_index);
                 <span class="comment">// println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &amp;d, edgename); // Assuming new_edges is a HashMap&lt;String, SomeType&gt;
                 </span>new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| <span class="macro">serde_json::json!</span>({}));
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(edge_value) = <span class="self">self</span>.edges.get(<span class="kw-2">&amp;</span>edgename.as_ref().unwrap().to_string()) {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(edge_value) = <span class="self">self</span>.edges.get(<span class="kw-2">&amp;</span>(<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string()) {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(seq_value) = edge_value.get(<span class="string">"seq"</span>) {
-                        <span class="kw">let </span><span class="kw-2">mut </span>new_edge_value = new_edges.entry(edgename.as_ref().unwrap().to_string()).or_insert_with(|| <span class="macro">serde_json::json!</span>({}));
+                        <span class="kw">let </span>new_edge_value = new_edges.entry((<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string()).or_insert_with(|| <span class="macro">serde_json::json!</span>({}));
                         new_edge_value[<span class="string">"seq"</span>] = seq_value.clone();
                     }
                 }
 
-                <span class="kw">let </span>edgename_str = edgename.as_ref().unwrap().to_string();
-                <span class="kw">let </span><span class="kw-2">mut </span>new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| <span class="macro">serde_json::json!</span>({}));
+                <span class="kw">let </span>edgename_str = (<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string();
+                <span class="kw">let </span>new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| <span class="macro">serde_json::json!</span>({}));
                 <span class="kw">if </span>!new_edge_value.get(<span class="string">"reads"</span>).is_some() {
                     new_edge_value[<span class="string">"reads"</span>] = serde_json::Value::Array(<span class="macro">vec!</span>[]);
                 }
@@ -404,16 +522,16 @@
                 }
 
 
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(outgoing_list) = <span class="self">self</span>.outgoing.get(<span class="kw-2">&amp;</span>edgename.as_ref().unwrap().to_string()) {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(outgoing_list) = <span class="self">self</span>.outgoing.get(<span class="kw-2">&amp;</span>(<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string()) {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(dst) = outgoing_list.get(<span class="number">0</span>){
-                        <span class="kw">let </span>incoming_list = new_incoming.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        <span class="kw">let </span>incoming_list = new_incoming.entry((<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(incoming_list, anchor.to_string());
 
                         <span class="kw">let </span>incoming_dst_list = new_incoming.entry(dst.to_string()).or_default();
-                        add_unique(incoming_dst_list, edgename.as_ref().unwrap().to_string());
+                        add_unique(incoming_dst_list, (<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string());
                         <span class="kw">let </span>outgoing_list = new_outgoing.entry(anchor.to_string()).or_default();
-                        add_unique(outgoing_list, edgename.as_ref().unwrap().to_string());
-                        <span class="kw">let </span>outgoing_edgename_list = new_outgoing.entry(edgename.as_ref().unwrap().to_string()).or_default();
+                        add_unique(outgoing_list, (<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string());
+                        <span class="kw">let </span>outgoing_edgename_list = new_outgoing.entry((<span class="kw-2">*</span>edgename.as_ref().unwrap()).to_string()).or_default();
                         add_unique(outgoing_edgename_list, dst.to_string());
                     }
                     <span class="kw">else</span>{
@@ -441,15 +559,16 @@
 }
 
 <span class="kw">impl </span>FindAllPathBetweenAnchors {
-    <span class="kw">pub fn </span>new(graph: <span class="kw-2">&amp;</span>GraphicalGenome, start: <span class="kw-2">&amp;</span>str, end: <span class="kw-2">&amp;</span>str, read_sets: HashSet&lt;String&gt;) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>new(graph: <span class="kw-2">&amp;</span>GraphicalGenome, start: <span class="kw-2">&amp;</span>str, end: <span class="kw-2">&amp;</span>str, read_sets: HashSet&lt;String&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
         };
-        finder.find_path(graph, start, end, Vec::new(), <span class="number">0</span>, read_sets);
+        finder.find_path(graph, start, end, <span class="kw-2">&amp;</span>Vec::new(), <span class="number">0</span>, read_sets);
         finder
     }
 
-    <span class="kw">pub fn </span>find_path(<span class="kw-2">&amp;mut </span><span class="self">self</span>, g: <span class="kw-2">&amp;</span>GraphicalGenome, start: <span class="kw-2">&amp;</span>str, end: <span class="kw-2">&amp;</span>str, <span class="kw-2">mut </span>sofar: Vec&lt;String&gt;, depth: usize, readset: HashSet&lt;String&gt;) {
+    <span class="kw">pub fn </span>find_path(<span class="kw-2">&amp;mut </span><span class="self">self</span>, g: <span class="kw-2">&amp;</span>GraphicalGenome, start: <span class="kw-2">&amp;</span>str, end: <span class="kw-2">&amp;</span>str, sofar: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, depth: usize, readset: HashSet&lt;String&gt;) {
         <span class="kw">if </span>start == end {
             <span class="kw">let </span><span class="kw-2">mut </span>sofar1 = sofar.clone();
             sofar1.push(end.to_string());
@@ -487,13 +606,14 @@
                 }
                 <span class="kw">let </span><span class="kw-2">mut </span>sofar1 = sofar.clone();
                 sofar1.push(start.to_string());
-                <span class="self">self</span>.find_path(g, dst, end, sofar1, depth1, readset1);
+                <span class="self">self</span>.find_path(g, dst, end, <span class="kw-2">&amp;</span>sofar1, depth1, readset1);
             }
         }
     }
 }
 
 <span class="comment">// Series parallele graph
+</span><span class="attr">#[must_use]
 </span><span class="kw">pub fn </span>reconstruct_path_seq(graph: <span class="kw-2">&amp;</span>GraphicalGenome, path: <span class="kw-2">&amp;</span>[String]) -&gt; String {
     <span class="kw">let </span><span class="kw-2">mut </span>seq = String::new();
     <span class="kw">for </span>item <span class="kw">in </span>path {

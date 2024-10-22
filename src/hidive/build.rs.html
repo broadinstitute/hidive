@@ -990,28 +990,22 @@
 <a href="#990" id="990">990</a>
 <a href="#991" id="991">991</a>
 <a href="#992" id="992">992</a>
-<a href="#993" id="993">993</a>
-<a href="#994" id="994">994</a>
-<a href="#995" id="995">995</a>
 </pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
 </span><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::path::PathBuf;
 
-<span class="kw">use </span>bio::io::fasta::{IndexedReader, Reader, Record};
+<span class="kw">use </span>bio::io::fasta::{Reader, Record};
 
 <span class="kw">use </span>flate2::read::GzDecoder;
 <span class="kw">use </span>serde_json::Value;
 
 <span class="comment">// Import the skydive module, which contains the necessary functions for building graphs
-</span><span class="kw">use </span>skydive;
 
-<span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>serde::{Deserialize, Serialize};
+</span><span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::error::Error;
 <span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::{<span class="self">self</span>, BufRead, BufReader, Write};
-<span class="kw">use </span>std::sync::Mutex;
 
 <span class="kw">pub fn </span>get_reference_kmer_profile(ref_hla: <span class="kw-2">&amp;</span>str, k: usize) -&gt; Vec&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>ref_kmer_profile: HashMap&lt;String, i32&gt; = HashMap::new();
@@ -1186,7 +1180,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>last_position = <span class="number">0</span>;
 
     <span class="kw">for </span>anchor <span class="kw">in </span>anchornames {
-        <span class="kw">let </span><span class="kw-2">mut </span>position = anchor_info[anchor].pos;
+        <span class="kw">let </span>position = anchor_info[anchor].pos;
         <span class="kw">if </span>position &gt; last_position + k {
             anchor_unadjacent_list.push(anchor.to_string());
             last_position = position;
@@ -1218,10 +1212,10 @@
         <span class="kw">let </span>anchor_rev = reverse_complement(<span class="kw-2">&amp;</span>anchor_seq);
         position_dict
             .entry(anchor_seq.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
         position_dict
             .entry(anchor_rev.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
     }
 
     <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..contig.len() - k + <span class="number">1 </span>{
@@ -1253,7 +1247,7 @@
     contig: String,
     contigname: String,
     sample: String,
-    Anchorseq: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    anchorseq: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
 ) -&gt; EdgeInfo {
     <span class="kw">let </span>src_seq: String;
     <span class="kw">let </span><span class="kw-2">mut </span>pr = <span class="bool-val">false</span>;
@@ -1265,12 +1259,12 @@
         pr = <span class="bool-val">true</span>;
     } <span class="kw">else </span>{
         src_seq = contig.chars().skip(src_pos).take(k).collect();
-        src = <span class="kw">match </span>Anchorseq.get(<span class="kw-2">&amp;</span>src_seq) {
+        src = <span class="kw">match </span>anchorseq.get(<span class="kw-2">&amp;</span>src_seq) {
             <span class="prelude-val">Some</span>(value) =&gt; value.clone(),
             <span class="prelude-val">None </span>=&gt; {
                 <span class="kw">let </span>reversed_src_seq = reverse_complement(<span class="kw-2">&amp;</span>src_seq);
                 pr = <span class="bool-val">true</span>;
-                Anchorseq
+                anchorseq
                     .get(<span class="kw-2">&amp;</span>reversed_src_seq)
                     .unwrap_or(<span class="kw-2">&amp;</span><span class="string">""</span>.to_string())
                     .clone()
@@ -1287,12 +1281,12 @@
         sr = <span class="bool-val">true</span>;
     } <span class="kw">else </span>{
         dst_seq = contig.chars().skip(dst_pos).take(k).collect::&lt;String&gt;();
-        dst = <span class="kw">match </span>Anchorseq.get(<span class="kw-2">&amp;</span>dst_seq) {
+        dst = <span class="kw">match </span>anchorseq.get(<span class="kw-2">&amp;</span>dst_seq) {
             <span class="prelude-val">Some</span>(value) =&gt; value.clone(),
             <span class="prelude-val">None </span>=&gt; {
                 <span class="kw">let </span>reversed_dst_seq = reverse_complement(<span class="kw-2">&amp;</span>dst_seq);
                 sr = <span class="bool-val">true</span>;
-                Anchorseq
+                anchorseq
                     .get(<span class="kw-2">&amp;</span>reversed_dst_seq)
                     .unwrap_or(<span class="kw-2">&amp;</span><span class="string">""</span>.to_string())
                     .clone()
@@ -1318,8 +1312,8 @@
 
     EdgeInfo {
         seq: edge_seq,
-        src: src,
-        dst: dst,
+        src,
+        dst,
         reads: <span class="macro">vec!</span>[contigname],
         samples: <span class="macro">vec!</span>[sample].into_iter().collect(),
     }
@@ -1347,7 +1341,7 @@
             .last()
             .unwrap_or_default()
             .to_string();
-        <span class="kw">let </span>(a, svs) = mapping_info(<span class="kw-2">&amp;</span>final_anchor, contig.to_string(), k);
+        <span class="kw">let </span>(a, _svs) = mapping_info(final_anchor, contig.to_string(), k);
         <span class="kw">let </span><span class="kw-2">mut </span>splitposlist: Vec&lt;<span class="kw">_</span>&gt; = a.values().filter_map(|<span class="kw-2">&amp;</span>x| x).collect();
         splitposlist.sort();
         <span class="kw">let </span><span class="kw-2">mut </span>edgeindex = <span class="number">0</span>;
@@ -1363,7 +1357,7 @@
                 <span class="kw-2">&amp;</span>anchorseq,
             );
             <span class="kw">let </span>src = <span class="kw-2">&amp;</span>e.src;
-            <span class="kw">let </span>edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+            <span class="kw">let </span>edgelist = outgoing.entry(src.clone()).or_default();
             <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = edgelist
                 .iter()
                 .position(|edge| edge_info[edge].dst == e.dst &amp;&amp; edge_info[edge].seq == e.seq)
@@ -1391,7 +1385,7 @@
             <span class="kw-2">&amp;</span>anchorseq,
         );
         <span class="kw">let </span>src = <span class="kw-2">&amp;</span>e.src;
-        <span class="kw">let </span>edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+        <span class="kw">let </span>edgelist = outgoing.entry(src.clone()).or_default();
         <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = edgelist
             .iter()
             .position(|edge| edge_info[edge].dst == e.dst &amp;&amp; edge_info[edge].seq == e.seq)
@@ -1562,8 +1556,8 @@
         <span class="prelude-val">Ok</span>(GraphicalGenome {
             anchor: anchor_dict,
             edges: edge_dict,
-            outgoing: outgoing,
-            incoming: incoming,
+            outgoing,
+            incoming,
         })
     }
 }
@@ -1591,7 +1585,7 @@
         g: <span class="kw-2">&amp;</span>GraphicalGenome,
         start: <span class="kw-2">&amp;</span>str,
         end: <span class="kw-2">&amp;</span>str,
-        <span class="kw-2">mut </span>sofar: Vec&lt;String&gt;,
+        sofar: Vec&lt;String&gt;,
         depth: usize,
         readset: HashSet&lt;String&gt;,
     ) {
@@ -1646,12 +1640,12 @@
     <span class="kw">for </span>item <span class="kw">in </span>path {
         <span class="kw">if </span>item.starts_with(<span class="string">'A'</span>) {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(anchor) = graph.anchor.get(item) {
-                seq += <span class="kw-2">&amp;</span>anchor[<span class="string">"seq"</span>].as_str().unwrap_or_default(); <span class="comment">// Assuming `anchor` is a HashMap and "seq" is a key
+                seq += anchor[<span class="string">"seq"</span>].as_str().unwrap_or_default(); <span class="comment">// Assuming `anchor` is a HashMap and "seq" is a key
                                                                     // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             </span>}
         } <span class="kw">else if </span>item.starts_with(<span class="string">"E"</span>) {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(edge) = graph.edges.get(item) {
-                seq += <span class="kw-2">&amp;</span>edge[<span class="string">"seq"</span>].as_str().unwrap_or_default(); <span class="comment">// Assuming `edges` is a HashMap and "seq" is a key
+                seq += edge[<span class="string">"seq"</span>].as_str().unwrap_or_default(); <span class="comment">// Assuming `edges` is a HashMap and "seq" is a key
             </span>}
         }
     }
@@ -1660,7 +1654,7 @@
 
 <span class="kw">pub fn </span>find_all_reads(graph: <span class="kw-2">&amp;</span>GraphicalGenome) -&gt; HashSet&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>read_sets = HashSet::new();
-    <span class="kw">for </span>(item, edge) <span class="kw">in </span><span class="kw-2">&amp;</span>graph.edges {
+    <span class="kw">for </span>(_item, edge) <span class="kw">in </span><span class="kw-2">&amp;</span>graph.edges {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(readlist) = edge.get(<span class="string">"reads"</span>).and_then(|r| r.as_array()) {
             <span class="kw">for </span>read <span class="kw">in </span>readlist {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(read_str) = read.as_str() {
@@ -1733,7 +1727,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>node = <span class="self">Self</span>::find_furthest_node(<span class="kw-2">&amp;</span>node_candidate, subgraph, <span class="kw-2">&amp;</span>start_node);
         nodelist.push(node.clone());
 
-        <span class="kw">while </span>node != end_node &amp;&amp; node != <span class="string">"" </span>{
+        <span class="kw">while </span>node != end_node &amp;&amp; !node.is_empty() {
             <span class="kw">let </span>edgelist = <span class="kw-2">&amp;</span>subgraph.outgoing[<span class="kw-2">&amp;</span>node];
             <span class="kw">let </span><span class="kw-2">mut </span>node_candidate: Vec&lt;String&gt; = Vec::new();
             <span class="kw">for </span>edge <span class="kw">in </span>edgelist {
@@ -1741,8 +1735,8 @@
                 <span class="kw">if </span>nodelist.contains(<span class="kw-2">&amp;</span><span class="string">"SINK"</span>.to_string()) {
                     <span class="kw">continue</span>;
                 }
-                <span class="kw">if </span>nodelist[<span class="number">0</span>] != <span class="string">""
-                    </span>&amp;&amp; subgraph.anchor.contains_key(<span class="kw-2">&amp;</span>nodelist[<span class="number">0</span>])
+                <span class="kw">if </span>!nodelist[<span class="number">0</span>].is_empty()
+                    &amp;&amp; subgraph.anchor.contains_key(<span class="kw-2">&amp;</span>nodelist[<span class="number">0</span>])
                     &amp;&amp; subgraph.outgoing.contains_key(<span class="kw-2">&amp;</span>nodelist[<span class="number">0</span>])
                 {
                     node_candidate.extend(nodelist.iter().cloned());
@@ -1783,12 +1777,12 @@
                 FindAllPathBetweenAnchors::new(subgraph, start_node, end_node, initial_set.clone());
             <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
             <span class="kw">for </span>(p, rs) <span class="kw">in </span>path.subpath.iter() {
-                <span class="kw">let </span>edgename = <span class="macro">format!</span>(
-                    <span class="string">"E{:05}.{:04}"</span>,
-                    start_node[<span class="number">1</span>..].parse::&lt;usize&gt;().unwrap(),
-                    index
-                );
-                <span class="kw">let </span>seq = reconstruct_path_seq(subgraph, <span class="kw-2">&amp;</span>p[<span class="number">1</span>..p.len() - <span class="number">1</span>]);
+                <span class="comment">// let edgename = format!(
+                //     "E{:05}.{:04}",
+                //     start_node[1..].parse::&lt;usize&gt;().unwrap(),
+                //     index
+                // );
+                </span><span class="kw">let </span>seq = reconstruct_path_seq(subgraph, <span class="kw-2">&amp;</span>p[<span class="number">1</span>..p.len() - <span class="number">1</span>]);
                 <span class="kw">let </span>edgelist = outgoing_dict
                     .get(start_node)
                     .cloned()
@@ -1961,7 +1955,7 @@
     <span class="kw">let </span>anchors = get_anchors(<span class="kw-2">&amp;</span>anchorlist, <span class="kw-2">&amp;</span>position_dict, k, <span class="kw-2">&amp;</span>stem);
 
     <span class="kw">let </span>final_anchor = get_final_anchor(<span class="kw-2">&amp;</span>anchors, k);
-    <span class="kw">let </span>(edge_info, outgoing) = create_edge_file(<span class="kw-2">&amp;</span>hla_seq, <span class="kw-2">&amp;</span>final_anchor, k);
+    <span class="kw">let </span>(edge_info, _outgoing) = create_edge_file(<span class="kw-2">&amp;</span>hla_seq, <span class="kw-2">&amp;</span>final_anchor, k);
 
     <span class="kw">let </span>dereferenced_final_anchor = final_anchor
         .iter()
@@ -1972,7 +1966,7 @@
     </span><span class="kw">let </span>filtered_edges = filter_undersupported_edges(<span class="kw-2">&amp;</span>edge_info, <span class="kw-2">&amp;</span>stem, <span class="number">4</span>);
 
     <span class="comment">// Write final graph to disk.
-    </span>write_gfa(
+    </span><span class="kw">let _ </span>= write_gfa(
         <span class="kw-2">&amp;</span>dereferenced_final_anchor,
         <span class="kw-2">&amp;</span>filtered_edges,
         output.to_str().unwrap(),
@@ -1984,7 +1978,7 @@
     </span><span class="kw">let </span><span class="kw-2">mut </span>sp_graph = GetSeriesParallelGraph::new(<span class="kw-2">&amp;</span>graph);
     <span class="kw">let </span>outputfilename_str = output.with_extension(<span class="string">"sp.gfa"</span>);
     <span class="comment">// println!("{:?}", outputfilename_str);
-    </span>write_graph_from_graph(outputfilename_str.to_str().unwrap(), <span class="kw-2">&amp;mut </span>sp_graph);
+    </span><span class="kw">let _ </span>= write_graph_from_graph(outputfilename_str.to_str().unwrap(), <span class="kw-2">&amp;mut </span>sp_graph);
     <span class="macro">println!</span>(<span class="string">"{:?}"</span>, outputfilename_str);
     <span class="comment">// write_graph_from_graph("HLA-A.sp.gfa", &amp;mut sp_graph);
 </span>}

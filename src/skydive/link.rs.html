@@ -86,6 +86,13 @@
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
 <a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::VecDeque;
 <span class="kw">use </span>std::fmt;
 
@@ -102,6 +109,7 @@
 
 <span class="kw">impl </span>Link {
     <span class="doccomment">/// Create an empty link record.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>new(is_forward: bool) -&gt; <span class="self">Self </span>{
         Link {
             is_forward,
@@ -110,6 +118,7 @@
     }
 
     <span class="doccomment">/// Create a link from a sequence of junction choices.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>from_junctions(is_forward: bool, seq: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="self">Self </span>{
         Link {
             is_forward,
@@ -118,16 +127,19 @@
     }
 
     <span class="doccomment">/// Return orientation of the link.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>is_forward(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.is_forward
     }
 
     <span class="doccomment">/// Return the number of junction choices in the link.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.junctions.len()
     }
 
     <span class="doccomment">/// Indicate whether the list of junctions is empty.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.junctions.is_empty()
     }
@@ -138,6 +150,7 @@
     }
 
     <span class="doccomment">/// Peek at a junction from the front of the queue.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>front(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>u8&gt; {
         <span class="self">self</span>.junctions.front()
     }
@@ -148,6 +161,7 @@
     }
 
     <span class="doccomment">/// Return a new link with the junction choices complemented.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>complement(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Link {
         <span class="kw">let </span><span class="kw-2">mut </span>new_link = Link::new(<span class="self">self</span>.is_forward);
 

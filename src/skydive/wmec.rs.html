@@ -325,9 +325,13 @@
 <a href="#325" id="325">325</a>
 <a href="#326" id="326">326</a>
 <a href="#327" id="327">327</a>
-</pre></div><pre class="rust"><code><span class="doccomment">//! This module implements the WhatsHap phasing algorithm as described in:
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! This module implements the `WhatsHap` phasing algorithm as described in:
 //! Murray Patterson, Tobias Marschall, Nadia Pisanti, Leo van Iersel, Leen Stougie, et al.
-//! WhatsHap: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
+//! `WhatsHap`: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
 //! Journal of Computational Biology, 2015, 22 (6), pp.498-509.
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988
@@ -343,6 +347,7 @@
 
 <span class="kw">impl </span>WMECData {
     <span class="comment">// Initialize the data structure with given reads and confidences
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>new(reads: Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt;&gt;, confidences: Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>num_snps = reads[<span class="number">0</span>].len();
         WMECData { reads, confidences, num_snps }
@@ -350,6 +355,7 @@
     
     <span class="comment">// Function to compute W^0(j, R) and W^1(j, R)
     // Cost to set all fragments in set R to 0 or 1 at SNP j
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>compute_costs(<span class="kw-2">&amp;</span><span class="self">self</span>, snp: usize, set_r: <span class="kw-2">&amp;</span>BTreeSet&lt;usize&gt;) -&gt; (u32, u32) {
         <span class="kw">let </span><span class="kw-2">mut </span>w0 = <span class="number">0</span>; <span class="comment">// Cost for setting to 0
         </span><span class="kw">let </span><span class="kw-2">mut </span>w1 = <span class="number">0</span>; <span class="comment">// Cost for setting to 1
@@ -370,6 +376,7 @@
     }
     
     <span class="comment">// Calculate minimum correction cost Delta C(j, (R, S))
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>delta_c(<span class="kw-2">&amp;</span><span class="self">self</span>, snp: usize, r: <span class="kw-2">&amp;</span>BTreeSet&lt;usize&gt;, s: <span class="kw-2">&amp;</span>BTreeSet&lt;usize&gt;) -&gt; u32 {
         <span class="kw">let </span>(w0_r, w1_r) = <span class="self">self</span>.compute_costs(snp, r);
         <span class="kw">let </span>(w0_s, w1_s) = <span class="self">self</span>.compute_costs(snp, s);
@@ -505,7 +512,7 @@
                 current_bipartition = prev_bipartition.clone();
             } <span class="kw">else </span>{
                 <span class="comment">// This should not happen if the DP table is correctly filled
-                </span><span class="macro">panic!</span>(<span class="string">"No valid previous bipartition found for SNP {}"</span>, snp);
+                </span><span class="macro">panic!</span>(<span class="string">"No valid previous bipartition found for SNP {snp}"</span>);
             }
         }
     }
@@ -514,6 +521,7 @@
 }
 
 <span class="comment">// Main function to perform WMEC using dynamic programming
+</span><span class="attr">#[must_use]
 </span><span class="kw">pub fn </span>phase(data: <span class="kw-2">&amp;</span>WMECData) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;) {
     <span class="kw">let </span>(<span class="kw-2">mut </span>dp, <span class="kw-2">mut </span>backtrack) = initialize_dp(data);
 

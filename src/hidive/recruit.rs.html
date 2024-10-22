@@ -144,11 +144,7 @@
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
 <a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::fs::File;
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::Write;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::Arc;
@@ -163,13 +159,11 @@
 <span class="kw">use </span>rayon::iter::ParallelIterator;
 <span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
 
-<span class="kw">use </span>rust_htslib::bam::ext::BamRecordExtensions;
-<span class="kw">use </span>rust_htslib::bam::{FetchDefinition, Read};
+<span class="kw">use </span>rust_htslib::bam::Read;
 
 <span class="comment">// Import the skydive module, which contains the necessary functions for staging data
-</span><span class="kw">use </span>skydive;
 
-<span class="kw">pub fn </span>start(
+</span><span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
@@ -204,7 +198,7 @@
     <span class="comment">// Read the FASTA files and search for the k-mers in each read.
     </span><span class="kw">let </span><span class="kw-2">mut </span>all_records = Vec::new();
     <span class="kw">for </span>seq_url <span class="kw">in </span>seq_urls {
-        <span class="kw">let </span><span class="kw-2">mut </span>reader = Reader::from_file(seq_url.to_file_path().unwrap()).unwrap();
+        <span class="kw">let </span>reader = Reader::from_file(seq_url.to_file_path().unwrap()).unwrap();
 
         <span class="kw">let </span>progress_bar =
             skydive::utils::default_unbounded_progress_bar(<span class="string">"Searching for similar reads (0 found)"</span>);
@@ -235,7 +229,7 @@
 
                 <span class="comment">// Count the number of k-mers found in our hashset from the long reads.
                 </span><span class="kw">let </span>fw_seq = read.seq();
-                <span class="kw">let </span>rl_seq = skydive::utils::homopolymer_compressed(<span class="kw-2">&amp;</span>fw_seq);
+                <span class="kw">let </span>rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
 
                 <span class="kw">let </span>num_kmers = rl_seq
                     .par_windows(kmer_size)
@@ -285,7 +279,7 @@
         <span class="macro">writeln!</span>(
             writer,
             <span class="string">"{}"</span>,
-            String::from_utf8_lossy(<span class="kw-2">&amp;</span>record.seq())
+            String::from_utf8_lossy(record.seq())
         )
         .expect(<span class="string">"Could not write to file"</span>);
     }

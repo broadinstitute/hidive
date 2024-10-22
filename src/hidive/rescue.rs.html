@@ -230,7 +230,6 @@
 <a href="#230" id="230">230</a>
 <a href="#231" id="231">231</a>
 <a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::Write;
@@ -252,9 +251,8 @@
 <span class="kw">use </span>rust_htslib::bam::{FetchDefinition, Read};
 
 <span class="comment">// Import the skydive module, which contains the necessary functions for staging data
-</span><span class="kw">use </span>skydive;
 
-<span class="kw">pub fn </span>start(
+</span><span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
