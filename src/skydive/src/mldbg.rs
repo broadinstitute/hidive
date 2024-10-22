@@ -15,6 +15,7 @@ pub struct MLdBG {
 
 impl MLdBG {
     /// Create an empty multi-color `LdBG`.
+    #[must_use]
     pub fn new(kmer_size: usize) -> Self {
         MLdBG {
             kmer_size,
@@ -38,6 +39,7 @@ impl MLdBG {
     /// This function will panic if the `kmer_size` of the `LdBG` being added does not match the
     /// `kmer_size` of the `MLdBG`. Specifically, it will panic at the `assert!` statement if the
     /// condition `ldbg.kmer_size == self.kmer_size` is not met.
+    #[must_use]
     pub fn from_ldbgs(ldbgs: Vec<LdBG>) -> Self {
         let kmer_size = ldbgs[0].kmer_size;
 
@@ -151,6 +153,7 @@ impl MLdBG {
     /// # Panics
     ///
     /// This function will panic if the model file cannot be loaded or if the prediction fails.
+    #[must_use]
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
@@ -237,6 +240,7 @@ impl MLdBG {
     }
 
     /// Get the union of kmers from all `LdBGs` in the `MLdBG`.
+    #[must_use]
     pub fn union_of_kmers(&self) -> HashSet<Vec<u8>> {
         let mut kmer_union = HashSet::new();
 
@@ -250,6 +254,7 @@ impl MLdBG {
     }
 
     /// Get a reference to the `LdBG` at a specific index.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&LdBG> {
         self.ldbgs.get(index)
     }
@@ -279,11 +284,13 @@ impl MLdBG {
     }
 
     /// Returns the number of `LdBGs` in the `MLdBG`.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.ldbgs.len()
     }
 
     /// Check if the `MLdBG` is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ldbgs.is_empty()
     }

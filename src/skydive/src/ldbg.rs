@@ -43,6 +43,7 @@ pub struct LdBG {
 }
 
 impl LdBG {
+    #[must_use]
     pub fn new(name: String, kmer_size: usize) -> Self {
         LdBG {
             name,
@@ -70,6 +71,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This function will panic if it cannot open a file.
+    #[must_use]
     pub fn from_file(
         name: String,
         kmer_size: usize,
@@ -114,6 +116,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This function will panic if it cannot open a file.
+    #[must_use]
     pub fn from_files(
         name: String,
         kmer_size: usize,
@@ -155,6 +158,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequence(
         name: String,
         kmer_size: usize,
@@ -189,6 +193,7 @@ impl LdBG {
     /// # Returns
     ///
     /// A new instance of `LdBG`.
+    #[must_use]
     pub fn from_sequences(
         name: String,
         kmer_size: usize,
@@ -215,10 +220,12 @@ impl LdBG {
     /// # Returns
     ///
     /// A reference to the name of the graph.
+    #[must_use]
     pub fn name(&self) -> &String {
         &self.name
     }
 
+    #[must_use]
     pub fn verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
@@ -727,6 +734,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This function will panic if it cannot load the model from the specified path.
+    #[must_use]
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
@@ -788,6 +796,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This function will panic if it encounters an error while accessing node weights in the graph.
+    #[must_use]
     pub fn correct_seq(&self, seq: &[u8]) -> Vec<Vec<u8>> {
         let (mut graph, node_indices) = self.initialize_read_graph(seq);
 
@@ -1159,6 +1168,7 @@ impl LdBG {
         (graph, node_indices)
     }
 
+    #[must_use]
     pub fn correct_seqs(&self, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let progress_bar = if self.verbose {
             crate::utils::default_bounded_progress_bar("Correcting reads", seqs.len() as u64)
@@ -1457,6 +1467,7 @@ impl LdBG {
     /// # Panics
     ///
     /// - This function will panic if the k-mer length does not match the expected length.
+    #[must_use]
     pub fn assemble(&self, kmer: &[u8]) -> Vec<u8> {
         let mut contig: Vec<u8> = kmer.to_vec();
 
@@ -1483,6 +1494,7 @@ impl LdBG {
     ///
     /// - This function will panic if the node weight for a unique node cannot be retrieved.
     /// - If `self.kmers.get(cn_kmer).unwrap()` returns None.
+    #[must_use]
     pub fn assemble_all(&self) -> Vec<Vec<u8>> {
         let mut contigs = Vec::new();
 
@@ -1529,6 +1541,7 @@ impl LdBG {
     ///
     /// - This function will panic if the node weight for a unique node cannot be retrieved.
     /// - if `g.node_weight(*unique_node).unwrap().as_bytes()` returns None.
+    #[must_use]
     pub fn assemble_at_bubbles(&self) -> Vec<Vec<u8>> {
         let g = self.traverse_all_kmers();
         let bubbles = find_all_superbubbles(&g);
@@ -1641,6 +1654,7 @@ impl LdBG {
         Some(contig[contig.len() - self.kmer_size as usize..].to_vec())
     }
 
+    #[must_use]
     pub fn clean(self, lenient_threshold: f32, strict_threshold: f32) -> Self {
         let kmer_size = self.kmer_size;
 
@@ -1669,6 +1683,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This function will panic if the `assemble_forward` or `assemble_backward` methods fail to assemble a contig.
+    #[must_use]
     pub fn clean_color_specific_paths(mut self, color: usize, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1753,6 +1768,7 @@ impl LdBG {
     ///
     /// # Panics
     /// - This line could panic if `self.kmers.get(cn_kmer).unwrap().in_degree()` returns `None`, meaning the in-degree of the k-mer is not available.
+    #[must_use]
     pub fn clean_branches(mut self, min_score: f32) -> Self {
         let bad_cn_kmers = self.kmers
             .keys()
@@ -1842,6 +1858,7 @@ impl LdBG {
     ///   - This line could panic if `g.node_weight(node)` returns `None`, meaning the node does not have an associated weight.
     ///   - This line could panic if `crate::utils::canonicalize_kmer(current_kmer)` encounters an unexpected input that it cannot process.
     ///   - This line could panic if `crate::utils::canonicalize_kmer(kmer)` encounters an unexpected input that it cannot process.
+    #[must_use]
     pub fn clean_tangles(mut self, color: usize, limit: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_tangles: usize = 0;
@@ -1900,6 +1917,7 @@ impl LdBG {
     ///
     /// # Panics
     /// If `self.kmers.get(cn_kmer)` returns `None`, the call to `unwrap()` will cause a panic.
+    #[must_use]
     pub fn clean_tips(mut self, limit: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
@@ -1972,6 +1990,7 @@ impl LdBG {
     ///
     ///  - When calling `unwrap` on the result of `g.node_weight(*node)`. If the node does not exist in the graph, this will cause a panic.
     ///  - When calling `unwrap_or` on the result of `self.scores.get(&cn_kmer)`. If the canonical k-mer is not found in the scores, it will return the default value `1.0` instead of panicking.
+    #[must_use]
     pub fn clean_bubbles(mut self, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_bubbles: usize = 0;
@@ -2062,6 +2081,7 @@ impl LdBG {
     /// # Panics
     ///
     /// This method will panic if the k-mer size is not set.
+    #[must_use]
     pub fn clean_contigs(mut self, min_contig_length: usize) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_contigs: usize = 0;
@@ -2376,6 +2396,7 @@ impl LdBG {
     }
 
     /// Traverse kmers starting from a given kmer and build a graph.
+    #[must_use]
     pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
@@ -2413,6 +2434,7 @@ impl LdBG {
     /// 2. **Indexing operations**:
     ///    - If `contig.windows(self.kmer_size)` is called with a `kmer_size` larger than the length of `contig`, it will panic.
     ///
+    #[must_use]
     pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
@@ -2509,6 +2531,7 @@ impl LdBG {
     /// # Panics
     ///
     /// Panics if the graph is not a directed graph.
+    #[must_use]
     pub fn traverse_all_kmers(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()
@@ -2569,6 +2592,7 @@ impl LdBG {
     /// # Panics
     ///
     /// Panics if the graph is not a directed graph.
+    #[must_use]
     pub fn traverse_all_contigs(&self) -> DiGraph<String, f32> {
         let cn_kmers = self.kmers
             .iter()
