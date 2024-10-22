@@ -588,9 +588,9 @@ impl LdBG {
                     let consensus_junction_choice = *links_in_scope.first()?.front().unwrap();
 
                     if r.outgoing_edges().contains(&consensus_junction_choice) {
-                        links_in_scope.iter_mut().for_each(|link| {
+                        for link in links_in_scope.iter_mut() {
                             link.pop_front();
-                        });
+                        };
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -616,9 +616,9 @@ impl LdBG {
                     if r.incoming_edges()
                         .contains(&complement(consensus_junction_choice))
                     {
-                        links_in_scope.iter_mut().for_each(|link| {
+                        for link in links_in_scope.iter_mut() {
                             link.pop_front();
-                        });
+                        };
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -669,9 +669,9 @@ impl LdBG {
                     };
 
                     if r.incoming_edges().contains(&consensus_junction_choice) {
-                        links_in_scope.iter_mut().for_each(|link| {
+                        for link in links_in_scope.iter_mut() {
                             link.pop_front();
-                        });
+                        };
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -700,9 +700,9 @@ impl LdBG {
                     if r.outgoing_edges()
                         .contains(&complement(consensus_junction_choice))
                     {
-                        links_in_scope.iter_mut().for_each(|link| {
+                        for link in links_in_scope.iter_mut() {
                             link.pop_front();
-                        });
+                        };
                         links_in_scope.retain(|link| !link.is_empty());
                         consensus_junction_choice
                     } else {
@@ -830,7 +830,7 @@ impl LdBG {
 
         let initial_segments = traverse_read_graph(&graph, 0);
 
-        if let Ok(connecting_segments) = self.try_connecting_all_segments(initial_segments) {
+        if let Ok(connecting_segments) = self.try_connecting_all_segments(&initial_segments) {
             for (contig, forward) in connecting_segments.into_iter() {
                 self.add_to_read_graph(contig, &mut graph, forward);
             }
@@ -939,9 +939,9 @@ impl LdBG {
         let mut forward_contig = from_kmer.to_vec();
         let mut backward_contig = to_kmer.to_vec();
 
-        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, from_kmer.to_vec(), HashSet::from([to_kmer.to_vec()]), 100) {
+        if let Ok(_) = self.assemble_forward_until(&mut forward_contig, &from_kmer, &HashSet::from([to_kmer.to_vec()]), 100) {
             return Ok((forward_contig, true));
-        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, to_kmer.to_vec(), HashSet::from([from_kmer.to_vec()]), 100) {
+        } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, &to_kmer, &HashSet::from([from_kmer.to_vec()]), 100) {
             return Ok((backward_contig, false));
         }
 
@@ -958,9 +958,9 @@ impl LdBG {
                     let mut forward_contig = new_from_kmer.to_vec();
                     let mut backward_contig = new_to_kmer.to_vec();
 
-                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
+                    if let Ok(_) = self.assemble_forward_until(&mut forward_contig, &new_from_kmer, &HashSet::from([new_to_kmer.to_vec()]), 100) {
                         return Ok((forward_contig, true));
-                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
+                    } else if let Ok(_) = self.assemble_backward_until(&mut backward_contig, &new_to_kmer, &HashSet::from([new_from_kmer.to_vec()]), 100) {
                         return Ok((backward_contig, false));
                     }
                 }
@@ -983,9 +983,9 @@ impl LdBG {
                     let seqs = vec![forward_contig.clone(), backward_contig.clone()];
                     let l = LdBG::from_sequences("contig".to_string(), self.kmer_size, &seqs).build_links(&seqs, false);
 
-                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, new_from_kmer.to_vec(), HashSet::from([new_to_kmer.to_vec()]), 100) {
+                    if let Ok(_) = l.assemble_forward_until(&mut forward_contig, &new_from_kmer, &HashSet::from([new_to_kmer.to_vec()]), 100) {
                         return Ok((forward_contig, true));
-                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, new_to_kmer.to_vec(), HashSet::from([new_from_kmer.to_vec()]), 100) {
+                    } else if let Ok(_) = l.assemble_backward_until(&mut backward_contig, &new_to_kmer, &HashSet::from([new_from_kmer.to_vec()]), 100) {
                         return Ok((backward_contig, false));
                     }
                 }
@@ -1057,7 +1057,7 @@ impl LdBG {
         return Err(anyhow::anyhow!("No alternate path found"));
     }
 
-    fn try_connecting_all_segments(&self, segments: Vec<Vec<u8>>) -> Result<Vec<(Vec<u8>, bool)>> {
+    fn try_connecting_all_segments(&self, segments: &[Vec<u8>]) -> Result<Vec<(Vec<u8>, bool)>> {
         let mut connecting_segments = Vec::new();
 
         for segment1 in segments.iter() {
@@ -1086,14 +1086,14 @@ impl LdBG {
 
         for start_kmer in start_kmers.iter() {
             let mut forward_contig = start_kmer.to_vec();
-            if let Ok(_) = self.assemble_forward_until(&mut forward_contig, start_kmer.to_vec(), end_kmers.clone(), 100) {
+            if let Ok(_) = self.assemble_forward_until(&mut forward_contig, &start_kmer, &end_kmers, 100) {
                 return Ok((forward_contig, true));
             }
         }
 
         for end_kmer in end_kmers.iter() {
             let mut backward_contig = end_kmer.to_vec();
-            if let Ok(_) = self.assemble_backward_until(&mut backward_contig, end_kmer.to_vec(), start_kmers.clone(), 100) {
+            if let Ok(_) = self.assemble_backward_until(&mut backward_contig, &end_kmer, &start_kmers, 100) {
                 return Ok((backward_contig, false));
             }
         }
@@ -1116,13 +1116,13 @@ impl LdBG {
 
     fn add_to_read_graph(&self, contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>, forward: bool) {
         if forward {
-            self.add_to_read_graph_forward(contig, graph);
+            self.add_to_read_graph_forward(&contig, graph);
         } else {
-            self.add_to_read_graph_backward(contig, graph);
+            self.add_to_read_graph_backward(&contig, graph);
         }
     }
 
-    fn add_to_read_graph_backward(&self, backward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+    fn add_to_read_graph_backward(&self, backward_contig: &[u8], graph: &mut petgraph::Graph<String, f64>) {
         // If backward assembly succeeded, add path to graph
         for i in (0..backward_contig.len() - self.kmer_size).rev() {
             let current_kmer = &backward_contig[i..i + self.kmer_size];
@@ -1139,7 +1139,7 @@ impl LdBG {
         }
     }
 
-    fn add_to_read_graph_forward(&self, forward_contig: Vec<u8>, graph: &mut petgraph::Graph<String, f64>) {
+    fn add_to_read_graph_forward(&self, forward_contig: &[u8], graph: &mut petgraph::Graph<String, f64>) {
         // If forward assembly succeeded, add path to graph
         for i in 0..forward_contig.len() - self.kmer_size {
             let current_kmer = &forward_contig[i..i + self.kmer_size];
@@ -1191,10 +1191,10 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
+    fn assemble_forward(&self, contig: &mut Vec<u8>, start_kmer: &[u8]) {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         let mut visited = HashSet::new();
 
         loop {
@@ -1228,10 +1228,10 @@ impl LdBG {
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmers` - A `HashSet` of k-mers to stop at.
     /// * `limit` - The maximum number of nodes to traverse before giving up.
-    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
+    fn assemble_forward_until(&self, contig: &mut Vec<u8>, start_kmer: &[u8], stop_kmers: &HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         let mut nodes_traversed = 0;
 
         loop {
@@ -1260,7 +1260,7 @@ impl LdBG {
         Err(anyhow::anyhow!("No stopping k-mer found"))
     }
 
-    fn assemble_forward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    fn assemble_forward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: &[u8], limit: usize, stopping_condition: F) -> Result<Vec<u8>>
     where
         F: Fn(&[u8], usize, &Self) -> bool,
     {
@@ -1268,7 +1268,7 @@ impl LdBG {
 
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
 
         loop {
             if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
@@ -1295,10 +1295,10 @@ impl LdBG {
         Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
-    fn assemble_forward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>> {
+    fn assemble_forward_limit(&self, contig: &mut Vec<u8>, start_kmer: &[u8], limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         loop {
             if contig.len() >= limit {
                 return Ok(last_kmer);
@@ -1326,10 +1326,10 @@ impl LdBG {
     ///
     /// * `contig` - A mutable reference to the contig being assembled.
     /// * `start_kmer` - A vector representing the starting k-mer.
-    fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>) {
+    fn assemble_backward(&self, contig: &mut Vec<u8>, start_kmer: &[u8]) {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         let mut visited = HashSet::new();
 
         loop {
@@ -1363,10 +1363,10 @@ impl LdBG {
     /// * `start_kmer` - A vector representing the starting k-mer.
     /// * `stop_kmers` - A `HashSet` of vectors representing the stopping k-mers.
     /// * `limit` - The maximum number of nodes to traverse before giving up.
-    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, stop_kmers: HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
+    fn assemble_backward_until(&self, contig: &mut Vec<u8>, start_kmer: &[u8], stop_kmers: &HashSet<Vec<u8>>, limit: usize) -> Result<Vec<u8>> {
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         let mut nodes_traversed = 0;
 
         loop {
@@ -1395,7 +1395,7 @@ impl LdBG {
         Err(anyhow::anyhow!("No stopping k-mer found"))
     }
 
-    fn assemble_backward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize, stopping_condition: F) -> Result<Vec<u8>>
+    fn assemble_backward_until_condition<F>(&self, contig: &mut Vec<u8>, start_kmer: &[u8], limit: usize, stopping_condition: F) -> Result<Vec<u8>>
     where
         F: Fn(&[u8], usize, &Self) -> bool,
     {
@@ -1403,7 +1403,7 @@ impl LdBG {
 
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
 
         loop {
             if stopping_condition(&last_kmer, contig.len() - initial_contig_length, self) {
@@ -1430,10 +1430,10 @@ impl LdBG {
         Err(anyhow::anyhow!("Stopping condition not satisfied"))
     }
 
-    fn assemble_backward_limit(&self, contig: &mut Vec<u8>, start_kmer: Vec<u8>, limit: usize) -> Result<Vec<u8>>{
+    fn assemble_backward_limit(&self, contig: &mut Vec<u8>, start_kmer: &[u8], limit: usize) -> Result<Vec<u8>>{
         let mut links_in_scope: Vec<Link> = Vec::new();
         let mut used_links = HashSet::new();
-        let mut last_kmer = start_kmer.clone();
+        let mut last_kmer = start_kmer.to_owned();
         loop {
             if contig.len() >= limit {
                 return Ok(last_kmer);
@@ -1479,8 +1479,8 @@ impl LdBG {
             self.kmer_size
         );
 
-        self.assemble_forward(&mut contig, kmer.to_vec());
-        self.assemble_backward(&mut contig, kmer.to_vec());
+        self.assemble_forward(&mut contig, kmer);
+        self.assemble_backward(&mut contig, kmer);
 
         contig
     }
@@ -1703,7 +1703,7 @@ impl LdBG {
                 let mut score_sum = 0.0;
 
                 let mut fw_contig = bad_cn_kmer.clone();
-                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+                self.assemble_forward(&mut fw_contig, &bad_cn_kmer);
 
                 for kmer in fw_contig.windows(self.kmer_size) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1719,7 +1719,7 @@ impl LdBG {
                 }
 
                 let mut rc_contig = bad_cn_kmer.clone();
-                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+                self.assemble_backward(&mut rc_contig, &bad_cn_kmer);
 
                 for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1787,7 +1787,7 @@ impl LdBG {
                 let mut score_sum = 0.0;
 
                 let mut fw_contig = bad_cn_kmer.clone();
-                self.assemble_forward(&mut fw_contig, bad_cn_kmer.clone());
+                self.assemble_forward(&mut fw_contig, &bad_cn_kmer);
 
                 for kmer in fw_contig.windows(self.kmer_size) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1803,7 +1803,7 @@ impl LdBG {
                 }
 
                 let mut rc_contig = bad_cn_kmer.clone();
-                self.assemble_backward(&mut rc_contig, bad_cn_kmer.clone());
+                self.assemble_backward(&mut rc_contig, &bad_cn_kmer);
 
                 for kmer in rc_contig.windows(self.kmer_size).rev().skip(1) {
                     let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -1872,7 +1872,7 @@ impl LdBG {
 
         for cn_kmer in self.kmers.keys() {
             if !visited.contains(cn_kmer) && self.sources.get(cn_kmer).unwrap_or(&vec![]) == &vec![color] && self.scores.get(cn_kmer).unwrap_or(&1.0) < &min_score && self.kmers.get(cn_kmer).unwrap().in_degree() + self.kmers.get(cn_kmer).unwrap().out_degree() >= 4 {
-                let g = self.traverse_kmers_until_condition(cn_kmer.to_vec(), color, limit, stopping_condition);
+                let g = self.traverse_kmers_until_condition(&cn_kmer, color, limit, stopping_condition);
 
                 visited.insert(cn_kmer.clone());
                 for node in g.node_indices() {
@@ -1928,7 +1928,7 @@ impl LdBG {
         for cn_kmer in self.kmers.keys() {
             if self.kmers.get(cn_kmer).unwrap().in_degree() == 0 && self.kmers.get(cn_kmer).unwrap().out_degree() > 1 {
                 let mut fw_contig = cn_kmer.to_vec();
-                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, cn_kmer.clone(), limit, stopping_condition) {
+                if let Ok(_) = self.assemble_forward_until_condition(&mut fw_contig, &cn_kmer, limit, stopping_condition) {
                     let score_sum = fw_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
                         .sum::<f32>();
@@ -1946,7 +1946,7 @@ impl LdBG {
 
             if self.kmers.get(cn_kmer).unwrap().out_degree() == 0 && self.kmers.get(cn_kmer).unwrap().in_degree() > 1 {
                 let mut rv_contig = cn_kmer.to_vec();
-                if let Ok(_) = self.assemble_backward_until_condition(&mut rv_contig, cn_kmer.clone(), limit, stopping_condition) {
+                if let Ok(_) = self.assemble_backward_until_condition(&mut rv_contig, &cn_kmer, limit, stopping_condition) {
                     let score_sum = rv_contig.kmers(self.kmer_size as u8)
                         .map(|kmer| self.scores.get(&crate::utils::canonicalize_kmer(&kmer)).unwrap_or(&1.0))
                         .sum::<f32>();
@@ -2379,7 +2379,7 @@ impl LdBG {
         }
     }
 
-    pub fn traverse_kmers_until_condition<F>(&self, start_kmer: Vec<u8>, color: usize, limit: usize, stopping_condition: F) -> DiGraph<String, f32>
+    pub fn traverse_kmers_until_condition<F>(&self, start_kmer: &[u8], color: usize, limit: usize, stopping_condition: F) -> DiGraph<String, f32>
     where
         F: Fn(&[u8], usize, &Self) -> bool,
     {
@@ -2398,7 +2398,7 @@ impl LdBG {
 
     /// Traverse kmers starting from a given kmer and build a graph.
     #[must_use]
-    pub fn traverse_kmers(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    pub fn traverse_kmers(&self, start_kmer: &[u8]) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::<String, NodeIndex>::new(); // Map node labels to indices
 
@@ -2436,7 +2436,7 @@ impl LdBG {
     ///    - If `contig.windows(self.kmer_size)` is called with a `kmer_size` larger than the length of `contig`, it will panic.
     ///
     #[must_use]
-    pub fn traverse_contigs(&self, start_kmer: Vec<u8>) -> DiGraph<String, f32> {
+    pub fn traverse_contigs(&self, start_kmer: &[u8]) -> DiGraph<String, f32> {
         let mut graph = DiGraph::new();
         let mut visited = HashMap::new();
 
@@ -2457,7 +2457,7 @@ impl LdBG {
                 for next_kmer in self.next_kmers(&last_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&next_kmer)) {
                         let mut next_contig = next_kmer.clone();
-                        self.assemble_forward(&mut next_contig, next_kmer.clone());
+                        self.assemble_forward(&mut next_contig, &next_kmer);
 
                         let weight = next_contig.windows(self.kmer_size)
                             .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
@@ -2492,7 +2492,7 @@ impl LdBG {
                 for prev_kmer in self.prev_kmers(&first_kmer) {
                     if !visited.contains_key(&crate::utils::canonicalize_kmer(&prev_kmer)) {
                         let mut prev_contig = prev_kmer.clone();
-                        self.assemble_backward(&mut prev_contig, prev_kmer.clone());
+                        self.assemble_backward(&mut prev_contig, &prev_kmer);
 
                         let weight = prev_contig.windows(self.kmer_size)
                             .map(|x| self.scores.get(&crate::utils::canonicalize_kmer(x)).unwrap_or(&1.0))
@@ -2546,7 +2546,7 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_kmers(cn_kmer.clone());
+                let g = self.traverse_kmers(&cn_kmer);
 
                 // Mark kmers as visited
                 for node_label in g.node_weights() {
@@ -2606,7 +2606,7 @@ impl LdBG {
 
         for cn_kmer in cn_kmers {
             if !visited.contains(&cn_kmer) {
-                let g = self.traverse_contigs(cn_kmer);
+                let g = self.traverse_contigs(&cn_kmer);
 
                 g.node_weights().for_each(|node| {
                     for kmer in node.as_bytes().kmers(self.kmer_size as u8) {

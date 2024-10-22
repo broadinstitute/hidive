@@ -21,7 +21,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     // Iterate over each locus in the provided list
     for locus in loci_list {
         // Attempt to parse the locus using a function from the skydive module
-        match skydive::parse::parse_locus(locus.to_owned(), 0) {
+        match skydive::parse::parse_locus(&locus, 0) {
             Ok(l_fmt) => {
                 // If parsing is successful, insert the formatted locus into the HashSet
                 loci.insert(l_fmt);

@@ -56,7 +56,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
                     continue;
                 }
 
-                match parse_locus(line.to_owned(), padding) {
+                match parse_locus(&line.to_owned(), padding) {
                     Ok(l_fmt) => {
                         loci.insert(l_fmt);
                     }
@@ -69,7 +69,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
             continue;
         } else {
             // Attempt to parse the locus
-            match parse_locus(locus.to_owned(), padding) {
+            match parse_locus(&locus.to_owned(), padding) {
                 Ok(l_fmt) => {
                     // If parsing is successful, insert the formatted locus into the HashSet
                     loci.insert(l_fmt);
@@ -114,7 +114,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
 /// # Panics
 ///
 /// This function will panic if the locus format is incorrect.
-pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, String)> {
+pub fn parse_locus(locus: &str, padding: u64) -> Result<(String, u64, u64, String)> {
     // Regex to capture the contig name, start position, stop position, and optional name.
     // Accepts:
     // - chr:start-stop
@@ -209,9 +209,9 @@ pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     }
 
     // Remove FOFN files from the set of BAM/CRAM files.
-    to_remove.iter().for_each(|url| {
+    for url in to_remove.iter() {
         let _ = reads_urls.remove(url);
-    });
+    }
 
     // Add the files from the file of filenames to the full list of files.
     reads_urls.extend(local_file_contents.into_iter().filter_map(|path| {
