@@ -1,11 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
 
+use bio::data_structures::interval_tree::IntervalTree;
 use bio::io::fasta::Reader;
+use bio::utils::Interval;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use minimap2::Aligner;
@@ -19,8 +21,6 @@ use rayon::prelude::*;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, Read};
 
-use needletail::sequence::complement;
-
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
@@ -28,7 +28,6 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
-    contigs: &Vec<String>,
     ref_path: Option<PathBuf>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
@@ -41,7 +40,7 @@ pub fn start(
     skydive::elog!("Intermediate data will be stored at {:?}.", cache_path);
 
     // Define the fetch definitions for the aligner.
-    let mut fetches = HashSet::new();
+    let mut fetches = Vec::new();
 
     // Read the FASTA files and prepare a hashmap of k-mers to search for in the other files.
     let mut kmer_set = HashSet::new();
@@ -65,18 +64,17 @@ pub fn start(
 
         if let Some(ref ref_path) = ref_path {
             skydive::elog!("Searching for relevant loci in reference genome...");
-            guess_relevant_contigs(ref_path, reads, &mut fetches);
-        } else {
-            skydive::elog!("Searching for relevant loci in {:?}...", contigs);
-            fetches.extend(contigs.iter().map(|c| c.as_bytes().to_vec()));
+            detect_relevant_loci(ref_path, reads, &mut fetches);
         }
 
-        fetches.insert("*".as_bytes().to_vec());
+        fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
 
-        skydive::elog!(" -- will search:");
-        for fetch in &fetches {
-            skydive::elog!("    {}", String::from_utf8_lossy(fetch));
-        }
+        let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
+        skydive::elog!(
+            " -- will search unaligned reads and {} bases in {} contigs.",
+            total_length.to_formatted_string(&Locale::en),
+            fetches.len().to_formatted_string(&Locale::en)
+        );
     }
 
     // Read the CRAM files and search for the k-mers in each read.
@@ -105,9 +103,9 @@ pub fn start(
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect::<HashMap<_, _>>());
 
-        for fetch in &fetches {
-            let fetch_definition = if String::from_utf8_lossy(fetch) != "*" {
-                FetchDefinition::String(fetch)
+        for (contig, interval) in &fetches {
+            let fetch_definition = if contig != "*" {
+                FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
             } else {
                 FetchDefinition::Unmapped
             };
@@ -191,7 +189,7 @@ pub fn start(
         let fw_seq = record.seq().as_bytes();
         let rc_seq = fw_seq.reverse_complement();
 
-        writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap(), record.reference_start(), record.reference_end()).expect("Could not write to file");
+        writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()), record.reference_start(), record.reference_end()).expect("Could not write to file");
         writeln!(
             writer,
             "{}",
@@ -212,7 +210,7 @@ pub fn start(
     }
 }
 
-fn guess_relevant_contigs(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut HashSet<Vec<u8>>) {
+fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
     let aligner = Aligner::builder()
         .sr()
         .with_sam_hit_only()
@@ -224,31 +222,80 @@ fn guess_relevant_contigs(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut
         .map(|seq| {
             seq
                 .windows(150)
-                .map(|window| {
-                    aligner.map(window, false, false, None, None).unwrap()
-                })
+                .map(|window| aligner.map(window, false, false, None, None).unwrap())
                 .flatten()
                 .collect::<Vec<_>>()
         })
         .flatten()
         .collect::<Vec<_>>();
 
+    let mut contig_lengths = HashMap::new();
     let loci = mappings.iter().filter_map(|m| {
         if let Some(target_name) = &m.target_name {
+            contig_lengths.insert(target_name.to_string(), m.target_len);
+
             Some((target_name.to_string().as_bytes().to_vec(), m.target_start, m.target_end))
         } else {
             None
         }
     }).collect::<HashSet<_>>();
 
+    // First pass - put all the intervals into a tree.
+    let mut trees = BTreeMap::new();
     for (seq, start, end) in &loci {
-        skydive::elog!("{}:{}..{}", String::from_utf8_lossy(&seq), start, end);
+        let contig_name = String::from_utf8_lossy(&seq).to_string();
+        let contig_length = contig_lengths.get(&contig_name).unwrap();
+
+        if !trees.contains_key(&contig_name) {
+            trees.insert(contig_name.clone(), IntervalTree::new());
+        }
+
+        let interval = Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add(1000).min(*contig_length)).unwrap();
+        trees.get_mut(&contig_name).unwrap().insert(interval, ());
     }
 
-    let sub_fetches = loci
-        .iter()
-        .map(|(seq, _, _)| seq.clone())
-        .collect::<HashSet<_>>();
+    // Second pass - figure out which intervals overlap, and merge them.
+    for (seq, start, end) in &loci {
+        let contig_name = String::from_utf8_lossy(&seq).to_string();
+        let contig_length = contig_lengths.get(&contig_name).unwrap();
 
-    fetches.extend(sub_fetches);
+        let tree = trees.get_mut(&contig_name).unwrap();
+
+        let current_interval = Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add(1000).min(*contig_length)).unwrap();
+        let overlaps = tree.find(current_interval).collect::<Vec<_>>();
+
+        let mut new_tree = IntervalTree::new();
+
+        if !overlaps.is_empty() {
+            // Calculate the new merged interval
+            let min_start = overlaps.iter()
+                .map(|o| o.interval().start)
+                .min()
+                .unwrap()
+                .min(*start);
+            let max_end = overlaps.iter()
+                .map(|o| o.interval().end)
+                .max()
+                .unwrap()
+                .max(*end);
+            
+            // Insert the new merged interval
+            let merged_interval = Interval::new(min_start..max_end).unwrap();
+
+            new_tree.insert(merged_interval, ());
+        } else {
+            new_tree.insert(Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add_unsigned(1000)).unwrap(), ());
+        }
+
+        trees.insert(contig_name.clone(), new_tree);
+    }
+
+    let sub_fetches: HashSet<_> = trees.iter()
+        .flat_map(|(contig_name, tree)| {
+            tree.find(Interval::new(0..i32::MAX).unwrap())
+                .map(move |entry| (contig_name.clone(), entry.interval().clone()))
+        })
+        .collect();
+
+    fetches.extend(sub_fetches.into_iter());
 }

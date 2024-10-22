@@ -192,10 +192,6 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
-        /// For aligned reads, restrict processing to these contigs.
-        #[clap(short, long, value_parser, required = false)]
-        contigs: Vec<String>,
-
         /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
         #[clap(short, long, value_parser, required = true)]
         ref_path: Option<PathBuf>,
@@ -439,12 +435,11 @@ fn main() {
             output,
             kmer_size,
             min_kmers_pct,
-            contigs,
             ref_path,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, &contigs, ref_path, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, ref_path, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,
