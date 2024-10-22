@@ -176,7 +176,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
                 current_bipartition = prev_bipartition.clone();
             } else {
                 // This should not happen if the DP table is correctly filled
-                panic!("No valid previous bipartition found for SNP {}", snp);
+                panic!("No valid previous bipartition found for SNP {snp}");
             }
         }
     }

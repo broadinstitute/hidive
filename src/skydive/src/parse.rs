@@ -61,7 +61,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
                         loci.insert(l_fmt);
                     }
                     Err(_) => {
-                        panic!("Could not parse locus '{}' from file '{}'.", line, locus);
+                        panic!("Could not parse locus '{line}' from file '{locus}'.");
                     }
                 }
             }
@@ -76,7 +76,7 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
                 }
                 Err(_) => {
                     // If parsing fails, panic and terminate the program, providing an error message
-                    panic!("Could not parse locus '{}'.", locus);
+                    panic!("Could not parse locus '{locus}'.");
                 }
             }
         }
@@ -131,7 +131,7 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
         let start = captures.get(2).unwrap().as_str().parse::<u64>()? - padding;
         let stop = captures.get(3).unwrap().as_str().parse::<u64>()? + padding;
         let name = captures.get(4).map_or_else(
-            || format!("{}:{}-{}", chr, start, stop),
+            || format!("{chr}:{start}-{stop}"),
             |m| m.as_str().to_string()
         );
 

@@ -185,7 +185,7 @@ fn extract_aligned_bam_reads(
                     Err(_) => String::from("unknown"),
                 };
 
-                let seq_name = format!("{}|{}|{}", qname, name, sm);
+                let seq_name = format!("{qname}|{name}|{sm}");
 
                 if !bmap.contains_key(&seq_name) {
                     bmap.insert(seq_name.to_owned(), String::new());
@@ -234,7 +234,7 @@ fn extract_unaligned_bam_reads(
             let qname = String::from_utf8_lossy(read.qname()).into_owned();
             let sm = get_sm_name_from_rg(&read, &rg_sm_map).unwrap();
 
-            let seq_name = format!("{}|{}", qname, sm);
+            let seq_name = format!("{qname}|{sm}");
 
             let vseq = read.seq().as_bytes();
             let bseq = vseq.as_bytes();
@@ -257,7 +257,7 @@ fn extract_fasta_seqs(
     stop: &u64,
     name: &String,
 ) -> Result<Vec<fasta::Record>> {
-    let id = format!("{}:{}-{}|{}|{}", chr, start, stop, name, basename);
+    let id = format!("{chr}:{start}-{stop}|{name}|{basename}");
     let seq = fasta
         .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
@@ -358,7 +358,7 @@ fn stage_data_from_all_files(
                 Ok(seqs) => seqs,
                 Err(e) => {
                     // If all retries fail, panic with an error message.
-                    panic!("Error: {}", e);
+                    panic!("Error: {e}");
                 }
             }
         })
@@ -414,7 +414,7 @@ pub fn stage_data(
     let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped) {
         Ok(all_data) => all_data,
         Err(e) => {
-            panic!("Error: {}", e);
+            panic!("Error: {e}");
         }
     };
 
