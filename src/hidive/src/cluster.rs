@@ -20,8 +20,8 @@ pub fn start(output: &PathBuf, k: usize, jaccard_threshold: f64, fasta_path: &Pa
     let mut sample_names = Vec::new();
     for record in &all_reads {
         let id = record.id().to_string();
-        let v: Vec<String> = id.split('|').map(|s| s.to_string()).collect();
 
+        //let v: Vec<String> = id.split('|').map(|s| s.to_string()).collect();
         // sample_names.push(v[1].clone());
         sample_names.push(id);
     }

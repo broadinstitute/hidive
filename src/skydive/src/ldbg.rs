@@ -1999,7 +1999,7 @@ impl LdBG {
         let g = self.traverse_all_kmers();
         let bubbles = find_all_superbubbles(&g);
 
-        for (i, ((in_node, out_node), interior)) in bubbles.iter().enumerate() {
+        for ((in_node, out_node), interior) in bubbles.iter() {
             let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
             let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
 

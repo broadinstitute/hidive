@@ -37,7 +37,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     let mut output_file = std::fs::File::create(output).expect("Unable to create output file");
 
     let mut bam = IndexedReader::from_path(bam_path).unwrap();
-    let rg_sm_map = get_rg_to_sm_mapping(&bam);
+    //let rg_sm_map = get_rg_to_sm_mapping(&bam);
 
     loci.iter().for_each(|(chr, start, stop, name)| {
         let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));

@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 
 use needletail::Sequence;
 use parquet::data_type::AsBytes;
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::graph::DiGraph;
 use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 
 /// This function takes a sequence URL and a list of possible extensions, and returns the base name of the file
