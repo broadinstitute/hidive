@@ -185,6 +185,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
 }
 
 // Main function to perform WMEC using dynamic programming
+#[must_use]
 pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>) {
     let (mut dp, mut backtrack) = initialize_dp(data);
 

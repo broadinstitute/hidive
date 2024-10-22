@@ -2738,6 +2738,7 @@ fn navigate_forward(node: NodeIndex, steps: u8, graph: &petgraph::Graph<String, 
 /// # Panics
 ///
 /// Panics if the graph is not a directed graph.
+#[must_use]
 pub fn find_superbubble(graph: &DiGraph<String, f32>, s: NodeIndex, direction: petgraph::Direction) -> Option<(NodeIndex, NodeIndex, Vec<NodeIndex>)> {
     let mut seen = HashSet::new();
     let mut visited = HashSet::new();
@@ -2801,6 +2802,7 @@ pub fn find_superbubble(graph: &DiGraph<String, f32>, s: NodeIndex, direction: p
     None
 }
 
+#[must_use]
 pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> HashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
     let mut bubbles = HashMap::new();
 

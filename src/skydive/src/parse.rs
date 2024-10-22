@@ -35,6 +35,7 @@ use path_absolutize::Absolutize;
 /// This function will panic if it cannot parse a given locus.
 /// It will also panic if it cannot read a given file path.
 ///
+#[must_use]
 pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64, u64, String)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();

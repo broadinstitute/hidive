@@ -36,6 +36,7 @@ use petgraph::visit::{EdgeRef, NodeIndexable, NodeRef};
 /// 1. If `seq_url.path_segments()` returns `None`, indicating that the URL does not have a path.
 /// 2. If `seq_url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap().last()` returns `None`,
 /// indicating that the path does not have any segments.
+#[must_use]
 pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> String {
     let mut basename = seq_url
         .path_segments()
@@ -66,6 +67,7 @@ pub fn basename_without_extension(seq_url: &url::Url, extensions: &[&str]) -> St
 ///
 /// # Panics
 /// This function will panic if it cannot read a given file path
+#[must_use]
 pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
     paths
         .iter()
@@ -81,6 +83,7 @@ pub fn read_fasta(paths: &Vec<PathBuf>) -> Vec<Vec<u8>> {
         .collect::<Vec<Vec<u8>>>()
 }
 
+#[must_use]
 pub fn default_hidden_progress_bar() -> indicatif::ProgressBar {
     indicatif::ProgressBar::hidden()
 }
@@ -166,6 +169,7 @@ pub fn default_unbounded_progress_bar(msg: impl Into<Cow<'static, str>>) -> indi
 ///
 /// A vector containing the canonical k-mer.
 #[inline(always)]
+#[must_use]
 pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     let rc_kmer = kmer.reverse_complement();
     if kmer < rc_kmer.as_bytes() {
@@ -175,6 +179,7 @@ pub fn canonicalize_kmer(kmer: &[u8]) -> Vec<u8> {
     }
 }
 
+#[must_use]
 pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     let mut compressed = Vec::new();
     let mut prev = None;
@@ -189,6 +194,7 @@ pub fn homopolymer_compressed(seq: &[u8]) -> Vec<u8> {
     compressed
 }
 
+#[must_use]
 pub fn shannon_entropy(seq: &[u8]) -> f32 {
     let mut freq = HashMap::new();
     let len = seq.len() as f32;
@@ -203,6 +209,7 @@ pub fn shannon_entropy(seq: &[u8]) -> f32 {
     }).sum::<f32>()
 }
 
+#[must_use]
 pub fn gc_content(seq: &[u8]) -> f32 {
     let gc_count = seq.iter().filter(|&&base| base == b'G' || base == b'C').count();
     gc_count as f32 / seq.len() as f32
