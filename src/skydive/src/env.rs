@@ -7,6 +7,7 @@ pub fn local_guess_curl_ca_bundle() {
     }
 }
 
+#[must_use]
 pub fn gcs_gcloud_is_installed() -> bool {
     // Check if gcloud is installed on the PATH
     // Suppress stdout and stderr to prevent them from printing to the screen
@@ -18,6 +19,12 @@ pub fn gcs_gcloud_is_installed() -> bool {
         .is_ok()
 }
 
+/// Authorize data access to Google Cloud Storage (GCS) using gcloud.
+/// The OAuth token is stored in the environment variable `GCS_OAUTH_TOKEN`.
+///
+/// # Panics
+///
+/// If gcloud is not installed on the PATH.
 pub fn gcs_authorize_data_access() {
     // Check if gcloud is installed on the PATH
     if !gcs_gcloud_is_installed() {

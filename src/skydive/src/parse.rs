@@ -6,6 +6,28 @@ use regex::Regex;
 
 use path_absolutize::Absolutize;
 
+/// Parse a list of loci strings into a `HashSet` of formatted loci.
+/// If a locus string is a file on disk, read its contents and parse each line as a locus.
+///
+/// # Arguments
+///
+/// * `loci_list` - A list of strings representing loci.
+/// * `padding` - A u64 representing the amount to extend the start and stop positions by.
+///
+/// # Returns
+///
+/// A `HashSet` of formatted loci.
+///
+/// # Errors
+///
+/// This function returns an error if it cannot parse a given locus.
+///
+/// # Panics
+///
+/// This function will panic if it cannot parse a given locus.
+/// It will also panic if it cannot read a given file path.
+///
+#[must_use]
 pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64, u64, String)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = HashSet::new();
@@ -26,12 +48,12 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
                     continue;
                 }
 
-                match parse_locus(line.to_owned(), padding) {
+                match parse_locus(&line.clone(), padding) {
                     Ok(l_fmt) => {
                         loci.insert(l_fmt);
                     }
                     Err(_) => {
-                        panic!("Could not parse locus '{}' from file '{}'.", line, locus);
+                        panic!("Could not parse locus '{line}' from file '{locus}'.");
                     }
                 }
             }
@@ -39,14 +61,14 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
             continue;
         } else {
             // Attempt to parse the locus
-            match parse_locus(locus.to_owned(), padding) {
+            match parse_locus(&locus.to_owned(), padding) {
                 Ok(l_fmt) => {
                     // If parsing is successful, insert the formatted locus into the HashSet
                     loci.insert(l_fmt);
                 }
                 Err(_) => {
                     // If parsing fails, panic and terminate the program, providing an error message
-                    panic!("Could not parse locus '{}'.", locus);
+                    panic!("Could not parse locus '{locus}'.");
                 }
             }
         }
@@ -55,7 +77,33 @@ pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64
     loci
 }
 
-pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, String)> {
+/// Parse a locus string into a tuple of contig name, start position, stop position, and optional name.
+/// The locus string can be in the following formats:
+/// - chr:start-stop
+/// - chr:start-stop|name
+/// - chr start stop
+/// - chr start stop name
+///
+/// The start and stop positions are 1-based and inclusive.
+/// The optional padding parameter can be used to extend the start and stop positions by a specified amount.
+///
+/// # Arguments
+///
+/// * `locus` - A string representing a locus.
+/// * `padding` - A u64 representing the amount to extend the start and stop positions by.
+///
+/// # Returns
+///
+/// A tuple containing the contig name, start position, stop position, and optional name.
+///
+/// # Errors
+///
+/// This function returns an error if the locus format is incorrect.
+///
+/// # Panics
+///
+/// This function will panic if the locus format is incorrect.
+pub fn parse_locus(locus: &str, padding: u64) -> Result<(String, u64, u64, String)> {
     // Regex to capture the contig name, start position, stop position, and optional name.
     // Accepts:
     // - chr:start-stop
@@ -72,7 +120,7 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
         let start = captures.get(2).unwrap().as_str().parse::<u64>()? - padding;
         let stop = captures.get(3).unwrap().as_str().parse::<u64>()? + padding;
         let name = captures.get(4).map_or_else(
-            || format!("{}:{}-{}", chr, start, stop),
+            || format!("{chr}:{start}-{stop}"),
             |m| m.as_str().to_string()
         );
 
@@ -89,6 +137,24 @@ pub fn parse_locus(locus: String, padding: u64) -> Result<(String, u64, u64, Str
     }
 }
 
+/// Parse a list of BAM file paths into a `HashSet` of URLs.
+/// If any of the files are a local file ending in .txt, assume it's a file of filenames.
+///
+/// # Arguments
+///
+/// * `bam_paths` - A list of BAM file paths.
+///
+/// # Returns
+///
+/// A `HashSet` of URLs.
+///
+/// # Errors
+///
+/// This function returns an error if it cannot parse a given file path.
+///
+/// # Panics
+///
+/// This function will panic if it cannot parse a given file path.
 pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     // Convert the list of BAM file paths into a HashSet of URLs
     let mut reads_urls: HashSet<Url> = bam_paths
@@ -125,9 +191,9 @@ pub fn parse_file_names(bam_paths: &[PathBuf]) -> HashSet<Url> {
     }
 
     // Remove FOFN files from the set of BAM/CRAM files.
-    to_remove.iter().for_each(|url| {
+    for url in to_remove.iter() {
         let _ = reads_urls.remove(url);
-    });
+    }
 
     // Add the files from the file of filenames to the full list of files.
     reads_urls.extend(local_file_contents.into_iter().filter_map(|path| {
@@ -149,48 +215,48 @@ mod tests {
     #[test]
     fn test_parse_locus() {
         // Valid locus without padding
-        let result = parse_locus("chr1:1000-2000".to_string(), 0);
+        let result = parse_locus("chr1:1000-2000", 0);
         assert_eq!(result.ok(), Some(("chr1".to_string(), 1000 as u64, 2000 as u64, "chr1:1000-2000".to_string())));
 
         // Valid locus with padding
-        let result = parse_locus("chr2:5000-6000".to_string(), 100);
+        let result = parse_locus("chr2:5000-6000", 100);
         assert!(result.is_ok());
         assert_eq!(result.ok(), Some(("chr2".to_string(), 4900 as u64, 6100 as u64, "chr2:4900-6100".to_string())));
 
         // Valid locus with name
-        let result = parse_locus("chr3:10000-20000|gene1".to_string(), 0);
+        let result = parse_locus("chr3:10000-20000|gene1", 0);
         assert_eq!(result.ok(), Some(("chr3".to_string(), 10000 as u64, 20000 as u64, "gene1".to_string())));
 
         // Valid locus with commas
-        let result = parse_locus("chr3:10,000-20,000|gene1".to_string(), 0);
+        let result = parse_locus("chr3:10,000-20,000|gene1", 0);
         assert_eq!(result.ok(), Some(("chr3".to_string(), 10000 as u64, 20000 as u64, "gene1".to_string())));
 
         // Combination of space and colon separators
-        let result = parse_locus("chr4 30000-40000".to_string(), 0);
+        let result = parse_locus("chr4 30000-40000", 0);
         assert_eq!(result.ok(), Some(("chr4".to_string(), 30000 as u64, 40000 as u64, "chr4:30000-40000".to_string())));
 
         // Invalid format (non-numeric start position)
-        let result = parse_locus("chr5:start-50000".to_string(), 0);
+        let result = parse_locus("chr5:start-50000", 0);
         assert!(result.is_err());
 
         // Invalid format (start position greater than end position)
-        let result = parse_locus("chr6:60000-50000".to_string(), 0);
+        let result = parse_locus("chr6:60000-50000", 0);
         assert!(result.is_err());
 
         // Valid locus with tab-separated fields
-        let result = parse_locus("chr7\t70000\t80000".to_string(), 0);
+        let result = parse_locus("chr7\t70000\t80000", 0);
         assert_eq!(result.ok(), Some(("chr7".to_string(), 70000 as u64, 80000 as u64, "chr7:70000-80000".to_string())));
 
         // Valid locus with tab-separated fields and name
-        let result = parse_locus("chr8\t90000\t100000\tgene2".to_string(), 0);
+        let result = parse_locus("chr8\t90000\t100000\tgene2", 0);
         assert_eq!(result.ok(), Some(("chr8".to_string(), 90000 as u64, 100000 as u64, "gene2".to_string())));
 
         // Valid locus with mixed tab and colon separators
-        let result = parse_locus("chr9:110000\t120000".to_string(), 0);
+        let result = parse_locus("chr9:110000\t120000", 0);
         assert_eq!(result.ok(), Some(("chr9".to_string(), 110000 as u64, 120000 as u64, "chr9:110000-120000".to_string())));
 
         // Contig name with dash in it
-        let result = parse_locus("chr10-A:130000-140000|chr10-A".to_string(), 0);
+        let result = parse_locus("chr10-A:130000-140000|chr10-A", 0);
         assert_eq!(result.ok(), Some(("chr10-A".to_string(), 130000 as u64, 140000 as u64, "chr10-A".to_string())));
     }
 }

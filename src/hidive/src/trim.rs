@@ -4,20 +4,14 @@ use std::io::Write;
 use std::{collections::HashMap, path::PathBuf};
 
 // Import the Absolutize trait to convert relative paths to absolute paths
-use path_absolutize::Absolutize;
 
 // Import the Url type to work with URLs
-use url::Url;
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
 
 // Import types from rust_htslib for working with BAM files.
 use rust_htslib::bam::{
-    self,
-    ext::BamRecordExtensions,
-    record::{Aux, Cigar},
-    Header, IndexedReader, Read,
+    self, IndexedReader, Read,
 };
 
 pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
@@ -27,7 +21,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     // Iterate over each locus in the provided list
     for locus in loci_list {
         // Attempt to parse the locus using a function from the skydive module
-        match skydive::parse::parse_locus(locus.to_owned(), 0) {
+        match skydive::parse::parse_locus(&locus, 0) {
             Ok(l_fmt) => {
                 // If parsing is successful, insert the formatted locus into the HashSet
                 loci.insert(l_fmt);
@@ -43,7 +37,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     let mut output_file = std::fs::File::create(output).expect("Unable to create output file");
 
     let mut bam = IndexedReader::from_path(bam_path).unwrap();
-    let rg_sm_map = get_rg_to_sm_mapping(&bam);
+    //let rg_sm_map = get_rg_to_sm_mapping(&bam);
 
     loci.iter().for_each(|(chr, start, stop, name)| {
         let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
@@ -66,17 +60,14 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
                         bmap.get_mut(&qname).unwrap().push(a as char);
                     }
 
-                    match alignment.indel() {
-                        bam::pileup::Indel::Ins(len) => {
-                            let pos1 = alignment.qpos().unwrap() as usize;
-                            let pos2 = pos1 + (len as usize);
-                            for pos in pos1..pos2 {
-                                let a = alignment.record().seq()[pos];
+                    if let bam::pileup::Indel::Ins(len) = alignment.indel() {
+                        let pos1 = alignment.qpos().unwrap();
+                        let pos2 = pos1 + (len as usize);
+                        for pos in pos1..pos2 {
+                            let a = alignment.record().seq()[pos];
 
-                                bmap.get_mut(&qname).unwrap().push(a as char);
-                            }
+                            bmap.get_mut(&qname).unwrap().push(a as char);
                         }
-                        _ => {}
                     }
                 }
             }

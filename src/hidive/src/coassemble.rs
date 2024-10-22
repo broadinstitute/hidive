@@ -120,7 +120,7 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
         let combined_base_counts = allele_counts(lr_msas, index1, index1+1);
         // let bases = allele_indices(lr_msas, index1, index1+1);
 
-        if combined_base_counts.len() == 0 {
+        if combined_base_counts.is_empty() {
             index1 += 1;
         } else if combined_base_counts.len() == 1 {
             let base = combined_base_counts.keys().next().unwrap();
@@ -145,8 +145,8 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
 
             if allele_counts.len() == 1 {
                 for (allele, _) in allele_counts {
-                    hap1.extend(allele.chars());
-                    hap2.extend(allele.chars());
+                    hap1.push_str(&allele);
+                    hap2.push_str(&allele);
                 }
             } else {
                 // let alleles = get_allele_indices(lr_msas, sr_msas, index1, index2);
@@ -155,9 +155,9 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
                     let mut phase = h1[hap_index] == 1;
                     for (allele, _) in allele_counts {
                         if !phase {
-                            hap1.extend(allele.chars());
+                            hap1.push_str(&allele);
                         } else {
-                            hap2.extend(allele.chars());
+                            hap2.push_str(&allele);
                         }
 
                         phase = !phase;
@@ -225,7 +225,7 @@ fn create_read_allele_matrix(lr_msas: &Vec<String>) -> Vec<BTreeMap<usize, Strin
                     alleles.iter().enumerate().for_each(|(i, a)| {
                         if *a == *allele {
                             // column.insert(i, allele.clone());
-                            column.insert(i, String::from(allele_index.to_string()));
+                            column.insert(i, allele_index.to_string());
                         }
                     });
 
@@ -254,7 +254,7 @@ fn allele_indices(lr_msas: &Vec<String>, index1: usize, index2: usize) -> Vec<St
 fn allele_counts(lr_msas: &Vec<String>, index1: usize, index2: usize) -> BTreeMap<String, i32> {
     let combined_allele_counts = lr_msas.iter()
         .map(|msa| msa[index1..index2].to_string().replace(" ", ""))
-        .filter(|allele| allele.len() > 0)
+        .filter(|allele| !allele.is_empty())
         .fold(BTreeMap::new(), |mut counts, base| {
             *counts.entry(base).or_insert(0) += 1;
             counts

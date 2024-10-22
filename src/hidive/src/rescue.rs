@@ -19,7 +19,6 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, Read};
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
 
 pub fn start(
     output: &PathBuf,

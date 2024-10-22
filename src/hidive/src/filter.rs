@@ -52,7 +52,7 @@ pub fn start(output: &PathBuf, gfa_path: &PathBuf, short_read_fasta_paths: &Vec<
     let mut filtered_sr_seqs: Vec<Vec<u8>> = Vec::new();
     for short_read_seq_url in &short_read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
-            &short_read_seq_url,
+            short_read_seq_url,
             &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
         );
         let fasta_path = short_read_seq_url.to_file_path().unwrap();
@@ -69,9 +69,7 @@ pub fn start(output: &PathBuf, gfa_path: &PathBuf, short_read_fasta_paths: &Vec<
         let fasta_reader = bio::io::fasta::Reader::new(reader);
         let all_reads = fasta_reader.records().flatten().collect::<Vec<_>>();
 
-        let progress_bar = skydive::utils::default_unbounded_progress_bar(format!(
-            "Filtering short reads (0 retained)",
-        ));
+        let progress_bar = skydive::utils::default_unbounded_progress_bar("Filtering short reads (0 retained)".to_string());
 
         // Create some thread-safe counters.
         let found_items = Arc::new(AtomicUsize::new(0));

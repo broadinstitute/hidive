@@ -31,12 +31,12 @@ pub fn start(
     test_truth_seq_paths: &Vec<PathBuf>,
     debug: bool,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
-    let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
-    let truth_seq_urls = skydive::parse::parse_file_names(&truth_seq_paths);
-    let test_long_read_seq_urls = skydive::parse::parse_file_names(&test_long_read_seq_paths);
-    let test_short_read_seq_urls = skydive::parse::parse_file_names(&test_short_read_seq_paths);
-    let test_truth_seq_urls = skydive::parse::parse_file_names(&test_truth_seq_paths);
+    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
+    let short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
+    let truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
+    let test_long_read_seq_urls = skydive::parse::parse_file_names(test_long_read_seq_paths);
+    let test_short_read_seq_urls = skydive::parse::parse_file_names(test_short_read_seq_paths);
+    let test_truth_seq_urls = skydive::parse::parse_file_names(test_truth_seq_paths);
 
     // Read all long reads.
     let all_lr_seqs: Vec<Vec<u8>> = process_reads(&long_read_seq_urls, "long");
@@ -135,7 +135,7 @@ pub fn start(
         .chain(test_s1.kmers.keys())
         .chain(test_t1.kmers.keys());
 
-    let mut test_data: DataVec = create_dataset_for_model(
+    let test_data: DataVec = create_dataset_for_model(
         test_kmers,
         &test_lr_distances,
         &test_sr_distances,
@@ -215,7 +215,7 @@ pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<
     let mut all_seqs: Vec<Vec<u8>> = Vec::new();
     for read_seq_url in read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
-            &read_seq_url,
+            read_seq_url,
             &[".fasta.gz", ".fa.gz", ".fasta", ".fa"],
         );
         let fasta_path = read_seq_url.to_file_path().unwrap();
@@ -258,7 +258,7 @@ pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(),
         &RED,
     ))?
         .label("ROC Curve")
-        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], &RED));
+        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], RED));
 
     // Draw a diagonal dotted line for reference.
     chart.draw_series(LineSeries::new(
@@ -266,9 +266,9 @@ pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(),
         &BLACK,
     ))?
         .label("Random")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLACK));
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK));
 
-    chart.configure_series_labels().background_style(&WHITE).draw()?;
+    chart.configure_series_labels().background_style(WHITE).draw()?;
 
     Ok(())
 }

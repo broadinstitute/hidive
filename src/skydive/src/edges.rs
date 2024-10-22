@@ -14,7 +14,8 @@ bitflags! {
 }
 
 impl Edges {
-    pub fn from_string(s: String) -> Self {
+    #[must_use]
+    pub fn from_string(s: &str) -> Self {
         let mut edges = Edges::empty();
 
         if s.chars().nth(0) == Some('a') {

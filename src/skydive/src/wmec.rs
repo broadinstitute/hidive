@@ -1,6 +1,6 @@
-//! This module implements the WhatsHap phasing algorithm as described in:
+//! This module implements the `WhatsHap` phasing algorithm as described in:
 //! Murray Patterson, Tobias Marschall, Nadia Pisanti, Leo van Iersel, Leen Stougie, et al.
-//! WhatsHap: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
+//! `WhatsHap`: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
 //! Journal of Computational Biology, 2015, 22 (6), pp.498-509.
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988
@@ -16,6 +16,7 @@ pub struct WMECData {
 
 impl WMECData {
     // Initialize the data structure with given reads and confidences
+    #[must_use]
     pub fn new(reads: Vec<Vec<Option<u8>>>, confidences: Vec<Vec<Option<u32>>>) -> Self {
         let num_snps = reads[0].len();
         WMECData { reads, confidences, num_snps }
@@ -23,6 +24,7 @@ impl WMECData {
     
     // Function to compute W^0(j, R) and W^1(j, R)
     // Cost to set all fragments in set R to 0 or 1 at SNP j
+    #[must_use]
     pub fn compute_costs(&self, snp: usize, set_r: &BTreeSet<usize>) -> (u32, u32) {
         let mut w0 = 0; // Cost for setting to 0
         let mut w1 = 0; // Cost for setting to 1
@@ -43,6 +45,7 @@ impl WMECData {
     }
     
     // Calculate minimum correction cost Delta C(j, (R, S))
+    #[must_use]
     pub fn delta_c(&self, snp: usize, r: &BTreeSet<usize>, s: &BTreeSet<usize>) -> u32 {
         let (w0_r, w1_r) = self.compute_costs(snp, r);
         let (w0_s, w1_s) = self.compute_costs(snp, s);
@@ -178,7 +181,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
                 current_bipartition = prev_bipartition.clone();
             } else {
                 // This should not happen if the DP table is correctly filled
-                panic!("No valid previous bipartition found for SNP {}", snp);
+                panic!("No valid previous bipartition found for SNP {snp}");
             }
         }
     }
@@ -187,6 +190,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
 }
 
 // Main function to perform WMEC using dynamic programming
+#[must_use]
 pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>) {
     let (mut dp, mut backtrack) = initialize_dp(data);
 

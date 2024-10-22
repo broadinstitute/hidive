@@ -28,7 +28,23 @@ use rust_htslib::faidx::Reader;
 // Import functions for authorizing access to Google Cloud Storage.
 use crate::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 
-// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+/// Function to open a BAM/CRAM file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// An `IndexedReader` object representing the opened BAM/CRAM file.
+///
+/// # Errors
+///
+/// This function returns an error if the BAM/CRAM file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -62,7 +78,23 @@ pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
     Ok(bam)
 }
 
-// Function to open a FASTA file from a URL and cache its contents locally.
+/// Function to open a FASTA file from a URL and cache its contents locally.
+///
+/// # Arguments
+///
+/// * `seqs_url` - A reference to a URL object representing the sequence file URL.
+///
+/// # Returns
+///
+/// A `Reader` object representing the opened FASTA file.
+///
+/// # Errors
+///
+/// This function returns an error if the FASTA file cannot be opened.
+///
+/// # Panics
+///
+/// This function panics if the URL scheme is not recognized.
 pub fn open_fasta(seqs_url: &Url) -> Result<Reader> {
     if env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
@@ -105,7 +137,7 @@ fn get_rg_to_sm_mapping(bam: &IndexedReader) -> HashMap<String, String> {
         .into_iter()
         .flat_map(|(_, records)| records)
         .filter(|record| record.contains_key("ID") && record.contains_key("SM"))
-        .map(|record| (record["ID"].to_owned(), record["SM"].to_owned()))
+        .map(|record| (record["ID"].clone(), record["SM"].clone()))
         .collect();
 
     rg_sm_map
@@ -145,7 +177,7 @@ fn extract_aligned_bam_reads(
     for p in bam.pileup() {
         let pileup = p.unwrap();
 
-        if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+        if *start <= (u64::from(pileup.pos())) && (u64::from(pileup.pos())) < *stop {
             for alignment in pileup.alignments() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
@@ -153,10 +185,10 @@ fn extract_aligned_bam_reads(
                     Err(_) => String::from("unknown"),
                 };
 
-                let seq_name = format!("{}|{}|{}", qname, name, sm);
+                let seq_name = format!("{qname}|{name}|{sm}");
 
                 if !bmap.contains_key(&seq_name) {
-                    bmap.insert(seq_name.to_owned(), String::new());
+                    bmap.insert(seq_name.clone(), String::new());
                 }
 
                 if !alignment.is_del() && !alignment.is_refskip() {
@@ -202,7 +234,7 @@ fn extract_unaligned_bam_reads(
             let qname = String::from_utf8_lossy(read.qname()).into_owned();
             let sm = get_sm_name_from_rg(&read, &rg_sm_map).unwrap();
 
-            let seq_name = format!("{}|{}", qname, sm);
+            let seq_name = format!("{qname}|{sm}");
 
             let vseq = read.seq().as_bytes();
             let bseq = vseq.as_bytes();
@@ -225,10 +257,9 @@ fn extract_fasta_seqs(
     stop: &u64,
     name: &String,
 ) -> Result<Vec<fasta::Record>> {
-    let id = format!("{}:{}-{}|{}|{}", chr, start, stop, name, basename);
+    let id = format!("{chr}:{start}-{stop}|{name}|{basename}");
     let seq = fasta
-        .fetch_seq_string(chr, *start as usize, (*stop - 1) as usize)
-        .unwrap();
+        .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
     if seq.len() > 0 {
         let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
@@ -327,7 +358,7 @@ fn stage_data_from_all_files(
                 Ok(seqs) => seqs,
                 Err(e) => {
                     // If all retries fail, panic with an error message.
-                    panic!("Error: {}", e);
+                    panic!("Error: {e}");
                 }
             }
         })
@@ -339,12 +370,55 @@ fn stage_data_from_all_files(
     Ok(flattened_data)
 }
 
-pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, u64, u64)>) -> bool {
-    loci.iter()
-        .any(|e| start <= e.1 as i64 && end >= e.2 as i64)
+/// Checks if a given genomic range spans any of the loci in the provided set.
+///
+/// # Arguments
+///
+/// * `start` - The start position of the genomic range.
+/// * `end` - The end position of the genomic range.
+/// * `loci` - A reference to a `HashSet` of tuples representing the loci.
+///
+/// # Returns
+///
+/// A `Result` containing `true` if the range spans any loci, `false` otherwise. Returns an error if the positions are negative.
+///
+/// # Errors
+///
+/// Returns an error if the start or end positions are negative.
+///
+/// # Panics
+///
+/// This function does not panic.
+pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>) -> Result<bool, String> {
+    if start < 0 || end < 0 {
+        return Err("Error: Negative genomic positions are not allowed.".to_string());
+    }
+
+    Ok(loci.iter().any(|e| start <= e.1 && end >= e.2))
 }
 
-// Public function to stage data from multiple BAM files and write to an output file.
+/// Public function to stage data from multiple BAM files and write to an output file.
+///
+/// # Arguments
+///
+/// * `output_path` - A reference to a `PathBuf` representing the output file path.
+/// * `loci` - A reference to a `HashSet` of tuples representing the loci to extract.
+/// * `seq_urls` - A reference to a `HashSet` of URLs representing the sequence files.
+/// * `unmapped` - A boolean indicating whether to extract unmapped reads.
+/// * `cache_path` - A reference to a `PathBuf` representing the cache directory path.
+///
+/// # Returns
+///
+/// The number of records written to the output file.
+///
+/// # Errors
+///
+/// This function returns an error if the output file cannot be created.
+///
+/// # Panics
+///
+/// If an error occurs while staging data from the files.
+///
 pub fn stage_data(
     output_path: &PathBuf,
     loci: &HashSet<(String, u64, u64, String)>,
@@ -359,7 +433,7 @@ pub fn stage_data(
     let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped) {
         Ok(all_data) => all_data,
         Err(e) => {
-            panic!("Error: {}", e);
+            panic!("Error: {e}");
         }
     };
 

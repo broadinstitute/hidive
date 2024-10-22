@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -14,11 +13,9 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 
-use rust_htslib::bam::ext::BamRecordExtensions;
-use rust_htslib::bam::{FetchDefinition, Read};
+use rust_htslib::bam::Read;
 
 // Import the skydive module, which contains the necessary functions for staging data
-use skydive;
 
 pub fn start(
     output: &PathBuf,
@@ -55,7 +52,7 @@ pub fn start(
     // Read the FASTA files and search for the k-mers in each read.
     let mut all_records = Vec::new();
     for seq_url in seq_urls {
-        let mut reader = Reader::from_file(seq_url.to_file_path().unwrap()).unwrap();
+        let reader = Reader::from_file(seq_url.to_file_path().unwrap()).unwrap();
 
         let progress_bar =
             skydive::utils::default_unbounded_progress_bar("Searching for similar reads (0 found)");
@@ -86,7 +83,7 @@ pub fn start(
 
                 // Count the number of k-mers found in our hashset from the long reads.
                 let fw_seq = read.seq();
-                let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
+                let rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
 
                 let num_kmers = rl_seq
                     .par_windows(kmer_size)
@@ -136,7 +133,7 @@ pub fn start(
         writeln!(
             writer,
             "{}",
-            String::from_utf8_lossy(&record.seq())
+            String::from_utf8_lossy(record.seq())
         )
         .expect("Could not write to file");
     }
