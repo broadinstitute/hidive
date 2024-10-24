@@ -146,7 +146,7 @@ fn extract_aligned_bam_reads(
         let pileup = p.unwrap();
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
-            for alignment in pileup.alignments() {
+            for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
@@ -160,6 +160,12 @@ fn extract_aligned_bam_reads(
                 }
 
                 if !alignment.is_del() && !alignment.is_refskip() {
+                    if alignment.qpos().unwrap() > alignment.record().seq().len() {
+                        crate::elog!("qpos {} > seq len {}", alignment.qpos().unwrap(), alignment.record().seq().len());
+                        crate::elog!("{} {} {} {}", String::from_utf8_lossy(alignment.record().qname()), alignment.record().mapq(), alignment.record().is_secondary(), alignment.record().is_supplementary());
+                        crate::elog!("{:?}", alignment.record());
+                    }
+
                     let a = alignment.record().seq()[alignment.qpos().unwrap()];
 
                     bmap.get_mut(&seq_name).unwrap().push(a as char);

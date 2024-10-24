@@ -75,6 +75,10 @@ pub fn start(
             total_length.to_formatted_string(&Locale::en),
             fetches.len().to_formatted_string(&Locale::en)
         );
+
+        for (contig, interval) in &fetches {
+            skydive::elog!(" -- {}:{:?}", contig, interval);
+        }
     }
 
     // Read the CRAM files and search for the k-mers in each read.
@@ -211,18 +215,36 @@ pub fn start(
 }
 
 fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
-    let aligner = Aligner::builder()
+    let lr_aligner = Aligner::builder()
+        .map_hifi()
+        .with_sam_hit_only()
+        .with_index(ref_path, None)
+        .expect("Unable to build index");
+
+    let lr_mappings = reads
+        .par_iter()
+        .map(|seq| {
+            lr_aligner.map(seq, false, false, None, None).unwrap()
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    for lr_mapping in &lr_mappings {
+        skydive::elog!("lr mapping {:?}:{}-{}", lr_mapping.target_name, lr_mapping.target_start, lr_mapping.target_end);
+    }
+
+    let sr_aligner = Aligner::builder()
         .sr()
         .with_sam_hit_only()
         .with_index(ref_path, None)
         .expect("Unable to build index");
 
-    let mappings = reads
+    let sr_mappings = reads
         .par_iter()
         .map(|seq| {
             seq
                 .windows(150)
-                .map(|window| aligner.map(window, false, false, None, None).unwrap())
+                .map(|window| sr_aligner.map(window, false, false, None, None).unwrap())
                 .flatten()
                 .collect::<Vec<_>>()
         })
@@ -230,7 +252,7 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
         .collect::<Vec<_>>();
 
     let mut contig_lengths = HashMap::new();
-    let loci = mappings.iter().filter_map(|m| {
+    let loci = lr_mappings.iter().chain(sr_mappings.iter()).filter_map(|m| {
         if let Some(target_name) = &m.target_name {
             contig_lengths.insert(target_name.to_string(), m.target_len);
 
@@ -250,7 +272,7 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
             trees.insert(contig_name.clone(), IntervalTree::new());
         }
 
-        let interval = Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add(1000).min(*contig_length)).unwrap();
+        let interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
         trees.get_mut(&contig_name).unwrap().insert(interval, ());
     }
 
@@ -261,7 +283,7 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
 
         let tree = trees.get_mut(&contig_name).unwrap();
 
-        let current_interval = Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add(1000).min(*contig_length)).unwrap();
+        let current_interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
         let overlaps = tree.find(current_interval).collect::<Vec<_>>();
 
         let mut new_tree = IntervalTree::new();
@@ -284,7 +306,7 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
 
             new_tree.insert(merged_interval, ());
         } else {
-            new_tree.insert(Interval::new(start.saturating_sub(1000).max(0)..end.saturating_add_unsigned(1000)).unwrap(), ());
+            new_tree.insert(Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap(), ());
         }
 
         trees.insert(contig_name.clone(), new_tree);
