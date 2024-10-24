@@ -92,9 +92,9 @@ pub fn start(
         })
         .collect::<Vec<String>>();
 
-    // for msa_string in &msa_strings {
-    //     println!("{}", msa_string);
-    // }
+    for msa_string in &msa_strings {
+        println!("{}", msa_string);
+    }
 
     let matrix = create_read_allele_matrix(&msa_strings);
     let wmec = create_wmec_matrix(&matrix);

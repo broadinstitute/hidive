@@ -210,7 +210,7 @@ pub fn start(
     };
 
     for record in all_records.iter() {
-        writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap(), record.reference_start(), record.reference_end()).expect("Could not write to file");
+        writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap_or(&String::from("*")), record.reference_start(), record.reference_end()).expect("Could not write to file");
         writeln!(
             writer,
             "{}",
