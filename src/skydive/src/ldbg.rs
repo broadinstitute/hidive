@@ -246,7 +246,7 @@ impl LdBG {
 
         // Iterate over sequences
         for fwd_seq in fwd_seqs {
-            if fwd_seq.len() < k + 1 {
+            if fwd_seq.len() < k + 1 || fwd_seq.iter().any(|&b| !matches!(b, b'A' | b'C' | b'G' | b'T')) {
                 continue;
             }
 
@@ -1664,8 +1664,9 @@ impl LdBG {
             .clean_tangles(1, 100, lenient_threshold)
             .clean_branches(strict_threshold)
             .clean_tips(3*kmer_size, strict_threshold)
-            // .clean_bubbles(2.0*lenient_threshold)
             .clean_contigs(100)
+            .clean_color_specific_paths(1, lenient_threshold)
+            .clean_bubbles(lenient_threshold)
     }
 
     /// Clean color-specific paths from the graph based on a minimum score threshold.
@@ -2025,7 +2026,7 @@ impl LdBG {
                 let mut cleaned_bubble = false;
 
                 for (j, (path, total_score)) in paths.iter().enumerate() {
-                    // let mut contig = String::new();
+                    let mut contig = String::new();
 
                     for node in path {
                         let kmer = g.node_weight(*node).unwrap().as_bytes();
@@ -2038,17 +2039,17 @@ impl LdBG {
                             cleaned_bubble = true;
                         }
 
-                        // if contig.is_empty() {
-                        //     contig = String::from_utf8_lossy(kmer).to_string();
-                        // } else {
-                        //     contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
-                        // }
+                        if contig.is_empty() {
+                            contig = String::from_utf8_lossy(kmer).to_string();
+                        } else {
+                            contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                        }
                     }
 
-                    // crate::elog!(" -- Bubble {}: {} (score: {}) (remove: {})", i, contig, total_score, num_remove);
+                    crate::elog!(" -- Bubble {} {}: {} (score: {})", in_node.index(), out_node.index(), contig, total_score);
                 }
 
-                // crate::elog!("");
+                crate::elog!("");
 
                 if cleaned_bubble {
                     bad_bubbles += paths.len() - 2;

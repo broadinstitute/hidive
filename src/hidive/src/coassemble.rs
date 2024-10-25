@@ -56,16 +56,19 @@ pub fn start(
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    // let contigs = m.assemble_at_bubbles();
+    let contigs = m.assemble_at_bubbles();
 
     // let mut fa_file = File::create(&output).unwrap();
     // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
     //     let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    //     println!("{}", String::from_utf8(contig.clone()).unwrap());
     // }
 
     skydive::elog!("Assembling diplotypes...");
 
-    let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
+    // let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
+    let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -4, -8, -6, -8, -4);
+    // let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
 
     let mut sg = spoa::Graph::new();
     for lr_seq in all_ref_seqs.iter().chain(corrected_seqs.iter()) {
@@ -96,17 +99,21 @@ pub fn start(
         println!("{}", msa_string);
     }
 
-    let matrix = create_read_allele_matrix(&msa_strings);
+    let matrix = create_read_allele_matrix(&msa_strings.iter().skip(all_ref_seqs.len()).cloned().collect());
     let wmec = create_wmec_matrix(&matrix);
 
     let (h1, _) = skydive::wmec::phase(&wmec);
-    let (hap1, hap2) = create_fully_phased_haplotypes(&msa_strings, &h1);
+    let (hap1, hap2) = create_fully_phased_haplotypes(&msa_strings.iter().skip(all_ref_seqs.len()).cloned().collect(), &h1);
 
     let mut output = File::create(output).expect("Failed to create output file");
-    writeln!(output, ">hap1").expect("Failed to write to output file");
-    writeln!(output, "{}", hap1.replace("-", "")).expect("Failed to write to output file");
-    writeln!(output, ">hap2").expect("Failed to write to output file");
-    writeln!(output, "{}", hap2.replace("-", "")).expect("Failed to write to output file");
+    // writeln!(output, ">hap1").expect("Failed to write to output file");
+    // writeln!(output, "{}", hap1.replace("-", "")).expect("Failed to write to output file");
+    // writeln!(output, ">hap2").expect("Failed to write to output file");
+    // writeln!(output, "{}", hap2.replace("-", "")).expect("Failed to write to output file");
+
+    for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
+        let _ = writeln!(output, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    }
 }
 
 fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (String, String) {

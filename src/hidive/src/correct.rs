@@ -71,7 +71,7 @@ pub fn start(
         let csv_output = gfa_output.with_extension("csv");
         let mut csv_file = File::create(&csv_output).unwrap();
 
-        writeln!(csv_file, "node,label").unwrap();
+        writeln!(csv_file, "node,kmer,label").unwrap();
 
         for (node_index, node_label) in g.node_indices().zip(g.node_weights()) {
             let kmer = node_label.as_bytes();
@@ -83,9 +83,10 @@ pub fn start(
 
             writeln!(
                 csv_file,
-                "{},{}",
+                "{},{},{}",
                 node_index.index(),
-                format!("{} ({})", source, score)
+                node_label,
+                format!("{} ({})", source, score),
             )
             .unwrap();
         }
