@@ -1665,7 +1665,6 @@ impl LdBG {
             .clean_branches(strict_threshold)
             .clean_tips(3*kmer_size, strict_threshold)
             .clean_contigs(100)
-            .clean_color_specific_paths(1, lenient_threshold)
             .clean_bubbles(lenient_threshold)
     }
 
@@ -1995,7 +1994,7 @@ impl LdBG {
     #[must_use]
     pub fn clean_bubbles(mut self, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
-        let mut bad_bubbles: usize = 0;
+        let mut bad_paths: usize = 0;
 
         let g = self.traverse_all_kmers();
         let bubbles = find_all_superbubbles(&g);
@@ -2013,30 +2012,33 @@ impl LdBG {
                             let cn_kmer = crate::utils::canonicalize_kmer(kmer);
                             *self.scores.get(&cn_kmer).unwrap_or(&1.0)
                         })
-                        .sum::<f32>() / path.len() as f32;
+                        .fold(1.0, |acc, x| acc * x)
+                        .powf(1.0 / path.len() as f32);
 
-                    (path, score)
+                    (path, if score.is_nan() { 0.0 } else { score })
                 })
                 .collect::<Vec<(Vec<NodeIndex>, f32)>>();
 
-            paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            if paths.len() > 1 {
+                paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-            if paths.len() > 2 {
-                let mut to_keep = HashSet::new();
-                let mut cleaned_bubble = false;
+                let to_keep = paths
+                    .iter()
+                    .filter(|(_, score)| *score >= min_score)
+                    .map(|(path, _)| path)
+                    .flatten()
+                    .map(|node| crate::utils::canonicalize_kmer(g.node_weight(*node).unwrap().as_bytes()))
+                    .collect::<HashSet<Vec<u8>>>();
 
-                for (j, (path, total_score)) in paths.iter().enumerate() {
+                paths.iter().filter(|(_, score)| *score < min_score).for_each(|(path, _)| {
                     let mut contig = String::new();
 
                     for node in path {
                         let kmer = g.node_weight(*node).unwrap().as_bytes();
                         let cn_kmer = crate::utils::canonicalize_kmer(kmer);
 
-                        if j < 2 {
-                            to_keep.insert(cn_kmer.clone());
-                        } else if !to_keep.contains(&cn_kmer) && *total_score < min_score {
+                        if !to_keep.contains(&cn_kmer) {
                             to_remove.insert(cn_kmer.clone());
-                            cleaned_bubble = true;
                         }
 
                         if contig.is_empty() {
@@ -2046,14 +2048,10 @@ impl LdBG {
                         }
                     }
 
-                    crate::elog!(" -- Bubble {} {}: {} (score: {})", in_node.index(), out_node.index(), contig, total_score);
-                }
+                    bad_paths += 1;
 
-                crate::elog!("");
-
-                if cleaned_bubble {
-                    bad_bubbles += paths.len() - 2;
-                }
+                    // crate::elog!(" -- Bubble {} {}: {} (score: {})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score);
+                });
             }
         }
 
@@ -2062,7 +2060,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad bubbles ({} kmers)", bad_bubbles, to_remove.len());
+        crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", bad_paths, to_remove.len());
 
         self.infer_edges();
 

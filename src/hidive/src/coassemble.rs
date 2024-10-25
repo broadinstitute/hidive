@@ -80,13 +80,22 @@ pub fn start(
     }
 
     let msa_cstrs = sg.multiple_sequence_alignment(false);
+    
+    let last_base_position = msa_cstrs[0].to_str().unwrap()
+        .chars()
+        .rev()
+        .position(|c| c == 'A' || c == 'C' || c == 'G' || c == 'T')
+        .map(|pos| msa_cstrs[0].to_str().unwrap().len() - 1 - pos)
+        .unwrap_or(0);
+    
     let msa_strings = msa_cstrs
         .iter()
         .map(|cstr| cstr.to_str().unwrap().to_string())
         .map(|msa_string| {
-            let leading_dashes = msa_string.chars().take_while(|&c| c == '-').count();
-            let trailing_dashes = msa_string.chars().rev().take_while(|&c| c == '-').count();
-            let middle = &msa_string[leading_dashes..msa_string.len() - trailing_dashes];
+            let trimmed_msa_string = msa_string.chars().take(last_base_position + 1).collect::<String>();
+            let leading_dashes = trimmed_msa_string.chars().take_while(|&c| c == '-').count();
+            let trailing_dashes = trimmed_msa_string.chars().rev().take_while(|&c| c == '-').count();
+            let middle = &trimmed_msa_string[leading_dashes..trimmed_msa_string.len() - trailing_dashes];
             format!("{}{}{}", 
                 " ".repeat(leading_dashes), 
                 middle, 
@@ -106,14 +115,14 @@ pub fn start(
     let (hap1, hap2) = create_fully_phased_haplotypes(&msa_strings.iter().skip(all_ref_seqs.len()).cloned().collect(), &h1);
 
     let mut output = File::create(output).expect("Failed to create output file");
-    // writeln!(output, ">hap1").expect("Failed to write to output file");
-    // writeln!(output, "{}", hap1.replace("-", "")).expect("Failed to write to output file");
-    // writeln!(output, ">hap2").expect("Failed to write to output file");
-    // writeln!(output, "{}", hap2.replace("-", "")).expect("Failed to write to output file");
+    writeln!(output, ">hap1").expect("Failed to write to output file");
+    writeln!(output, "{}", hap1.replace("-", "")).expect("Failed to write to output file");
+    writeln!(output, ">hap2").expect("Failed to write to output file");
+    writeln!(output, "{}", hap2.replace("-", "")).expect("Failed to write to output file");
 
-    for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
-        let _ = writeln!(output, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
-    }
+    // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
+    //     let _ = writeln!(output, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
+    // }
 }
 
 fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (String, String) {
