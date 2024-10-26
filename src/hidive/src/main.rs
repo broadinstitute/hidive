@@ -196,10 +196,6 @@ enum Commands {
         #[clap(short, long, value_parser, required = false)]
         contigs: Vec<String>,
 
-        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
-        #[clap(short, long, value_parser, required = true)]
-        ref_path: Option<PathBuf>,
-
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -440,11 +436,10 @@ fn main() {
             kmer_size,
             min_kmers_pct,
             contigs,
-            ref_path,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, &contigs, ref_path, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, &contigs, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,
