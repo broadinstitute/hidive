@@ -532,11 +532,6 @@
 <a href="#532" id="532">532</a>
 <a href="#533" id="533">533</a>
 <a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
@@ -734,10 +729,6 @@
         <span class="doccomment">/// For aligned reads, restrict processing to these contigs.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">false</span>)]
         </span>contigs: Vec&lt;String&gt;,
-
-        <span class="doccomment">/// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
-        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
-        </span>ref_path: <span class="prelude-ty">Option</span>&lt;PathBuf&gt;,
 
         <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
@@ -979,11 +970,10 @@
             kmer_size,
             min_kmers_pct,
             contigs,
-            ref_path,
             fasta_paths,
             seq_paths,
         } =&gt; {
-            rescue::start(<span class="kw-2">&amp;</span>output, kmer_size, min_kmers_pct, <span class="kw-2">&amp;</span>contigs, ref_path, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
+            rescue::start(<span class="kw-2">&amp;</span>output, kmer_size, min_kmers_pct, <span class="kw-2">&amp;</span>contigs, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
         }
         Commands::Recruit {
             output,
