@@ -1660,12 +1660,12 @@ impl LdBG {
         let kmer_size = self.kmer_size;
 
         self
-            .clean_color_specific_paths(1, lenient_threshold)
-            .clean_tangles(1, 100, lenient_threshold)
-            .clean_branches(strict_threshold)
-            .clean_tips(3*kmer_size, strict_threshold)
-            .clean_contigs(100)
-            .clean_bubbles(lenient_threshold)
+            // .clean_color_specific_paths(1, lenient_threshold)
+            // .clean_tangles(1, 100, lenient_threshold)
+            // .clean_branches(strict_threshold)
+            // .clean_tips(3*kmer_size, strict_threshold)
+            // .clean_contigs(100)
+            // .clean_bubbles(lenient_threshold)
     }
 
     /// Clean color-specific paths from the graph based on a minimum score threshold.
