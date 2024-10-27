@@ -1998,7 +1998,7 @@ impl LdBG {
     #[must_use]
     pub fn clean_superbubbles(mut self, color: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
-        let mut bad_paths: usize = 0;
+        let mut num_bad_paths: usize = 0;
 
         let g = self.traverse_all_kmers();
         let bubbles = find_all_superbubbles(&g);
@@ -2038,44 +2038,21 @@ impl LdBG {
                 })
                 .collect::<Vec<(Vec<NodeIndex>, f32)>>();
 
-            if paths.len() > 1 {
-                paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-                /*
-                let mut contig = String::new();
-                let mut colors = HashMap::new();
+            let good_paths = paths.iter().take(2).collect::<Vec<_>>();
+            let bad_paths = paths.iter().filter(|path| !good_paths.contains(path)).collect::<Vec<_>>();
 
-                paths.iter().for_each(|(path, _)| {
-                    for node in path {
-                        let kmer = g.node_weight(*node).unwrap().as_bytes();
-                        let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+            let to_keep = good_paths
+                .iter()
+                .map(|(path, _)| path)
+                .flatten()
+                .map(|node| crate::utils::canonicalize_kmer(g.node_weight(*node).unwrap().as_bytes()))
+                .collect::<HashSet<Vec<u8>>>();
 
-                        if contig.is_empty() {
-                            contig = String::from_utf8_lossy(kmer).to_string();
-                        } else {
-                            contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
-                        }
-
-                        for color in self.sources.get(&cn_kmer).unwrap_or(&vec![]).iter() {
-                            *colors.entry(*color).or_insert(0) += 1;
-                        }
-                    }
-
-                    crate::elog!(" -- Bubble {} {}: {} (score: {}{}, colors: {:?})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score, if *score > min_score { "*" } else { ""}, colors);
-                });
-
-                crate::elog!("");
-                */
-
-                let to_keep = paths
-                    .iter()
-                    .filter(|(_, score)| *score >= min_score)
-                    .map(|(path, _)| path)
-                    .flatten()
-                    .map(|node| crate::utils::canonicalize_kmer(g.node_weight(*node).unwrap().as_bytes()))
-                    .collect::<HashSet<Vec<u8>>>();
-
-                paths.iter().filter(|(_, score)| *score < min_score).for_each(|(path, _)| {
+            bad_paths
+                .iter()
+                .for_each(|(path, _)| {
                     for node in path {
                         let kmer = g.node_weight(*node).unwrap().as_bytes();
                         let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -2084,10 +2061,9 @@ impl LdBG {
                             to_remove.insert(cn_kmer.clone());
                         }
                     }
-
-                    bad_paths += 1;
                 });
-            }
+
+            num_bad_paths += bad_paths.len();
         }
 
         for cn_kmer in &to_remove {
@@ -2095,7 +2071,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", bad_paths, to_remove.len());
+        crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", num_bad_paths, to_remove.len());
 
         self.infer_edges();
 
