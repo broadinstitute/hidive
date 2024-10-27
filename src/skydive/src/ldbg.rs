@@ -1660,12 +1660,12 @@ impl LdBG {
         let kmer_size = self.kmer_size;
 
         self
-            // .clean_color_specific_paths(1, lenient_threshold)
-            // .clean_tangles(1, 100, lenient_threshold)
-            // .clean_branches(strict_threshold)
-            // .clean_tips(3*kmer_size, strict_threshold)
-            // .clean_contigs(100)
-            // .clean_bubbles(lenient_threshold)
+            .clean_tangles(0, 500, lenient_threshold)
+            .clean_tangles(1, 500, lenient_threshold)
+            .clean_tips(3*kmer_size, strict_threshold)
+            .clean_branches(strict_threshold)
+            .clean_superbubbles(1, strict_threshold)
+            .clean_contigs(100)
     }
 
     /// Clean color-specific paths from the graph based on a minimum score threshold.
@@ -1784,7 +1784,8 @@ impl LdBG {
         for bad_cn_kmer in bad_cn_kmers {
             if !to_remove.contains(&bad_cn_kmer) {
                 let mut seen_kmers = HashSet::new();
-                let mut score_sum = 0.0;
+                // let mut score_sum = 0.0;
+                let mut score_prod = 1.0;
 
                 let mut fw_contig = bad_cn_kmer.clone();
                 self.assemble_forward(&mut fw_contig, &bad_cn_kmer);
@@ -1795,7 +1796,8 @@ impl LdBG {
                     if let Some(r) = self.kmers.get(&cn_kmer) {
                         if r.in_degree() == 1 && r.out_degree() == 1 {
                             seen_kmers.insert(cn_kmer.clone());
-                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                            // score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                            score_prod *= self.scores.get(&cn_kmer).unwrap_or(&1.0);
                         } else {
                             break;
                         }
@@ -1811,14 +1813,16 @@ impl LdBG {
                     if let Some(r) = self.kmers.get(&cn_kmer) {
                         if r.in_degree() == 1 && r.out_degree() == 1 {
                             seen_kmers.insert(cn_kmer.clone());
-                            score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                            // score_sum += self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                            score_prod *= self.scores.get(&cn_kmer).unwrap_or(&1.0);
                         } else {
                             break;
                         }
                     }
                 }
 
-                let weight = score_sum / seen_kmers.len() as f32;
+                // let weight = score_sum / seen_kmers.len() as f32;
+                let weight = score_prod.powf(1.0 / seen_kmers.len() as f32);
 
                 if weight < min_score {
                     to_remove.extend(seen_kmers);
@@ -1897,7 +1901,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} tangles ({} kmers)", bad_tangles, to_remove.len());
+        crate::elog!(" -- Removed {} tangles in color {} ({} kmers)", bad_tangles, color, to_remove.len());
 
         self.infer_edges();
 
@@ -1992,7 +1996,7 @@ impl LdBG {
     ///  - When calling `unwrap` on the result of `g.node_weight(*node)`. If the node does not exist in the graph, this will cause a panic.
     ///  - When calling `unwrap_or` on the result of `self.scores.get(&cn_kmer)`. If the canonical k-mer is not found in the scores, it will return the default value `1.0` instead of panicking.
     #[must_use]
-    pub fn clean_bubbles(mut self, min_score: f32) -> Self {
+    pub fn clean_superbubbles(mut self, color: usize, min_score: f32) -> Self {
         let mut to_remove = HashSet::new();
         let mut bad_paths: usize = 0;
 
@@ -2015,12 +2019,51 @@ impl LdBG {
                         .fold(1.0, |acc, x| acc * x)
                         .powf(1.0 / path.len() as f32);
 
-                    (path, if score.is_nan() { 0.0 } else { score })
+                    let mut bad_color_count = 0;
+
+                    for node in &path {
+                        let kmer = g.node_weight(*node).unwrap().as_bytes();
+                        let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                        let seen_colors = self.sources.get(&cn_kmer).unwrap_or(&vec![]).iter().cloned().collect::<HashSet<_>>();
+
+                        if seen_colors.len() == 1 && seen_colors.contains(&color) {
+                            bad_color_count += 1;
+                        }
+                    }
+
+                    let is_bad_color = bad_color_count as f32 > 0.5*(path.len() as f32);
+
+                    (path, if score.is_nan() || is_bad_color { 0.0 } else { score })
                 })
                 .collect::<Vec<(Vec<NodeIndex>, f32)>>();
 
             if paths.len() > 1 {
                 paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+                let mut contig = String::new();
+                let mut colors = HashMap::new();
+
+                paths.iter().for_each(|(path, _)| {
+                    for node in path {
+                        let kmer = g.node_weight(*node).unwrap().as_bytes();
+                        let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+
+                        if contig.is_empty() {
+                            contig = String::from_utf8_lossy(kmer).to_string();
+                        } else {
+                            contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                        }
+
+                        for color in self.sources.get(&cn_kmer).unwrap_or(&vec![]).iter() {
+                            *colors.entry(*color).or_insert(0) += 1;
+                        }
+                    }
+
+                    // crate::elog!(" -- Bubble {} {}: {} (score: {}{}, colors: {:?})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score, if *score > min_score { "*" } else { ""}, colors);
+                });
+
+                // crate::elog!("");
 
                 let to_keep = paths
                     .iter()
@@ -2031,8 +2074,6 @@ impl LdBG {
                     .collect::<HashSet<Vec<u8>>>();
 
                 paths.iter().filter(|(_, score)| *score < min_score).for_each(|(path, _)| {
-                    let mut contig = String::new();
-
                     for node in path {
                         let kmer = g.node_weight(*node).unwrap().as_bytes();
                         let cn_kmer = crate::utils::canonicalize_kmer(kmer);
@@ -2040,17 +2081,9 @@ impl LdBG {
                         if !to_keep.contains(&cn_kmer) {
                             to_remove.insert(cn_kmer.clone());
                         }
-
-                        if contig.is_empty() {
-                            contig = String::from_utf8_lossy(kmer).to_string();
-                        } else {
-                            contig.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
-                        }
                     }
 
                     bad_paths += 1;
-
-                    // crate::elog!(" -- Bubble {} {}: {} (score: {})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score);
                 });
             }
         }
@@ -2066,6 +2099,7 @@ impl LdBG {
 
         self
     }
+
 
     /// This method will remove contigs that are shorter than the specified minimum length
     /// and that are not connected to the rest of the graph.
