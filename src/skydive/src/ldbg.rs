@@ -2041,6 +2041,7 @@ impl LdBG {
             if paths.len() > 1 {
                 paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
+                /*
                 let mut contig = String::new();
                 let mut colors = HashMap::new();
 
@@ -2060,10 +2061,11 @@ impl LdBG {
                         }
                     }
 
-                    // crate::elog!(" -- Bubble {} {}: {} (score: {}{}, colors: {:?})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score, if *score > min_score { "*" } else { ""}, colors);
+                    crate::elog!(" -- Bubble {} {}: {} (score: {}{}, colors: {:?})", g.node_weight(*in_node).unwrap(), g.node_weight(*out_node).unwrap(), contig, score, if *score > min_score { "*" } else { ""}, colors);
                 });
 
-                // crate::elog!("");
+                crate::elog!("");
+                */
 
                 let to_keep = paths
                     .iter()
