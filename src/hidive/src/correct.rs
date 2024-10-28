@@ -45,16 +45,19 @@ pub fn start(
     //     let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
     // }
 
-    let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
+    let all_seqs = all_lr_seqs.iter().chain(all_sr_seqs.iter()).cloned().collect::<Vec<Vec<u8>>>();
 
-    let corrected_seqs = all_lr_seqs
+    let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_seqs.len() as u64);
+
+    let corrected_seqs =
+        all_seqs
         .par_iter()
         .progress_with(progress_bar)
         .map(|seq| m.correct_seq(seq))
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    skydive::elog!("Writing reads to {}", output.display());
+    skydive::elog!("Writing {} corrected reads to {}", corrected_seqs.len(), output.display());
     
     let mut fa_file = File::create(output).unwrap();
     for (i, corrected_seq) in corrected_seqs.iter().enumerate() {

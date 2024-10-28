@@ -46,10 +46,12 @@ pub fn start(
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
-    let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_lr_seqs.len() as u64);
+    let all_seqs = all_lr_seqs.iter().chain(all_sr_seqs.iter()).cloned().collect::<Vec<Vec<u8>>>();
+
+    let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_seqs.len() as u64);
 
     let corrected_seqs =
-        all_lr_seqs
+        all_seqs
         .par_iter()
         .progress_with(progress_bar)
         .map(|seq| m.correct_seq(seq))
