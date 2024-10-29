@@ -284,9 +284,9 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
         let tree = trees.get_mut(&contig_name).unwrap();
 
         let current_interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
-        let overlaps = tree.find(current_interval).collect::<Vec<_>>();
+        let overlaps = tree.find(current_interval.clone()).collect::<Vec<_>>();
 
-        let mut new_tree = IntervalTree::new();
+        let mut merged_intervals = IntervalTree::new();
 
         if !overlaps.is_empty() {
             // Calculate the new merged interval
@@ -303,13 +303,12 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
             
             // Insert the new merged interval
             let merged_interval = Interval::new(min_start..max_end).unwrap();
-
-            new_tree.insert(merged_interval, ());
+            merged_intervals.insert(merged_interval, ());
         } else {
-            new_tree.insert(Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap(), ());
+            merged_intervals.insert(current_interval, ());
         }
 
-        trees.insert(contig_name.clone(), new_tree);
+        trees.insert(contig_name.clone(), merged_intervals);
     }
 
     let sub_fetches: HashSet<_> = trees.iter()
