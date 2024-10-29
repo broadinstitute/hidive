@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,7 +10,7 @@ use bio::io::fasta::Reader;
 use bio::utils::Interval;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use minimap2::Aligner;
+use minimap2::{Aligner, Mapping};
 use needletail::Sequence;
 use num_format::{Locale, ToFormattedString};
 
@@ -215,56 +215,87 @@ pub fn start(
 }
 
 fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
-    let lr_aligner = Aligner::builder()
-        .map_hifi()
-        .with_sam_hit_only()
-        .with_index(ref_path, None)
-        .expect("Unable to build index");
+    let lr_aligner = initialize_aligner(ref_path, false);
 
-    let lr_mappings = reads
-        .par_iter()
-        .map(|seq| {
-            lr_aligner.map(seq, false, false, None, None).unwrap()
-        })
-        .flatten()
-        .collect::<Vec<_>>();
+    let lr_mappings = map_sequences(&lr_aligner, &reads, false);
 
     for lr_mapping in &lr_mappings {
         skydive::elog!("lr mapping {:?}:{}-{}", lr_mapping.target_name, lr_mapping.target_start, lr_mapping.target_end);
     }
 
-    let sr_aligner = Aligner::builder()
-        .sr()
-        .with_sam_hit_only()
-        .with_index(ref_path, None)
-        .expect("Unable to build index");
+    let sr_aligner = initialize_aligner(ref_path, true);
 
-    let sr_mappings = reads
-        .par_iter()
-        .map(|seq| {
-            seq
-                .windows(150)
-                .map(|window| sr_aligner.map(window, false, false, None, None).unwrap())
-                .flatten()
-                .collect::<Vec<_>>()
-        })
-        .flatten()
-        .collect::<Vec<_>>();
+    let sr_mappings = map_sequences(&sr_aligner, &reads, true);
 
     let mut contig_lengths = HashMap::new();
-    let loci = lr_mappings.iter().chain(sr_mappings.iter()).filter_map(|m| {
+    let loci = collect_loci(&lr_mappings, &sr_mappings, &mut contig_lengths);
+
+    // First pass - put all the intervals into a tree.
+    let mut trees = BTreeMap::new();
+    populate_interval_trees(&mut trees, &loci, &contig_lengths);
+
+    // Second pass
+    merge_overlapping_intervals(&mut trees, &loci, &contig_lengths);
+
+    let sub_fetches: HashSet<_> = trees.iter()
+        .flat_map(|(contig_name, tree)| {
+            tree.find(Interval::new(0..i32::MAX).unwrap())
+                .map(move |entry| (contig_name.clone(), entry.interval().clone()))
+        })
+        .collect();
+
+    fetches.extend(sub_fetches.into_iter());
+}
+
+
+fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner {
+    if is_sr {
+        Aligner::builder()
+            .sr()
+            .with_sam_hit_only()
+            .with_index(ref_path, None)
+            .expect("Unable to build index")
+    } else {
+        Aligner::builder()
+            .map_hifi()
+            .with_sam_hit_only()
+            .with_index(ref_path, None)
+            .expect("Unable to build index")
+    }
+}
+
+fn map_sequences(aligner: &Aligner, reads: &[Vec<u8>], is_sr: bool) -> Vec<Mapping> {
+    reads.par_iter().flat_map(|seq| {
+        if is_sr {
+            seq.windows(150).flat_map(|window| aligner.map(window, false, false, None, None).unwrap_or_else(|_| vec![])).collect::<Vec<_>>()
+        } else {
+            aligner.map(seq, false, false, None, None).unwrap_or_else(|_| vec![])
+        }
+    }).collect()
+}
+
+fn collect_loci(
+    lr_mappings: &[Mapping],
+    sr_mappings: &[Mapping],
+    contig_lengths: &mut HashMap<String, i32>,
+) -> HashSet<(Vec<u8>, i32, i32)> {
+    lr_mappings.iter().chain(sr_mappings.iter()).filter_map(|m| {
         if let Some(target_name) = &m.target_name {
             contig_lengths.insert(target_name.to_string(), m.target_len);
-
             Some((target_name.to_string().as_bytes().to_vec(), m.target_start, m.target_end))
         } else {
             None
         }
-    }).collect::<HashSet<_>>();
+    }).collect::<HashSet<_>>()
+}
 
-    // First pass - put all the intervals into a tree.
-    let mut trees = BTreeMap::new();
-    for (seq, start, end) in &loci {
+
+fn populate_interval_trees(
+    trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
+    loci: &HashSet<(Vec<u8>, i32, i32)>,
+    contig_lengths: &HashMap<String, i32>
+) {
+    for (seq, start, end) in loci {
         let contig_name = String::from_utf8_lossy(&seq).to_string();
         let contig_length = contig_lengths.get(&contig_name).unwrap();
 
@@ -275,12 +306,17 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
         let interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
         trees.get_mut(&contig_name).unwrap().insert(interval, ());
     }
+}
 
-    // Second pass - figure out which intervals overlap, and merge them.
-    for (seq, start, end) in &loci {
+
+fn merge_overlapping_intervals(
+    trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
+    loci: &HashSet<(Vec<u8>, i32, i32)>,
+    contig_lengths: &HashMap<String, i32>
+) {
+    for (seq, start, end) in loci {
         let contig_name = String::from_utf8_lossy(&seq).to_string();
         let contig_length = contig_lengths.get(&contig_name).unwrap();
-
         let tree = trees.get_mut(&contig_name).unwrap();
 
         let current_interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
@@ -289,34 +325,13 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
         let mut merged_intervals = IntervalTree::new();
 
         if !overlaps.is_empty() {
-            // Calculate the new merged interval
-            let min_start = overlaps.iter()
-                .map(|o| o.interval().start)
-                .min()
-                .unwrap()
-                .min(*start);
-            let max_end = overlaps.iter()
-                .map(|o| o.interval().end)
-                .max()
-                .unwrap()
-                .max(*end);
-            
-            // Insert the new merged interval
-            let merged_interval = Interval::new(min_start..max_end).unwrap();
-            merged_intervals.insert(merged_interval, ());
+            let min_start = overlaps.iter().map(|o| o.interval().start).min().unwrap().min(*start);
+            let max_end = overlaps.iter().map(|o| o.interval().end).max().unwrap().max(*end);
+            merged_intervals.insert(Interval::new(min_start..max_end).unwrap(), ());
         } else {
             merged_intervals.insert(current_interval, ());
         }
 
         trees.insert(contig_name.clone(), merged_intervals);
     }
-
-    let sub_fetches: HashSet<_> = trees.iter()
-        .flat_map(|(contig_name, tree)| {
-            tree.find(Interval::new(0..i32::MAX).unwrap())
-                .map(move |entry| (contig_name.clone(), entry.interval().clone()))
-        })
-        .collect();
-
-    fetches.extend(sub_fetches.into_iter());
 }
