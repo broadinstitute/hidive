@@ -214,6 +214,17 @@ pub fn start(
     }
 }
 
+/// This function detects the relevant loci in the reference genome.
+///
+/// # Arguments
+///
+/// * `ref_path` - The path to the reference genome.
+/// * `reads` - The reads to map.
+/// * `fetches` - The fetches to populate.
+///
+/// # Panics
+///
+/// If no mappings are found for the provided sequences.
 fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
     let lr_aligner = initialize_aligner(ref_path, false);
 
@@ -248,6 +259,20 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
 }
 
 
+/// This function initializes the aligner.
+///
+/// # Arguments
+///
+/// * `ref_path` - The path to the reference genome.
+/// * `is_sr` - Whether the reads are short reads or not.
+///
+/// # Returns
+///
+/// An aligner object.
+///
+/// # Panics
+///
+/// If the index cannot be built.
 fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner {
     if is_sr {
         Aligner::builder()
@@ -264,16 +289,51 @@ fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner {
     }
 }
 
+/// This function maps the sequences to the reference genome using the aligner.
+///
+/// # Arguments
+///
+/// * `aligner` - The aligner object to use for mapping.
+/// * `reads` - The reads to map.
+/// * `is_sr` - Whether the reads are short reads or not.
+///
+/// # Returns
+///
+/// A vector of mappings.
+///
+/// # Panics
+///
+/// If no mappings are found for the provided sequences.
 fn map_sequences(aligner: &Aligner, reads: &[Vec<u8>], is_sr: bool) -> Vec<Mapping> {
-    reads.par_iter().flat_map(|seq| {
+    let mappings: Vec<Mapping> = reads.par_iter().flat_map(|seq| {
         if is_sr {
             seq.windows(150).flat_map(|window| aligner.map(window, false, false, None, None).unwrap_or_else(|_| vec![])).collect::<Vec<_>>()
         } else {
             aligner.map(seq, false, false, None, None).unwrap_or_else(|_| vec![])
         }
-    }).collect()
+    }).collect();
+
+    if mappings.is_empty() {
+        panic!("No mappings found for the provided sequences.");
+    }
+
+    mappings
 }
 
+/// This function collects the loci from the mappings.
+///
+/// # Arguments
+///
+/// * `lr_mappings` - The long read mappings.
+/// * `sr_mappings` - The short read mappings.
+///
+/// # Returns
+///
+/// A hashset of loci.
+///
+/// # Panics
+///
+/// If the target name is not found in the mappings.
 fn collect_loci(
     lr_mappings: &[Mapping],
     sr_mappings: &[Mapping],
@@ -289,7 +349,17 @@ fn collect_loci(
     }).collect::<HashSet<_>>()
 }
 
-
+/// This function populates the interval trees with the loci.
+///
+/// # Arguments
+///
+/// * `trees` - The interval trees to populate.
+/// * `loci` - The loci to insert into the trees.
+/// * `contig_lengths` - The lengths of the contigs.
+///
+/// # Panics
+///
+/// If the contig name is not found in the contig lengths.
 fn populate_interval_trees(
     trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
     loci: &HashSet<(Vec<u8>, i32, i32)>,
@@ -309,6 +379,17 @@ fn populate_interval_trees(
 }
 
 
+/// This function merges overlapping intervals.
+///
+/// # Arguments
+///
+/// * `trees` - The interval trees to merge.
+/// * `loci` - The loci to merge.
+/// * `contig_lengths` - The lengths of the contigs.
+///
+/// # Panics
+///
+/// If the contig name is not found in the trees.
 fn merge_overlapping_intervals(
     trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
     loci: &HashSet<(Vec<u8>, i32, i32)>,
@@ -335,3 +416,5 @@ fn merge_overlapping_intervals(
         trees.insert(contig_name.clone(), merged_intervals);
     }
 }
+
+
