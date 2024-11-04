@@ -699,35 +699,35 @@
 
     <span class="kw">let _ </span>= bam.fetch(((<span class="kw-2">*</span>chr).as_bytes(), <span class="kw-2">*</span>start, <span class="kw-2">*</span>stop));
     <span class="kw">for </span>p <span class="kw">in </span>bam.pileup() {
-        <span class="kw">let </span>pileup = p.unwrap();
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(pileup) = p {
+            <span class="kw">if </span><span class="kw-2">*</span>start &lt;= (u64::from(pileup.pos())) &amp;&amp; (u64::from(pileup.pos())) &lt; <span class="kw-2">*</span>stop {
+                <span class="kw">for </span>alignment <span class="kw">in </span>pileup.alignments().filter(|a| !a.record().is_secondary()) {
+                    <span class="kw">let </span>qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
+                    <span class="kw">let </span>sm = <span class="kw">match </span>get_sm_name_from_rg(<span class="kw-2">&amp;</span>alignment.record(), <span class="kw-2">&amp;</span>rg_sm_map) {
+                        <span class="prelude-val">Ok</span>(a) =&gt; a,
+                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>),
+                    };
 
-        <span class="kw">if </span><span class="kw-2">*</span>start &lt;= (u64::from(pileup.pos())) &amp;&amp; (u64::from(pileup.pos())) &lt; <span class="kw-2">*</span>stop {
-            <span class="kw">for </span>alignment <span class="kw">in </span>pileup.alignments() {
-                <span class="kw">let </span>qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
-                <span class="kw">let </span>sm = <span class="kw">match </span>get_sm_name_from_rg(<span class="kw-2">&amp;</span>alignment.record(), <span class="kw-2">&amp;</span>rg_sm_map) {
-                    <span class="prelude-val">Ok</span>(a) =&gt; a,
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>),
-                };
+                    <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{qname}|{name}|{sm}"</span>);
 
-                <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{qname}|{name}|{sm}"</span>);
+                    <span class="kw">if </span>!bmap.contains_key(<span class="kw-2">&amp;</span>seq_name) {
+                        bmap.insert(seq_name.clone(), String::new());
+                    }
 
-                <span class="kw">if </span>!bmap.contains_key(<span class="kw-2">&amp;</span>seq_name) {
-                    bmap.insert(seq_name.clone(), String::new());
-                }
+                    <span class="kw">if </span>!alignment.is_del() &amp;&amp; !alignment.is_refskip() {
+                        <span class="kw">let </span>a = alignment.record().seq()[alignment.qpos().unwrap()];
 
-                <span class="kw">if </span>!alignment.is_del() &amp;&amp; !alignment.is_refskip() {
-                    <span class="kw">let </span>a = alignment.record().seq()[alignment.qpos().unwrap()];
+                        bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
+                    }
 
-                    bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
-                }
+                    <span class="kw">if let </span>bam::pileup::Indel::Ins(len) = alignment.indel() {
+                        <span class="kw">if let </span><span class="prelude-val">Some</span>(pos1) = alignment.qpos() {
+                            <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
+                            <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
+                                <span class="kw">let </span>a = alignment.record().seq()[pos];
 
-                <span class="kw">if let </span>bam::pileup::Indel::Ins(len) = alignment.indel() {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(pos1) = alignment.qpos() {
-                        <span class="kw">let </span>pos2 = pos1 + (len <span class="kw">as </span>usize);
-                        <span class="kw">for </span>pos <span class="kw">in </span>pos1..pos2 {
-                            <span class="kw">let </span>a = alignment.record().seq()[pos];
-
-                            bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
+                                bmap.get_mut(<span class="kw-2">&amp;</span>seq_name).unwrap().push(a <span class="kw">as </span>char);
+                            }
                         }
                     }
                 }

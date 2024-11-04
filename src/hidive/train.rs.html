@@ -386,6 +386,25 @@
 <a href="#386" id="386">386</a>
 <a href="#387" id="387">387</a>
 <a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>num_format::{Locale, ToFormattedString};
 <span class="comment">// use rand::SeedableRng;
 // use skydive::mldbg::MLdBG;
@@ -469,11 +488,11 @@
 
     <span class="comment">// Configure GBDT.
     </span><span class="kw">let </span><span class="kw-2">mut </span>cfg = Config::new();
-    cfg.set_feature_size(<span class="number">7</span>);
+    cfg.set_feature_size(<span class="number">6</span>);
     cfg.set_max_depth(<span class="number">4</span>);
-    cfg.set_min_leaf_size(<span class="number">1</span>);
+    cfg.set_min_leaf_size(<span class="number">5</span>);
     cfg.set_loss(<span class="kw-2">&amp;</span>loss2string(<span class="kw-2">&amp;</span>Loss::BinaryLogitraw));
-    cfg.set_shrinkage(<span class="number">0.1</span>);
+    cfg.set_shrinkage(<span class="number">0.05</span>);
     cfg.set_iterations(iterations);
     cfg.set_debug(debug);
 
@@ -599,6 +618,7 @@
 
     distances
 }
+
 <span class="kw">pub fn </span>process_reads(read_seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;, read_type: <span class="kw-2">&amp;</span>str)  -&gt; Vec&lt;Vec&lt;u8&gt;&gt;{
     <span class="kw">let </span><span class="kw-2">mut </span>all_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
     <span class="kw">for </span>read_seq_url <span class="kw">in </span>read_seq_urls {
@@ -730,8 +750,8 @@
 
     (precision, recall, f1_score)
 }
-<span class="doccomment">/// Creates a dataset for the ML model.
 
+<span class="doccomment">/// Creates a dataset for the ML model.
 </span><span class="kw">pub fn </span>create_dataset_for_model(
     kmers: Chain&lt;Chain&lt;Keys&lt;Vec&lt;u8&gt;, Record&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;,
     lr_distances: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, usize&gt;,
@@ -747,26 +767,44 @@
         <span class="kw">let </span>compressed_len_diff = (kmer.len() - compressed_len) <span class="kw">as </span>f32;
         <span class="kw">let </span>entropy = skydive::utils::shannon_entropy(kmer);
         <span class="kw">let </span>gc_content = skydive::utils::gc_content(kmer);
-        <span class="kw">let </span>lr_distance = <span class="kw-2">*</span>lr_distances.get(kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) <span class="kw">as </span>f32;
-        <span class="kw">let </span>sr_distance = <span class="kw-2">*</span>sr_distances.get(kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) <span class="kw">as </span>f32;
+        <span class="comment">// let lr_distance = *lr_distances.get(kmer).unwrap_or(&amp;0) as f32;
+        // let sr_distance = *sr_distances.get(kmer).unwrap_or(&amp;0) as f32;
 
-        <span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |lr| lr.coverage());
-        <span class="kw">let </span>scov = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.coverage());
-        <span class="kw">let </span>tcov = t1.kmers.get(kmer).map_or(<span class="number">0</span>, |tr| tr.coverage());
+        </span><span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |lr| lr.coverage());
+
+        <span class="kw">let </span>scov_fw = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.fw_coverage());
+        <span class="kw">let </span>scov_rc = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.rc_coverage());
+        <span class="kw">let </span>scov_total = scov_fw + scov_rc;
+        <span class="kw">let </span>strand_ratio = <span class="kw">if </span>scov_total &gt; <span class="number">0 </span>{
+            (scov_fw <span class="kw">as </span>f32).max(scov_rc <span class="kw">as </span>f32) / scov_total <span class="kw">as </span>f32
+        } <span class="kw">else </span>{
+            <span class="number">0.5
+        </span>};
+
+        <span class="comment">// let expected = (scov_fw + scov_rc) as f32 / 2.0;
+        // let chi_square = if expected &gt; 0.0 {
+        //     ((scov_fw as f32 - expected).powi(2) + 
+        //     (scov_rc as f32 - expected).powi(2)) / expected
+        // } else {
+        //     0.0
+        // };
+
+        </span><span class="kw">let </span>tcov = t1.kmers.get(kmer).map_or(<span class="number">0</span>, |tr| tr.coverage());
 
         <span class="kw">let </span>data = Data::new_training_data(
             <span class="macro">vec!</span>[
-                <span class="kw">if </span>lcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},
-                scov <span class="kw">as </span>f32,
-                compressed_len_diff,
-                entropy,
-                gc_content,
-                lr_distance,
-                sr_distance,
-            ],
+                <span class="kw">if </span>lcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},    <span class="comment">// present in long reads
+                </span>scov_total <span class="kw">as </span>f32,                   <span class="comment">// coverage in short reads
+                </span>strand_ratio <span class="kw">as </span>f32,                 <span class="comment">// measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+                </span>compressed_len_diff,                 <span class="comment">// homopolymer compression length difference
+                </span>entropy,                             <span class="comment">// shannon entropy
+                </span>gc_content,                          <span class="comment">// gc content
+                // lr_distance,                         // distance to nearest long read contig end
+                // sr_distance,                         // distance to nearest short read contig end
+            </span>],
             <span class="number">1.0</span>,
-            <span class="kw">if </span>tcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},
-            <span class="prelude-val">None</span>,
+            <span class="kw">if </span>tcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>}, <span class="comment">// present in truth
+            </span><span class="prelude-val">None</span>,
         );
 
         dataset.push(data);
