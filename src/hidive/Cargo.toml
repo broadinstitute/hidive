@@ -22,6 +22,7 @@ gaoya = "0.2.0"
 indicatif = { version = "0.17.8", features = ["rayon"] }
 itertools = "0.13.0"
 # linfa = "0.5"
+linked-hash-map = "0.5.6"
 minimap2 = { version = "0.1.20+minimap2.2.28", features = ["simde"] }
 needletail = "0.5.1"
 # noodles = "0.78.0"
@@ -29,7 +30,7 @@ needletail = "0.5.1"
 num-format = "0.4.4"
 path-absolutize = "3.1.1"
 # parquet = "*"
-# petgraph = "*"
+petgraph = "0.6.5"
 #poasta = { path = "/Users/kiran/repositories/poasta" }
 #polars = "*"
 rand = "0.8.5"

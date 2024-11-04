@@ -1,4 +1,5 @@
 use anyhow::Result;
+use linked_hash_map::LinkedHashMap;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
@@ -24,6 +25,7 @@ use bio::alignment::distance::levenshtein;
 use crate::edges::Edges;
 use crate::link::Link;
 use crate::record::Record;
+use crate::wmec::WMECData;
 
 type KmerGraph = HashMap<Vec<u8>, Record>;
 type KmerScores = HashMap<Vec<u8>, f32>;
@@ -330,10 +332,10 @@ impl LdBG {
         let rc_kmer_vec = fw_kmer.reverse_complement();
         let rc_kmer = rc_kmer_vec.as_bytes();
 
-        let (cn_kmer, can_prev_base, can_next_base) = if fw_kmer < rc_kmer {
-            (fw_kmer, fw_prev_base, fw_next_base)
+        let (cn_kmer, can_prev_base, can_next_base, is_forward) = if fw_kmer < rc_kmer {
+            (fw_kmer, fw_prev_base, fw_next_base, true)
         } else {
-            (rc_kmer, complement(fw_next_base), complement(fw_prev_base))
+            (rc_kmer, complement(fw_next_base), complement(fw_prev_base), false)
         };
 
         // If it's not already there, insert k-mer and empty record into k-mer map.
@@ -343,6 +345,13 @@ impl LdBG {
 
         // Increment the canonical k-mer's coverage.
         graph.get_mut(cn_kmer).unwrap().increment_coverage();
+
+        // Increment per-strand coverage.
+        if is_forward {
+            graph.get_mut(cn_kmer).unwrap().increment_fw_coverage();
+        } else {
+            graph.get_mut(cn_kmer).unwrap().increment_rc_coverage();
+        }
 
         // Set incoming edge for canonical k-mer.
         graph
@@ -1080,7 +1089,6 @@ impl LdBG {
     }
 
     fn try_connecting_segments(&self, segment1: &[u8], segment2: &[u8]) -> Result<(Vec<u8>, bool)> {
-        // let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len() - 2*self.kmer_size).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
         let start_kmers = segment1.windows(self.kmer_size).skip(segment1.len().saturating_sub(2*self.kmer_size)).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
         let end_kmers = segment2.windows(self.kmer_size).take(10).map(|kmer| kmer.to_vec()).collect::<HashSet<Vec<u8>>>();
 
@@ -1591,6 +1599,103 @@ impl LdBG {
         all_contigs
     }
 
+    /*
+    pub fn cluster_reads(&self, lr_seqs: &[Vec<u8>], sr_seqs: &[Vec<u8>]) {
+        let g = self.traverse_all_kmers();
+        let bubbles = find_all_superbubbles(&g);
+
+        let mut reads = vec![vec![None; bubbles.len()]; lr_seqs.len()];
+        let mut confidences = vec![vec![None; bubbles.len()]; lr_seqs.len()];
+
+        let cn_kmers: HashMap<Vec<u8>, Vec<usize>> = lr_seqs
+            .iter()
+            .enumerate()
+            .flat_map(|(read_index, seq)| {
+                seq.windows(self.kmer_size)
+                    .map(move |kmer| (crate::utils::canonicalize_kmer(kmer), read_index))
+            })
+            .fold(HashMap::new(), |mut acc, (kmer, read_idx)| {
+                acc.entry(kmer).or_default().push(read_idx);
+                acc
+            });
+
+        for (bubble_index, ((in_node, out_node), interior)) in bubbles.iter().enumerate() {
+            let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
+            let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
+
+            let mut path_info = paths_fwd.chain(paths_rev).map(|path| {
+                let path_kmers = path
+                    .iter()
+                    .map(|node| g.node_weight(*node).unwrap().as_bytes().to_vec())
+                    .map(|kmer| crate::utils::canonicalize_kmer(&kmer))
+                    .collect::<Vec<Vec<u8>>>();
+
+                let mut read_index_counts = HashMap::new();
+
+                let mut path_score = 1.0;
+                for kmer in &path_kmers {
+                    if let Some(read_indices) = cn_kmers.get(kmer) {
+                        for &read_index in read_indices {
+                            *read_index_counts.entry(read_index).or_insert(0) += 1;
+                        }
+                    }
+
+                    let cn_kmer = crate::utils::canonicalize_kmer(kmer);
+                    path_score *= self.scores.get(&cn_kmer).unwrap_or(&1.0);
+                }
+
+                path_score = path_score.powf(1.0 / path_kmers.len() as f32);
+                if path_score.is_nan() {
+                    path_score = 0.0;
+                }
+
+                let path_length = path_kmers.len();
+                let read_index_counts_filtered: BTreeMap<usize, i32> = read_index_counts.iter()
+                    .filter(|(_, &count)| count as f32 > 0.8 * path_length as f32)
+                    .map(|(&index, &count)| (index, count))
+                    .collect();
+
+                let read_indices = read_index_counts_filtered.keys().cloned().collect::<Vec<_>>();
+
+                (path_kmers, read_indices, path_score)
+            })
+            .collect::<Vec<_>>();
+
+            path_info.sort_by(|(_, _, score_a), (_, _, score_b)| score_b.partial_cmp(score_a).unwrap());
+
+            for (path_index, (path_kmers, read_indices, path_score)) in path_info.iter().take(2).enumerate() {
+                let mut allele = String::new();
+                for path_kmer in path_kmers {
+                    let kmer = std::str::from_utf8(path_kmer).unwrap();
+                    if allele.is_empty() {
+                        allele.push_str(kmer);
+                    } else {
+                        allele.push_str(&kmer.chars().last().unwrap().to_string());
+                    }
+                }
+
+                let path_qual = (-10.0 * (1.0 - path_score).log10()) as u32;
+
+                // crate::elog!("[{} {}]: {:.3} {} {} {:?}", bubble_index, path_index, path_score, path_qual, allele, read_indices);
+
+                for read_index in read_indices {
+                    reads[*read_index][bubble_index] = Some(path_index as u8);
+                    confidences[*read_index][bubble_index] = Some(path_qual);
+                }
+            }
+        }
+
+        let mat = WMECData::new(reads, confidences);
+
+        let (h1, h2) = crate::wmec::phase(&mat);
+
+        // mat.write_reads_matrix("reads.tsv").unwrap();
+
+        crate::elog!("Hap1: {:?}", h1);
+        crate::elog!("Hap2: {:?}", h2);
+    }
+    */
+
     /// Update links available to inform navigation during graph traversal.
     ///
     /// # Arguments
@@ -1656,15 +1761,16 @@ impl LdBG {
     }
 
     #[must_use]
-    pub fn clean(self, lenient_threshold: f32, strict_threshold: f32) -> Self {
+    pub fn clean(self, threshold: f32) -> Self {
         let kmer_size = self.kmer_size;
 
         self
-            .clean_tangles(0, 500, lenient_threshold)
-            .clean_tangles(1, 500, lenient_threshold)
-            .clean_tips(3*kmer_size, strict_threshold)
-            .clean_branches(strict_threshold)
-            .clean_superbubbles(1, strict_threshold)
+            .clean_tangles(0, 500, threshold)
+            .clean_tangles(1, 500, threshold)
+            .clean_tips(3*kmer_size, threshold)
+            .clean_branches(threshold)
+            .clean_superbubbles(1, threshold)
+            .clean_branches(threshold)
             .clean_contigs(100)
     }
 
@@ -2007,8 +2113,7 @@ impl LdBG {
             let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
             let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
 
-            let mut paths = paths_fwd
-                .chain(paths_rev)
+            let mut paths = paths_fwd.chain(paths_rev)
                 .map(|path| {
                     let score = path.iter()
                         .map(|node| {
@@ -2041,6 +2146,7 @@ impl LdBG {
             paths.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
             let good_paths = paths.iter().take(2).collect::<Vec<_>>();
+            // let good_paths = paths.iter().take(1).chain(paths.iter().skip(1).filter(|path| path.1 > min_score).take(1)).collect::<Vec<_>>();
             let bad_paths = paths.iter().filter(|path| !good_paths.contains(path)).collect::<Vec<_>>();
 
             let to_keep = good_paths
@@ -2815,8 +2921,8 @@ pub fn find_superbubble(graph: &DiGraph<String, f32>, s: NodeIndex, direction: p
 }
 
 #[must_use]
-pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> HashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
-    let mut bubbles = HashMap::new();
+pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
+    let mut bubbles = LinkedHashMap::new();
 
     let mut visited: HashSet<NodeIndex> = HashSet::new();
     for n in graph.node_indices() {

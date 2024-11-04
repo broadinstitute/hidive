@@ -1,7 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
+use needletail::Sequence;
+use petgraph::graph::NodeIndex;
 use rayon::prelude::*;
 use indicatif::ParallelProgressIterator;
 
@@ -41,90 +44,231 @@ pub fn start(
     let m = MLdBG::from_ldbgs(vec![l1, s1])
         .score_kmers(model_path)
         .collapse()
-        .clean(0.2, 0.01)
+        .clean(0.1)
         .build_links(&all_lr_seqs, true);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
-    let all_seqs = all_lr_seqs.iter().chain(all_sr_seqs.iter()).cloned().collect::<Vec<Vec<u8>>>();
+    skydive::elog!("Correcting reads...");
+    let corrected_lr_seqs = correct_reads(&m, &all_lr_seqs);
 
-    let progress_bar = skydive::utils::default_bounded_progress_bar("Correcting reads", all_seqs.len() as u64);
+    skydive::elog!("Clustering reads...");
+    let (reads_hap1, reads_hap2) = cluster_reads(&m, &corrected_lr_seqs);
 
+    skydive::elog!("Assembling haplotype 1...");
+    let asm1 = assemble_haplotype(&all_ref_seqs, &reads_hap1);
+
+    skydive::elog!("Assembling haplotype 2...");
+    let asm2 = assemble_haplotype(&all_ref_seqs, &reads_hap2);
+
+    let mut output = File::create(output).expect("Failed to create output file");
+    writeln!(output, ">hap1").expect("Failed to write to output file");
+    writeln!(output, "{}", asm1).expect("Failed to write to output file");
+    writeln!(output, ">hap2").expect("Failed to write to output file");
+    writeln!(output, "{}", asm2).expect("Failed to write to output file");
+}
+
+fn assemble_haplotype(ref_seqs: &Vec<Vec<u8>>, reads: &Vec<Vec<u8>>) -> String {
+    let mut sg = spoa::Graph::new();
+
+    let oriented_reads = orient_reads(ref_seqs, reads);
+
+    let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
+    oriented_reads.iter().filter(|read| read.len() > 500).for_each(|lr_seq| {
+        let seq = lr_seq.clone();
+        let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
+        let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
+
+        let a = la.align(seq_cstr.as_ref(), &sg);
+        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+    });
+
+    let consensus_cstr = sg.consensus();
+
+    consensus_cstr.to_str().unwrap().to_string()
+}
+
+fn orient_reads(ref_seqs: &Vec<Vec<u8>>, reads: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+    let mut ref_kmers = HashSet::new();
+    for ref_seq in ref_seqs {
+        for kmer in ref_seq.windows(17) {
+            ref_kmers.insert(kmer);
+        }
+    }
+
+    let mut sorted_reads = reads.clone();
+    sorted_reads.sort_by(|a, b| b.len().cmp(&a.len()));
+
+    let mut oriented_reads = Vec::new();
+
+    for i in 0..sorted_reads.len() {
+        if oriented_reads.is_empty() {
+            oriented_reads.push(sorted_reads[i].clone());
+        } else {
+            let last_read_fw = oriented_reads[oriented_reads.len() - 1].clone();
+            let last_read_kmers = last_read_fw.windows(17).collect::<Vec<_>>();
+            // let last_read_kmers = &ref_kmers;
+
+            let this_read_fw = &sorted_reads[i];
+            let this_read_rc = this_read_fw.reverse_complement();
+
+            let fw_overlaps = this_read_fw.windows(17).filter(|kmer| last_read_kmers.contains(kmer)).count();
+            let rc_overlaps = this_read_rc.windows(17).filter(|kmer| last_read_kmers.contains(kmer)).count();
+
+            if fw_overlaps > rc_overlaps {
+                oriented_reads.push(this_read_fw.clone());
+            } else {
+                oriented_reads.push(this_read_rc);
+            }
+        }
+    }
+
+    oriented_reads
+}
+
+fn cluster_reads(l: &LdBG, all_seqs: &[Vec<u8>]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
+    let g = l.traverse_all_kmers();
+    let bubbles = skydive::ldbg::find_all_superbubbles(&g);
+
+    skydive::elog!("Found {} bubbles.", bubbles.len());
+
+    let lr_mat = assign_reads_to_bubbles(&bubbles, &all_seqs, l, &g);
+    let (h1, h2) = skydive::wmec::phase(&lr_mat);
+
+    let all_mat = assign_reads_to_bubbles(&bubbles, &all_seqs, l, &g);
+
+    let mut reads_hap1 = Vec::new();
+    let mut reads_hap2 = Vec::new();
+    for (read_index, read) in all_mat.reads.iter().enumerate() {
+        let read_u8 = read.iter().map(|x| if x.is_some() { x.unwrap() } else { 2 }).collect::<Vec<u8>>();
+
+        let mut h1_matches = 0;
+        let mut h2_matches = 0;
+        let mut total_valid = 0;
+
+        for (i, &allele) in read_u8.iter().enumerate() {
+            if allele == 0 || allele == 1 {
+                total_valid += 1;
+                if allele == h1[i] {
+                    h1_matches += 1;
+                }
+                if allele == h2[i] {
+                    h2_matches += 1;
+                }
+            }
+        }
+
+        let h1_similarity = if total_valid > 0 { h1_matches as f64 / total_valid as f64 } else { 0.0 };
+        let h2_similarity = if total_valid > 0 { h2_matches as f64 / total_valid as f64 } else { 0.0 };
+
+        if h1_similarity > 0.8 || h2_similarity > 0.8 {
+            if h1_similarity > h2_similarity {
+                reads_hap1.push(all_seqs[read_index].clone());
+            } else {
+                reads_hap2.push(all_seqs[read_index].clone());
+            }
+        }
+    }
+
+    (reads_hap1, reads_hap2)
+}
+
+fn assign_reads_to_bubbles(bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>>, lr_seqs: &[Vec<u8>], l: &LdBG, g: &petgraph::Graph<String, f32>) -> WMECData {
+    let mut reads = vec![vec![None; bubbles.len()]; lr_seqs.len()];
+    let mut confidences = vec![vec![None; bubbles.len()]; lr_seqs.len()];
+
+    let cn_kmers: HashMap<Vec<u8>, Vec<usize>> = lr_seqs
+        .iter()
+        .enumerate()
+        .flat_map(|(read_index, seq)| {
+            seq.windows(l.kmer_size)
+                .map(move |kmer| (skydive::utils::canonicalize_kmer(kmer), read_index))
+        })
+        .fold(HashMap::new(), |mut acc, (kmer, read_idx)| {
+            acc.entry(kmer).or_default().push(read_idx);
+            acc
+        });
+
+    for (bubble_index, ((in_node, out_node), interior)) in bubbles.iter().enumerate() {
+        let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
+        let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
+
+        let mut path_info = paths_fwd.chain(paths_rev).map(|path| {
+            let path_kmers = path
+                .iter()
+                .map(|node| g.node_weight(*node).unwrap().as_bytes().to_vec())
+                .map(|kmer| skydive::utils::canonicalize_kmer(&kmer))
+                .collect::<Vec<Vec<u8>>>();
+
+            let mut read_index_counts = HashMap::new();
+
+            let mut path_score = 1.0;
+            for kmer in &path_kmers {
+                if let Some(read_indices) = cn_kmers.get(kmer) {
+                    for &read_index in read_indices {
+                        *read_index_counts.entry(read_index).or_insert(0) += 1;
+                    }
+                }
+
+                let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
+                path_score *= l.scores.get(&cn_kmer).unwrap_or(&1.0);
+            }
+
+            path_score = path_score.powf(1.0 / path_kmers.len() as f32);
+            if path_score.is_nan() {
+                path_score = 0.0;
+            }
+
+            let path_length = path_kmers.len();
+            let read_index_counts_filtered: BTreeMap<usize, i32> = read_index_counts.iter()
+                .filter(|(_, &count)| count as f32 > 0.8 * path_length as f32)
+                .map(|(&index, &count)| (index, count))
+                .collect();
+
+            let read_indices = read_index_counts_filtered.keys().cloned().collect::<Vec<_>>();
+
+            (path_kmers, read_indices, path_score)
+        })
+        .collect::<Vec<_>>();
+
+        path_info.sort_by(|(_, _, score_a), (_, _, score_b)| score_b.partial_cmp(score_a).unwrap());
+
+        for (path_index, (path_kmers, read_indices, path_score)) in path_info.iter().take(2).enumerate() {
+            let mut allele = String::new();
+            for path_kmer in path_kmers {
+                let kmer = std::str::from_utf8(path_kmer).unwrap();
+                if allele.is_empty() {
+                    allele.push_str(kmer);
+                } else {
+                    allele.push_str(&kmer.chars().last().unwrap().to_string());
+                }
+            }
+
+            let path_qual = (-10.0 * (1.0 - path_score).log10()) as u32;
+
+            // crate::elog!("[{} {}]: {:.3} {} {} {:?}", bubble_index, path_index, path_score, path_qual, allele, read_indices);
+
+            for read_index in read_indices {
+                reads[*read_index][bubble_index] = Some(path_index as u8);
+                confidences[*read_index][bubble_index] = Some(path_qual);
+            }
+        }
+    }
+
+    let mat = WMECData::new(reads, confidences);
+
+    mat
+}
+
+fn correct_reads(m: &LdBG, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
     let corrected_seqs =
-        all_seqs
+        seqs
         .par_iter()
-        .progress_with(progress_bar)
         .map(|seq| m.correct_seq(seq))
         .flatten()
         .collect::<Vec<Vec<u8>>>();
 
-    let contigs = m.assemble_at_bubbles();
-
-    // let mut fa_file = File::create(&output).unwrap();
-    // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
-    //     let _ = writeln!(fa_file, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
-    //     println!("{}", String::from_utf8(contig.clone()).unwrap());
-    // }
-
-    skydive::elog!("Assembling diplotypes...");
-
-    // let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -10, -16, -12, -20, -8);
-    let mut la = spoa::AlignmentEngine::new(AlignmentType::kSW, 5, -4, -8, -6, -8, -4);
-    // let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
-
-    let mut sg = spoa::Graph::new();
-    for lr_seq in all_ref_seqs.iter().chain(corrected_seqs.iter()) {
-        let seq_cstr = std::ffi::CString::new(lr_seq.clone()).unwrap();
-        let seq_qual = std::ffi::CString::new(vec![b'I'; lr_seq.len()]).unwrap();
-        let a = la.align(seq_cstr.as_ref(), &sg);
-
-        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
-    }
-
-    let msa_cstrs = sg.multiple_sequence_alignment(false);
-    
-    let last_base_position = msa_cstrs[0].to_str().unwrap()
-        .chars()
-        .rev()
-        .position(|c| c == 'A' || c == 'C' || c == 'G' || c == 'T')
-        .map(|pos| msa_cstrs[0].to_str().unwrap().len() - 1 - pos)
-        .unwrap_or(0);
-    
-    let msa_strings = msa_cstrs
-        .iter()
-        .map(|cstr| cstr.to_str().unwrap().to_string())
-        .map(|msa_string| {
-            let trimmed_msa_string = msa_string.chars().take(last_base_position + 1).collect::<String>();
-            let leading_dashes = trimmed_msa_string.chars().take_while(|&c| c == '-').count();
-            let trailing_dashes = trimmed_msa_string.chars().rev().take_while(|&c| c == '-').count();
-            let middle = &trimmed_msa_string[leading_dashes..trimmed_msa_string.len() - trailing_dashes];
-            format!("{}{}{}", 
-                " ".repeat(leading_dashes), 
-                middle, 
-                " ".repeat(trailing_dashes)
-            )
-        })
-        .collect::<Vec<String>>();
-
-    for msa_string in &msa_strings {
-        println!("{}", msa_string);
-    }
-
-    let matrix = create_read_allele_matrix(&msa_strings.iter().skip(all_ref_seqs.len()).cloned().collect());
-    let wmec = create_wmec_matrix(&matrix);
-
-    let (h1, _) = skydive::wmec::phase(&wmec);
-    let (hap1, hap2) = create_fully_phased_haplotypes(&msa_strings.iter().skip(all_ref_seqs.len()).cloned().collect(), &h1);
-
-    let mut output = File::create(output).expect("Failed to create output file");
-    writeln!(output, ">hap1").expect("Failed to write to output file");
-    writeln!(output, "{}", hap1.replace("-", "")).expect("Failed to write to output file");
-    writeln!(output, ">hap2").expect("Failed to write to output file");
-    writeln!(output, "{}", hap2.replace("-", "")).expect("Failed to write to output file");
-
-    // for (i, contig) in corrected_seqs.iter().chain(contigs.iter()).enumerate() {
-    //     let _ = writeln!(output, ">contig_{}\n{}", i, String::from_utf8(contig.clone()).unwrap());
-    // }
+    corrected_seqs
 }
 
 fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (String, String) {

@@ -94,7 +94,7 @@ enum Commands {
         // test_split: f32,
 
         /// Number of training iterations.
-        #[clap(short, long, value_parser, default_value_t = 50)]
+        #[clap(short, long, value_parser, default_value_t = 200)]
         iterations: usize,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.

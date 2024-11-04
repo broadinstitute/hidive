@@ -81,11 +81,11 @@ pub fn start(
 
     // Configure GBDT.
     let mut cfg = Config::new();
-    cfg.set_feature_size(7);
+    cfg.set_feature_size(6);
     cfg.set_max_depth(4);
-    cfg.set_min_leaf_size(1);
+    cfg.set_min_leaf_size(5);
     cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
-    cfg.set_shrinkage(0.1);
+    cfg.set_shrinkage(0.05);
     cfg.set_iterations(iterations);
     cfg.set_debug(debug);
 
@@ -211,6 +211,7 @@ pub fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> Has
 
     distances
 }
+
 pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<u8>>{
     let mut all_seqs: Vec<Vec<u8>> = Vec::new();
     for read_seq_url in read_seq_urls {
@@ -342,8 +343,8 @@ pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_thres
 
     (precision, recall, f1_score)
 }
-/// Creates a dataset for the ML model.
 
+/// Creates a dataset for the ML model.
 pub fn create_dataset_for_model(
     kmers: Chain<Chain<Keys<Vec<u8>, Record>, Keys<Vec<u8>, Record>>, Keys<Vec<u8>, Record>>,
     lr_distances: &HashMap<Vec<u8>, usize>,
@@ -359,25 +360,43 @@ pub fn create_dataset_for_model(
         let compressed_len_diff = (kmer.len() - compressed_len) as f32;
         let entropy = skydive::utils::shannon_entropy(kmer);
         let gc_content = skydive::utils::gc_content(kmer);
-        let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
-        let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
+        // let lr_distance = *lr_distances.get(kmer).unwrap_or(&0) as f32;
+        // let sr_distance = *sr_distances.get(kmer).unwrap_or(&0) as f32;
 
         let lcov = l1.kmers.get(kmer).map_or(0, |lr| lr.coverage());
-        let scov = s1.kmers.get(kmer).map_or(0, |sr| sr.coverage());
+
+        let scov_fw = s1.kmers.get(kmer).map_or(0, |sr| sr.fw_coverage());
+        let scov_rc = s1.kmers.get(kmer).map_or(0, |sr| sr.rc_coverage());
+        let scov_total = scov_fw + scov_rc;
+        let strand_ratio = if scov_total > 0 {
+            (scov_fw as f32).max(scov_rc as f32) / scov_total as f32
+        } else {
+            0.5
+        };
+
+        // let expected = (scov_fw + scov_rc) as f32 / 2.0;
+        // let chi_square = if expected > 0.0 {
+        //     ((scov_fw as f32 - expected).powi(2) + 
+        //     (scov_rc as f32 - expected).powi(2)) / expected
+        // } else {
+        //     0.0
+        // };
+
         let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
 
         let data = Data::new_training_data(
             vec![
-                if lcov > 0 { 1.0 } else { 0.0 },
-                scov as f32,
-                compressed_len_diff,
-                entropy,
-                gc_content,
-                lr_distance,
-                sr_distance,
+                if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
+                scov_total as f32,                   // coverage in short reads
+                strand_ratio as f32,                 // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+                compressed_len_diff,                 // homopolymer compression length difference
+                entropy,                             // shannon entropy
+                gc_content,                          // gc content
+                // lr_distance,                         // distance to nearest long read contig end
+                // sr_distance,                         // distance to nearest short read contig end
             ],
             1.0,
-            if tcov > 0 { 1.0 } else { 0.0 },
+            if tcov > 0 { 1.0 } else { 0.0 }, // present in truth
             None,
         );
 

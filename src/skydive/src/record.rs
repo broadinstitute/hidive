@@ -6,6 +6,8 @@ use crate::edges::Edges;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     coverage: u16,
+    cov_fw: u16,
+    cov_rc: u16,
     edges: Edges,
 }
 
@@ -15,6 +17,8 @@ impl Record {
     pub fn new(coverage: u16, edges: Option<Edges>) -> Self {
         Record {
             coverage,
+            cov_fw: 0,
+            cov_rc: 0,
             edges: edges.unwrap_or(Edges::empty()),
         }
     }
@@ -31,6 +35,18 @@ impl Record {
     #[must_use]
     pub fn coverage(&self) -> u16 {
         self.coverage
+    }
+
+    /// Return the Record's forward coverage.
+    #[must_use]
+    pub fn fw_coverage(&self) -> u16 {
+        self.cov_fw
+    }
+
+    /// Return the Record's reverse complement coverage.
+    #[must_use]
+    pub fn rc_coverage(&self) -> u16 {
+        self.cov_rc
     }
 
     // Return all edges.
@@ -84,6 +100,16 @@ impl Record {
     /// Increment the coverage value by 1.
     pub fn increment_coverage(&mut self) {
         self.coverage = self.coverage.saturating_add(1);
+    }
+
+    /// Increment the forward coverage value by 1.
+    pub fn increment_fw_coverage(&mut self) {
+        self.cov_fw = self.cov_fw.saturating_add(1);
+    }
+
+    /// Increment the reverse complement coverage value by 1.
+    pub fn increment_rc_coverage(&mut self) {
+        self.cov_rc = self.cov_rc.saturating_add(1);
     }
 
     /// Set the coverage value.

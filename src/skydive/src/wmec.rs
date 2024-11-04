@@ -7,6 +7,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use std::fs::File;
+use std::io::Write;
+
 #[derive(Debug)]
 pub struct WMECData {
     pub reads: Vec<Vec<Option<u8>>>,        // Reads matrix where None represents missing data
@@ -56,6 +59,33 @@ impl WMECData {
         // Alternatively, under the all heterozygous assumption, where one wants to enforce all SNPs
         // to be heterozygous, the equation becomes:
         // std::cmp::min(w0_r + w1_r, w0_s + w1_s)
+    }
+
+    // Write reads matrix to a file in tab-separated format
+    pub fn write_reads_matrix(&self, path: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+
+        // Write header row with SNP positions
+        for j in 0..self.num_snps {
+            write!(file, "\tSNP_{}", j)?;
+        }
+        writeln!(file)?;
+
+        // Write each read's data
+        for (i, read) in self.reads.iter().enumerate() {
+            write!(file, "Read_{}", i)?;
+            for allele in read {
+                if let Some(allele) = allele {
+                    if *allele == 0 { write!(file, "\t0")? };
+                    if *allele == 1 { write!(file, "\t1")? };
+                } else {
+                    write!(file, "\t-")?;
+                }
+            }
+            writeln!(file)?;
+        }
+
+        Ok(())
     }
 }
 
