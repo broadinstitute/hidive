@@ -157,24 +157,63 @@ impl MLdBG {
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
+        // let lr_contigs = self.ldbgs[0].assemble_all();
+        // let lr_distances = Self::distance_to_a_contig_end(&lr_contigs, self.kmer_size);
+
+        // let sr_contigs = self.ldbgs[1].assemble_all();
+        // let sr_distances = Self::distance_to_a_contig_end(&sr_contigs, self.kmer_size);
+
         self.scores = self.union_of_kmers().iter().map(|cn_kmer| {
-            let mut features = vec![];
-
-            for ldbg in &self.ldbgs {
-                let cov = ldbg.kmers.get(cn_kmer).map_or(0, |record| record.coverage());
-                features.push(cov as f32);
-            }
-
             let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
-            features.push(compressed_len as f32);
+            let compressed_len_diff = (cn_kmer.len() - compressed_len) as f32;
+            let entropy = crate::utils::shannon_entropy(cn_kmer);
+            let gc_content = crate::utils::gc_content(cn_kmer);
+            // let lr_distance = *lr_distances.get(cn_kmer).unwrap_or(&0) as f32;
+            // let sr_distance = *sr_distances.get(cn_kmer).unwrap_or(&0) as f32;
 
-            let data = Data::new_test_data(features, Some(0.0));
+            let lcov = self.ldbgs[0].kmers.get(cn_kmer).map_or(0, |record| record.coverage());
+
+            let scov_fw = self.ldbgs[1].kmers.get(cn_kmer).map_or(0, |sr| sr.fw_coverage());
+            let scov_rc = self.ldbgs[1].kmers.get(cn_kmer).map_or(0, |sr| sr.rc_coverage());
+            let scov_total = scov_fw + scov_rc;
+            let strand_ratio = if scov_total > 0 {
+                (scov_fw as f32).max(scov_rc as f32) / scov_total as f32
+            } else {
+                0.5
+            };
+
+            let features = vec![
+                if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
+                scov_total as f32,                   // coverage in short reads
+                strand_ratio as f32,                 // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+                compressed_len_diff,                 // homopolymer compression length difference
+                entropy,                             // shannon entropy
+                gc_content,                          // gc content
+                // lr_distance,                         // distance to nearest long read contig end
+                // sr_distance,                         // distance to nearest short read contig end
+            ];
+
+            let data = Data::new_test_data(features, None);
             let prediction = *gbdt.predict(&vec![data]).first().unwrap_or(&0.0);
 
             (cn_kmer.clone(), prediction)
         }).collect();
 
         self
+    }
+
+    fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
+        let mut distances = HashMap::new();
+
+        for contig in contigs {
+            for (distance_from_start, cn_kmer) in contig.windows(kmer_size).map(crate::utils::canonicalize_kmer).enumerate() {
+                let distance_from_end = contig.len() - distance_from_start - kmer_size;
+
+                distances.insert(cn_kmer, if distance_from_start < distance_from_end { distance_from_start } else { distance_from_end });
+            }
+        }
+
+        distances
     }
 
     pub fn collapse(&mut self) -> LdBG {
