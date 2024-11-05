@@ -28,6 +28,7 @@ pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
+    search_all: bool,
     ref_path: Option<PathBuf>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
@@ -109,7 +110,11 @@ pub fn start(
 
         for (contig, interval) in &fetches {
             let fetch_definition = if contig != "*" {
-                FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
+                if search_all {
+                    FetchDefinition::String(contig.as_bytes())
+                } else {
+                    FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
+                }
             } else {
                 FetchDefinition::Unmapped
             };
