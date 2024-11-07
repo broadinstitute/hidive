@@ -132,12 +132,14 @@ pub fn start(
                     // Increment progress counters and update the progress bar every once in a while.
                     let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
                     if current_processed % UPDATE_FREQUENCY == 0 {
+                        let unknown_chrom = "Unknown".to_string();
+                        let chrom_name = tid_to_chrom
+                            .get(&read.tid())
+                            .unwrap_or(&unknown_chrom);  // Use `&unknown_chrom` as the fallback reference
                         progress_bar.set_message(format!(
                             "Searching for similar reads ({} found, most recent at {}:{})",
-                            found_items
-                                .load(Ordering::Relaxed)
-                                .to_formatted_string(&Locale::en),
-                            tid_to_chrom.get(&read.tid()).unwrap(),
+                            found_items.load(Ordering::Relaxed).to_formatted_string(&Locale::en),
+                            chrom_name,
                             read.reference_start().to_formatted_string(&Locale::en)
                         ));
                         progress_bar.inc(UPDATE_FREQUENCY as u64);
