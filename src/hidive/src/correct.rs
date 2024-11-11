@@ -36,14 +36,10 @@ pub fn start(
         .score_kmers(model_path)
         .collapse()
         .clean(0.1)
-        // .build_links(&all_lr_seqs, true)
-        ;
+        .build_links(&all_lr_seqs, false);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
-    // let seq = b"TGCACTCAGAACTGCCACTGGGTCGTGGTGTTAAGCCCAGGAGGGGTGCATATGTTGAACAACCTTGTATTGCTTAGTTGCTGAG";
-
-    // let corrected_seqs = m.correct_seqs(&vec![seq.to_vec()]);
     let corrected_seqs = m.correct_seqs(&all_lr_seqs);
 
     let mut fa_file = File::create(output).unwrap();
