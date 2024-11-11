@@ -423,6 +423,7 @@
 <a href="#423" id="423">423</a>
 <a href="#424" id="424">424</a>
 <a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{BTreeMap, HashMap, HashSet};
 <span class="kw">use </span>std::{fs::File, path::PathBuf, io::Write};
 
@@ -686,14 +687,15 @@
 }
 
 <span class="kw">fn </span>correct_reads(m: <span class="kw-2">&amp;</span>LdBG, seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+    <span class="kw">let </span>g = m.traverse_all_kmers();
     <span class="kw">let </span>corrected_seqs =
         seqs
-        .par_iter()
-        .map(|seq| m.correct_seq(seq))
-        .flatten()
-        .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;();
+            .par_iter()
+            .map(|seq| m.correct_seq(<span class="kw-2">&amp;</span>g, seq))
+            .flatten()
+            .collect::&lt;Vec&lt;u8&gt;&gt;();
 
-    corrected_seqs
+    <span class="macro">vec!</span>[corrected_seqs]
 }
 
 <span class="kw">fn </span>create_fully_phased_haplotypes(lr_msas: <span class="kw-2">&amp;</span>Vec&lt;String&gt;, h1: <span class="kw-2">&amp;</span>Vec&lt;u8&gt;) -&gt; (String, String) {
