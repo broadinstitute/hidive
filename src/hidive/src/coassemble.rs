@@ -261,14 +261,15 @@ fn assign_reads_to_bubbles(bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<N
 }
 
 fn correct_reads(m: &LdBG, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+    let g = m.traverse_all_kmers();
     let corrected_seqs =
         seqs
-        .par_iter()
-        .map(|seq| m.correct_seq(seq))
-        .flatten()
-        .collect::<Vec<Vec<u8>>>();
+            .par_iter()
+            .map(|seq| m.correct_seq(&g, seq))
+            .flatten()
+            .collect::<Vec<u8>>();
 
-    corrected_seqs
+    vec![corrected_seqs]
 }
 
 fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (String, String) {
