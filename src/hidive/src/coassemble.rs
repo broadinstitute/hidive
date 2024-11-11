@@ -45,12 +45,12 @@ pub fn start(
         .score_kmers(model_path)
         .collapse()
         .clean(0.1)
-        .build_links(&all_lr_seqs, true);
+        .build_links(&all_lr_seqs, false);
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
     skydive::elog!("Correcting reads...");
-    let corrected_lr_seqs = correct_reads(&m, &all_lr_seqs);
+    let corrected_lr_seqs = m.correct_seqs(&all_lr_seqs);
 
     skydive::elog!("Clustering reads...");
     let (reads_hap1, reads_hap2) = cluster_reads(&m, &corrected_lr_seqs);
@@ -258,18 +258,6 @@ fn assign_reads_to_bubbles(bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<N
     let mat = WMECData::new(reads, confidences);
 
     mat
-}
-
-fn correct_reads(m: &LdBG, seqs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
-    let g = m.traverse_all_kmers();
-    let corrected_seqs =
-        seqs
-            .par_iter()
-            .map(|seq| m.correct_seq(&g, seq))
-            .flatten()
-            .collect::<Vec<u8>>();
-
-    vec![corrected_seqs]
 }
 
 fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (String, String) {

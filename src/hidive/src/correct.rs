@@ -40,6 +40,7 @@ pub fn start(
 
     skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
 
+    skydive::elog!("Correcting reads...");
     let corrected_seqs = m.correct_seqs(&all_lr_seqs);
 
     let mut fa_file = File::create(output).unwrap();
