@@ -67,6 +67,8 @@ pub fn start(
 
             let source = if sources.len() == 1 { sources[0] } else { 2 };
 
+            // let in_read = a_kmers.contains_key(&cn_kmer);
+
             writeln!(
                 csv_file,
                 "{},{},{}",
