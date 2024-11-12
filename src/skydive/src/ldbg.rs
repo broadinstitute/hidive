@@ -33,6 +33,7 @@ type KmerGraph = HashMap<Vec<u8>, Record>;
 type KmerScores = HashMap<Vec<u8>, f32>;
 type Links = HashMap<Vec<u8>, HashMap<Link, u16>>;
 type Sources = HashMap<Vec<u8>, Vec<usize>>;
+type KmerNoise = HashSet<Vec<u8>>;
 
 /// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 #[derive(Debug, Clone)]
@@ -43,6 +44,7 @@ pub struct LdBG {
     pub scores: KmerScores,
     pub links: Links,
     pub sources: Sources,
+    pub noise: KmerNoise,
     pub verbose: bool,
 }
 
@@ -56,6 +58,7 @@ impl LdBG {
             scores: KmerScores::new(),
             links: Links::new(),
             sources: Sources::new(),
+            noise: KmerNoise::new(),
             verbose: false,
         }
     }
@@ -93,6 +96,7 @@ impl LdBG {
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
         let sources: Sources = Sources::new();
+        let noise: KmerNoise = Self::find_noise(&fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -101,6 +105,7 @@ impl LdBG {
             scores,
             links,
             sources,
+            noise,
             verbose: false,
         }
     }
@@ -139,6 +144,7 @@ impl LdBG {
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
         let sources: Sources = Sources::new();
+        let noise: KmerNoise = Self::find_noise(&fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -147,6 +153,7 @@ impl LdBG {
             scores,
             links,
             sources,
+            noise,
             verbose: false,
         }
     }
@@ -174,6 +181,7 @@ impl LdBG {
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
         let sources: Sources = Sources::new();
+        let noise: KmerNoise = Self::find_noise(&fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -182,6 +190,7 @@ impl LdBG {
             scores,
             links,
             sources,
+            noise,
             verbose: false,
         }
     }
@@ -207,6 +216,7 @@ impl LdBG {
         let scores: KmerScores = kmers.keys().map(|k| (k.clone(), 1.0)).collect();
         let links: Links = Links::new();
         let sources: Sources = Sources::new();
+        let noise: KmerNoise = Self::find_noise(&fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -215,6 +225,7 @@ impl LdBG {
             scores,
             links,
             sources,
+            noise,
             verbose: false,
         }
     }
@@ -233,6 +244,38 @@ impl LdBG {
     pub fn verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
+    }
+
+    fn find_noise(fwd_seqs: &Vec<Vec<u8>>, kmer_size: usize) -> HashSet<Vec<u8>> {
+        let mut noise: KmerNoise = KmerNoise::new();
+
+        for seq in fwd_seqs {
+            let mut kmer_positions = HashMap::new();
+            for (i, fw_kmer) in seq.windows(kmer_size).enumerate() {
+                let cn_kmer = crate::utils::canonicalize_kmer(fw_kmer);
+                kmer_positions.entry(cn_kmer)
+                    .or_insert_with(Vec::new)
+                    .push(i);
+            }
+
+            for (cn_kmer, positions) in kmer_positions {
+                if positions.len() > 1 {
+                    noise.insert(cn_kmer);
+                }
+            }
+
+            for range in sdust::symmetric_dust(seq) {
+                if range.len() >= 1 {
+                    for fw_kmer in seq[range.start..range.end].windows(kmer_size) {
+                        let cn_kmer = crate::utils::canonicalize_kmer(fw_kmer);
+
+                        noise.insert(cn_kmer);
+                    }
+                }
+            }
+        }
+
+        noise
     }
 
     /// Build a de Bruijn graph from a vector of sequences.
@@ -1946,6 +1989,7 @@ impl LdBG {
         let kmer_size = self.kmer_size;
 
         self
+            .clean_hairballs()
             .clean_tangles(0, 500, threshold)
             .clean_tangles(1, 500, threshold)
             .clean_tips(3*kmer_size, threshold)
@@ -2189,6 +2233,20 @@ impl LdBG {
         }
 
         crate::elog!(" -- Removed {} tangles in color {} ({} kmers)", bad_tangles, color, to_remove.len());
+
+        self.infer_edges();
+
+        self
+    }
+
+    #[must_use]
+    pub fn clean_hairballs(mut self) -> Self {
+        for cn_kmer in self.noise.iter() {
+            self.kmers.remove(cn_kmer);
+            self.scores.remove(cn_kmer);
+        }
+
+        crate::elog!(" -- Removed repetitive noise ({} kmers)", self.noise.len());
 
         self.infer_edges();
 

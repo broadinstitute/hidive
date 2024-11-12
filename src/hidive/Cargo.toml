@@ -40,6 +40,7 @@ rayon = "1.10.0"
 #russcip = "0.3.4"
 rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
 # rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
+sdust = "=0.1.0"
 serde = "1.0.204"
 serde_json = "1.0.120"
 spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}

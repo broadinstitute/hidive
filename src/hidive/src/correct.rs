@@ -58,24 +58,26 @@ pub fn start(
         let csv_output = gfa_output.with_extension("csv");
         let mut csv_file = File::create(&csv_output).unwrap();
 
-        writeln!(csv_file, "node,label,kmer").unwrap();
+        writeln!(csv_file, "node,label,kmer,cov,entropy").unwrap();
 
         for (node_index, node_label) in g.node_indices().zip(g.node_weights()) {
             let kmer = node_label.as_bytes();
             let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
             let score = (100.0 * *m.scores.get(&cn_kmer).unwrap_or(&0.0)) as u32;
+            let cov = if m.kmers.contains_key(&cn_kmer) { m.kmers.get(&cn_kmer).unwrap().coverage() } else { 0 };
+            let entropy = skydive::utils::shannon_entropy(kmer);
             let sources = m.sources.get(&cn_kmer).unwrap_or(&vec![]).clone();
 
             let source = if sources.len() == 1 { sources[0] } else { 2 };
 
-            // let in_read = a_kmers.contains_key(&cn_kmer);
-
             writeln!(
                 csv_file,
-                "{},{},{}",
+                "{},{},{},{},{}",
                 node_index.index(),
                 format!("{} ({})", source, score),
                 node_label,
+                cov,
+                entropy,
             )
             .unwrap();
         }
