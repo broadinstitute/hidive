@@ -14,12 +14,13 @@ use minimap2::{Aligner, Mapping};
 use needletail::Sequence;
 use num_format::{Locale, ToFormattedString};
 
+use indicatif::ProgressBar;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 
 use rust_htslib::bam::ext::BamRecordExtensions;
-use rust_htslib::bam::{FetchDefinition, Read};
+use rust_htslib::bam::{FetchDefinition, IndexedReader, Read, Record as BamRecord};
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -108,85 +109,19 @@ pub fn start(
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect::<HashMap<_, _>>());
 
-        for (contig, interval) in &fetches {
-            let fetch_definition = if contig != "*" {
-                if search_all {
-                    FetchDefinition::String(contig.as_bytes())
-                } else {
-                    FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
-                }
-            } else {
-                FetchDefinition::Unmapped
-            };
-
-            // Iterate over the records in parallel.
-            reader
-                .fetch(fetch_definition)
-                .expect("Failed to fetch reads");
-
-            let records: Vec<_> = reader
-                .records()
-                .par_bridge()
-                .flat_map(|record| record.ok())
-                .filter_map(|read| {
-                    // Increment progress counters and update the progress bar every once in a while.
-                    let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
-                    if current_processed % UPDATE_FREQUENCY == 0 {
-                        let unknown_chrom = "Unknown".to_string();
-                        let chrom_name = tid_to_chrom
-                            .get(&read.tid())
-                            .unwrap_or(&unknown_chrom);  // Use `&unknown_chrom` as the fallback reference
-                        progress_bar.set_message(format!(
-                            "Searching for similar reads ({} found, most recent at {}:{})",
-                            found_items.load(Ordering::Relaxed).to_formatted_string(&Locale::en),
-                            chrom_name,
-                            read.reference_start().to_formatted_string(&Locale::en)
-                        ));
-                        progress_bar.inc(UPDATE_FREQUENCY as u64);
-                    }
-
-                    // Count the number of k-mers found in our hashset from the long reads.
-                    // let read_seq = if read.is_reverse() { read.seq().as_bytes().reverse_complement() } else { read.seq().as_bytes() };
-                    let read_seq = read.seq().as_bytes();
-                    let rl_seq = skydive::utils::homopolymer_compressed(&read_seq);
-
-                    let num_kmers = rl_seq
-                        .par_windows(kmer_size)
-                        .map(|kmer| kmer_set.contains(&skydive::utils::canonicalize_kmer(kmer)))
-                        .filter(|&contains| contains)
-                        .count();
-
-                    // If the number of k-mers found is greater than the threshold, add the read to the list of similar reads.
-                    if num_kmers as f32 / rl_seq.len() as f32 > min_kmers_pct as f32 / 100.0 {
-                        let current_found = found_items.fetch_add(1, Ordering::Relaxed);
-                        if current_found % UPDATE_FREQUENCY == 0 {
-                            progress_bar.set_message(format!(
-                                "Searching for similar reads ({} found, most recent at {}:{})",
-                                (current_found + 1).to_formatted_string(&Locale::en),
-                                tid_to_chrom.get(&read.tid()).unwrap(),
-                                read.reference_start().to_formatted_string(&Locale::en)
-                            ));
-                        }
-                        Some(read)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            // Final update to ensure the last counts are displayed
-            let final_found = found_items.load(Ordering::Relaxed);
-            let final_processed = processed_items.load(Ordering::Relaxed);
-            progress_bar.set_message(format!(
-                "Found {} reads in {} reads total.",
-                final_found.to_formatted_string(&Locale::en),
-                final_processed.to_formatted_string(&Locale::en)
-            ));
-            progress_bar.finish();
-
-            // Add the reads to the list of all records.
-            all_records.extend(records);
-        }
+        process_fetches(
+            &fetches,
+            &mut reader,
+            kmer_size,
+            min_kmers_pct,
+            search_all,
+            &kmer_set,
+            &tid_to_chrom,
+            &progress_bar,
+            &found_items,
+            &processed_items,
+            &mut all_records,
+        );
     }
 
     let file = File::create(output).expect("Could not open file for writing.");
@@ -220,6 +155,12 @@ pub fn start(
         std::process::exit(1);
     }
 }
+
+//////////////////////////////////////////////////////////////////
+//// detect_relevant_loci and its helper functions
+////
+//////////////////////////////////////////////////////////////////
+
 
 /// This function detects the relevant loci in the reference genome.
 ///
@@ -424,4 +365,195 @@ fn merge_overlapping_intervals(
     }
 }
 
+////////////////////////////////////////////////////////////////
+//// process_fetches and its helper functions
+////
+////////////////////////////////////////////////////////////////
 
+/// This function processes the fetches and searches for similar reads.
+///
+/// # Arguments
+/// - `fetches` - The fetches to process.
+/// - `reader` - The reader to use for fetching reads.
+/// - `kmer_size` - The size of the k-mers to search for.
+/// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
+/// - `search_all` - Whether to search all reads or not.
+/// - `kmer_set` - The set of k-mers to search for.
+/// - `tid_to_chrom` - The mapping of TID to chromosome name.
+/// - `progress_bar` - The progress bar to update.
+/// - `found_items` - The number of found items.
+/// - `processed_items` - The number of processed items.
+/// - `all_records` - The vector of all records.
+///
+fn process_fetches(
+    fetches: &[(String, Interval<i32>)],
+    reader: &mut IndexedReader,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    search_all: bool,
+    kmer_set: &HashSet<Vec<u8>>,
+    tid_to_chrom: &HashMap<i32, String>,
+    progress_bar: &Arc<ProgressBar>,
+    found_items: &Arc<AtomicUsize>,
+    processed_items: &Arc<AtomicUsize>,
+    all_records: &mut Vec<BamRecord>,
+) {
+    const UPDATE_FREQUENCY: usize = 1_000_000;
+
+    let fetches_updated = prepare_fetches(fetches, search_all);
+
+    for (contig, interval) in fetches_updated {
+        let fetch_definition = create_fetch_definition(&contig, interval, search_all);
+        reader.fetch(fetch_definition).expect("Failed to fetch reads");
+
+        let records: Vec<_> = reader.records()
+            .par_bridge()
+            .flat_map(|record| record.ok())
+            .filter_map(|read| {
+                update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+
+                if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
+                    update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+                    Some(read)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        all_records.extend(records);
+    }
+
+    finalize_progress(progress_bar, found_items, processed_items);
+}
+
+/// This function prepares the fetches for searching.
+///
+/// # Arguments
+/// - `fetches` - The fetches to prepare.
+/// - `search_all` - Whether to search all reads or not.
+///
+/// # Returns
+/// A vector of fetches to search.
+///
+/// # Panics
+/// If the contig is not valid.
+fn prepare_fetches(fetches: &[(String, Interval<i32>)], search_all: bool) -> Vec<(String, Interval<i32>)> {
+    if search_all {
+        let uniq_contigs: HashSet<_> = fetches.iter().map(|(contig, _)| contig.clone()).collect();
+        uniq_contigs.into_iter().map(|contig| (contig, Interval::new(0..1).unwrap())).collect()
+    } else {
+        fetches.iter()
+            .map(|(contig, interval)| (contig.clone(), interval.clone()))
+            .collect()
+    }
+}
+
+
+/// This function creates a fetch definition.
+///
+/// # Arguments
+/// - `contig` - The contig to fetch.
+/// - `interval` - The interval to fetch.
+/// - `search_all` - Whether to search all reads or not.
+///
+/// # Returns
+/// A fetch definition.
+fn create_fetch_definition(contig: &String, interval: Interval<i32>, search_all: bool) -> FetchDefinition {
+    if contig != "*" {
+        if search_all {
+            FetchDefinition::String(contig.as_bytes())
+        } else {
+            FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
+        }
+    } else {
+        FetchDefinition::Unmapped
+    }
+}
+
+/// This function updates the processed progress.
+///
+/// # Arguments
+/// - `processed_items` - The number of processed items.
+/// - `update_freq` - The update frequency.
+/// - `tid_to_chrom` - The mapping of TID to chromosome name.
+/// - `read` - The read to process.
+/// - `progress_bar` - The progress bar to update.
+///
+/// # Panics
+/// If the chromosome name is not found in the mapping.
+fn update_processed_progress(processed_items: &Arc<AtomicUsize>, update_freq: usize, tid_to_chrom: &HashMap<i32, String>, read: &BamRecord, progress_bar: &Arc<ProgressBar>) {
+    let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
+    if current_processed % update_freq == 0 {
+        let unknown_chrom = "Unknown".to_string();
+        let chrom_name = tid_to_chrom.get(&read.tid()).unwrap_or(&unknown_chrom);
+        progress_bar.set_message(format!(
+            "Searching for similar reads ({} processed, most recent at {}:{})",
+            current_processed.to_formatted_string(&Locale::en),
+            chrom_name,
+            read.reference_start().to_formatted_string(&Locale::en)
+        ));
+        progress_bar.inc(update_freq as u64);
+    }
+}
+
+/// This function updates the found progress.
+///
+/// # Arguments
+/// - `found_items` - The number of found items.
+/// - `update_freq` - The update frequency.
+/// - `tid_to_chrom` - The mapping of TID to chromosome name.
+/// - `read` - The read to process.
+/// - `progress_bar` - The progress bar to update.
+///
+/// # Panics
+/// If the chromosome name is not found in the mapping.
+fn update_found_progress(found_items: &Arc<AtomicUsize>, update_freq: usize, tid_to_chrom: &HashMap<i32, String>, read: &BamRecord, progress_bar: &Arc<ProgressBar>) {
+    let current_found = found_items.fetch_add(1, Ordering::Relaxed);
+    if current_found % update_freq == 0 {
+        let unknown_chrom = "Unknown".to_string();
+        let chrom_name = tid_to_chrom.get(&read.tid()).unwrap_or(&unknown_chrom);
+        progress_bar.set_message(format!(
+            "Found {} similar reads (most recent at {}:{})",
+            current_found.to_formatted_string(&Locale::en),
+            chrom_name,
+            read.reference_start().to_formatted_string(&Locale::en)
+        ));
+    }
+}
+
+/// This function checks if a read is valid.
+///
+/// # Arguments
+/// - `read` - The read to check.
+/// - `kmer_size` - The size of the k-mers to search for.
+/// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
+/// - `kmer_set` - The set of k-mers to search for.
+///
+/// # Returns
+/// Whether the read is valid or not.
+fn is_valid_read(read: &BamRecord, kmer_size: usize, min_kmers_pct: usize, kmer_set: &HashSet<Vec<u8>>) -> bool {
+    let read_seq = read.seq().as_bytes();
+    let rl_seq = skydive::utils::homopolymer_compressed(&read_seq);
+    let num_kmers = rl_seq.par_windows(kmer_size)
+        .filter(|kmer| kmer_set.contains(&skydive::utils::canonicalize_kmer(kmer)))
+        .count();
+    (num_kmers as f32 / rl_seq.len() as f32) > (min_kmers_pct as f32 / 100.0)
+}
+
+/// This function finalizes the progress.
+///
+/// # Arguments
+/// - `progress_bar` - The progress bar to finalize.
+/// - `found_items` - The number of found items.
+/// - `processed_items` - The number of processed items.
+fn finalize_progress(progress_bar: &Arc<ProgressBar>, found_items: &Arc<AtomicUsize>, processed_items: &Arc<AtomicUsize>) {
+    let final_found = found_items.load(Ordering::Relaxed);
+    let final_processed = processed_items.load(Ordering::Relaxed);
+    progress_bar.set_message(format!(
+        "Found {} reads in {} reads total.",
+        final_found.to_formatted_string(&Locale::en),
+        final_processed.to_formatted_string(&Locale::en)
+    ));
+    progress_bar.finish();
+}
