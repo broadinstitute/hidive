@@ -48,6 +48,7 @@
 //!  export GCS_REQUESTER_PAYS_PROJECT=<Google Project ID>
 //! ```
 
+use crate::rescue::SearchOption;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -192,9 +193,9 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
-        /// Search all reads in se_paths, not just those that are align to the region similar to ref_path.
-        #[clap(short, long, value_parser, default_value_t = false)]
-        search_all: bool,
+        /// Option to search for reads based on alignment status or regions of interest.
+        #[clap(short, long, default_value = "contig-and-interval")]
+        search_option: SearchOption,
 
         /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
         #[clap(short, long, value_parser, required = true)]
@@ -439,12 +440,12 @@ fn main() {
             output,
             kmer_size,
             min_kmers_pct,
-            search_all,
+            search_option,
             ref_path,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, search_all, ref_path, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, search_option, ref_path, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,

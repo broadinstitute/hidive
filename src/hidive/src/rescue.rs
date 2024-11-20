@@ -4,7 +4,8 @@ use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
-
+use std::cmp::PartialEq;
+use clap::{ValueEnum};
 use bio::data_structures::interval_tree::IntervalTree;
 use bio::io::fasta::Reader;
 use bio::utils::Interval;
@@ -25,11 +26,19 @@ use rust_htslib::bam::{FetchDefinition, IndexedReader, Read, Record as BamRecord
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
 
+#[derive(Clone, PartialEq, ValueEnum, Debug)]
+pub(crate) enum SearchOption {
+    All,
+    Contig,
+    ContigAndInterval,
+    Unmapped,
+}
+
 pub fn start(
     output: &PathBuf,
     kmer_size: usize,
     min_kmers_pct: usize,
-    search_all: bool,
+    search_option: SearchOption,
     ref_path: Option<PathBuf>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
@@ -64,24 +73,29 @@ pub fn start(
             reads.push(fw_seq.to_vec());
         }
 
-        if let Some(ref ref_path) = ref_path {
-            skydive::elog!("Searching for relevant loci in reference genome...");
-            detect_relevant_loci(ref_path, reads, &mut fetches);
-        }
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+            if let Some(ref ref_path) = ref_path {
+                skydive::elog!("Searching for relevant loci in reference genome...");
+                detect_relevant_loci(ref_path, reads, &mut fetches);
+            }
 
-        fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
+            fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
 
-        let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
-        skydive::elog!(
-            " -- will search unaligned reads and {} bases in {} contigs.",
-            total_length.to_formatted_string(&Locale::en),
-            fetches.len().to_formatted_string(&Locale::en)
-        );
+            let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
+            skydive::elog!(
+                " -- will search unaligned reads and {} bases in {} contigs.",
+                total_length.to_formatted_string(&Locale::en),
+                fetches.len().to_formatted_string(&Locale::en)
+            );
 
-        for (contig, interval) in &fetches {
-            skydive::elog!(" -- {}:{:?}", contig, interval);
+            // for (contig, interval) in &fetches {
+            //     skydive::elog!(" -- {}:{:?}", contig, interval);
+            // }
         }
     }
+
+
+
 
     // Read the CRAM files and search for the k-mers in each read.
     let mut tid_to_chrom: HashMap<i32, String> = HashMap::new();
@@ -109,50 +123,65 @@ pub fn start(
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect::<HashMap<_, _>>());
 
-        process_fetches(
-            &fetches,
-            &mut reader,
-            kmer_size,
-            min_kmers_pct,
-            search_all,
-            &kmer_set,
-            &tid_to_chrom,
-            &progress_bar,
-            &found_items,
-            &processed_items,
-            &mut all_records,
-        );
-    }
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+            process_fetches(
+                &fetches,
+                &mut reader,
+                kmer_size,
+                min_kmers_pct,
+                &search_option,
+                &kmer_set,
+                &tid_to_chrom,
+                &progress_bar,
+                &found_items,
+                &processed_items,
+                &mut all_records,
+            );
+        } else {
+            process_all_or_unmapped_reads(
+                &mut reader,
+                &search_option,
+                kmer_size,
+                min_kmers_pct,
+                &kmer_set,
+                &tid_to_chrom,
+                &progress_bar,
+                &found_items,
+                &processed_items,
+                &mut all_records,
+            );
+        }
 
-    let file = File::create(output).expect("Could not open file for writing.");
-    let mut writer: Box<dyn Write> = if output.to_str().unwrap().ends_with(".gz") {
-        Box::new(GzEncoder::new(file, Compression::default()))
-    } else {
-        Box::new(file)
-    };
+        let file = File::create(output).expect("Could not open file for writing.");
+        let mut writer: Box<dyn Write> = if output.to_str().unwrap().ends_with(".gz") {
+            Box::new(GzEncoder::new(file, Compression::default()))
+        } else {
+            Box::new(file)
+        };
 
-    for record in all_records.iter() {
-        let fw_seq = record.seq().as_bytes();
-        let rc_seq = fw_seq.reverse_complement();
+        for record in all_records.iter() {
+            let fw_seq = record.seq().as_bytes();
+            let rc_seq = fw_seq.reverse_complement();
 
-        writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()), record.reference_start(), record.reference_end()).expect("Could not write to file");
-        writeln!(
-            writer,
-            "{}",
-            if record.is_reverse() { String::from_utf8_lossy(&rc_seq) } else { String::from_utf8_lossy(&fw_seq) }
-        )
-        .expect("Could not write to file");
-    }
+            writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()), record.reference_start(), record.reference_end()).expect("Could not write to file");
+            writeln!(
+                writer,
+                "{}",
+                if record.is_reverse() { String::from_utf8_lossy(&rc_seq) } else { String::from_utf8_lossy(&fw_seq) }
+            )
+                .expect("Could not write to file");
+        }
 
-    if !all_records.is_empty() {
-        skydive::elog!(
-            "Wrote {} reads to {}.",
-            all_records.len().to_formatted_string(&Locale::en),
-            output.to_str().unwrap()
-        );
-    } else {
-        skydive::elog!("No reads were found in the CRAM files. Aborting.");
-        std::process::exit(1);
+        if !all_records.is_empty() {
+            skydive::elog!(
+                "Wrote {} reads to {}.",
+                all_records.len().to_formatted_string(&Locale::en),
+                output.to_str().unwrap()
+            );
+        } else {
+            skydive::elog!("No reads were found in the CRAM files. Aborting.");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -377,7 +406,7 @@ fn merge_overlapping_intervals(
 /// - `reader` - The reader to use for fetching reads.
 /// - `kmer_size` - The size of the k-mers to search for.
 /// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
-/// - `search_all` - Whether to search all reads or not.
+/// - `search_option` - Whether to search all reads or not.
 /// - `kmer_set` - The set of k-mers to search for.
 /// - `tid_to_chrom` - The mapping of TID to chromosome name.
 /// - `progress_bar` - The progress bar to update.
@@ -390,7 +419,7 @@ fn process_fetches(
     reader: &mut IndexedReader,
     kmer_size: usize,
     min_kmers_pct: usize,
-    search_all: bool,
+    search_opiton: &SearchOption,
     kmer_set: &HashSet<Vec<u8>>,
     tid_to_chrom: &HashMap<i32, String>,
     progress_bar: &Arc<ProgressBar>,
@@ -400,13 +429,14 @@ fn process_fetches(
 ) {
     const UPDATE_FREQUENCY: usize = 1_000_000;
 
-    let fetches_updated = prepare_fetches(fetches, search_all);
+    let fetches_updated = prepare_fetches(fetches, search_opiton);
 
     for (contig, interval) in fetches_updated {
-        let fetch_definition = create_fetch_definition(&contig, interval, search_all);
+        let fetch_definition = create_fetch_definition(search_opiton, Option::from(&contig), Option::from(interval));
         reader.fetch(fetch_definition).expect("Failed to fetch reads");
 
-        let records: Vec<_> = reader.records()
+        let records: Vec<_> = reader
+            .records()
             .par_bridge()
             .flat_map(|record| record.ok())
             .filter_map(|read| {
@@ -428,24 +458,31 @@ fn process_fetches(
 }
 
 /// This function prepares the fetches for searching.
+/// If the search option is 'Contig', it will extract the unique contigs from the fetches and add a dummy interval.
+/// If the search option is 'ContigAndInterval', it will return the fetches as is.
+/// In both cases, the fetches will be returned as a vector of contigs and intervals.
 ///
 /// # Arguments
 /// - `fetches` - The fetches to prepare.
-/// - `search_all` - Whether to search all reads or not.
+/// - `search_option` - Whether to search all reads or not.
 ///
 /// # Returns
 /// A vector of fetches to search.
 ///
 /// # Panics
 /// If the contig is not valid.
-fn prepare_fetches(fetches: &[(String, Interval<i32>)], search_all: bool) -> Vec<(String, Interval<i32>)> {
-    if search_all {
+fn prepare_fetches(
+    fetches: &[(String, Interval<i32>)], search_option: &SearchOption
+) -> Vec<(String, Interval<i32>)> {
+    if *search_option == SearchOption::Contig {
         let uniq_contigs: HashSet<_> = fetches.iter().map(|(contig, _)| contig.clone()).collect();
         uniq_contigs.into_iter().map(|contig| (contig, Interval::new(0..1).unwrap())).collect()
-    } else {
+    } else if *search_option == SearchOption::ContigAndInterval {
         fetches.iter()
             .map(|(contig, interval)| (contig.clone(), interval.clone()))
             .collect()
+    } else {
+        panic!("Invalid search option");
     }
 }
 
@@ -453,23 +490,42 @@ fn prepare_fetches(fetches: &[(String, Interval<i32>)], search_all: bool) -> Vec
 /// This function creates a fetch definition.
 ///
 /// # Arguments
+/// - `search_option` - Whether to search all reads or not.
 /// - `contig` - The contig to fetch.
 /// - `interval` - The interval to fetch.
-/// - `search_all` - Whether to search all reads or not.
 ///
 /// # Returns
 /// A fetch definition.
-fn create_fetch_definition(contig: &String, interval: Interval<i32>, search_all: bool) -> FetchDefinition {
-    if contig != "*" {
-        if search_all {
+fn create_fetch_definition<'a>(
+    search_option: &'a SearchOption,
+    contig: Option<&'a String>,
+    interval: Option<Interval<i32>>,
+) -> FetchDefinition<'a> {
+    match (contig, search_option) {
+        (None, SearchOption::All) => FetchDefinition::All,
+        (None, SearchOption::Unmapped) => FetchDefinition::Unmapped,
+        (Some(contig), SearchOption::Contig) if contig != "*" => {
             FetchDefinition::String(contig.as_bytes())
-        } else {
+        },
+        (Some(contig), SearchOption::ContigAndInterval) if contig != "*" => {
+            let interval = interval.unwrap_or_else(|| Interval::new(0..1).unwrap());
             FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
-        }
-    } else {
-        FetchDefinition::Unmapped
+        },
+        (Some(contig), _) if contig == "*" => FetchDefinition::Unmapped,
+        _ => panic!(
+            "Invalid fetch definition settings. \
+                If you are using the 'Contig' or 'ContigAndInterval' search options, \
+                you must provide a contig name. \
+                If you are using the 'All' or 'Unmapped' search options, \
+                you must NOT provide a contig name. \
+             search option: '{:?}' , contig: '{:?}', interval: '{:?}'",
+            search_option,
+            contig.as_deref().unwrap_or(&"None".to_string()),
+            interval.map(|i| format!("{:?}", i)).unwrap_or_else(|| "None".to_string())
+        ),
     }
 }
+
 
 /// This function updates the processed progress.
 ///
@@ -557,3 +613,44 @@ fn finalize_progress(progress_bar: &Arc<ProgressBar>, found_items: &Arc<AtomicUs
     ));
     progress_bar.finish();
 }
+
+/// This function will either process all reads or only reads from the specified contigs.
+fn process_all_or_unmapped_reads(
+    reader: &mut IndexedReader,
+    search_option: &SearchOption,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    kmer_set: &HashSet<Vec<u8>>,
+    tid_to_chrom: &HashMap<i32, String>,
+    progress_bar: &Arc<ProgressBar>,
+    found_items: &Arc<AtomicUsize>,
+    processed_items: &Arc<AtomicUsize>,
+    all_records: &mut Vec<BamRecord>,
+) {
+    const UPDATE_FREQUENCY: usize = 1_000_000;
+
+    let fetch_definition = create_fetch_definition(search_option, None, None);
+
+    reader.fetch(fetch_definition).expect("Failed to fetch reads");
+
+    let records: Vec<_> = reader
+        .records()
+        .par_bridge()
+        .flat_map(|record| record.ok())
+        .filter_map(|read| {
+            update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+
+            if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
+                update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+                Some(read)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    finalize_progress(progress_bar, found_items, processed_items);
+
+    all_records.extend(records);
+}
+
