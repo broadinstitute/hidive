@@ -97,9 +97,10 @@ pub fn start(
 
                     for (id, seq) in long_reads {
                         let corrected_seq = m.correct_seq(&g, &seq);
+
                         corrected_reads.entry(id)
                             .or_insert_with(Vec::new)
-                            .push(corrected_seq);
+                            .push((corrected_seq, m.scores.clone()));
                     }
                 }
             }
@@ -107,12 +108,33 @@ pub fn start(
             let mut file = fa_file.lock().unwrap();
             for id in corrected_reads.keys() {
                 let pieces = corrected_reads.get(id).unwrap();
-                let mut joined = Vec::<u8>::new();
-                for piece in pieces {
-                    joined.extend(piece);
+
+                let mut joined_seq = Vec::<u8>::new();
+                let mut joined_scores = HashMap::new();
+                for (piece, scores) in pieces {
+                    joined_seq.extend(piece);
+                    joined_scores.extend(scores);
                 }
 
-                let _ = writeln!(file, ">{}\n{}", id, String::from_utf8(joined).unwrap());
+                let mut prob = vec![1.0; joined_seq.len()];
+                let mut count = vec![1; joined_seq.len()];
+                for (i, kmer) in joined_seq.windows(kmer_size).enumerate() {
+                    let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
+                    let score = **joined_scores.get(&cn_kmer).unwrap_or(&&1.0);
+
+                    for j in i..std::cmp::min(i+kmer_size, prob.len()) {
+                        prob[j] *= score;
+                        count[j] += 1;
+                    }
+                }
+
+                let mut qual = vec![0; joined_seq.len()];
+                for i in 0..prob.len() {
+                    prob[i] = prob[i].powf(1.0/count[i] as f32);
+                    qual[i] = (-10.0*(1.0 - (prob[i] - 0.0001).max(0.0)).log10()) as u8 + 33;
+                }
+
+                let _ = writeln!(file, "@{}\n{}\n+\n{}", id, String::from_utf8(joined_seq).unwrap(), String::from_utf8_lossy(&qual));
             }
         });
 }

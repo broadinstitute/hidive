@@ -995,7 +995,7 @@ impl LdBG {
                 }
             }
 
-            // crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
+            crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
 
             if start_pos <= end_pos {
                 b.splice(start_pos..=end_pos, replacement_path);
@@ -1012,7 +1012,7 @@ impl LdBG {
             }
         }
 
-        //
+        /*
         let gfa_output = PathBuf::from(format!("read.{}.gfa", 0));
         let _ = crate::utils::write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g_seq);
 
@@ -1038,7 +1038,7 @@ impl LdBG {
             )
             .unwrap();
         }
-        //
+        */
 
         c.as_bytes().to_vec()
     }
