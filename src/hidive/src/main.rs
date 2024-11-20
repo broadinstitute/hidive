@@ -56,6 +56,7 @@ mod build;
 mod cluster;
 mod coassemble;
 mod correct;
+mod clean;
 mod fetch;
 mod filter;
 mod impute;
@@ -75,6 +76,7 @@ struct Cli {
 }
 
 const DEFAULT_KMER_SIZE: usize = 17;
+const DEFAULT_WINDOW_SIZE: usize = 1000;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -341,6 +343,38 @@ enum Commands {
         short_read_fasta_path: PathBuf,
     },
 
+    /// Error-clean long reads using a linked de Bruijn graph.
+    #[clap(arg_required_else_help = true)]
+    Clean {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Window size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_WINDOW_SIZE)]
+        window_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
+    },
+
     /// Co-assemble target locus from long- and short-read data using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Coassemble {
@@ -492,6 +526,25 @@ fn main() {
             short_read_fasta_path,
         } => {
             correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
+        }
+        Commands::Clean {
+            output,
+            loci,
+            kmer_size,
+            window_size,
+            model_path,
+            long_read_fasta_path,
+            short_read_fasta_path,
+        } => {
+            clean::start(
+                &output,
+                &loci,
+                kmer_size,
+                window_size,
+                &model_path,
+                &long_read_fasta_path,
+                &short_read_fasta_path
+            );
         }
         Commands::Coassemble {
             output,

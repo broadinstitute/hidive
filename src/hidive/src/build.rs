@@ -971,7 +971,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
         .collect();
 
     // Filter edges with little read support.
-    let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
+    let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 30);
 
     // Write final graph to disk.
     let _ = write_gfa(

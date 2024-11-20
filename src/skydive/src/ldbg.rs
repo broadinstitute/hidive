@@ -891,20 +891,16 @@ impl LdBG {
             let kmer_in = g_seq[in_node].as_bytes();
             let kmer_out = g_seq[out_node].as_bytes();
 
-            let start_position = seq.windows(self.kmer_size).position(|w| w == kmer_in);
-            let end_position = seq.windows(self.kmer_size).position(|w| w == kmer_out);
-
-            if start_position.is_none() || end_position.is_none() || start_position.unwrap() > end_position.unwrap() {
-                continue;
-            }
-
-            // let paths_fw = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g_seq, in_node, out_node, 0, Some(interior.len()));
-            // let paths_rv = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g_seq, out_node, in_node, 0, Some(interior.len()));
-            // let all_paths = paths_fw.chain(paths_rv).collect::<Vec<Vec<NodeIndex>>>();
+            // let start_position = seq.windows(self.kmer_size).position(|w| w == kmer_in);
+            // let end_position = seq.windows(self.kmer_size).position(|w| w == kmer_out);
 
             // crate::elog!("Superbubble: {} -> {} ({} interior nodes)", String::from_utf8_lossy(kmer_in), String::from_utf8_lossy(kmer_out), interior.len());
+            // crate::elog!(" - start: {:?}", start_position);
+            // crate::elog!(" -   end: {:?}", end_position);
 
             if a_kmer_set.contains(&kmer_in.to_vec()) && a_kmer_set.contains(&kmer_out.to_vec()) {
+                // crate::elog!(" - contains k-mers");
+
                 let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g_seq, in_node, out_node, 0, Some(interior.len()));
                 let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g_seq, out_node, in_node, 0, Some(interior.len()));
 
@@ -933,7 +929,6 @@ impl LdBG {
 
                 paths.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
 
-                /*
                 for (path, score, seen_kmer_count) in &paths {
                     let mut contig = String::new();
 
@@ -945,9 +940,8 @@ impl LdBG {
                         }
                     }
 
-                    crate::elog!("Contig: {} (score: {}, seen k-mer count: {})", contig, score, seen_kmer_count);
+                    // crate::elog!("Contig: {} (score: {}, seen k-mer count: {})", contig, score, seen_kmer_count);
                 }
-                */
 
                 let read_path = paths.first().cloned().unwrap();
                 let read_kmers = read_path.0.iter().map(|node| g_seq[*node].as_bytes().to_vec()).collect::<Vec<_>>();
@@ -971,6 +965,8 @@ impl LdBG {
                     let replacement_kmers = replacement_path.0.iter().map(|node| g_seq[*node].as_bytes().to_vec()).collect::<Vec<_>>();
 
                     replacements.push((read_kmers, replacement_kmers));
+
+                    // crate::elog!(" - replaced");
                 }
             }
         }
@@ -999,9 +995,11 @@ impl LdBG {
                 }
             }
 
-            // crate::elog!("Replacing {}-{}\n{}\n{}", start_pos, end_pos, q1, r1);
+            // crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
 
-            b.splice(start_pos..=end_pos, replacement_path);
+            if start_pos <= end_pos {
+                b.splice(start_pos..=end_pos, replacement_path);
+            }
         }
 
         let mut c = String::new();
@@ -1014,8 +1012,8 @@ impl LdBG {
             }
         }
 
-        /*
-        let gfa_output = PathBuf::from("read.gfa");
+        //
+        let gfa_output = PathBuf::from(format!("read.{}.gfa", 0));
         let _ = crate::utils::write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g_seq);
 
         let csv_output = gfa_output.with_extension("csv");
@@ -1040,7 +1038,7 @@ impl LdBG {
             )
             .unwrap();
         }
-        */
+        //
 
         c.as_bytes().to_vec()
     }
@@ -2079,7 +2077,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad paths specific to color {} ({} kmers)", bad_paths, color, to_remove.len());
+        // crate::elog!(" -- Removed {} bad paths specific to color {} ({} kmers)", bad_paths, color, to_remove.len());
 
         self.infer_edges();
 
@@ -2167,7 +2165,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad paths ({} kmers)", bad_paths, to_remove.len());
+        // crate::elog!(" -- Removed {} bad paths ({} kmers)", bad_paths, to_remove.len());
 
         self.infer_edges();
 
@@ -2232,7 +2230,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} tangles in color {} ({} kmers)", bad_tangles, color, to_remove.len());
+        // crate::elog!(" -- Removed {} tangles in color {} ({} kmers)", bad_tangles, color, to_remove.len());
 
         self.infer_edges();
 
@@ -2246,7 +2244,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed repetitive noise ({} kmers)", self.noise.len());
+        // crate::elog!(" -- Removed repetitive noise ({} kmers)", self.noise.len());
 
         self.infer_edges();
 
@@ -2317,7 +2315,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
+        // crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
 
         self.infer_edges();
 
@@ -2415,7 +2413,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", num_bad_paths, to_remove.len());
+        // crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", num_bad_paths, to_remove.len());
 
         self.infer_edges();
 
@@ -2475,7 +2473,7 @@ impl LdBG {
             self.scores.remove(cn_kmer);
         }
 
-        crate::elog!(" -- Removed {} bad contigs ({} kmers)", bad_contigs, to_remove.len());
+        // crate::elog!(" -- Removed {} bad contigs ({} kmers)", bad_contigs, to_remove.len());
 
         self.infer_edges();
 
@@ -3163,12 +3161,12 @@ pub fn find_superbubble(graph: &DiGraph<String, f32>, s: NodeIndex, direction: p
 }
 
 #[must_use]
-pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
+pub fn find_all_superbubbles_old(graph: &petgraph::Graph<String, f32>) -> LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
     let mut bubbles = LinkedHashMap::new();
 
     let mut visited: HashSet<NodeIndex> = HashSet::new();
     for n in graph.node_indices() {
-        if !visited.contains(&n) {
+        // if !visited.contains(&n) {
             for d in [petgraph::Direction::Outgoing, petgraph::Direction::Incoming] {
                 let bubble = find_superbubble(&graph, n, d);
 
@@ -3181,6 +3179,30 @@ pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> LinkedHash
                     if !bubbles.contains_key(&key_fwd) && !bubbles.contains_key(&key_rev) {
                         bubbles.insert((bubble.0, bubble.1), bubble.2);
                     }
+                }
+            }
+        // }
+    }
+
+    bubbles
+}
+
+pub fn find_all_superbubbles(graph: &petgraph::Graph<String, f32>) -> LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>> {
+    let mut bubbles = LinkedHashMap::new();
+    let mut processed_pairs = HashSet::new();
+
+    for n in graph.node_indices() {
+        for d in [petgraph::Direction::Outgoing, petgraph::Direction::Incoming] {
+            if let Some((start, end, interior)) = find_superbubble(graph, n, d) {
+                // Create both possible orderings of the pair
+                let pair_forward = (start.index(), end.index());
+                let pair_reverse = (end.index(), start.index());
+                
+                // Only process this bubble if we haven't seen it before
+                if !processed_pairs.contains(&pair_forward) && !processed_pairs.contains(&pair_reverse) {
+                    bubbles.insert((start, end), interior);
+                    processed_pairs.insert(pair_forward);
+                    processed_pairs.insert(pair_reverse);
                 }
             }
         }

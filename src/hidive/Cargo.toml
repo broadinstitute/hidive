@@ -36,7 +36,7 @@ petgraph = "0.6.5"
 rand = "0.8.5"
 rayon = "1.10.0"
 #recgraph = { git = "https://github.com/AlgoLab/RecGraph" }
-# regex = "1.10.5"
+regex = "1.10.5"
 #russcip = "0.3.4"
 rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
 # rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}

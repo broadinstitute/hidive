@@ -3,6 +3,7 @@ use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use minimap2::Aligner;
 use needletail::Sequence;
 use petgraph::graph::NodeIndex;
 use rayon::prelude::*;
@@ -57,15 +58,80 @@ pub fn start(
 
     skydive::elog!("Assembling haplotype 1...");
     let asm1 = assemble_haplotype(&all_ref_seqs, &reads_hap1);
+    // let hap1 = refine_haplotype(asm1, reference_fasta_paths[0].clone(), all_ref_seqs.get(0).unwrap());
 
     skydive::elog!("Assembling haplotype 2...");
     let asm2 = assemble_haplotype(&all_ref_seqs, &reads_hap2);
+    // let hap2 = refine_haplotype(asm2, reference_fasta_paths[0].clone(), all_ref_seqs.get(0).unwrap());
 
     let mut output = File::create(output).expect("Failed to create output file");
     writeln!(output, ">hap1").expect("Failed to write to output file");
     writeln!(output, "{}", asm1).expect("Failed to write to output file");
     writeln!(output, ">hap2").expect("Failed to write to output file");
     writeln!(output, "{}", asm2).expect("Failed to write to output file");
+
+}
+
+fn refine_haplotype(asm: String, ref_path: PathBuf, ref_seq: &Vec<u8>) -> String {
+    let aligner = Aligner::builder()
+        .map_hifi()
+        .with_cigar()
+        .with_index(ref_path.clone(), None)
+        .expect("Failed to build aligner");
+
+    let results = vec![asm]
+        .iter()
+        .map(|hap| aligner.map(hap.as_bytes(), true, false, None, None).unwrap())
+        .collect::<Vec<_>>();
+
+    let mut alt_seq: Vec<u8> = Vec::new();
+    for result in results {
+        for mapping in result {
+            if let Some(alignment) = &mapping.alignment {
+                if mapping.is_primary && !mapping.is_supplementary {
+                    if let Some(cs) = &alignment.cs {
+                        let re = regex::Regex::new(r"([:\*\+\-])(\w+)").unwrap();
+                        let mut cursor = 0;
+                        for cap in re.captures_iter(cs) {
+                            let op = cap.get(1).unwrap().as_str();
+                            let seq = cap.get(2).unwrap().as_str();
+
+                            match op {
+                                ":" => {
+                                    // Match (copy from reference)
+                                    let length = seq.parse::<usize>().unwrap();
+                                    alt_seq.extend(&ref_seq[cursor..cursor + length]);
+                                    cursor += length;
+                                }
+                                "*" => {
+                                    // Substitution
+                                    // let ref_base = seq.as_bytes()[0];
+                                    let alt_base = seq.to_uppercase().as_bytes()[1];
+                                    alt_seq.push(alt_base);
+                                    cursor += 1;
+                                }
+                                "+" => {
+                                    // Insertion
+                                    alt_seq.extend(seq.to_uppercase().as_bytes());
+                                }
+                                "-" => {
+                                    // Deletion
+                                    // alt_seq.extend(vec![b'-'; seq.len()]);
+                                    cursor += seq.len();
+                                }
+                                _ => unreachable!("Invalid CIGAR operation"),
+                            }
+                        }
+                    }
+                }
+
+                // skydive::elog!("ref {}", String::from_utf8_lossy(ref_seq));
+                // skydive::elog!("alt {}", String::from_utf8_lossy(&alt_seq));
+            }
+        }
+    }
+
+    String::from_utf8_lossy(&alt_seq).to_string()
 }
 
 fn assemble_haplotype(ref_seqs: &Vec<Vec<u8>>, reads: &Vec<Vec<u8>>) -> String {
