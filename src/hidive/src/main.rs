@@ -55,8 +55,8 @@ use clap::{Parser, Subcommand};
 mod build;
 mod cluster;
 mod coassemble;
+mod assemble;
 mod correct;
-mod clean;
 mod fetch;
 mod filter;
 mod impute;
@@ -317,7 +317,7 @@ enum Commands {
 
     /// Error-correct long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
-    Correct {
+    Assemble {
         /// Output path for corrected reads.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -345,7 +345,7 @@ enum Commands {
 
     /// Error-clean long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
-    Clean {
+    Correct {
         /// Output path for corrected reads.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -517,7 +517,7 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Correct {
+        Commands::Assemble {
             output,
             gfa_output,
             kmer_size,
@@ -525,9 +525,9 @@ fn main() {
             long_read_fasta_path,
             short_read_fasta_path,
         } => {
-            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
+            assemble::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
         }
-        Commands::Clean {
+        Commands::Correct {
             output,
             loci,
             kmer_size,
@@ -536,7 +536,7 @@ fn main() {
             long_read_fasta_path,
             short_read_fasta_path,
         } => {
-            clean::start(
+            correct::start(
                 &output,
                 &loci,
                 kmer_size,

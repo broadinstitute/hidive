@@ -1,92 +1,139 @@
 use std::collections::{HashMap, HashSet};
 use std::{fs::File, path::PathBuf, io::Write};
 
-use needletail::Sequence;
-use petgraph::graph::NodeIndex;
+use indicatif::{ProgressIterator, ParallelProgressIterator};
 use rayon::prelude::*;
-use indicatif::ParallelProgressIterator;
+// use rayon::iter::IntoParallelRefIterator;
+// use rayon::iter::ParallelIterator;
 
 use skydive::ldbg::LdBG;
 use skydive::mldbg::MLdBG;
-use skydive::utils::*;
 
 pub fn start(
     output: &PathBuf,
-    gfa_output: Option<PathBuf>,
+    loci_list: &Vec<String>,
     kmer_size: usize,
+    window: usize,
     model_path: &PathBuf,
     long_read_fasta_path: &PathBuf,
     short_read_fasta_path: &PathBuf,
 ) {
+    // Get the system's temporary directory path
+    let cache_path = std::env::temp_dir();
+    skydive::elog!("Intermediate data will be stored at {:?}.", cache_path);
+
+    // Load datasets
     let long_read_seq_urls = skydive::parse::parse_file_names(&[long_read_fasta_path.clone()]);
-    let short_read_seq_urls = skydive::parse::parse_file_names(&[short_read_fasta_path.clone()]);
 
-    // Read all long reads.
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
-    let all_lr_seqs = skydive::utils::read_fasta(&vec![long_read_fasta_path.clone()]);
-
-    // Read all short reads.
-    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!("Processing short-read sample {}...", short_read_fasta_path.display());
     let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path.clone()]);
+    skydive::elog!(" - {} short reads loaded", all_sr_seqs.len());
 
-    let l1 = LdBG::from_sequences("lr".to_string(), kmer_size, &all_lr_seqs);
-    let s1 = LdBG::from_sequences("sr".to_string(), kmer_size, &all_sr_seqs);
+    // Iterate over loci
+    let loci = skydive::parse::parse_loci(loci_list, window as u64).into_iter().collect::<Vec<_>>();
 
-    let m = MLdBG::from_ldbgs(vec![l1, s1])
-        .score_kmers(model_path)
-        .collapse()
-        .clean(0.1)
-        .build_links(&all_lr_seqs, false);
+    // let progress_bar = skydive::utils::default_bounded_progress_bar("Processing loci", loci.len() as u64);
 
-    skydive::elog!("Built MLdBG with {} k-mers.", m.kmers.len());
+    let fa_file = std::sync::Mutex::new(File::create(output).unwrap());
+    loci
+        // .par_iter()
+        // .progress_with(progress_bar)
+        .iter()
+        .inspect(|(chrom, start, end, name)| {
+            skydive::elog!("Processing locus {} ({}:{}-{})", name, chrom, start, end);
+        })
+        .for_each(|(chrom, start, end, name)| {
+            let (padded_start, padded_end) = pad_interval(start, end, window);
 
-    skydive::elog!("Correcting reads...");
-    let corrected_seqs = m.correct_seqs(&all_lr_seqs);
+            let mut corrected_reads = HashMap::new();
 
-    let mut fa_file = File::create(output).unwrap();
-    for (i, corrected_seq) in corrected_seqs.iter().enumerate() {
-        let _ = writeln!(fa_file, ">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());
-    }
+            for window_start in (padded_start..padded_end).step_by(window) {
+                let window_end = window_start + window as u64;
 
-    // let read = b"CAGCTGCCCATGCCACCTCCTCCTTCTCTGCCCGCCCCAGTGCCTTATGGGTCCAAGGTTGACTCCTGTCCCTAGGGCAGGCCTGTGGGCCCTGCCTGATCCCTACTGGGAGGATGGTACCTAGGGTTGGAGCCAAACAAGTGTCCTCCTCCAGCGCCAGCCTGGCCCTGAGTGCGAACTCGTCACTGGTCAGGGGTCTGTACAGCAGCGTCCCTGAGGGCCCAGAGAGGTAGCCAGTCCTGTGGTGAGGTGACGAGGCTGAGGGTGGTGGCTCAGTCCTGGGCTTCCATGGGGCCTTCCCAGGGAACGTTCTGGCACCTGCCGACTGAGCCCTGGGAGGTAGGTAGCCCTGGCCTATAGCTCCCTGACGCCATGATTTGTCTTCCGTTTTTGGGGTGTCATATATGAAGGGAGGTGACTGTGATGGTGCTGGCAGGACTGCTGTCCCTGATGTGGGGTGGGCTGAGTTAGGCCTGAAATATGGGCCTCCAGGCTGAGTCCTGCCCTCTCCACCACATCCAGGGCTGACTGACACCTCTAGTCAGCCCATTCTGGCCCCTTCCCCACATGCCAGGACAATGTAGTCCTTGTCATCAATCTGGGCAGTCAGAGTTGGGTCAGTGGGGGACATGGGATTATGGGCAAGGGTAACTGACATCTGCTCAGCCTCAACGTACCCCTGTCTCAAATGCGGCCAGGCGGTGGGGTAAGCAGGAATGAGGCAGGGGTTGGGGTTGCCCTGAGGAGGATGATCCCAACGAGGGCGTGAGCAGGGGACCCGAGTT";
-    // let corrected_seqs = m.correct_seqs(&vec![read.to_vec()]);
-    // let mut fa_file = File::create(output).unwrap();
-    // for (i, corrected_seq) in corrected_seqs.iter().enumerate() {
-    //     let _ = writeln!(fa_file, ">corrected_{}\n{}", i, String::from_utf8(corrected_seq.clone()).unwrap());
-    // }
+                let locus = HashSet::from([(chrom.clone(), window_start, window_end, name.clone())]);
 
-    if let Some(gfa_output) = gfa_output {
-        skydive::elog!("Writing GFA to {}", gfa_output.display());
+                let r = skydive::stage::stage_data_in_memory(&locus, &long_read_seq_urls, false, &cache_path);
+                if let Ok(reads) = r {
+                    let long_reads: HashMap<String, Vec<u8>> = reads
+                        .into_iter()
+                        .map(|read| (read.id().to_string(), read.seq().to_vec()))
+                        .collect();
 
-        let g = m.traverse_all_kmers();
+                    let cn_kmers = long_reads
+                        .values()
+                        .map(|seq| seq.windows(kmer_size).collect::<Vec<_>>())
+                        .flatten()
+                        .map(|kmer| skydive::utils::canonicalize_kmer(kmer))
+                        .collect::<HashSet<_>>();
 
-        let _ = write_gfa(&mut File::create(gfa_output.clone()).unwrap(), &g);
+                    let sr_seqs = all_sr_seqs
+                        .iter()
+                        .filter_map(|seq| {
+                            let kmers = seq.windows(kmer_size).collect::<Vec<_>>();
+                            let read_kmers = kmers.iter().map(|kmer| skydive::utils::canonicalize_kmer(kmer)).collect::<HashSet<_>>();
 
-        let csv_output = gfa_output.with_extension("csv");
-        let mut csv_file = File::create(&csv_output).unwrap();
+                            let count = cn_kmers.intersection(&read_kmers).count();
 
-        writeln!(csv_file, "node,label,kmer,cov,entropy").unwrap();
+                            if count > (0.5*read_kmers.len() as f64) as usize {
+                                Some(seq)
+                            } else {
+                                None
+                            }
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>();
 
-        for (node_index, node_label) in g.node_indices().zip(g.node_weights()) {
-            let kmer = node_label.as_bytes();
-            let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
-            let score = (100.0 * *m.scores.get(&cn_kmer).unwrap_or(&0.0)) as u32;
-            let cov = if m.kmers.contains_key(&cn_kmer) { m.kmers.get(&cn_kmer).unwrap().coverage() } else { 0 };
-            let entropy = skydive::utils::shannon_entropy(kmer);
-            let sources = m.sources.get(&cn_kmer).unwrap_or(&vec![]).clone();
+                    let lr_seqs = long_reads.values().cloned().collect::<Vec<_>>();
+                    let l1 = LdBG::from_sequences("lr".to_string(), kmer_size, &lr_seqs);
+                    let s1 = LdBG::from_sequences("sr".to_string(), kmer_size, &sr_seqs);
 
-            let source = if sources.len() == 1 { sources[0] } else { 2 };
+                    let m = MLdBG::from_ldbgs(vec![l1, s1])
+                        .score_kmers(model_path)
+                        .collapse()
+                        .clean(0.1)
+                        .build_links(&lr_seqs, false);
 
-            writeln!(
-                csv_file,
-                "{},{},{},{},{}",
-                node_index.index(),
-                format!("{} ({})", source, score),
-                node_label,
-                cov,
-                entropy,
-            )
-            .unwrap();
-        }
-    }
+                    let g = m.traverse_all_kmers();
+
+                    for (id, seq) in long_reads {
+                        let corrected_seq = m.correct_seq(&g, &seq);
+                        corrected_reads.entry(id)
+                            .or_insert_with(Vec::new)
+                            .push(corrected_seq);
+                    }
+                }
+            }
+
+            let mut file = fa_file.lock().unwrap();
+            for id in corrected_reads.keys() {
+                let pieces = corrected_reads.get(id).unwrap();
+                let mut joined = Vec::<u8>::new();
+                for piece in pieces {
+                    joined.extend(piece);
+                }
+
+                let _ = writeln!(file, ">{}\n{}", id, String::from_utf8(joined).unwrap());
+            }
+        });
+}
+
+fn pad_interval(start: &u64, end: &u64, window: usize) -> (u64, u64) {
+    // Calculate how much padding is needed to make the interval cleanly divisible by 1000
+    let interval_length = end - start;
+    let remainder = interval_length % window as u64;
+
+    let (padded_start, padded_end) = if remainder > 0 {
+        let padding_needed = window as u64 - remainder;
+        let half_padding = padding_needed / 2;
+    
+        // Add padding evenly to start and end
+        let new_start = start.saturating_sub(half_padding);
+        let new_end = end + (padding_needed - half_padding);
+    
+        (new_start, new_end)
+    } else {
+        (*start, *end)
+    };
+
+    (padded_start, padded_end)
 }
