@@ -40,6 +40,7 @@ pub fn start(
     min_kmers_pct: usize,
     search_option: SearchOption,
     ref_path: Option<PathBuf>,
+    loci: Option<Vec<String>>,
     fasta_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
 ) {
@@ -72,25 +73,44 @@ pub fn start(
 
             reads.push(fw_seq.to_vec());
         }
-
+        // If the search option is 'Contig' or 'ContigAndInterval', we need to set fetches with the input loci or the detected relevant loci.
         if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
-            if let Some(ref ref_path) = ref_path {
-                skydive::elog!("Searching for relevant loci in reference genome...");
-                detect_relevant_loci(ref_path, reads, &mut fetches);
+            if let Some(loci) = &loci {
+                skydive::elog!("Setting loci from input...");
+                // use skydive parse::parse_loci to parse loci
+                let loci = skydive::parse::parse_loci(loci, 0);
+                for (contig, start, stop, name) in loci {
+                    fetches.push((contig, Interval::new(start as i32..stop as i32).unwrap()));
+                }
+
+            }else {
+                if let Some(ref ref_path) = ref_path {
+                    skydive::elog!("Searching for relevant loci in reference genome...");
+                    detect_relevant_loci(ref_path, reads, &mut fetches);
+                } else {
+                    skydive::elog!("No reference genome provided but search option is set to 'Contig' or 'ContigAndInterval'. Aborting.");
+                    std::process::exit(1);
+                }
+                fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
             }
 
-            fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
-
+            // Print the set loci in the fetches.
             let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
             skydive::elog!(
                 " -- will search unaligned reads and {} bases in {} contigs.",
                 total_length.to_formatted_string(&Locale::en),
                 fetches.len().to_formatted_string(&Locale::en)
             );
-
-            // for (contig, interval) in &fetches {
-            //     skydive::elog!(" -- {}:{:?}", contig, interval);
-            // }
+            // TODO: Print the fetches before merging
+            for (contig, interval) in &fetches {
+                skydive::elog!(" -- {}:{:?}", contig, interval);
+            }
+        } else {
+            // assert that the search option is 'All' or 'Unmapped' and loci is None
+            assert!(
+                (search_option == SearchOption::All || search_option == SearchOption::Unmapped) && loci.is_none(),
+                "Assertion failed: search_option is 'All' or 'Unmapped' and loci is NOT None"
+            );
         }
     }
 
@@ -614,7 +634,23 @@ fn finalize_progress(progress_bar: &Arc<ProgressBar>, found_items: &Arc<AtomicUs
     progress_bar.finish();
 }
 
-/// This function will either process all reads or only reads from the specified contigs.
+/// This function will either process all reads or only reads from the specified contigs
+/// and update all_records with the found reads.
+///
+/// # Arguments
+/// - `reader` - The reader to use for fetching reads.
+/// - `search_option` - Whether to search all reads or not.
+/// - `kmer_size` - The size of the k-mers to search for.
+/// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
+/// - `kmer_set` - The set of k-mers to search for.
+/// - `tid_to_chrom` - The mapping of TID to chromosome name.
+/// - `progress_bar` - The progress bar to update.
+/// - `found_items` - The number of found items.
+/// - `processed_items` - The number of processed items.
+/// - `all_records` - The vector of all records.
+///
+/// # Panics
+/// If the search option is invalid.
 fn process_all_or_unmapped_reads(
     reader: &mut IndexedReader,
     search_option: &SearchOption,
