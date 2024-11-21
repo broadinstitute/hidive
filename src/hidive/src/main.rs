@@ -201,6 +201,10 @@ enum Commands {
         #[clap(short, long, value_parser, required = true)]
         ref_path: Option<PathBuf>,
 
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = false)]
+        loci: Option<Vec<String>>,
+
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
@@ -442,10 +446,11 @@ fn main() {
             min_kmers_pct,
             search_option,
             ref_path,
+            loci,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, search_option, ref_path, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, search_option, ref_path, loci, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,

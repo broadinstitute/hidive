@@ -15,6 +15,7 @@ use minimap2::{Aligner, Mapping};
 use needletail::Sequence;
 use num_format::{Locale, ToFormattedString};
 
+
 use indicatif::ProgressBar;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
@@ -22,6 +23,7 @@ use rayon::prelude::*;
 
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader, Read, Record as BamRecord};
+use std::option::Option;
 
 // Import the skydive module, which contains the necessary functions for staging data
 use skydive;
@@ -73,48 +75,25 @@ pub fn start(
 
             reads.push(fw_seq.to_vec());
         }
-        // If the search option is 'Contig' or 'ContigAndInterval', we need to set fetches with the input loci or the detected relevant loci.
-        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
-            if let Some(loci) = &loci {
-                skydive::elog!("Setting loci from input...");
-                // use skydive parse::parse_loci to parse loci
-                let loci = skydive::parse::parse_loci(loci, 0);
-                for (contig, start, stop, name) in loci {
-                    fetches.push((contig, Interval::new(start as i32..stop as i32).unwrap()));
-                }
 
-            }else {
-                if let Some(ref ref_path) = ref_path {
-                    skydive::elog!("Searching for relevant loci in reference genome...");
-                    detect_relevant_loci(ref_path, reads, &mut fetches);
-                } else {
-                    skydive::elog!("No reference genome provided but search option is set to 'Contig' or 'ContigAndInterval'. Aborting.");
+        // Set fetches with the input loci or the detected relevant loci.
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+            match populate_fetches(&search_option, &loci, &ref_path, &reads, &mut fetches) {
+                Ok(_) => {},
+                Err(e) => {
+                    skydive::elog!("Error: {}", e);
                     std::process::exit(1);
                 }
-                fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
             }
+            print_fetches_info(&fetches);
 
-            // Print the set loci in the fetches.
-            let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
-            skydive::elog!(
-                " -- will search unaligned reads and {} bases in {} contigs.",
-                total_length.to_formatted_string(&Locale::en),
-                fetches.len().to_formatted_string(&Locale::en)
-            );
-            // TODO: Print the fetches before merging
-            for (contig, interval) in &fetches {
-                skydive::elog!(" -- {}:{:?}", contig, interval);
+            } else {
+                assert!(
+                    (search_option == SearchOption::All || search_option == SearchOption::Unmapped) && loci.is_none(),
+                    "Assertion failed: search_option is 'All' or 'Unmapped' and loci is NOT None"
+                );
             }
-        } else {
-            // assert that the search option is 'All' or 'Unmapped' and loci is None
-            assert!(
-                (search_option == SearchOption::All || search_option == SearchOption::Unmapped) && loci.is_none(),
-                "Assertion failed: search_option is 'All' or 'Unmapped' and loci is NOT None"
-            );
-        }
     }
-
-
 
 
     // Read the CRAM files and search for the k-mers in each read.
@@ -144,12 +123,13 @@ pub fn start(
             .collect::<HashMap<_, _>>());
 
         if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
-            process_fetches(
-                &fetches,
+            // Use the fetches to retrieve the records.
+            retrieve_records(
                 &mut reader,
+                Some(&fetches),
+                &search_option,
                 kmer_size,
                 min_kmers_pct,
-                &search_option,
                 &kmer_set,
                 &tid_to_chrom,
                 &progress_bar,
@@ -158,8 +138,10 @@ pub fn start(
                 &mut all_records,
             );
         } else {
-            process_all_or_unmapped_reads(
+            // Retrieve all or unmapped reads.
+            retrieve_records(
                 &mut reader,
+                None,
                 &search_option,
                 kmer_size,
                 min_kmers_pct,
@@ -205,6 +187,79 @@ pub fn start(
     }
 }
 
+
+////////////////////////////////////////////////////////////////
+//// print_fetches_info and its helper functions
+////
+////////////////////////////////////////////////////////////////
+
+/// This function will populate the fetches with the input loci or the detected relevant loci.
+/// Function should only be called if the search option is set to 'Contig' or 'ContigAndInterval'.
+///
+/// # Arguments
+/// - `search_option` - The search option.
+/// - `loci` - The loci to search for.
+/// - `ref_path` - The path to the reference genome.
+/// - `reads` - The reads to map.
+/// - `fetches` - The fetches to populate.
+///
+/// # Panics
+/// If the search option is set to 'Contig' or 'ContigAndInterval' and no reference genome is provided.
+fn populate_fetches(
+    search_option: &SearchOption,
+    loci: &Option<Vec<String>>,
+    ref_path: &Option<PathBuf>,
+    reads: &Vec<Vec<u8>>,
+    fetches: &mut Vec<(String, Interval<i32>)>,
+) -> Result<(), String>{
+    if !matches!(search_option, SearchOption::Contig | SearchOption::ContigAndInterval) {
+        return Err("Function should only be called if the search option is 'Contig' or 'ContigAndInterval'".to_string());
+    }
+
+    if let Some(loci) = loci {
+        skydive::elog!("Setting loci from input...");
+        let loci = skydive::parse::parse_loci(loci, 0);
+        for (contig, start, stop, name) in loci {
+            match Interval::new(start as i32..stop as i32) {
+                Ok(interval) => fetches.push((contig, interval)),
+                Err(e) => {
+                    skydive::elog!("Invalid interval for contig {}: {:?}, start: {}, stop: {}. Error: {}", contig, start..stop, start, stop, e);
+                    return Err(format!("Error creating interval for contig {}: {:?}", contig, e));
+                }
+            }
+        }
+    } else if let Some(ref ref_path) = ref_path {
+        skydive::elog!("Searching for relevant loci in reference genome...");
+        detect_relevant_loci(ref_path, reads, fetches);
+        fetches.push(("*".to_string(), Interval::new(0..1).unwrap()));
+    } else {
+        skydive::elog!("No reference genome provided but search option is set to 'Contig' or 'ContigAndInterval'. Aborting.");
+        return Err("No reference genome provided.".to_string());
+    }
+
+    Ok(())
+}
+
+/// This function will print the fetches' info.
+/// # Arguments
+/// - `fetches` - The fetches to print.
+///
+/// # Panics
+///
+/// If the total length of the fetches cannot be calculated.
+fn print_fetches_info(fetches: &[(String, Interval<i32>)]) {
+    let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
+    skydive::elog!(
+        " -- will search unaligned reads and {} bases in {} contigs.",
+        total_length.to_formatted_string(&Locale::en),
+        fetches.len().to_formatted_string(&Locale::en)
+    );
+
+    for (contig, interval) in fetches {
+        skydive::elog!(" -- {}:{:?}", contig, interval);
+    }
+}
+
 //////////////////////////////////////////////////////////////////
 //// detect_relevant_loci and its helper functions
 ////
@@ -222,7 +277,7 @@ pub fn start(
 /// # Panics
 ///
 /// If no mappings are found for the provided sequences.
-fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
+fn detect_relevant_loci(ref_path: &PathBuf, reads: &Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
     let lr_aligner = initialize_aligner(ref_path, false);
 
     let lr_mappings = map_sequences(&lr_aligner, &reads, false);
@@ -254,7 +309,6 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: Vec<Vec<u8>>, fetches: &mut V
 
     fetches.extend(sub_fetches.into_iter());
 }
-
 
 /// This function initializes the aligner.
 ///
@@ -375,7 +429,6 @@ fn populate_interval_trees(
     }
 }
 
-
 /// This function merges overlapping intervals.
 ///
 /// # Arguments
@@ -419,7 +472,7 @@ fn merge_overlapping_intervals(
 ////
 ////////////////////////////////////////////////////////////////
 
-/// This function processes the fetches and searches for similar reads.
+/// This function retrieves the records from the reader.
 ///
 /// # Arguments
 /// - `fetches` - The fetches to process.
@@ -434,12 +487,12 @@ fn merge_overlapping_intervals(
 /// - `processed_items` - The number of processed items.
 /// - `all_records` - The vector of all records.
 ///
-fn process_fetches(
-    fetches: &[(String, Interval<i32>)],
+fn retrieve_records(
     reader: &mut IndexedReader,
+    fetches: Option<&[(String, Interval<i32>)]>,
+    search_option: &SearchOption,
     kmer_size: usize,
     min_kmers_pct: usize,
-    search_opiton: &SearchOption,
     kmer_set: &HashSet<Vec<u8>>,
     tid_to_chrom: &HashMap<i32, String>,
     progress_bar: &Arc<ProgressBar>,
@@ -449,32 +502,90 @@ fn process_fetches(
 ) {
     const UPDATE_FREQUENCY: usize = 1_000_000;
 
-    let fetches_updated = prepare_fetches(fetches, search_opiton);
+    if let Some(fetches) = fetches {
+        let fetches_updated = prepare_fetches(fetches, search_option);
 
-    for (contig, interval) in fetches_updated {
-        let fetch_definition = create_fetch_definition(search_opiton, Option::from(&contig), Option::from(interval));
+        for (contig, interval) in fetches_updated {
+            let fetch_definition = create_fetch_definition(search_option, Some(&contig), Some(interval));
+            reader.fetch(fetch_definition).expect("Failed to fetch reads");
+
+            let records = filter_and_collect_records(
+                reader,
+                kmer_size,
+                min_kmers_pct,
+                kmer_set,
+                tid_to_chrom,
+                progress_bar,
+                found_items,
+                processed_items,
+            );
+
+            all_records.extend(records);
+        }
+    } else {
+        let fetch_definition = create_fetch_definition(search_option, None, None);
         reader.fetch(fetch_definition).expect("Failed to fetch reads");
 
-        let records: Vec<_> = reader
-            .records()
-            .par_bridge()
-            .flat_map(|record| record.ok())
-            .filter_map(|read| {
-                update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
-
-                if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
-                    update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
-                    Some(read)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let records = filter_and_collect_records(
+            reader,
+            kmer_size,
+            min_kmers_pct,
+            kmer_set,
+            tid_to_chrom,
+            progress_bar,
+            found_items,
+            processed_items,
+        );
 
         all_records.extend(records);
     }
 
     finalize_progress(progress_bar, found_items, processed_items);
+}
+
+/// This function processes all or unmapped reads.
+/// # Arguments
+/// - `reader` - The reader to use for fetching reads.
+/// - `kmer_size` - The size of the k-mers to search for.
+/// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
+/// - `kmer_set` - The set of k-mers to search for.
+/// - `tid_to_chrom` - The mapping of TID to chromosome name.
+/// - `progress_bar` - The progress bar to update.
+/// - `found_items` - The number of found items.
+/// - `processed_items` - The number of processed items.
+///
+/// # Panics
+/// If the search option is not 'All' or 'Unmapped'.
+///
+/// # Returns
+/// A vector of all records.
+fn filter_and_collect_records(
+    reader: &mut IndexedReader,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    kmer_set: &HashSet<Vec<u8>>,
+    tid_to_chrom: &HashMap<i32, String>,
+    progress_bar: &Arc<ProgressBar>,
+    found_items: &Arc<AtomicUsize>,
+    processed_items: &Arc<AtomicUsize>,
+) -> Vec<BamRecord> {
+    const UPDATE_FREQUENCY: usize = 1_000_000;
+
+    reader
+        .records()
+        .par_bridge()
+        .flat_map(|record| record.ok())
+        .filter_map(|read| {
+            update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+
+            if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
+                update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+                Some(read)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// This function prepares the fetches for searching.
@@ -505,7 +616,6 @@ fn prepare_fetches(
         panic!("Invalid search option");
     }
 }
-
 
 /// This function creates a fetch definition.
 ///
@@ -545,7 +655,6 @@ fn create_fetch_definition<'a>(
         ),
     }
 }
-
 
 /// This function updates the processed progress.
 ///
@@ -633,60 +742,3 @@ fn finalize_progress(progress_bar: &Arc<ProgressBar>, found_items: &Arc<AtomicUs
     ));
     progress_bar.finish();
 }
-
-/// This function will either process all reads or only reads from the specified contigs
-/// and update all_records with the found reads.
-///
-/// # Arguments
-/// - `reader` - The reader to use for fetching reads.
-/// - `search_option` - Whether to search all reads or not.
-/// - `kmer_size` - The size of the k-mers to search for.
-/// - `min_kmers_pct` - The minimum percentage of k-mers to search for.
-/// - `kmer_set` - The set of k-mers to search for.
-/// - `tid_to_chrom` - The mapping of TID to chromosome name.
-/// - `progress_bar` - The progress bar to update.
-/// - `found_items` - The number of found items.
-/// - `processed_items` - The number of processed items.
-/// - `all_records` - The vector of all records.
-///
-/// # Panics
-/// If the search option is invalid.
-fn process_all_or_unmapped_reads(
-    reader: &mut IndexedReader,
-    search_option: &SearchOption,
-    kmer_size: usize,
-    min_kmers_pct: usize,
-    kmer_set: &HashSet<Vec<u8>>,
-    tid_to_chrom: &HashMap<i32, String>,
-    progress_bar: &Arc<ProgressBar>,
-    found_items: &Arc<AtomicUsize>,
-    processed_items: &Arc<AtomicUsize>,
-    all_records: &mut Vec<BamRecord>,
-) {
-    const UPDATE_FREQUENCY: usize = 1_000_000;
-
-    let fetch_definition = create_fetch_definition(search_option, None, None);
-
-    reader.fetch(fetch_definition).expect("Failed to fetch reads");
-
-    let records: Vec<_> = reader
-        .records()
-        .par_bridge()
-        .flat_map(|record| record.ok())
-        .filter_map(|read| {
-            update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
-
-            if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
-                update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
-                Some(read)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    finalize_progress(progress_bar, found_items, processed_items);
-
-    all_records.extend(records);
-}
-
