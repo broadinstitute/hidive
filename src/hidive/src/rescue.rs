@@ -219,7 +219,7 @@ fn populate_fetches(
     if let Some(loci) = loci {
         skydive::elog!("Setting loci from input...");
         let loci = skydive::parse::parse_loci(loci, 0);
-        for (contig, start, stop, name) in loci {
+        for (contig, start, stop, _) in loci {
             match Interval::new(start as i32..stop as i32) {
                 Ok(interval) => fetches.push((contig, interval)),
                 Err(e) => {
