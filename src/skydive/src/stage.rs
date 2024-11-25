@@ -161,7 +161,7 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
 }
 
 // Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_aligned_bam_reads(
+pub fn extract_aligned_bam_reads(
     _basename: &str,
     bam: &mut IndexedReader,
     chr: &str,

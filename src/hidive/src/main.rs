@@ -65,6 +65,7 @@ mod recruit;
 mod train;
 mod trim;
 mod eval_model;
+mod call;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -402,6 +403,26 @@ enum Commands {
         #[clap(required = false, value_parser)]
         short_read_fasta_path: PathBuf,
     },
+
+    /// Call and phase variants.
+    #[clap(arg_required_else_help = true)]
+    Call {
+        /// Output path for assembled short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// FASTA reference sequence.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
+    },
 }
 
 fn main() {
@@ -563,6 +584,20 @@ fn main() {
                 short_read_fasta_path
             );
         }
+        Commands::Call {
+            output,
+            loci,
+            reference_fasta_path,
+            bam_path,
+        } => {
+            call::start(
+                &output,
+                &loci,
+                &reference_fasta_path,
+                &bam_path
+            );
+        }
+
     }
 
     skydive::elog!("Complete. Elapsed time: {}.", elapsed_time(start_time));
