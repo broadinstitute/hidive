@@ -10,7 +10,7 @@ RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
     curl wget bzip2 make gcc cmake g++ keychain git build-essential zlib1g-dev libssl-dev lbzip2 \
     libbz2-dev libcurl4-gnutls-dev libncurses5-dev libstdc++6 libncursesw5-dev liblzma-dev clang \
-    libclang-dev pkg-config libtcmalloc-minimal4 python3-dev python3-setuptools && \
+    libclang-dev pkg-config libtcmalloc-minimal4 python3-dev python3-setuptools fontconfig && \
     rm -rf /var/lib/apt/lists/*
 
 # Reduced gcloud installation (from framegrace: https://github.com/GoogleCloudPlatform/gsutil/issues/1732#issuecomment-2029591598)
@@ -58,6 +58,11 @@ RUN wget -O samtools-1.21.tar.bz2 https://github.com/samtools/samtools/releases/
 
 # Final stage
 FROM python:3.9-slim
+
+# Install fontconfig in final image
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fontconfig && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy necessary files from builder stage
 COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
