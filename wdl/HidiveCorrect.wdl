@@ -31,7 +31,7 @@ workflow Hidive {
     call Correct {
         input:
             model = model,
-            long_read_fasta = Fetch.fasta,
+            long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
     }
 
@@ -71,7 +71,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -120,7 +120,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "~{num_cpus} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -130,20 +130,21 @@ task Rescue {
 task Correct {
     input {
         File model
-        File long_read_fasta
+        String long_reads_bam
         File short_read_fasta
 
+        String locus
         String prefix = "out"
 
         Int num_cpus = 4
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([model, long_read_fasta, short_read_fasta], "GB"))
+    Int disk_size_gb = 1 + 2*ceil(size([model, short_read_fasta], "GB"))
 
     command <<<
         set -euxo pipefail
 
-        hidive correct -m ~{model} -g {prefix}.gfa ~{long_read_fasta} ~{short_read_fasta} > ~{prefix}.fa
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} > ~{prefix}.fa
     >>>
 
     output {
@@ -152,7 +153,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.85"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "4 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -182,7 +183,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.78"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
