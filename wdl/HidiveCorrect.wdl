@@ -30,6 +30,7 @@ workflow Hidive {
 
     call Correct {
         input:
+            locus = locus,
             model = model,
             long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
