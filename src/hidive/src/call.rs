@@ -39,13 +39,6 @@ pub fn start(
 
     for (chr, start, stop, name) in loci {
         let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
-
-        let seq = fasta
-            .fetch_seq_string(&chr, usize::try_from(start).unwrap(), usize::try_from(stop - 1).unwrap())
-            .unwrap()
-            .as_bytes()
-            .to_vec();
-
         let mut bam = skydive::stage::open_bam(&bam_url).unwrap();
 
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
@@ -53,9 +46,10 @@ pub fn start(
 
         let mut read_ids = HashMap::new();
         let mut matrix = Vec::new();
+        let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
 
         let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
-        for p in bam.pileup() {
+        for (cursor, p) in bam.pileup().enumerate() {
             let pileup = p.unwrap();
 
             let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pileup.pos()).unwrap(), usize::try_from(pileup.pos()).unwrap()).unwrap();
@@ -116,22 +110,86 @@ pub fn start(
             if is_variant {
                 // skydive::elog!("Variant found at {}:{} {} ({:?})", chr, pileup.pos() + 1, ref_base, alleles);
                 matrix.push(allele_map);
+                // metadata.push((pileup.pos(), ref_base));
+                // metadata.insert(cursor, ref_base);
+                metadata.insert(pileup.pos() + 1, String::from_utf8(vec![ref_base]).unwrap());
             }
         }
 
         let (h1, h2) = phase_variants(&matrix);
 
-        skydive::elog!("Haplotype 1: {:?}", h1);
-        skydive::elog!("Haplotype 2: {:?}", h2);
+        skydive::elog!("Haplotype 1: {:?} ({})", h1, h1.len());
+        skydive::elog!("Haplotype 2: {:?} ({})", h2, h2.len());
+        skydive::elog!("Metadata: {:?}", metadata);
+
+        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+
+        /*
+        let seq = fasta
+            .fetch_seq_string(&chr, usize::try_from(start).unwrap(), usize::try_from(stop - 1).unwrap())
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+        */
+
+        let mut hap1 = Vec::new();
+        let mut hap2 = Vec::new();
+
+        let mut cursor = 0;
+        for pos in start as u32..stop as u32 {
+            let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
+
+            if metadata.contains_key(&pos) {
+                let a1 = h1[cursor].clone();
+                let a2 = h2[cursor].clone();
+
+                hap1.push(a1.unwrap_or(ref_str.clone()));
+                hap2.push(a2.unwrap_or(ref_str.clone()));
+
+                cursor += 1;
+            } else {
+                hap1.push(ref_str.clone());
+                hap2.push(ref_str.clone());
+            }
+        }
+
+
+        /*
+        let mut cursor = 0;
+        for (pos, &base) in seq.iter().enumerate() {
+            if metadata.contains_key(&pos) {
+                let a1 = h1[cursor].clone();
+                let a2 = h2[cursor].clone();
+
+                hap1.push(a1.unwrap_or(String::from_utf8(vec![base]).unwrap()));
+                hap2.push(a2.unwrap_or(String::from_utf8(vec![base]).unwrap()));
+
+                cursor += 1;
+            } else {
+                hap1.push(String::from_utf8(vec![base]).unwrap());
+                hap2.push(String::from_utf8(vec![base]).unwrap());
+            }
+        }
+        */
+
+        let h1 = hap1.join("").replace("-", "");
+        let h2 = hap2.join("").replace("-", "");
+
+        let mut output = File::create(output).expect("Failed to create output file");
+        writeln!(output, ">h1").expect("Failed to write to output file");
+        writeln!(output, "{}", h1).expect("Failed to write to output file");
+        writeln!(output, ">h2").expect("Failed to write to output file");
+        writeln!(output, "{}", h2).expect("Failed to write to output file");
     }
 }
 
-fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<u8>, Vec<u8>) {
+fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<String>>, Vec<Option<String>>) {
     let num_snps = matrix.len();
     let num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(&0) + 1).max().unwrap_or(0);
 
     let mut reads = vec![vec![None; num_snps]; num_reads];
     let mut confidences = vec![vec![None; num_snps]; num_reads];
+    let mut all_alleles = vec![HashMap::new(); num_snps];
 
     for (snp_idx, column) in matrix.iter().enumerate() {
         // Count frequency of each allele in this column
@@ -155,17 +213,36 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<u8>, Vec<
 
         let allele_map = alleles.iter().enumerate().map(|(i, a)| (a, i as u8)).collect::<HashMap<_, _>>();
 
+        let mut index_map = HashMap::new();
+
         for (&read_idx, (allele, qual)) in column {
             if let Some(allele_idx) = allele_map.get(allele) {
                 reads[read_idx][snp_idx] = Some(*allele_idx);
                 confidences[read_idx][snp_idx] = Some(*qual as u32);
+
+                index_map.insert(*allele_idx, allele.clone());
             }
         }
+
+        all_alleles[snp_idx] = index_map;
     }
 
     let wmec_matrix = WMECData::new(reads, confidences);
 
-    let (h1, h2) = skydive::wmec::phase(&wmec_matrix);
+    let (p1, p2) = skydive::wmec::phase(&wmec_matrix);
+
+    let mut h1 = Vec::new();
+    let mut h2 = Vec::new();
+    for i in 0..p1.len() {
+        // h1.push(all_alleles[i].get(&p1[i]).unwrap().clone());
+        // h2.push(all_alleles[i].get(&p2[i]).unwrap().clone());
+
+        let a1 = all_alleles[i].get(&p1[i]).cloned();
+        let a2 = all_alleles[i].get(&p2[i]).cloned();
+
+        h1.push(a1);
+        h2.push(a2);
+    }
 
     (h1, h2)
 }
