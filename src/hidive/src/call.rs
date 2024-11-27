@@ -52,6 +52,12 @@ pub fn start(
         for (cursor, p) in bam.pileup().enumerate() {
             let pileup = p.unwrap();
 
+            // skydive::elog!("Processing position {}:{}-{} {}...", chr, start, stop, pileup.pos() + 1);
+
+            if pileup.pos() + 1 < start as u32 || pileup.pos() + 1 > stop as u32 {
+                continue;
+            }
+
             let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pileup.pos()).unwrap(), usize::try_from(pileup.pos()).unwrap()).unwrap();
             let ref_base = ref_str.as_bytes()[0];
 
@@ -80,7 +86,7 @@ pub fn start(
 
                 match alignment.indel() {
                     rust_htslib::bam::pileup::Indel::Ins(len) => {
-                        let qpos_start = alignment.qpos().unwrap() + 1;
+                        let qpos_start = alignment.qpos().unwrap();
                         let qpos_stop = alignment.qpos().unwrap() + 1 + (len as usize);
                         let seq = record.seq().as_bytes()[qpos_start..qpos_stop].to_vec();
                         let qual = record.qual()[qpos_start..qpos_stop].to_vec();

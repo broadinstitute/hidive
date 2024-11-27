@@ -150,7 +150,6 @@ task Correct {
 
     output {
         File fasta = "~{prefix}.fa"
-        File gfa = "~{prefix}.gfa"
     }
 
     runtime {
