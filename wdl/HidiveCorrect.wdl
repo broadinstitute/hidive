@@ -46,7 +46,8 @@ workflow Hidive {
         input:
             locus = locus,
             reference = reference,
-            long_reads_bam = long_reads_bam,
+            aligned_reads_bam = AlignReads.aligned_bam,
+            aligned_reads_bai = AlignReads.aligned_bai,
     }
 
     call Align as AlignHaplotypes {
@@ -210,7 +211,8 @@ task Align {
 task Call {
     input {
         File reference
-        String long_reads_bam
+        File aligned_reads_bam
+        File aligned_reads_bai
 
         String locus
         String prefix = "out"
@@ -223,7 +225,7 @@ task Call {
     command <<<
         set -euxo pipefail
 
-        hidive call -l "~{locus}" -r ~{reference} ~{long_reads_bam} > ~{prefix}.fa
+        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} > ~{prefix}.fa
     >>>
 
     output {
