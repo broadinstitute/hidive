@@ -55,6 +55,7 @@ use clap::{Parser, Subcommand};
 mod build;
 mod cluster;
 mod coassemble;
+mod assemble;
 mod correct;
 mod fetch;
 mod filter;
@@ -64,6 +65,7 @@ mod recruit;
 mod train;
 mod trim;
 mod eval_model;
+mod call;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -75,6 +77,7 @@ struct Cli {
 }
 
 const DEFAULT_KMER_SIZE: usize = 17;
+const DEFAULT_WINDOW_SIZE: usize = 1000;
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -315,7 +318,7 @@ enum Commands {
 
     /// Error-correct long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
-    Correct {
+    Assemble {
         /// Output path for corrected reads.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -327,6 +330,38 @@ enum Commands {
         /// Kmer-size
         #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
         kmer_size: usize,
+
+        /// Trained error-cleaning model.
+        #[clap(short, long, required = true, value_parser)]
+        model_path: PathBuf,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
+    },
+
+    /// Error-clean long reads using a linked de Bruijn graph.
+    #[clap(arg_required_else_help = true)]
+    Correct {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Window size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_WINDOW_SIZE)]
+        window_size: usize,
 
         /// Trained error-cleaning model.
         #[clap(short, long, required = true, value_parser)]
@@ -367,6 +402,26 @@ enum Commands {
         /// FASTA files with short-read sequences (may contain one or more samples).
         #[clap(required = false, value_parser)]
         short_read_fasta_path: PathBuf,
+    },
+
+    /// Call and phase variants.
+    #[clap(arg_required_else_help = true)]
+    Call {
+        /// Output path for assembled short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// FASTA reference sequence.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
     },
 }
 
@@ -483,7 +538,7 @@ fn main() {
         Commands::Impute { output, graph } => {
             impute::start(&output, &graph);
         }
-        Commands::Correct {
+        Commands::Assemble {
             output,
             gfa_output,
             kmer_size,
@@ -491,7 +546,26 @@ fn main() {
             long_read_fasta_path,
             short_read_fasta_path,
         } => {
-            correct::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
+            assemble::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
+        }
+        Commands::Correct {
+            output,
+            loci,
+            kmer_size,
+            window_size,
+            model_path,
+            long_read_fasta_path,
+            short_read_fasta_path,
+        } => {
+            correct::start(
+                &output,
+                &loci,
+                kmer_size,
+                window_size,
+                &model_path,
+                &long_read_fasta_path,
+                &short_read_fasta_path
+            );
         }
         Commands::Coassemble {
             output,
@@ -510,6 +584,20 @@ fn main() {
                 short_read_fasta_path
             );
         }
+        Commands::Call {
+            output,
+            loci,
+            reference_fasta_path,
+            bam_path,
+        } => {
+            call::start(
+                &output,
+                &loci,
+                &reference_fasta_path,
+                &bam_path
+            );
+        }
+
     }
 
     skydive::elog!("Complete. Elapsed time: {}.", elapsed_time(start_time));

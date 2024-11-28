@@ -161,7 +161,7 @@ fn get_sm_name_from_rg(read: &bam::Record, rg_sm_map: &HashMap<String, String>) 
 }
 
 // Function to extract seqs from a BAM file within a specified genomic region.
-fn extract_aligned_bam_reads(
+pub fn extract_aligned_bam_reads(
     _basename: &str,
     bam: &mut IndexedReader,
     chr: &str,
@@ -450,6 +450,28 @@ pub fn stage_data(
     let _ = fasta_writer.flush();
 
     Ok(all_data.len())
+}
+
+pub fn stage_data_in_memory(
+    loci: &HashSet<(String, u64, u64, String)>,
+    seq_urls: &HashSet<Url>,
+    unmapped: bool,
+    cache_path: &PathBuf,
+) -> Result<Vec<fasta::Record>> {
+    let current_dir = env::current_dir()?;
+    env::set_current_dir(cache_path).unwrap();
+
+    // Stage data from all BAM files.
+    let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped) {
+        Ok(all_data) => all_data,
+        Err(e) => {
+            panic!("Error: {e}");
+        }
+    };
+
+    env::set_current_dir(current_dir).unwrap();
+
+    Ok(all_data)
 }
 
 #[cfg(test)]

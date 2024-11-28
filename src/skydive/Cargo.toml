@@ -47,6 +47,7 @@ rayon = "1.10.0"
 regex = "1.10.5"
 reqwest = { version = "0.12.5", features = ["blocking"]}
 rust-htslib = { version = "0.47.0", features = ["curl", "gcs"] }
+sdust = "=0.1.0"
 # serde = "1.0.204"
 # serde_derive = "1.0.204"
 serde_json = "1.0.120"

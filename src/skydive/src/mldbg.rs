@@ -241,6 +241,12 @@ impl MLdBG {
 
         ldbg.scores = self.scores.clone();
 
+        for l in &self.ldbgs {
+            for cn_kmer in l.noise.iter() {
+                ldbg.noise.insert(cn_kmer.clone());
+            }
+        }
+
         ldbg.infer_edges();
 
         ldbg

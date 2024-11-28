@@ -23,7 +23,8 @@ indicatif = { version = "0.17.8", features = ["rayon"] }
 itertools = "0.13.0"
 # linfa = "0.5"
 linked-hash-map = "0.5.6"
-minimap2 = { version = "0.1.20+minimap2.2.28", features = ["simde"] }
+# minimap2 = { version = "0.1.20+minimap2.2.28", features = ["simde"] }
+minimap2 = "0.1.21"
 needletail = "0.5.1"
 # noodles = "0.78.0"
 # ndarray = "0.15"
@@ -36,10 +37,11 @@ petgraph = "0.6.5"
 rand = "0.8.5"
 rayon = "1.10.0"
 #recgraph = { git = "https://github.com/AlgoLab/RecGraph" }
-# regex = "1.10.5"
+regex = "1.10.5"
 #russcip = "0.3.4"
 rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
 # rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
+sdust = "=0.1.0"
 serde = "1.0.204"
 serde_json = "1.0.120"
 spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}

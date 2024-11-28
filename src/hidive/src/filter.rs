@@ -97,7 +97,7 @@ pub fn start(output: &PathBuf, gfa_path: &PathBuf, short_read_fasta_paths: &Vec<
                     }
 
                     let count = aligner
-                        .map(&sr_seq, false, false, None, None)
+                        .map(&sr_seq, false, false, None, None, None)
                         .iter()
                         .flatten()
                         .filter_map(|a| {
