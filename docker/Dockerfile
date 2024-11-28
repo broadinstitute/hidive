@@ -61,7 +61,8 @@ FROM python:3.9-slim
 
 # Install some libraries in final image
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends fontconfig libcurl4-gnutls-dev && \
+    apt-get install -y --no-install-recommends fontconfig libcurl4-gnutls-dev \
+    libbz2-dev zlib1g-dev libncurses5-dev libncursesw5-dev liblzma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy necessary files from builder stage
