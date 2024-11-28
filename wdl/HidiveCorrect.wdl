@@ -174,7 +174,9 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} ~{sequences} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+        grep '^@' -A1 ~{sequences} | grep -v -- "^--$" | sed 's/^@/>/' | \
+            minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} - | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
