@@ -181,7 +181,7 @@ task Align {
 
     output {
         File aligned_bam = "~{prefix}.bam"
-        File aligned_bai = "~{prefix}.bam.bai"
+        File aligned_bai = "~{prefix}.bam.csi"
     }
 
     runtime {
