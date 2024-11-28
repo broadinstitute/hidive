@@ -47,6 +47,7 @@ pub fn start(
         let mut read_ids = HashMap::new();
         let mut matrix = Vec::new();
         let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
+        let mut mloci = Vec::new();
 
         let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
         for (cursor, p) in bam.pileup().enumerate() {
@@ -119,6 +120,7 @@ pub fn start(
                 // metadata.push((pileup.pos(), ref_base));
                 // metadata.insert(cursor, ref_base);
                 metadata.insert(pileup.pos() + 1, String::from_utf8(vec![ref_base]).unwrap());
+                mloci.push(pileup.pos());
             }
         }
 
@@ -128,55 +130,36 @@ pub fn start(
         skydive::elog!("Haplotype 2: {:?} ({})", h2, h2.len());
         skydive::elog!("Metadata: {:?}", metadata);
 
-        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+        let mut hap_alleles = HashMap::new();
+        for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
+            if a1.is_some() && a2.is_some() {
+                hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
+            } else if a1.is_some() && a2.is_none() {
+                hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
+            } else if a1.is_none() && a2.is_some() {
+                hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
+            }
+        }
 
-        /*
-        let seq = fasta
-            .fetch_seq_string(&chr, usize::try_from(start).unwrap(), usize::try_from(stop - 1).unwrap())
-            .unwrap()
-            .as_bytes()
-            .to_vec();
-        */
+        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
 
         let mut hap1 = Vec::new();
         let mut hap2 = Vec::new();
 
-        let mut cursor = 0;
         for pos in start as u32..stop as u32 {
             let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
 
-            if metadata.contains_key(&pos) {
-                let a1 = h1[cursor].clone();
-                let a2 = h2[cursor].clone();
+            if hap_alleles.contains_key(&pos) {
+                let a1 = hap_alleles.get(&pos).unwrap().0.clone();
+                let a2 = hap_alleles.get(&pos).unwrap().1.clone();
 
-                hap1.push(a1.unwrap_or(ref_str.clone()));
-                hap2.push(a2.unwrap_or(ref_str.clone()));
-
-                cursor += 1;
+                hap1.push(a1);
+                hap2.push(a2);
             } else {
                 hap1.push(ref_str.clone());
                 hap2.push(ref_str.clone());
             }
         }
-
-
-        /*
-        let mut cursor = 0;
-        for (pos, &base) in seq.iter().enumerate() {
-            if metadata.contains_key(&pos) {
-                let a1 = h1[cursor].clone();
-                let a2 = h2[cursor].clone();
-
-                hap1.push(a1.unwrap_or(String::from_utf8(vec![base]).unwrap()));
-                hap2.push(a2.unwrap_or(String::from_utf8(vec![base]).unwrap()));
-
-                cursor += 1;
-            } else {
-                hap1.push(String::from_utf8(vec![base]).unwrap());
-                hap2.push(String::from_utf8(vec![base]).unwrap());
-            }
-        }
-        */
 
         let h1 = hap1.join("").replace("-", "");
         let h2 = hap2.join("").replace("-", "");
