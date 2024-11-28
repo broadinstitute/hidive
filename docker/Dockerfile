@@ -59,9 +59,9 @@ RUN wget -O samtools-1.21.tar.bz2 https://github.com/samtools/samtools/releases/
 # Final stage
 FROM python:3.9-slim
 
-# Install fontconfig in final image
+# Install some libraries in final image
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends fontconfig && \
+    apt-get install -y --no-install-recommends fontconfig libcurl4-gnutls-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy necessary files from builder stage
