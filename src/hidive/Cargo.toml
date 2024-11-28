@@ -23,7 +23,8 @@ indicatif = { version = "0.17.8", features = ["rayon"] }
 itertools = "0.13.0"
 # linfa = "0.5"
 linked-hash-map = "0.5.6"
-minimap2 = { version = "0.1.20+minimap2.2.28", features = ["simde"] }
+# minimap2 = { version = "0.1.20+minimap2.2.28", features = ["simde"] }
+minimap2 = "0.1.21"
 needletail = "0.5.1"
 # noodles = "0.78.0"
 # ndarray = "0.15"

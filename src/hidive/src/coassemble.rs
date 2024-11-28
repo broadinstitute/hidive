@@ -81,7 +81,7 @@ fn refine_haplotype(asm: String, ref_path: PathBuf, ref_seq: &Vec<u8>) -> String
 
     let results = vec![asm]
         .iter()
-        .map(|hap| aligner.map(hap.as_bytes(), true, false, None, None).unwrap())
+        .map(|hap| aligner.map(hap.as_bytes(), true, false, None, None, None).unwrap())
         .collect::<Vec<_>>();
 
     let mut alt_seq: Vec<u8> = Vec::new();
