@@ -36,16 +36,31 @@ workflow Hidive {
             short_read_fasta = Rescue.fasta,
     }
 
-    call Align {
+    call Align as AlignReads {
         input:
             reference = reference,
             sequences = Correct.fasta,
     }
 
+    call Call {
+        input:
+            locus = locus,
+            reference = reference,
+            long_reads_bam = long_reads_bam,
+    }
+
+    call Align as AlignHaplotypes {
+        input:
+            reference = reference,
+            sequences = Call.fasta,
+    }
+
     output {
         File corrected_fa = Correct.fasta
-        File aligned_bam = Align.aligned_bam
-        File aligned_bai = Align.aligned_bai
+        File aligned_reads_bam = AlignReads.aligned_bam
+        File aligned_reads_bai = AlignReads.aligned_bai
+        File aligned_haplotypes_bam = AlignHaplotypes.aligned_bam
+        File aligned_haplotypes_bai = AlignHaplotypes.aligned_bai
     }
 }
 
@@ -189,5 +204,36 @@ task Align {
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
+    }
+}
+
+task Call {
+    input {
+        File reference
+        String long_reads_bam
+
+        String locus
+        String prefix = "out"
+
+        Int num_cpus = 4
+    }
+
+    Int disk_size_gb = 4
+
+    command <<<
+        set -euxo pipefail
+
+        hidive call -l "~{locus}" -r ~{reference} ~{long_reads_bam} > ~{prefix}.fa
+    >>>
+
+    output {
+        File fasta = "~{prefix}.fa"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
+        memory: "4 GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
