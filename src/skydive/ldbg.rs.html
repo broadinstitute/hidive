@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/ldbg.rs`."><title>ldbg.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-492a78a4a87dcc01.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.82.0 (f6e511eec 2024-10-15)" data-channel="1.82.0" data-search-js="search-a99f1315e7cc5121.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-921df33f47b8780c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-3b12f09e550e0385.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/ldbg.rs`."><title>ldbg.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">skydive/</div>ldbg.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -3938,7 +3939,86 @@
 <a href="#3938" id="3938">3938</a>
 <a href="#3939" id="3939">3939</a>
 <a href="#3940" id="3940">3940</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
+<a href="#3941" id="3941">3941</a>
+<a href="#3942" id="3942">3942</a>
+<a href="#3943" id="3943">3943</a>
+<a href="#3944" id="3944">3944</a>
+<a href="#3945" id="3945">3945</a>
+<a href="#3946" id="3946">3946</a>
+<a href="#3947" id="3947">3947</a>
+<a href="#3948" id="3948">3948</a>
+<a href="#3949" id="3949">3949</a>
+<a href="#3950" id="3950">3950</a>
+<a href="#3951" id="3951">3951</a>
+<a href="#3952" id="3952">3952</a>
+<a href="#3953" id="3953">3953</a>
+<a href="#3954" id="3954">3954</a>
+<a href="#3955" id="3955">3955</a>
+<a href="#3956" id="3956">3956</a>
+<a href="#3957" id="3957">3957</a>
+<a href="#3958" id="3958">3958</a>
+<a href="#3959" id="3959">3959</a>
+<a href="#3960" id="3960">3960</a>
+<a href="#3961" id="3961">3961</a>
+<a href="#3962" id="3962">3962</a>
+<a href="#3963" id="3963">3963</a>
+<a href="#3964" id="3964">3964</a>
+<a href="#3965" id="3965">3965</a>
+<a href="#3966" id="3966">3966</a>
+<a href="#3967" id="3967">3967</a>
+<a href="#3968" id="3968">3968</a>
+<a href="#3969" id="3969">3969</a>
+<a href="#3970" id="3970">3970</a>
+<a href="#3971" id="3971">3971</a>
+<a href="#3972" id="3972">3972</a>
+<a href="#3973" id="3973">3973</a>
+<a href="#3974" id="3974">3974</a>
+<a href="#3975" id="3975">3975</a>
+<a href="#3976" id="3976">3976</a>
+<a href="#3977" id="3977">3977</a>
+<a href="#3978" id="3978">3978</a>
+<a href="#3979" id="3979">3979</a>
+<a href="#3980" id="3980">3980</a>
+<a href="#3981" id="3981">3981</a>
+<a href="#3982" id="3982">3982</a>
+<a href="#3983" id="3983">3983</a>
+<a href="#3984" id="3984">3984</a>
+<a href="#3985" id="3985">3985</a>
+<a href="#3986" id="3986">3986</a>
+<a href="#3987" id="3987">3987</a>
+<a href="#3988" id="3988">3988</a>
+<a href="#3989" id="3989">3989</a>
+<a href="#3990" id="3990">3990</a>
+<a href="#3991" id="3991">3991</a>
+<a href="#3992" id="3992">3992</a>
+<a href="#3993" id="3993">3993</a>
+<a href="#3994" id="3994">3994</a>
+<a href="#3995" id="3995">3995</a>
+<a href="#3996" id="3996">3996</a>
+<a href="#3997" id="3997">3997</a>
+<a href="#3998" id="3998">3998</a>
+<a href="#3999" id="3999">3999</a>
+<a href="#4000" id="4000">4000</a>
+<a href="#4001" id="4001">4001</a>
+<a href="#4002" id="4002">4002</a>
+<a href="#4003" id="4003">4003</a>
+<a href="#4004" id="4004">4004</a>
+<a href="#4005" id="4005">4005</a>
+<a href="#4006" id="4006">4006</a>
+<a href="#4007" id="4007">4007</a>
+<a href="#4008" id="4008">4008</a>
+<a href="#4009" id="4009">4009</a>
+<a href="#4010" id="4010">4010</a>
+<a href="#4011" id="4011">4011</a>
+<a href="#4012" id="4012">4012</a>
+<a href="#4013" id="4013">4013</a>
+<a href="#4014" id="4014">4014</a>
+<a href="#4015" id="4015">4015</a>
+<a href="#4016" id="4016">4016</a>
+<a href="#4017" id="4017">4017</a>
+<a href="#4018" id="4018">4018</a>
+<a href="#4019" id="4019">4019</a>
+<a href="#4020" id="4020">4020</a></pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>itertools::Itertools;
 <span class="kw">use </span>linked_hash_map::LinkedHashMap;
 
@@ -3973,6 +4053,7 @@
 <span class="kw">type </span>KmerScores = HashMap&lt;Vec&lt;u8&gt;, f32&gt;;
 <span class="kw">type </span>Links = HashMap&lt;Vec&lt;u8&gt;, HashMap&lt;Link, u16&gt;&gt;;
 <span class="kw">type </span>Sources = HashMap&lt;Vec&lt;u8&gt;, Vec&lt;usize&gt;&gt;;
+<span class="kw">type </span>KmerNoise = HashSet&lt;Vec&lt;u8&gt;&gt;;
 
 <span class="doccomment">/// Represents a linked de Bruijn graph with a k-mer size specified at construction time.
 </span><span class="attr">#[derive(Debug, Clone)]
@@ -3983,6 +4064,7 @@
     <span class="kw">pub </span>scores: KmerScores,
     <span class="kw">pub </span>links: Links,
     <span class="kw">pub </span>sources: Sources,
+    <span class="kw">pub </span>noise: KmerNoise,
     <span class="kw">pub </span>verbose: bool,
 }
 
@@ -3996,6 +4078,7 @@
             scores: KmerScores::new(),
             links: Links::new(),
             sources: Sources::new(),
+            noise: KmerNoise::new(),
             verbose: <span class="bool-val">false</span>,
         }
     }
@@ -4033,6 +4116,7 @@
         <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
         <span class="kw">let </span>links: Links = Links::new();
         <span class="kw">let </span>sources: Sources = Sources::new();
+        <span class="kw">let </span>noise: KmerNoise = <span class="self">Self</span>::find_noise(<span class="kw-2">&amp;</span>fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -4041,6 +4125,7 @@
             scores,
             links,
             sources,
+            noise,
             verbose: <span class="bool-val">false</span>,
         }
     }
@@ -4079,6 +4164,7 @@
         <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
         <span class="kw">let </span>links: Links = Links::new();
         <span class="kw">let </span>sources: Sources = Sources::new();
+        <span class="kw">let </span>noise: KmerNoise = <span class="self">Self</span>::find_noise(<span class="kw-2">&amp;</span>fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -4087,6 +4173,7 @@
             scores,
             links,
             sources,
+            noise,
             verbose: <span class="bool-val">false</span>,
         }
     }
@@ -4114,6 +4201,7 @@
         <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
         <span class="kw">let </span>links: Links = Links::new();
         <span class="kw">let </span>sources: Sources = Sources::new();
+        <span class="kw">let </span>noise: KmerNoise = <span class="self">Self</span>::find_noise(<span class="kw-2">&amp;</span>fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -4122,6 +4210,7 @@
             scores,
             links,
             sources,
+            noise,
             verbose: <span class="bool-val">false</span>,
         }
     }
@@ -4147,6 +4236,7 @@
         <span class="kw">let </span>scores: KmerScores = kmers.keys().map(|k| (k.clone(), <span class="number">1.0</span>)).collect();
         <span class="kw">let </span>links: Links = Links::new();
         <span class="kw">let </span>sources: Sources = Sources::new();
+        <span class="kw">let </span>noise: KmerNoise = <span class="self">Self</span>::find_noise(<span class="kw-2">&amp;</span>fwd_seqs, kmer_size);
 
         LdBG {
             name,
@@ -4155,6 +4245,7 @@
             scores,
             links,
             sources,
+            noise,
             verbose: <span class="bool-val">false</span>,
         }
     }
@@ -4174,6 +4265,38 @@
         <span class="self">self</span>.verbose = verbose;
         <span class="self">self
     </span>}
+
+    <span class="kw">fn </span>find_noise(fwd_seqs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, kmer_size: usize) -&gt; HashSet&lt;Vec&lt;u8&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>noise: KmerNoise = KmerNoise::new();
+
+        <span class="kw">for </span>seq <span class="kw">in </span>fwd_seqs {
+            <span class="kw">let </span><span class="kw-2">mut </span>kmer_positions = HashMap::new();
+            <span class="kw">for </span>(i, fw_kmer) <span class="kw">in </span>seq.windows(kmer_size).enumerate() {
+                <span class="kw">let </span>cn_kmer = <span class="kw">crate</span>::utils::canonicalize_kmer(fw_kmer);
+                kmer_positions.entry(cn_kmer)
+                    .or_insert_with(Vec::new)
+                    .push(i);
+            }
+
+            <span class="kw">for </span>(cn_kmer, positions) <span class="kw">in </span>kmer_positions {
+                <span class="kw">if </span>positions.len() &gt; <span class="number">1 </span>{
+                    noise.insert(cn_kmer);
+                }
+            }
+
+            <span class="kw">for </span>range <span class="kw">in </span>sdust::symmetric_dust(seq) {
+                <span class="kw">if </span>range.len() &gt;= <span class="number">1 </span>{
+                    <span class="kw">for </span>fw_kmer <span class="kw">in </span>seq[range.start..range.end].windows(kmer_size) {
+                        <span class="kw">let </span>cn_kmer = <span class="kw">crate</span>::utils::canonicalize_kmer(fw_kmer);
+
+                        noise.insert(cn_kmer);
+                    }
+                }
+            }
+        }
+
+        noise
+    }
 
     <span class="doccomment">/// Build a de Bruijn graph from a vector of sequences.
     ///
@@ -4788,21 +4911,17 @@
             <span class="kw">let </span>kmer_in = g_seq[in_node].as_bytes();
             <span class="kw">let </span>kmer_out = g_seq[out_node].as_bytes();
 
-            <span class="kw">let </span>start_position = seq.windows(<span class="self">self</span>.kmer_size).position(|w| w == kmer_in);
-            <span class="kw">let </span>end_position = seq.windows(<span class="self">self</span>.kmer_size).position(|w| w == kmer_out);
-
-            <span class="kw">if </span>start_position.is_none() || end_position.is_none() || start_position.unwrap() &gt; end_position.unwrap() {
-                <span class="kw">continue</span>;
-            }
-
-            <span class="comment">// let paths_fw = petgraph::algo::all_simple_paths::&lt;Vec&lt;_&gt;, _&gt;(&amp;g_seq, in_node, out_node, 0, Some(interior.len()));
-            // let paths_rv = petgraph::algo::all_simple_paths::&lt;Vec&lt;_&gt;, _&gt;(&amp;g_seq, out_node, in_node, 0, Some(interior.len()));
-            // let all_paths = paths_fw.chain(paths_rv).collect::&lt;Vec&lt;Vec&lt;NodeIndex&gt;&gt;&gt;();
+            <span class="comment">// let start_position = seq.windows(self.kmer_size).position(|w| w == kmer_in);
+            // let end_position = seq.windows(self.kmer_size).position(|w| w == kmer_out);
 
             // crate::elog!("Superbubble: {} -&gt; {} ({} interior nodes)", String::from_utf8_lossy(kmer_in), String::from_utf8_lossy(kmer_out), interior.len());
+            // crate::elog!(" - start: {:?}", start_position);
+            // crate::elog!(" -   end: {:?}", end_position);
 
             </span><span class="kw">if </span>a_kmer_set.contains(<span class="kw-2">&amp;</span>kmer_in.to_vec()) &amp;&amp; a_kmer_set.contains(<span class="kw-2">&amp;</span>kmer_out.to_vec()) {
-                <span class="kw">let </span>paths_fwd = petgraph::algo::all_simple_paths::&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;(<span class="kw-2">&amp;</span>g_seq, in_node, out_node, <span class="number">0</span>, <span class="prelude-val">Some</span>(interior.len()));
+                <span class="comment">// crate::elog!(" - contains k-mers");
+
+                </span><span class="kw">let </span>paths_fwd = petgraph::algo::all_simple_paths::&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;(<span class="kw-2">&amp;</span>g_seq, in_node, out_node, <span class="number">0</span>, <span class="prelude-val">Some</span>(interior.len()));
                 <span class="kw">let </span>paths_rev = petgraph::algo::all_simple_paths::&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;(<span class="kw-2">&amp;</span>g_seq, out_node, in_node, <span class="number">0</span>, <span class="prelude-val">Some</span>(interior.len()));
 
                 <span class="kw">let </span><span class="kw-2">mut </span>paths = paths_fwd.chain(paths_rev)
@@ -4830,23 +4949,21 @@
 
                 paths.sort_by(|a, b| b.<span class="number">2</span>.partial_cmp(<span class="kw-2">&amp;</span>a.<span class="number">2</span>).unwrap());
 
-                <span class="comment">/*
-                for (path, score, seen_kmer_count) in &amp;paths {
-                    let mut contig = String::new();
+                <span class="kw">for </span>(path, score, seen_kmer_count) <span class="kw">in </span><span class="kw-2">&amp;</span>paths {
+                    <span class="kw">let </span><span class="kw-2">mut </span>contig = String::new();
 
-                    for node in path {
-                        if contig.is_empty() {
-                            contig.push_str(&amp;String::from_utf8_lossy(g_seq[*node].as_bytes()));
-                        } else {
-                            contig.push_str(&amp;String::from_utf8_lossy(&amp;g_seq[*node].as_bytes()[self.kmer_size - 1..]));
+                    <span class="kw">for </span>node <span class="kw">in </span>path {
+                        <span class="kw">if </span>contig.is_empty() {
+                            contig.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(g_seq[<span class="kw-2">*</span>node].as_bytes()));
+                        } <span class="kw">else </span>{
+                            contig.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(<span class="kw-2">&amp;</span>g_seq[<span class="kw-2">*</span>node].as_bytes()[<span class="self">self</span>.kmer_size - <span class="number">1</span>..]));
                         }
                     }
 
-                    crate::elog!("Contig: {} (score: {}, seen k-mer count: {})", contig, score, seen_kmer_count);
-                }
-                */
+                    <span class="comment">// crate::elog!("Contig: {} (score: {}, seen k-mer count: {})", contig, score, seen_kmer_count);
+                </span>}
 
-                </span><span class="kw">let </span>read_path = paths.first().cloned().unwrap();
+                <span class="kw">let </span>read_path = paths.first().cloned().unwrap();
                 <span class="kw">let </span>read_kmers = read_path.<span class="number">0</span>.iter().map(|node| g_seq[<span class="kw-2">*</span>node].as_bytes().to_vec()).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
                 <span class="comment">/*
@@ -4868,7 +4985,9 @@
                     <span class="kw">let </span>replacement_kmers = replacement_path.<span class="number">0</span>.iter().map(|node| g_seq[<span class="kw-2">*</span>node].as_bytes().to_vec()).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
                     replacements.push((read_kmers, replacement_kmers));
-                }
+
+                    <span class="comment">// crate::elog!(" - replaced");
+                </span>}
             }
         }
 
@@ -4896,9 +5015,11 @@
                 }
             }
 
-            <span class="comment">// crate::elog!("Replacing {}-{}\n{}\n{}", start_pos, end_pos, q1, r1);
+            <span class="macro">crate::elog!</span>(<span class="string">"Replacing {}-{} in read of length {}\n{}\n{}"</span>, start_pos, end_pos, b.len(), q1, r1);
 
-            </span>b.splice(start_pos..=end_pos, replacement_path);
+            <span class="kw">if </span>start_pos &lt;= end_pos {
+                b.splice(start_pos..=end_pos, replacement_path);
+            }
         }
 
         <span class="kw">let </span><span class="kw-2">mut </span>c = String::new();
@@ -4912,7 +5033,7 @@
         }
 
         <span class="comment">/*
-        let gfa_output = PathBuf::from("read.gfa");
+        let gfa_output = PathBuf::from(format!("read.{}.gfa", 0));
         let _ = crate::utils::write_gfa(&amp;mut File::create(gfa_output.clone()).unwrap(), &amp;g_seq);
 
         let csv_output = gfa_output.with_extension("csv");
@@ -5886,7 +6007,8 @@
         <span class="kw">let </span>kmer_size = <span class="self">self</span>.kmer_size;
 
         <span class="self">self
-            </span>.clean_tangles(<span class="number">0</span>, <span class="number">500</span>, threshold)
+            </span>.clean_hairballs()
+            .clean_tangles(<span class="number">0</span>, <span class="number">500</span>, threshold)
             .clean_tangles(<span class="number">1</span>, <span class="number">500</span>, threshold)
             .clean_tips(<span class="number">3</span><span class="kw-2">*</span>kmer_size, threshold)
             .clean_branches(threshold)
@@ -5975,9 +6097,9 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} bad paths specific to color {} ({} kmers)"</span>, bad_paths, color, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} bad paths specific to color {} ({} kmers)", bad_paths, color, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -6063,9 +6185,9 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} bad paths ({} kmers)"</span>, bad_paths, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} bad paths ({} kmers)", bad_paths, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -6128,9 +6250,23 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} tangles in color {} ({} kmers)"</span>, bad_tangles, color, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} tangles in color {} ({} kmers)", bad_tangles, color, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
+
+        <span class="self">self
+    </span>}
+
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>clean_hairballs(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="kw">for </span>cn_kmer <span class="kw">in </span><span class="self">self</span>.noise.iter() {
+            <span class="self">self</span>.kmers.remove(cn_kmer);
+            <span class="self">self</span>.scores.remove(cn_kmer);
+        }
+
+        <span class="comment">// crate::elog!(" -- Removed repetitive noise ({} kmers)", self.noise.len());
+
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -6199,9 +6335,9 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} bad tips ({} kmers)"</span>, bad_paths, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} bad tips ({} kmers)", bad_paths, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -6297,9 +6433,9 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} bad bubble paths ({} kmers)"</span>, num_bad_paths, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} bad bubble paths ({} kmers)", num_bad_paths, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -6357,9 +6493,9 @@
             <span class="self">self</span>.scores.remove(cn_kmer);
         }
 
-        <span class="macro">crate::elog!</span>(<span class="string">" -- Removed {} bad contigs ({} kmers)"</span>, bad_contigs, to_remove.len());
+        <span class="comment">// crate::elog!(" -- Removed {} bad contigs ({} kmers)", bad_contigs, to_remove.len());
 
-        <span class="self">self</span>.infer_edges();
+        </span><span class="self">self</span>.infer_edges();
 
         <span class="self">self
     </span>}
@@ -7045,13 +7181,13 @@
 </span>}
 
 <span class="attr">#[must_use]
-</span><span class="kw">pub fn </span>find_all_superbubbles(graph: <span class="kw-2">&amp;</span>petgraph::Graph&lt;String, f32&gt;) -&gt; LinkedHashMap&lt;(NodeIndex, NodeIndex), Vec&lt;NodeIndex&gt;&gt; {
+</span><span class="kw">pub fn </span>find_all_superbubbles_old(graph: <span class="kw-2">&amp;</span>petgraph::Graph&lt;String, f32&gt;) -&gt; LinkedHashMap&lt;(NodeIndex, NodeIndex), Vec&lt;NodeIndex&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>bubbles = LinkedHashMap::new();
 
     <span class="kw">let </span><span class="kw-2">mut </span>visited: HashSet&lt;NodeIndex&gt; = HashSet::new();
     <span class="kw">for </span>n <span class="kw">in </span>graph.node_indices() {
-        <span class="kw">if </span>!visited.contains(<span class="kw-2">&amp;</span>n) {
-            <span class="kw">for </span>d <span class="kw">in </span>[petgraph::Direction::Outgoing, petgraph::Direction::Incoming] {
+        <span class="comment">// if !visited.contains(&amp;n) {
+            </span><span class="kw">for </span>d <span class="kw">in </span>[petgraph::Direction::Outgoing, petgraph::Direction::Incoming] {
                 <span class="kw">let </span>bubble = find_superbubble(<span class="kw-2">&amp;</span>graph, n, d);
 
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(bubble) = bubble {
@@ -7063,6 +7199,30 @@
                     <span class="kw">if </span>!bubbles.contains_key(<span class="kw-2">&amp;</span>key_fwd) &amp;&amp; !bubbles.contains_key(<span class="kw-2">&amp;</span>key_rev) {
                         bubbles.insert((bubble.<span class="number">0</span>, bubble.<span class="number">1</span>), bubble.<span class="number">2</span>);
                     }
+                }
+            }
+        <span class="comment">// }
+    </span>}
+
+    bubbles
+}
+
+<span class="kw">pub fn </span>find_all_superbubbles(graph: <span class="kw-2">&amp;</span>petgraph::Graph&lt;String, f32&gt;) -&gt; LinkedHashMap&lt;(NodeIndex, NodeIndex), Vec&lt;NodeIndex&gt;&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>bubbles = LinkedHashMap::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>processed_pairs = HashSet::new();
+
+    <span class="kw">for </span>n <span class="kw">in </span>graph.node_indices() {
+        <span class="kw">for </span>d <span class="kw">in </span>[petgraph::Direction::Outgoing, petgraph::Direction::Incoming] {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>((start, end, interior)) = find_superbubble(graph, n, d) {
+                <span class="comment">// Create both possible orderings of the pair
+                </span><span class="kw">let </span>pair_forward = (start.index(), end.index());
+                <span class="kw">let </span>pair_reverse = (end.index(), start.index());
+                
+                <span class="comment">// Only process this bubble if we haven't seen it before
+                </span><span class="kw">if </span>!processed_pairs.contains(<span class="kw-2">&amp;</span>pair_forward) &amp;&amp; !processed_pairs.contains(<span class="kw-2">&amp;</span>pair_reverse) {
+                    bubbles.insert((start, end), interior);
+                    processed_pairs.insert(pair_forward);
+                    processed_pairs.insert(pair_reverse);
                 }
             }
         }

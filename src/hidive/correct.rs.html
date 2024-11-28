@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/correct.rs`."><title>correct.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-492a78a4a87dcc01.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.82.0 (f6e511eec 2024-10-15)" data-channel="1.82.0" data-search-js="search-a99f1315e7cc5121.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-921df33f47b8780c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-3b12f09e550e0385.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/correct.rs`."><title>correct.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hidive/</div>correct.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -80,85 +81,242 @@
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet};
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{HashMap, HashSet};
 <span class="kw">use </span>std::{fs::File, path::PathBuf, io::Write};
 
-<span class="kw">use </span>needletail::Sequence;
-<span class="kw">use </span>petgraph::graph::NodeIndex;
+<span class="kw">use </span>indicatif::{ProgressIterator, ParallelProgressIterator};
 <span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>indicatif::ParallelProgressIterator;
+<span class="comment">// use rayon::iter::IntoParallelRefIterator;
+// use rayon::iter::ParallelIterator;
 
-<span class="kw">use </span>skydive::ldbg::LdBG;
+</span><span class="kw">use </span>skydive::ldbg::LdBG;
 <span class="kw">use </span>skydive::mldbg::MLdBG;
-<span class="kw">use </span>skydive::utils::<span class="kw-2">*</span>;
 
 <span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
-    gfa_output: <span class="prelude-ty">Option</span>&lt;PathBuf&gt;,
+    loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
     kmer_size: usize,
+    window: usize,
     model_path: <span class="kw-2">&amp;</span>PathBuf,
     long_read_fasta_path: <span class="kw-2">&amp;</span>PathBuf,
     short_read_fasta_path: <span class="kw-2">&amp;</span>PathBuf,
 ) {
-    <span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[long_read_fasta_path.clone()]);
-    <span class="kw">let </span>short_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[short_read_fasta_path.clone()]);
+    <span class="comment">// Get the system's temporary directory path
+    </span><span class="kw">let </span>cache_path = std::env::temp_dir();
+    <span class="macro">skydive::elog!</span>(<span class="string">"Intermediate data will be stored at {:?}."</span>, cache_path);
 
-    <span class="comment">// Read all long reads.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing long-read samples {:?}..."</span>, long_read_seq_urls.iter().map(|url| url.as_str()).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;());
-    <span class="kw">let </span>all_lr_seqs = skydive::utils::read_fasta(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[long_read_fasta_path.clone()]);
+    <span class="comment">// Load datasets
+    </span><span class="kw">let </span>long_read_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[long_read_fasta_path.clone()]);
 
-    <span class="comment">// Read all short reads.
-    </span><span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read samples {:?}..."</span>, short_read_seq_urls.iter().map(|url| url.as_str()).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;());
+    <span class="macro">skydive::elog!</span>(<span class="string">"Processing short-read sample {}..."</span>, short_read_fasta_path.display());
     <span class="kw">let </span>all_sr_seqs = skydive::utils::read_fasta(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[short_read_fasta_path.clone()]);
+    <span class="macro">skydive::elog!</span>(<span class="string">" - {} short reads loaded"</span>, all_sr_seqs.len());
 
-    <span class="kw">let </span>l1 = LdBG::from_sequences(<span class="string">"lr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>all_lr_seqs);
-    <span class="kw">let </span>s1 = LdBG::from_sequences(<span class="string">"sr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>all_sr_seqs);
+    <span class="comment">// Iterate over loci
+    </span><span class="kw">let </span>loci = skydive::parse::parse_loci(loci_list, window <span class="kw">as </span>u64).into_iter().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="kw">let </span>m = MLdBG::from_ldbgs(<span class="macro">vec!</span>[l1, s1])
-        .score_kmers(model_path)
-        .collapse()
-        .clean(<span class="number">0.1</span>)
-        .build_links(<span class="kw-2">&amp;</span>all_lr_seqs, <span class="bool-val">false</span>);
+    <span class="comment">// let progress_bar = skydive::utils::default_bounded_progress_bar("Processing loci", loci.len() as u64);
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"Built MLdBG with {} k-mers."</span>, m.kmers.len());
+    </span><span class="kw">let </span>fa_file = std::sync::Mutex::new(File::create(output).unwrap());
+    loci
+        <span class="comment">// .par_iter()
+        // .progress_with(progress_bar)
+        </span>.iter()
+        .inspect(|(chrom, start, end, name)| {
+            <span class="macro">skydive::elog!</span>(<span class="string">"Processing locus {} ({}:{}-{})"</span>, name, chrom, start, end);
+        })
+        .for_each(|(chrom, start, end, name)| {
+            <span class="kw">let </span>(padded_start, padded_end) = pad_interval(start, end, window);
 
-    <span class="kw">let </span>corrected_seqs = m.correct_seqs(<span class="kw-2">&amp;</span>all_lr_seqs);
+            <span class="kw">let </span><span class="kw-2">mut </span>corrected_reads = HashMap::new();
 
-    <span class="kw">let </span><span class="kw-2">mut </span>fa_file = File::create(output).unwrap();
-    <span class="kw">for </span>(i, corrected_seq) <span class="kw">in </span>corrected_seqs.iter().enumerate() {
-        <span class="kw">let _ </span>= <span class="macro">writeln!</span>(fa_file, <span class="string">"&gt;corrected_{}\n{}"</span>, i, String::from_utf8(corrected_seq.clone()).unwrap());
-    }
+            <span class="kw">for </span>window_start <span class="kw">in </span>(padded_start..padded_end).step_by(window) {
+                <span class="kw">let </span>window_end = window_start + window <span class="kw">as </span>u64;
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(gfa_output) = gfa_output {
-        <span class="macro">skydive::elog!</span>(<span class="string">"Writing GFA to {}"</span>, gfa_output.display());
+                <span class="kw">let </span>locus = HashSet::from([(chrom.clone(), window_start, window_end, name.clone())]);
 
-        <span class="kw">let </span>g = m.traverse_all_kmers();
+                <span class="kw">let </span>r = skydive::stage::stage_data_in_memory(<span class="kw-2">&amp;</span>locus, <span class="kw-2">&amp;</span>long_read_seq_urls, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span>cache_path);
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(reads) = r {
+                    <span class="kw">let </span>long_reads: HashMap&lt;String, Vec&lt;u8&gt;&gt; = reads
+                        .into_iter()
+                        .map(|read| (read.id().to_string(), read.seq().to_vec()))
+                        .collect();
 
-        <span class="kw">let _ </span>= write_gfa(<span class="kw-2">&amp;mut </span>File::create(gfa_output.clone()).unwrap(), <span class="kw-2">&amp;</span>g);
+                    <span class="kw">let </span>cn_kmers = long_reads
+                        .values()
+                        .map(|seq| seq.windows(kmer_size).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;())
+                        .flatten()
+                        .map(|kmer| skydive::utils::canonicalize_kmer(kmer))
+                        .collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>csv_output = gfa_output.with_extension(<span class="string">"csv"</span>);
-        <span class="kw">let </span><span class="kw-2">mut </span>csv_file = File::create(<span class="kw-2">&amp;</span>csv_output).unwrap();
+                    <span class="kw">let </span>sr_seqs = all_sr_seqs
+                        .iter()
+                        .filter_map(|seq| {
+                            <span class="kw">let </span>kmers = seq.windows(kmer_size).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+                            <span class="kw">let </span>read_kmers = kmers.iter().map(|kmer| skydive::utils::canonicalize_kmer(kmer)).collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="macro">writeln!</span>(csv_file, <span class="string">"node,label,kmer"</span>).unwrap();
+                            <span class="kw">let </span>count = cn_kmers.intersection(<span class="kw-2">&amp;</span>read_kmers).count();
 
-        <span class="kw">for </span>(node_index, node_label) <span class="kw">in </span>g.node_indices().zip(g.node_weights()) {
-            <span class="kw">let </span>kmer = node_label.as_bytes();
-            <span class="kw">let </span>cn_kmer = skydive::utils::canonicalize_kmer(kmer);
-            <span class="kw">let </span>score = (<span class="number">100.0 </span>* <span class="kw-2">*</span>m.scores.get(<span class="kw-2">&amp;</span>cn_kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="number">0.0</span>)) <span class="kw">as </span>u32;
-            <span class="kw">let </span>sources = m.sources.get(<span class="kw-2">&amp;</span>cn_kmer).unwrap_or(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[]).clone();
+                            <span class="kw">if </span>count &gt; (<span class="number">0.5</span><span class="kw-2">*</span>read_kmers.len() <span class="kw">as </span>f64) <span class="kw">as </span>usize {
+                                <span class="prelude-val">Some</span>(seq)
+                            } <span class="kw">else </span>{
+                                <span class="prelude-val">None
+                            </span>}
+                        })
+                        .cloned()
+                        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-            <span class="kw">let </span>source = <span class="kw">if </span>sources.len() == <span class="number">1 </span>{ sources[<span class="number">0</span>] } <span class="kw">else </span>{ <span class="number">2 </span>};
+                    <span class="kw">let </span>lr_seqs = long_reads.values().cloned().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+                    <span class="kw">let </span>l1 = LdBG::from_sequences(<span class="string">"lr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>lr_seqs);
+                    <span class="kw">let </span>s1 = LdBG::from_sequences(<span class="string">"sr"</span>.to_string(), kmer_size, <span class="kw-2">&amp;</span>sr_seqs);
 
-            <span class="comment">// let in_read = a_kmers.contains_key(&amp;cn_kmer);
+                    <span class="kw">let </span>m = MLdBG::from_ldbgs(<span class="macro">vec!</span>[l1, s1])
+                        .score_kmers(model_path)
+                        .collapse()
+                        .clean(<span class="number">0.1</span>)
+                        .build_links(<span class="kw-2">&amp;</span>lr_seqs, <span class="bool-val">false</span>);
 
-            </span><span class="macro">writeln!</span>(
-                csv_file,
-                <span class="string">"{},{},{}"</span>,
-                node_index.index(),
-                <span class="macro">format!</span>(<span class="string">"{} ({})"</span>, source, score),
-                node_label,
-            )
-            .unwrap();
-        }
-    }
+                    <span class="kw">let </span>g = m.traverse_all_kmers();
+
+                    <span class="kw">for </span>(id, seq) <span class="kw">in </span>long_reads {
+                        <span class="kw">let </span>corrected_seq = m.correct_seq(<span class="kw-2">&amp;</span>g, <span class="kw-2">&amp;</span>seq);
+
+                        corrected_reads.entry(id)
+                            .or_insert_with(Vec::new)
+                            .push((corrected_seq, m.scores.clone()));
+                    }
+                }
+            }
+
+            <span class="kw">let </span><span class="kw-2">mut </span>file = fa_file.lock().unwrap();
+            <span class="kw">for </span>id <span class="kw">in </span>corrected_reads.keys() {
+                <span class="kw">let </span>pieces = corrected_reads.get(id).unwrap();
+
+                <span class="kw">let </span><span class="kw-2">mut </span>joined_seq = Vec::&lt;u8&gt;::new();
+                <span class="kw">let </span><span class="kw-2">mut </span>joined_scores = HashMap::new();
+                <span class="kw">for </span>(piece, scores) <span class="kw">in </span>pieces {
+                    joined_seq.extend(piece);
+                    joined_scores.extend(scores);
+                }
+
+                <span class="kw">let </span><span class="kw-2">mut </span>prob = <span class="macro">vec!</span>[<span class="number">1.0</span>; joined_seq.len()];
+                <span class="kw">let </span><span class="kw-2">mut </span>count = <span class="macro">vec!</span>[<span class="number">1</span>; joined_seq.len()];
+                <span class="kw">for </span>(i, kmer) <span class="kw">in </span>joined_seq.windows(kmer_size).enumerate() {
+                    <span class="kw">let </span>cn_kmer = skydive::utils::canonicalize_kmer(kmer);
+                    <span class="kw">let </span>score = <span class="kw-2">**</span>joined_scores.get(<span class="kw-2">&amp;</span>cn_kmer).unwrap_or(&amp;&amp;<span class="number">1.0</span>);
+
+                    <span class="kw">for </span>j <span class="kw">in </span>i..std::cmp::min(i+kmer_size, prob.len()) {
+                        prob[j] <span class="kw-2">*</span>= score;
+                        count[j] += <span class="number">1</span>;
+                    }
+                }
+
+                <span class="kw">let </span><span class="kw-2">mut </span>qual = <span class="macro">vec!</span>[<span class="number">0</span>; joined_seq.len()];
+                <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..prob.len() {
+                    prob[i] = prob[i].powf(<span class="number">1.0</span>/count[i] <span class="kw">as </span>f32);
+                    qual[i] = (-<span class="number">10.0</span><span class="kw-2">*</span>(<span class="number">1.0 </span>- (prob[i] - <span class="number">0.0001</span>).max(<span class="number">0.0</span>)).log10()) <span class="kw">as </span>u8 + <span class="number">33</span>;
+                }
+
+                <span class="kw">let _ </span>= <span class="macro">writeln!</span>(file, <span class="string">"@{}\n{}\n+\n{}"</span>, id, String::from_utf8(joined_seq).unwrap(), String::from_utf8_lossy(<span class="kw-2">&amp;</span>qual));
+            }
+        });
+}
+
+<span class="kw">fn </span>pad_interval(start: <span class="kw-2">&amp;</span>u64, end: <span class="kw-2">&amp;</span>u64, window: usize) -&gt; (u64, u64) {
+    <span class="comment">// Calculate how much padding is needed to make the interval cleanly divisible by 1000
+    </span><span class="kw">let </span>interval_length = end - start;
+    <span class="kw">let </span>remainder = interval_length % window <span class="kw">as </span>u64;
+
+    <span class="kw">let </span>(padded_start, padded_end) = <span class="kw">if </span>remainder &gt; <span class="number">0 </span>{
+        <span class="kw">let </span>padding_needed = window <span class="kw">as </span>u64 - remainder;
+        <span class="kw">let </span>half_padding = padding_needed / <span class="number">2</span>;
+    
+        <span class="comment">// Add padding evenly to start and end
+        </span><span class="kw">let </span>new_start = start.saturating_sub(half_padding);
+        <span class="kw">let </span>new_end = end + (padding_needed - half_padding);
+    
+        (new_start, new_end)
+    } <span class="kw">else </span>{
+        (<span class="kw-2">*</span>start, <span class="kw-2">*</span>end)
+    };
+
+    (padded_start, padded_end)
 }</code></pre></div></section></main></body></html>
