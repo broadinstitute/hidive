@@ -106,7 +106,8 @@ pub fn start(
 
                         let len = read_ids.len();
                         read_ids.entry(qname.clone()).or_insert(len);
-                        allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&seq).to_string(), q));
+                        let full_seq = [&[ref_base], seq.as_slice()].concat();
+                        allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&full_seq).to_string(), q));
 
                         is_variant = true;
                     },
@@ -158,6 +159,24 @@ pub fn start(
             } else {
                 hap1.push(ref_str.clone());
                 hap2.push(ref_str.clone());
+            }
+        }
+
+        for i in 0..hap1.len() {
+            if hap1[i].contains("-") {
+                let len = hap1[i].len();
+
+                for j in 1..len {
+                    hap1[i+j] = "".to_string();
+                }
+            }
+
+            if hap2[i].contains("-") {
+                let len = hap2[i].len();
+
+                for j in 1..len {
+                    hap2[i+j] = "".to_string();
+                }
             }
         }
 
