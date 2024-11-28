@@ -183,7 +183,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "32 GB"
         cpu: num_cpus
         disks: "local-disk 100 SSD"
