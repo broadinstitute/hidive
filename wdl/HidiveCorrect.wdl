@@ -36,16 +36,32 @@ workflow Hidive {
             short_read_fasta = Rescue.fasta,
     }
 
-    call Align {
+    call Align as AlignReads {
         input:
             reference = reference,
             sequences = Correct.fasta,
     }
 
+    call Call {
+        input:
+            locus = locus,
+            reference = reference,
+            aligned_reads_bam = AlignReads.aligned_bam,
+            aligned_reads_bai = AlignReads.aligned_bai,
+    }
+
+    call Align as AlignHaplotypes {
+        input:
+            reference = reference,
+            sequences = Call.fasta,
+    }
+
     output {
         File corrected_fa = Correct.fasta
-        File aligned_bam = Align.aligned_bam
-        File aligned_bai = Align.aligned_bai
+        File aligned_reads_bam = AlignReads.aligned_bam
+        File aligned_reads_bai = AlignReads.aligned_bai
+        File aligned_haplotypes_bam = AlignHaplotypes.aligned_bam
+        File aligned_haplotypes_bai = AlignHaplotypes.aligned_bai
     }
 }
 
@@ -174,18 +190,52 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} ~{sequences} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+        grep '^@' -A1 ~{sequences} | grep -v -- "^--$" | sed 's/^@/>/' | \
+            minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} - | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
         File aligned_bam = "~{prefix}.bam"
-        File aligned_bai = "~{prefix}.bam.bai"
+        File aligned_bai = "~{prefix}.bam.csi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_fix_docker_deps"
+        memory: "32 GB"
+        cpu: num_cpus
+        disks: "local-disk 100 SSD"
+    }
+}
+
+task Call {
+    input {
+        File reference
+        File aligned_reads_bam
+        File aligned_reads_bai
+
+        String locus
+        String prefix = "out"
+
+        Int num_cpus = 4
+    }
+
+    Int disk_size_gb = 4
+
+    command <<<
+        set -euxo pipefail
+
+        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} > ~{prefix}.fa
+    >>>
+
+    output {
+        File fasta = "~{prefix}.fa"
     }
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
-        memory: "32 GB"
+        memory: "4 GB"
         cpu: num_cpus
-        disks: "local-disk 100 SSD"
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
