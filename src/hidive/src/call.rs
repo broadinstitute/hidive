@@ -42,7 +42,6 @@ pub fn start(
         let mut bam = skydive::stage::open_bam(&bam_url).unwrap();
 
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
-        // skydive::elog!("Reference sequence: {}", seq);
 
         let mut read_ids = HashMap::new();
         let mut matrix = Vec::new();
@@ -50,10 +49,8 @@ pub fn start(
         let mut mloci = Vec::new();
 
         let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
-        for (cursor, p) in bam.pileup().enumerate() {
+        for p in bam.pileup() {
             let pileup = p.unwrap();
-
-            // skydive::elog!("Processing position {}:{}-{} {}...", chr, start, stop, pileup.pos() + 1);
 
             if pileup.pos() + 1 < start as u32 || pileup.pos() + 1 > stop as u32 {
                 continue;
@@ -116,20 +113,15 @@ pub fn start(
             }
 
             if is_variant {
-                // skydive::elog!("Variant found at {}:{} {} ({:?})", chr, pileup.pos() + 1, ref_base, alleles);
                 matrix.push(allele_map);
-                // metadata.push((pileup.pos(), ref_base));
-                // metadata.insert(cursor, ref_base);
                 metadata.insert(pileup.pos() + 1, String::from_utf8(vec![ref_base]).unwrap());
                 mloci.push(pileup.pos());
             }
         }
 
-        let (h1, h2) = phase_variants(&matrix);
+        skydive::elog!("Phasing {} variants...", mloci.len());
 
-        skydive::elog!("Haplotype 1: {:?} ({})", h1, h1.len());
-        skydive::elog!("Haplotype 2: {:?} ({})", h2, h2.len());
-        skydive::elog!("Metadata: {:?}", metadata);
+        let (h1, h2) = phase_variants(&matrix);
 
         let mut hap_alleles = HashMap::new();
         for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
@@ -237,14 +229,11 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
 
     let wmec_matrix = WMECData::new(reads, confidences);
 
-    let (p1, p2) = skydive::wmec::phase(&wmec_matrix);
+    let (p1, p2) = skydive::wmec::phase_all(&wmec_matrix, 30, 20);
 
     let mut h1 = Vec::new();
     let mut h2 = Vec::new();
     for i in 0..p1.len() {
-        // h1.push(all_alleles[i].get(&p1[i]).unwrap().clone());
-        // h2.push(all_alleles[i].get(&p2[i]).unwrap().clone());
-
         let a1 = all_alleles[i].get(&p1[i]).cloned();
         let a2 = all_alleles[i].get(&p2[i]).cloned();
 
@@ -253,75 +242,4 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
     }
 
     (h1, h2)
-}
-
-fn create_read_allele_matrix(lr_msas: &Vec<String>) -> Vec<BTreeMap<usize, String>> {
-    let mut matrix = Vec::new();
-
-    let mut index1 = 0;
-    while index1 < lr_msas[0].len() {
-        let combined_base_counts = allele_counts(lr_msas, index1, index1+1);
-
-        if combined_base_counts.len() > 1 {
-            let mut index2 = index1;
-            let mut allele_base_counts = allele_counts(lr_msas, index2, index2+1);
-
-            while index2 < lr_msas[0].len() && allele_base_counts.len() > 1 {
-                index2 += 1;
-                allele_base_counts = allele_counts(lr_msas, index2, index2+1);
-            }
-
-            let allele_counts = allele_counts(lr_msas, index1, index2)
-                .into_iter()
-                .sorted_by(|a, b| b.1.cmp(&a.1))
-                .take(2)
-                .collect::<BTreeMap<_, _>>();
-
-            // println!("{} {} {:?}", index1, index2, allele_counts);
-
-            if allele_counts.len() == 2 {
-                let mut column = BTreeMap::new();
-
-                let alleles = allele_indices(lr_msas, index1, index2);
-
-                let mut allele_index = 0;
-                for (allele, _) in &allele_counts {
-                    alleles.iter().enumerate().for_each(|(i, a)| {
-                        if *a == *allele {
-                            // column.insert(i, allele.clone());
-                            column.insert(i, allele_index.to_string());
-                        }
-                    });
-
-                    allele_index += 1;
-                }
-
-                matrix.push(column);
-            }
-
-            index1 = index2;
-        } else {
-            index1 += 1;
-        }
-    }
-
-    matrix
-}
-
-fn allele_indices(lr_msas: &Vec<String>, index1: usize, index2: usize) -> Vec<String> {
-    let alleles = lr_msas.iter()
-        .map(|msa| msa[index1..index2].to_string().replace(" ", ""))
-        .collect::<Vec<String>>();
-    alleles
-}
-
-fn allele_counts(lr_msas: &Vec<String>, index1: usize, index2: usize) -> BTreeMap<String, i32> {
-    let combined_allele_counts = lr_msas.iter()
-        .map(|msa| msa[index1..index2].to_string().replace(" ", ""))
-        .filter(|allele| !allele.is_empty())
-        .fold(BTreeMap::new(), |mut counts, base| {
-            *counts.entry(base).or_insert(0) += 1;
-            counts
-        });
-    combined_allele_counts
 }

@@ -10,6 +10,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Write;
 
+use rayon::prelude::*;
+
 #[derive(Debug)]
 pub struct WMECData {
     pub reads: Vec<Vec<Option<u8>>>,        // Reads matrix where None represents missing data
@@ -229,6 +231,91 @@ pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>) {
     }
 
     backtrack_haplotypes(data, &dp, &backtrack)
+}
+
+#[must_use]
+pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec<u8>) {
+    // First, collect all window ranges
+    let mut windows: Vec<_> = (0..data.num_snps)
+        .step_by(stride)
+        .map(|start| (start, (start + window).min(data.num_snps)))
+        .collect();
+
+    // Filter out last window if it completely overlaps with previous window
+    if let Some(&(_, prev_end)) = windows.get(windows.len() - 2) {
+        if let Some(&(_, last_end)) = windows.last() {
+            if last_end == prev_end {
+                windows.pop();
+            }
+        }
+    }
+
+    // crate::elog!("Windows: {:?}", windows);
+
+    // Process windows in parallel
+    let haplotype_pairs: Vec<_> = windows.par_iter()
+        .map(|&(start, end)| {
+            let (window_reads, window_confidences): (Vec<Vec<Option<u8>>>, Vec<Vec<Option<u32>>>) = data.reads.iter().zip(data.confidences.iter())
+                .filter_map(|(read, confidence)| {
+                    let window_read = read[start..end].to_vec();
+                    if window_read.iter().any(|x| x.is_some()) {
+                        Some((window_read, confidence[start..end].to_vec()))
+                    } else {
+                        None
+                    }
+                })
+                .unzip();
+
+            let window_data = WMECData::new(window_reads, window_confidences);
+            
+            // crate::elog!("Processing window {} to {} ({})", start, end, window_data.num_snps);
+
+            let (mut dp, mut backtrack) = initialize_dp(&window_data);
+            
+            for snp in 1..window_data.num_snps {
+                update_dp(&window_data, &mut dp, &mut backtrack, snp);
+            }
+
+            backtrack_haplotypes(&window_data, &dp, &backtrack)
+        })
+        .collect();
+
+    let mut haplotype1 = Vec::new();
+    let mut haplotype2 = Vec::new();
+
+    let overlap = window - stride;
+
+    for (hap1, hap2) in haplotype_pairs {
+        if haplotype1.len() == 0 {
+            haplotype1 = hap1;
+            haplotype2 = hap2;
+        } else {
+            // Compare overlap regions to determine orientation
+            let h1_overlap = &haplotype1[haplotype1.len()-overlap..];
+            let h2_overlap = &haplotype2[haplotype2.len()-overlap..];
+            let new_overlap = &hap1[..overlap];
+
+            // Count matches between overlapping regions
+            let h1_matches = h1_overlap.iter().zip(new_overlap.iter())
+                .filter(|(a,b)| a == b)
+                .count();
+            let h2_matches = h2_overlap.iter().zip(new_overlap.iter())
+                .filter(|(a,b)| a == b)
+                .count();
+
+            // Append new haplotypes in correct orientation based on best overlap match
+            if h1_matches >= h2_matches {
+                haplotype1.extend_from_slice(&hap1[overlap..]);
+                haplotype2.extend_from_slice(&hap2[overlap..]);
+            } else {
+                haplotype1.extend_from_slice(&hap2[overlap..]);
+                haplotype2.extend_from_slice(&hap1[overlap..]);
+            }
+
+        }
+    }
+
+    (haplotype1, haplotype2)
 }
 
 #[cfg(test)]
