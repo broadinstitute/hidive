@@ -155,6 +155,8 @@ task Correct {
         hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
+
+        ls -lah *
     >>>
 
     output {
