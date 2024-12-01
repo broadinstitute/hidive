@@ -32,36 +32,24 @@ workflow Hidive {
         input:
             locus = locus,
             model = model,
+            reference = reference,
             long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
-    }
-
-    call Align as AlignReads {
-        input:
-            reference = reference,
-            sequences = Correct.fasta,
     }
 
     call Call {
         input:
             locus = locus,
             reference = reference,
-            aligned_reads_bam = AlignReads.aligned_bam,
-            aligned_reads_bai = AlignReads.aligned_bai,
-    }
-
-    call Align as AlignHaplotypes {
-        input:
-            reference = reference,
-            sequences = Call.fasta,
+            aligned_reads_bam = Correct.corrected_bam,
+            aligned_reads_csi = Correct.corrected_csi,
     }
 
     output {
-        File corrected_fa = Correct.fasta
-        File aligned_reads_bam = AlignReads.aligned_bam
-        File aligned_reads_bai = AlignReads.aligned_bai
-        File aligned_haplotypes_bam = AlignHaplotypes.aligned_bam
-        File aligned_haplotypes_bai = AlignHaplotypes.aligned_bai
+        File corrected_bam = Correct.corrected_bam
+        File corrected_csi = Correct.corrected_csi
+        File called_bam = Call.called_bam
+        File called_csi = Call.called_csi
     }
 }
 
@@ -146,65 +134,39 @@ task Rescue {
 
 task Correct {
     input {
-        File model
-        String long_reads_bam
         File short_read_fasta
+        String long_reads_bam
 
         String locus
+        File model
+        File reference
+
         String prefix = "out"
 
         Int num_cpus = 4
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([model, short_read_fasta], "GB"))
+    Int memory_gb = 1*num_cpus
 
     command <<<
         set -euxo pipefail
 
-        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} > ~{prefix}.fa
-    >>>
-
-    output {
-        File fasta = "~{prefix}.fa"
-    }
-
-    runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
-        memory: "4 GB"
-        cpu: num_cpus
-        disks: "local-disk ~{disk_size_gb} SSD"
-    }
-}
-
-task Align {
-    input {
-        File reference
-        File sequences
-
-        String preset = "map-hifi"
-        String prefix = "out"
-
-        Int num_cpus = 8
-    }
-
-    command <<<
-        set -euxo pipefail
-
-        grep '^@' -A1 ~{sequences} | grep -v -- "^--$" | sed 's/^@/>/' | \
-            minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} - | \
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} |
+            minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
-        File aligned_bam = "~{prefix}.bam"
-        File aligned_bai = "~{prefix}.bam.csi"
+        File corrected_bam = "~{prefix}.bam"
+        File corrected_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_fix_docker_deps"
-        memory: "32 GB"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:main"
+        memory: "~{memory_gb} GB"
         cpu: num_cpus
-        disks: "local-disk 100 SSD"
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
 
@@ -212,7 +174,7 @@ task Call {
     input {
         File reference
         File aligned_reads_bam
-        File aligned_reads_bai
+        File aligned_reads_csi
 
         String locus
         String prefix = "out"
@@ -220,21 +182,25 @@ task Call {
         Int num_cpus = 4
     }
 
-    Int disk_size_gb = 4
+    Int disk_size_gb = 1 + 2*ceil(size([reference, aligned_reads_bam, aligned_reads_csi], "GB"))
+    Int memory_gb = 1*num_cpus
 
     command <<<
         set -euxo pipefail
 
-        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} > ~{prefix}.fa
+        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} |
+            minimap2 -ayYL -x map-hifi ~{reference} - | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
-        File fasta = "~{prefix}.fa"
+        File called_bam = "~{prefix}.bam"
+        File called_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
-        memory: "4 GB"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:main"
+        memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
     }
