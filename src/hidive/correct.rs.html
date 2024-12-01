@@ -292,7 +292,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>qual = <span class="macro">vec!</span>[<span class="number">0</span>; joined_seq.len()];
                 <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..prob.len() {
                     prob[i] = prob[i].powf(<span class="number">1.0</span>/count[i] <span class="kw">as </span>f32);
-                    qual[i] = (-<span class="number">10.0</span><span class="kw-2">*</span>(<span class="number">1.0 </span>- (prob[i] - <span class="number">0.0001</span>).max(<span class="number">0.0</span>)).log10()) <span class="kw">as </span>u8 + <span class="number">33</span>;
+                    qual[i] = ((-<span class="number">10.0</span><span class="kw-2">*</span>(<span class="number">1.0 </span>- (prob[i] - <span class="number">0.0001</span>).max(<span class="number">0.0</span>)).log10()) <span class="kw">as </span>u8).clamp(<span class="number">1</span>, <span class="number">40</span>);
                 }
 
                 <span class="kw">let _ </span>= <span class="macro">writeln!</span>(file, <span class="string">"@{}\n{}\n+\n{}"</span>, id, String::from_utf8(joined_seq).unwrap(), String::from_utf8_lossy(<span class="kw-2">&amp;</span>qual));

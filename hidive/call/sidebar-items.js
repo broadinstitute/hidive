@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["allele_counts","allele_indices","create_read_allele_matrix","phase_variants","start"]};
+window.SIDEBAR_ITEMS = {"fn":["phase_variants","start"]};

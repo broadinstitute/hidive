@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["phase"],"struct":["WMECData"]};
+window.SIDEBAR_ITEMS = {"fn":["phase","phase_all"],"struct":["WMECData"]};
