@@ -152,7 +152,7 @@ task Correct {
     command <<<
         set -euxo pipefail
 
-        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} |
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
@@ -163,7 +163,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:main"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.97"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -188,7 +188,7 @@ task Call {
     command <<<
         set -euxo pipefail
 
-        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} |
+        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
@@ -199,7 +199,7 @@ task Call {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:main"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.97"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
