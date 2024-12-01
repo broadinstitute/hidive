@@ -2,19 +2,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
-use minimap2::Aligner;
-use needletail::Sequence;
-use petgraph::graph::NodeIndex;
-use rayon::prelude::*;
-use indicatif::ParallelProgressIterator;
 
 use rust_htslib::bam::{FetchDefinition, Read};
-use skydive::ldbg::LdBG;
-use skydive::mldbg::MLdBG;
 
 use skydive::wmec::*;
-use spoa::AlignmentType;
 
 pub fn start(
     output: &PathBuf,
@@ -119,7 +110,7 @@ pub fn start(
             }
         }
 
-        skydive::elog!("Phasing {} variants...", mloci.len());
+        skydive::elog!(" - phasing {} variants...", mloci.len());
 
         let (h1, h2) = phase_variants(&matrix);
 
