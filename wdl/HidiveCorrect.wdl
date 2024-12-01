@@ -152,10 +152,9 @@ task Correct {
     command <<<
         set -x
 
-        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} > corrected.fa
-        minimap2 -ayYL -x map-hifi ~{reference} corrected.fa | samtools sort --write-index -O BAM -o ~{prefix}.bam
-
-        find . -type f
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
+            minimap2 -ayYL -x map-hifi ~{reference} corrected.fa | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
@@ -164,7 +163,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.97"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -187,7 +186,7 @@ task Call {
     Int memory_gb = 1*num_cpus
 
     command <<<
-        set -euxo pipefail
+        set -x
 
         hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
@@ -200,7 +199,7 @@ task Call {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.97"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"

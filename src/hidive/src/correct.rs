@@ -131,7 +131,7 @@ pub fn start(
                 let mut qual = vec![0; joined_seq.len()];
                 for i in 0..prob.len() {
                     prob[i] = prob[i].powf(1.0/count[i] as f32);
-                    qual[i] = ((-10.0*(1.0 - (prob[i] - 0.0001).max(0.0)).log10()) as u8).clamp(1, 40);
+                    qual[i] = ((-10.0*(1.0 - (prob[i] - 0.0001).max(0.0)).log10()) as u8 + 33).clamp(33, 73);
                 }
 
                 let _ = writeln!(file, "@{}\n{}\n+\n{}", id, String::from_utf8(joined_seq).unwrap(), String::from_utf8_lossy(&qual));
