@@ -37,19 +37,19 @@ workflow Hidive {
             short_read_fasta = Rescue.fasta,
     }
 
-    # call Call {
-    #     input:
-    #         locus = locus,
-    #         reference = reference,
-    #         aligned_reads_bam = Correct.corrected_bam,
-    #         aligned_reads_csi = Correct.corrected_csi,
-    # }
+    call Call {
+        input:
+            locus = locus,
+            reference = reference,
+            aligned_reads_bam = Correct.corrected_bam,
+            aligned_reads_csi = Correct.corrected_csi,
+    }
 
     output {
         File corrected_bam = Correct.corrected_bam
         File corrected_csi = Correct.corrected_csi
-        # File called_bam = Call.called_bam
-        # File called_csi = Call.called_csi
+        File called_bam = Call.called_bam
+        File called_csi = Call.called_csi
     }
 }
 
