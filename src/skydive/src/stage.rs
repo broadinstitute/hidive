@@ -175,14 +175,15 @@ pub fn extract_aligned_bam_reads(
 
     let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
     for p in bam.pileup() {
-        if let Ok(pileup) = p {
-            if *start <= (u64::from(pileup.pos())) && (u64::from(pileup.pos())) < *stop {
-                for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
-                    let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
-                    let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
-                        Ok(a) => a,
-                        Err(_) => String::from("unknown"),
-                    };
+        let pileup = p.unwrap();
+
+        if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
+            for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
+                let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
+                let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
+                    Ok(a) => a,
+                    Err(_) => String::from("unknown"),
+                };
 
                     let seq_name = format!("{qname}|{name}|{sm}");
 
@@ -190,20 +191,25 @@ pub fn extract_aligned_bam_reads(
                         bmap.insert(seq_name.clone(), String::new());
                     }
 
-                    if !alignment.is_del() && !alignment.is_refskip() {
-                        let a = alignment.record().seq()[alignment.qpos().unwrap()];
-
-                        bmap.get_mut(&seq_name).unwrap().push(a as char);
+                if !alignment.is_del() && !alignment.is_refskip() {
+                    if alignment.qpos().unwrap() > alignment.record().seq().len() {
+                        crate::elog!("qpos {} > seq len {}", alignment.qpos().unwrap(), alignment.record().seq().len());
+                        crate::elog!("{} {} {} {}", String::from_utf8_lossy(alignment.record().qname()), alignment.record().mapq(), alignment.record().is_secondary(), alignment.record().is_supplementary());
+                        crate::elog!("{:?}", alignment.record());
                     }
 
-                    if let bam::pileup::Indel::Ins(len) = alignment.indel() {
-                        if let Some(pos1) = alignment.qpos() {
-                            let pos2 = pos1 + (len as usize);
-                            for pos in pos1..pos2 {
-                                let a = alignment.record().seq()[pos];
+                    let a = alignment.record().seq()[alignment.qpos().unwrap()];
 
-                                bmap.get_mut(&seq_name).unwrap().push(a as char);
-                            }
+                    bmap.get_mut(&seq_name).unwrap().push(a as char);
+                }
+
+                if let bam::pileup::Indel::Ins(len) = alignment.indel() {
+                    if let Some(pos1) = alignment.qpos() {
+                        let pos2 = pos1 + (len as usize);
+                        for pos in pos1..pos2 {
+                            let a = alignment.record().seq()[pos];
+
+                            bmap.get_mut(&seq_name).unwrap().push(a as char);
                         }
                     }
                 }
