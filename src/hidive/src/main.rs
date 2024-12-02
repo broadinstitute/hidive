@@ -48,6 +48,7 @@
 //!  export GCS_REQUESTER_PAYS_PROJECT=<Google Project ID>
 //! ```
 
+use crate::rescue::SearchOption;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -195,9 +196,17 @@ enum Commands {
         #[clap(short, long, value_parser, default_value_t = 70)]
         min_kmers_pct: usize,
 
-        /// For aligned reads, restrict processing to these contigs.
+        /// Option to search for reads based on alignment status or regions of interest.
+        #[clap(short, long, default_value = "contig-and-interval")]
+        search_option: SearchOption,
+
+        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        #[clap(short, long, value_parser, required = true)]
+        ref_path: Option<PathBuf>,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
         #[clap(short, long, value_parser, required = false)]
-        contigs: Vec<String>,
+        loci: Option<Vec<String>>,
 
         /// FASTA files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
@@ -490,11 +499,13 @@ fn main() {
             output,
             kmer_size,
             min_kmers_pct,
-            contigs,
+            search_option,
+            ref_path,
+            loci,
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, &contigs, &fasta_paths, &seq_paths);
+            rescue::start(&output, kmer_size, min_kmers_pct, search_option, ref_path, loci, &fasta_paths, &seq_paths);
         }
         Commands::Recruit {
             output,
@@ -608,7 +619,7 @@ fn elapsed_time(start_time: std::time::Instant) -> String {
     let elapsed_time = end_time.duration_since(start_time);
 
     let elapsed_secs = elapsed_time.as_secs_f64();
-    
+
 
     if elapsed_secs < 60.0 {
         format!("{:.2} seconds", elapsed_secs)
