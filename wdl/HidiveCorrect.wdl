@@ -129,6 +129,7 @@ task Rescue {
         memory: "~{num_cpus} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 2
     }
 }
 
