@@ -104,7 +104,7 @@ pub fn start(
                         found_items
                             .load(Ordering::Relaxed)
                             .to_formatted_string(&Locale::en),
-                        tid_to_chrom.get(&read.tid()).unwrap(),
+                        tid_to_chrom.get(&read.tid()).unwrap_or(&"unknown".to_string()),
                         read.reference_start().to_formatted_string(&Locale::en)
                     ));
                     progress_bar.inc(UPDATE_FREQUENCY as u64);
