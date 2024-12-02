@@ -620,7 +620,18 @@
 <a href="#619" id="619">619</a>
 <a href="#620" id="620">620</a>
 <a href="#621" id="621">621</a>
-<a href="#622" id="622">622</a></pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a></pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
 //! a series-parallel graph representation of long-read data and a linked de Bruijn graph
@@ -670,7 +681,8 @@
 //!  export GCS_REQUESTER_PAYS_PROJECT=&lt;Google Project ID&gt;
 //! ```
 
-</span><span class="kw">use </span>std::path::PathBuf;
+</span><span class="kw">use </span><span class="kw">crate</span>::rescue::SearchOption;
+<span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">use </span>clap::{Parser, Subcommand};
 
@@ -817,9 +829,17 @@
         </span><span class="attr">#[clap(short, long, value_parser, default_value_t = <span class="number">70</span>)]
         </span>min_kmers_pct: usize,
 
-        <span class="doccomment">/// For aligned reads, restrict processing to these contigs.
+        <span class="doccomment">/// Option to search for reads based on alignment status or regions of interest.
+        </span><span class="attr">#[clap(short, long, default_value = <span class="string">"contig-and-interval"</span>)]
+        </span>search_option: SearchOption,
+
+        <span class="doccomment">/// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
+        </span>ref_path: <span class="prelude-ty">Option</span>&lt;PathBuf&gt;,
+
+        <span class="doccomment">/// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">false</span>)]
-        </span>contigs: Vec&lt;String&gt;,
+        </span>loci: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
 
         <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
@@ -1112,11 +1132,13 @@
             output,
             kmer_size,
             min_kmers_pct,
-            contigs,
+            search_option,
+            ref_path,
+            loci,
             fasta_paths,
             seq_paths,
         } =&gt; {
-            rescue::start(<span class="kw-2">&amp;</span>output, kmer_size, min_kmers_pct, <span class="kw-2">&amp;</span>contigs, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
+            rescue::start(<span class="kw-2">&amp;</span>output, kmer_size, min_kmers_pct, search_option, ref_path, loci, <span class="kw-2">&amp;</span>fasta_paths, <span class="kw-2">&amp;</span>seq_paths);
         }
         Commands::Recruit {
             output,
@@ -1230,7 +1252,7 @@
     <span class="kw">let </span>elapsed_time = end_time.duration_since(start_time);
 
     <span class="kw">let </span>elapsed_secs = elapsed_time.as_secs_f64();
-    
+
 
     <span class="kw">if </span>elapsed_secs &lt; <span class="number">60.0 </span>{
         <span class="macro">format!</span>(<span class="string">"{:.2} seconds"</span>, elapsed_secs)
