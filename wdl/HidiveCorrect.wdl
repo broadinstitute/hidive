@@ -160,7 +160,7 @@ task Correct {
 
         head corrected.sam
 
-        samtools sort --write-index -O BAM -o ~{prefix}.bam
+        cat corrected.sam | samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
