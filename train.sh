@@ -27,7 +27,7 @@ export RUST_BACKTRACE=full
 cargo build
 cargo build --release
 
-HIDIVE_DEBUG="./target/debug/hidive"
+#HIDIVE_DEBUG="./target/debug/hidive"
 HIDIVE="./target/release/hidive"
 
 mkdir -p $OUTPUT

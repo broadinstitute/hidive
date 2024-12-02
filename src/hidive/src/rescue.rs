@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,7 +11,7 @@ use bio::io::fasta::Reader;
 use bio::utils::Interval;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use minimap2::{Aligner, Mapping};
+use minimap2::{Aligner, Built, Mapping};
 use needletail::Sequence;
 use num_format::{Locale, ToFormattedString};
 
@@ -97,7 +97,6 @@ pub fn start(
 
 
     // Read the CRAM files and search for the k-mers in each read.
-    let mut tid_to_chrom: HashMap<i32, String> = HashMap::new();
 
     let mut all_records = Vec::new();
     for seq_url in seq_urls {
@@ -114,13 +113,13 @@ pub fn start(
         const UPDATE_FREQUENCY: usize = 1_000_000;
 
         // Create an immutable map of tid to chromosome name
-        tid_to_chrom.extend(reader
+        let tid_to_chrom: HashMap<i32, String> = reader
             .header()
             .target_names()
             .iter()
             .enumerate()
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
-            .collect::<HashMap<_, _>>());
+            .collect::<HashMap<_, _>>();
 
         if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
             // Use the fetches to retrieve the records.
@@ -324,7 +323,7 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: &Vec<Vec<u8>>, fetches: &mut 
 /// # Panics
 ///
 /// If the index cannot be built.
-fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner {
+fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner<Built> {
     if is_sr {
         Aligner::builder()
             .sr()
@@ -355,12 +354,12 @@ fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner {
 /// # Panics
 ///
 /// If no mappings are found for the provided sequences.
-fn map_sequences(aligner: &Aligner, reads: &[Vec<u8>], is_sr: bool) -> Vec<Mapping> {
+fn map_sequences(aligner: &Aligner<Built>, reads: &[Vec<u8>], is_sr: bool) -> Vec<Mapping> {
     let mappings: Vec<Mapping> = reads.par_iter().flat_map(|seq| {
         if is_sr {
-            seq.windows(150).flat_map(|window| aligner.map(window, false, false, None, None).unwrap_or_else(|_| vec![])).collect::<Vec<_>>()
+            seq.windows(150).flat_map(|window| aligner.map(window, false, false, None, None, None).unwrap_or_else(|_| vec![])).collect::<Vec<_>>()
         } else {
-            aligner.map(seq, false, false, None, None).unwrap_or_else(|_| vec![])
+            aligner.map(seq, false, false, None, None, None).unwrap_or_else(|_| vec![])
         }
     }).collect();
 
