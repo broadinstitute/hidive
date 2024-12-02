@@ -143,7 +143,7 @@ task Correct {
 
         String prefix = "out"
 
-        Int num_cpus = 4
+        Int num_cpus = 8
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([model, reference, short_read_fasta], "GB"))
