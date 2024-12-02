@@ -6,10 +6,12 @@
 //! HAL ID: hal-01225988
 
 use std::collections::{BTreeSet, HashMap};
-
 use std::fs::File;
 use std::io::Write;
 
+use itertools::Itertools;
+
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
 #[derive(Debug)]
@@ -136,7 +138,7 @@ fn initialize_dp(data: &WMECData) -> (HashMap<(usize, BTreeSet<usize>, BTreeSet<
 }
 
 // Function to update the DP table for each SNP position
-fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
+fn update_dp_old(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
     let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
         .filter(|(_, read)| read[snp].is_some()) // Only consider fragments covering SNP
         .map(|(index, _)| index)
@@ -171,6 +173,53 @@ fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet
 
         dp.insert((snp, r.clone(), s.clone()), min_cost);
         backtrack.insert((snp, r.clone(), s.clone()), best_bipartition);
+    }
+}
+
+fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
+    let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+        .filter(|(_, read)| read[snp].is_some())
+        .map(|(index, _)| index)
+        .collect();
+    let partitions = generate_bipartitions(&active_fragments);
+    
+    // Pre-compute prev_active_fragments since it's used by all iterations
+    let prev_active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+        .filter(|(_, read)| read[snp - 1].is_some())
+        .map(|(index, _)| index)
+        .collect();
+
+    // Collect results in parallel
+    let results: Vec<_> = partitions.par_iter()
+        .map(|(r, s)| {
+            let delta_cost = data.delta_c(snp, r, s);
+            let mut min_cost = u32::MAX;
+            let mut best_bipartition = None;
+            
+            for (prev_r, prev_s) in generate_bipartitions(&prev_active_fragments) {
+                let r_compatible = r.intersection(&prev_active_fragments).all(|&x| prev_r.contains(&x));
+                let s_compatible = s.intersection(&prev_active_fragments).all(|&x| prev_s.contains(&x));
+
+                if r_compatible && s_compatible {
+                    if let Some(&prev_cost) = dp.get(&(snp - 1, prev_r.clone(), prev_s.clone())) {
+                        let current_cost = delta_cost + prev_cost;
+
+                        if current_cost < min_cost {
+                            min_cost = current_cost;
+                            best_bipartition = Some((prev_r.clone(), prev_s.clone()));
+                        }
+                    }
+                }
+            }
+
+            ((r.clone(), s.clone()), (min_cost, best_bipartition))
+        })
+        .collect();
+
+    // Update the hashmaps with the results
+    for ((r, s), (min_cost, best_bipartition)) in results {
+        dp.insert((snp, r.clone(), s.clone()), min_cost);
+        backtrack.insert((snp, r, s), best_bipartition);
     }
 }
 
@@ -250,28 +299,30 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
         }
     }
 
-    // crate::elog!("Windows: {:?}", windows);
+    let pb = crate::utils::default_bounded_progress_bar("Processing windows", windows.len() as u64);
 
     // Process windows in parallel
-    let haplotype_pairs: Vec<_> = windows.par_iter()
+    let haplotype_pairs: Vec<_> = windows
+        // .iter()
+        .par_iter()
+        .progress_with(pb)
         .map(|&(start, end)| {
             let (window_reads, window_confidences): (Vec<Vec<Option<u8>>>, Vec<Vec<Option<u32>>>) = data.reads.iter().zip(data.confidences.iter())
-                .filter_map(|(read, confidence)| {
+                .map(|(read, confidence)| {
                     let window_read = read[start..end].to_vec();
-                    if window_read.iter().any(|x| x.is_some()) {
-                        Some((window_read, confidence[start..end].to_vec()))
-                    } else {
-                        None
-                    }
+                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
+                    (none_count, window_read, confidence[start..end].to_vec())
                 })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .sorted_by_key(|(none_count, _, _)| *none_count)
+                .take(10)
+                .map(|(_, window_read, window_confidence)| (window_read, window_confidence))
                 .unzip();
 
             let window_data = WMECData::new(window_reads, window_confidences);
             
-            // crate::elog!("Processing window {} to {} ({})", start, end, window_data.num_snps);
-
             let (mut dp, mut backtrack) = initialize_dp(&window_data);
-            
             for snp in 1..window_data.num_snps {
                 update_dp(&window_data, &mut dp, &mut backtrack, snp);
             }

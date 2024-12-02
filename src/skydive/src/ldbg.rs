@@ -995,7 +995,7 @@ impl LdBG {
                 }
             }
 
-            crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
+            // crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
 
             if start_pos <= end_pos {
                 b.splice(start_pos..=end_pos, replacement_path);

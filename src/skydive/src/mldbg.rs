@@ -157,19 +157,11 @@ impl MLdBG {
     pub fn score_kmers(mut self, model_path: &PathBuf) -> Self {
         let gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
-        // let lr_contigs = self.ldbgs[0].assemble_all();
-        // let lr_distances = Self::distance_to_a_contig_end(&lr_contigs, self.kmer_size);
-
-        // let sr_contigs = self.ldbgs[1].assemble_all();
-        // let sr_distances = Self::distance_to_a_contig_end(&sr_contigs, self.kmer_size);
-
         self.scores = self.union_of_kmers().iter().map(|cn_kmer| {
             let compressed_len = crate::utils::homopolymer_compressed(cn_kmer).len();
             let compressed_len_diff = (cn_kmer.len() - compressed_len) as f32;
             let entropy = crate::utils::shannon_entropy(cn_kmer);
             let gc_content = crate::utils::gc_content(cn_kmer);
-            // let lr_distance = *lr_distances.get(cn_kmer).unwrap_or(&0) as f32;
-            // let sr_distance = *sr_distances.get(cn_kmer).unwrap_or(&0) as f32;
 
             let lcov = self.ldbgs[0].kmers.get(cn_kmer).map_or(0, |record| record.coverage());
 
@@ -189,8 +181,6 @@ impl MLdBG {
                 compressed_len_diff,                 // homopolymer compression length difference
                 entropy,                             // shannon entropy
                 gc_content,                          // gc content
-                // lr_distance,                         // distance to nearest long read contig end
-                // sr_distance,                         // distance to nearest short read contig end
             ];
 
             let data = Data::new_test_data(features, None);

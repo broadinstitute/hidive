@@ -22,6 +22,12 @@ pub fn start(
     let cache_path = std::env::temp_dir();
     skydive::elog!("Intermediate data will be stored at {:?}.", cache_path);
 
+    let model_absolute_path = if model_path.is_absolute() {
+        model_path.clone()
+    } else {
+        std::env::current_dir().unwrap().join(model_path)
+    };
+
     // Load datasets
     let long_read_seq_urls = skydive::parse::parse_file_names(&[long_read_fasta_path.clone()]);
 
@@ -45,15 +51,25 @@ pub fn start(
         .for_each(|(chrom, start, end, name)| {
             let (padded_start, padded_end) = pad_interval(start, end, window);
 
-            let mut corrected_reads = HashMap::new();
+            // let mut corrected_reads_old: HashMap<String, Vec<(Vec<u8>, HashMap<Vec<u8>, f32>)>> = HashMap::new();
+            // for window_start in (padded_start..padded_end).step_by(window) {
 
-            for window_start in (padded_start..padded_end).step_by(window) {
-                let window_end = window_start + window as u64;
+            let corrected_reads: HashMap<String, Vec<(Vec<u8>, HashMap<Vec<u8>, f32>)>> = (padded_start..padded_end).step_by(window).collect::<Vec<_>>()
+                .into_par_iter()
+                .filter_map(|window_start| {
+                    let window_end = window_start + window as u64;
 
-                let locus = HashSet::from([(chrom.clone(), window_start, window_end, name.clone())]);
+                    let locus = HashSet::from([(chrom.clone(), window_start, window_end, name.clone())]);
 
-                let r = skydive::stage::stage_data_in_memory(&locus, &long_read_seq_urls, false, &cache_path);
-                if let Ok(reads) = r {
+                    let r = skydive::stage::stage_data_in_memory(&locus, &long_read_seq_urls, false, &cache_path);
+
+                    if let Ok(reads) = r {
+                        Some(reads)
+                    } else {
+                        None
+                    }
+                })
+                .map(|reads| {
                     let long_reads: HashMap<String, Vec<u8>> = reads
                         .into_iter()
                         .map(|read| (read.id().to_string(), read.seq().to_vec()))
@@ -88,22 +104,34 @@ pub fn start(
                     let s1 = LdBG::from_sequences("sr".to_string(), kmer_size, &sr_seqs);
 
                     let m = MLdBG::from_ldbgs(vec![l1, s1])
-                        .score_kmers(model_path)
+                        .score_kmers(&model_absolute_path)
                         .collapse()
                         .clean(0.1)
                         .build_links(&lr_seqs, false);
 
                     let g = m.traverse_all_kmers();
 
+                    let mut window_corrections = HashMap::new();
                     for (id, seq) in long_reads {
                         let corrected_seq = m.correct_seq(&g, &seq);
-
-                        corrected_reads.entry(id)
+                        window_corrections.entry(id)
                             .or_insert_with(Vec::new)
                             .push((corrected_seq, m.scores.clone()));
                     }
-                }
-            }
+
+                    window_corrections
+                })
+                .reduce(
+                    || HashMap::new(),
+                    |mut acc, window_map| {
+                        for (id, corrections) in window_map {
+                            acc.entry(id)
+                            .or_insert_with(Vec::new)
+                            .extend(corrections);
+                        }
+                        acc
+                    }
+                );
 
             let mut file = fa_file.lock().unwrap();
             for id in corrected_reads.keys() {
@@ -131,7 +159,7 @@ pub fn start(
                 let mut qual = vec![0; joined_seq.len()];
                 for i in 0..prob.len() {
                     prob[i] = prob[i].powf(1.0/count[i] as f32);
-                    qual[i] = ((-10.0*(1.0 - (prob[i] - 0.0001).max(0.0)).log10()) as u8).clamp(1, 40);
+                    qual[i] = ((-10.0*(1.0 - (prob[i] - 0.0001).max(0.0)).log10()) as u8 + 33).clamp(33, 73);
                 }
 
                 let _ = writeln!(file, "@{}\n{}\n+\n{}", id, String::from_utf8(joined_seq).unwrap(), String::from_utf8_lossy(&qual));

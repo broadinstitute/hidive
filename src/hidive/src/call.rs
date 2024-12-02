@@ -220,7 +220,7 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
 
     let wmec_matrix = WMECData::new(reads, confidences);
 
-    let (p1, p2) = skydive::wmec::phase_all(&wmec_matrix, 30, 20);
+    let (p1, p2) = skydive::wmec::phase_all(&wmec_matrix, 20, 10);
 
     let mut h1 = Vec::new();
     let mut h2 = Vec::new();
