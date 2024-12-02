@@ -152,9 +152,15 @@ task Correct {
     command <<<
         set -x
 
-        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
-            minimap2 -ayYL -x map-hifi ~{reference} - | \
-            samtools sort --write-index -O BAM -o ~{prefix}.bam
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} > corrected.fq
+
+        head corrected.fq
+
+        minimap2 -ayYL -x map-hifi ~{reference} corrected.fq > corrected.sam
+
+        head corrected.sam
+
+        samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
