@@ -147,7 +147,7 @@ task Correct {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([model, reference, short_read_fasta], "GB"))
-    Int memory_gb = 1*num_cpus
+    Int memory_gb = 2*num_cpus
 
     command <<<
         set -x
