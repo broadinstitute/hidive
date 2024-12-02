@@ -76,7 +76,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -125,7 +125,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
         memory: "~{num_cpus} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -164,7 +164,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -200,7 +200,7 @@ task Call {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
