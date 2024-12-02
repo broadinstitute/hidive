@@ -348,17 +348,7 @@
 <a href="#347" id="347">347</a>
 <a href="#348" id="348">348</a>
 <a href="#349" id="349">349</a>
-<a href="#350" id="350">350</a>
-<a href="#351" id="351">351</a>
-<a href="#352" id="352">352</a>
-<a href="#353" id="353">353</a>
-<a href="#354" id="354">354</a>
-<a href="#355" id="355">355</a>
-<a href="#356" id="356">356</a>
-<a href="#357" id="357">357</a>
-<a href="#358" id="358">358</a>
-<a href="#359" id="359">359</a>
-<a href="#360" id="360">360</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::{HashMap, HashSet}, path::PathBuf};
+<a href="#350" id="350">350</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 <span class="kw">use </span>gbdt::{decision_tree::Data, gradient_boost::GBDT};
 <span class="kw">use </span>itertools::Itertools;
@@ -517,21 +507,13 @@
     </span><span class="kw">pub fn </span>score_kmers(<span class="kw-2">mut </span><span class="self">self</span>, model_path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>gbdt = GBDT::load_model(model_path.to_str().unwrap()).unwrap();
 
-        <span class="comment">// let lr_contigs = self.ldbgs[0].assemble_all();
-        // let lr_distances = Self::distance_to_a_contig_end(&amp;lr_contigs, self.kmer_size);
-
-        // let sr_contigs = self.ldbgs[1].assemble_all();
-        // let sr_distances = Self::distance_to_a_contig_end(&amp;sr_contigs, self.kmer_size);
-
-        </span><span class="self">self</span>.scores = <span class="self">self</span>.union_of_kmers().iter().map(|cn_kmer| {
+        <span class="self">self</span>.scores = <span class="self">self</span>.union_of_kmers().iter().map(|cn_kmer| {
             <span class="kw">let </span>compressed_len = <span class="kw">crate</span>::utils::homopolymer_compressed(cn_kmer).len();
             <span class="kw">let </span>compressed_len_diff = (cn_kmer.len() - compressed_len) <span class="kw">as </span>f32;
             <span class="kw">let </span>entropy = <span class="kw">crate</span>::utils::shannon_entropy(cn_kmer);
             <span class="kw">let </span>gc_content = <span class="kw">crate</span>::utils::gc_content(cn_kmer);
-            <span class="comment">// let lr_distance = *lr_distances.get(cn_kmer).unwrap_or(&amp;0) as f32;
-            // let sr_distance = *sr_distances.get(cn_kmer).unwrap_or(&amp;0) as f32;
 
-            </span><span class="kw">let </span>lcov = <span class="self">self</span>.ldbgs[<span class="number">0</span>].kmers.get(cn_kmer).map_or(<span class="number">0</span>, |record| record.coverage());
+            <span class="kw">let </span>lcov = <span class="self">self</span>.ldbgs[<span class="number">0</span>].kmers.get(cn_kmer).map_or(<span class="number">0</span>, |record| record.coverage());
 
             <span class="kw">let </span>scov_fw = <span class="self">self</span>.ldbgs[<span class="number">1</span>].kmers.get(cn_kmer).map_or(<span class="number">0</span>, |sr| sr.fw_coverage());
             <span class="kw">let </span>scov_rc = <span class="self">self</span>.ldbgs[<span class="number">1</span>].kmers.get(cn_kmer).map_or(<span class="number">0</span>, |sr| sr.rc_coverage());
@@ -549,8 +531,6 @@
                 </span>compressed_len_diff,                 <span class="comment">// homopolymer compression length difference
                 </span>entropy,                             <span class="comment">// shannon entropy
                 </span>gc_content,                          <span class="comment">// gc content
-                // lr_distance,                         // distance to nearest long read contig end
-                // sr_distance,                         // distance to nearest short read contig end
             </span>];
 
             <span class="kw">let </span>data = Data::new_test_data(features, <span class="prelude-val">None</span>);
