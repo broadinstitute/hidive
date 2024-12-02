@@ -30,21 +30,26 @@ workflow Hidive {
 
     call Correct {
         input:
+            locus = locus,
             model = model,
-            long_read_fasta = Fetch.fasta,
+            reference = reference,
+            long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
     }
 
-    call Align {
+    call Call {
         input:
+            locus = locus,
             reference = reference,
-            sequences = Correct.fasta,
+            aligned_reads_bam = Correct.corrected_bam,
+            aligned_reads_csi = Correct.corrected_csi,
     }
 
     output {
-        File corrected_fa = Correct.fasta
-        File aligned_bam = Align.aligned_bam
-        File aligned_bai = Align.aligned_bai
+        File corrected_bam = Correct.corrected_bam
+        File corrected_csi = Correct.corrected_csi
+        File called_bam = Call.called_bam
+        File called_csi = Call.called_csi
     }
 }
 
@@ -71,7 +76,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -120,71 +125,84 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.77"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_phase"
         memory: "~{num_cpus} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 2
     }
 }
 
 task Correct {
     input {
-        File model
-        File long_read_fasta
         File short_read_fasta
+        String long_reads_bam
 
-        String prefix = "out"
-
-        Int num_cpus = 4
-    }
-
-    Int disk_size_gb = 1 + 2*ceil(size([model, long_read_fasta, short_read_fasta], "GB"))
-
-    command <<<
-        set -euxo pipefail
-
-        hidive correct -m ~{model} -g {prefix}.gfa ~{long_read_fasta} ~{short_read_fasta} > ~{prefix}.fa
-    >>>
-
-    output {
-        File fasta = "~{prefix}.fa"
-        File gfa = "~{prefix}.gfa"
-    }
-
-    runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.85"
-        memory: "4 GB"
-        cpu: num_cpus
-        disks: "local-disk ~{disk_size_gb} SSD"
-    }
-}
-
-task Align {
-    input {
+        String locus
+        File model
         File reference
-        File sequences
 
-        String preset = "map-hifi"
         String prefix = "out"
 
         Int num_cpus = 8
     }
 
-    command <<<
-        set -euxo pipefail
+    Int disk_size_gb = 1 + 2*ceil(size([model, reference, short_read_fasta], "GB"))
+    Int memory_gb = 2*num_cpus
 
-        minimap2 -t ~{num_cpus} -ayYL -x ~{preset} ~{reference} ~{sequences} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+    command <<<
+        set -x
+
+        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
+            minimap2 -ayYL -x map-hifi ~{reference} - | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
-        File aligned_bam = "~{prefix}.bam"
-        File aligned_bai = "~{prefix}.bam.bai"
+        File corrected_bam = "~{prefix}.bam"
+        File corrected_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.78"
-        memory: "32 GB"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
+        memory: "~{memory_gb} GB"
         cpu: num_cpus
-        disks: "local-disk 100 SSD"
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Call {
+    input {
+        File reference
+        File aligned_reads_bam
+        File aligned_reads_csi
+
+        String locus
+        String prefix = "out"
+
+        Int num_cpus = 8
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([reference, aligned_reads_bam, aligned_reads_csi], "GB"))
+    Int memory_gb = 2*num_cpus
+
+    command <<<
+        set -x
+
+        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | \
+            minimap2 -ayYL -x map-hifi ~{reference} - | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
+    >>>
+
+    output {
+        File called_bam = "~{prefix}.bam"
+        File called_csi = "~{prefix}.bam.csi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_improve_wdl"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }

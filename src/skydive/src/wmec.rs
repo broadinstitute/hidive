@@ -1,11 +1,18 @@
-//! This module implements the WhatsHap phasing algorithm as described in:
+//! This module implements the `WhatsHap` phasing algorithm as described in:
 //! Murray Patterson, Tobias Marschall, Nadia Pisanti, Leo van Iersel, Leen Stougie, et al.
-//! WhatsHap: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
+//! `WhatsHap`: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
 //! Journal of Computational Biology, 2015, 22 (6), pp.498-509.
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988
 
 use std::collections::{BTreeSet, HashMap};
+use std::fs::File;
+use std::io::Write;
+
+use itertools::Itertools;
+
+use indicatif::ParallelProgressIterator;
+use rayon::prelude::*;
 
 #[derive(Debug)]
 pub struct WMECData {
@@ -16,6 +23,7 @@ pub struct WMECData {
 
 impl WMECData {
     // Initialize the data structure with given reads and confidences
+    #[must_use]
     pub fn new(reads: Vec<Vec<Option<u8>>>, confidences: Vec<Vec<Option<u32>>>) -> Self {
         let num_snps = reads[0].len();
         WMECData { reads, confidences, num_snps }
@@ -23,6 +31,7 @@ impl WMECData {
     
     // Function to compute W^0(j, R) and W^1(j, R)
     // Cost to set all fragments in set R to 0 or 1 at SNP j
+    #[must_use]
     pub fn compute_costs(&self, snp: usize, set_r: &BTreeSet<usize>) -> (u32, u32) {
         let mut w0 = 0; // Cost for setting to 0
         let mut w1 = 0; // Cost for setting to 1
@@ -43,6 +52,7 @@ impl WMECData {
     }
     
     // Calculate minimum correction cost Delta C(j, (R, S))
+    #[must_use]
     pub fn delta_c(&self, snp: usize, r: &BTreeSet<usize>, s: &BTreeSet<usize>) -> u32 {
         let (w0_r, w1_r) = self.compute_costs(snp, r);
         let (w0_s, w1_s) = self.compute_costs(snp, s);
@@ -53,6 +63,33 @@ impl WMECData {
         // Alternatively, under the all heterozygous assumption, where one wants to enforce all SNPs
         // to be heterozygous, the equation becomes:
         // std::cmp::min(w0_r + w1_r, w0_s + w1_s)
+    }
+
+    // Write reads matrix to a file in tab-separated format
+    pub fn write_reads_matrix(&self, path: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+
+        // Write header row with SNP positions
+        for j in 0..self.num_snps {
+            write!(file, "\tSNP_{}", j)?;
+        }
+        writeln!(file)?;
+
+        // Write each read's data
+        for (i, read) in self.reads.iter().enumerate() {
+            write!(file, "Read_{}", i)?;
+            for allele in read {
+                if let Some(allele) = allele {
+                    if *allele == 0 { write!(file, "\t0")? };
+                    if *allele == 1 { write!(file, "\t1")? };
+                } else {
+                    write!(file, "\t-")?;
+                }
+            }
+            writeln!(file)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -101,7 +138,7 @@ fn initialize_dp(data: &WMECData) -> (HashMap<(usize, BTreeSet<usize>, BTreeSet<
 }
 
 // Function to update the DP table for each SNP position
-fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
+fn update_dp_old(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
     let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
         .filter(|(_, read)| read[snp].is_some()) // Only consider fragments covering SNP
         .map(|(index, _)| index)
@@ -136,6 +173,53 @@ fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet
 
         dp.insert((snp, r.clone(), s.clone()), min_cost);
         backtrack.insert((snp, r.clone(), s.clone()), best_bipartition);
+    }
+}
+
+fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
+    let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+        .filter(|(_, read)| read[snp].is_some())
+        .map(|(index, _)| index)
+        .collect();
+    let partitions = generate_bipartitions(&active_fragments);
+    
+    // Pre-compute prev_active_fragments since it's used by all iterations
+    let prev_active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+        .filter(|(_, read)| read[snp - 1].is_some())
+        .map(|(index, _)| index)
+        .collect();
+
+    // Collect results in parallel
+    let results: Vec<_> = partitions.par_iter()
+        .map(|(r, s)| {
+            let delta_cost = data.delta_c(snp, r, s);
+            let mut min_cost = u32::MAX;
+            let mut best_bipartition = None;
+            
+            for (prev_r, prev_s) in generate_bipartitions(&prev_active_fragments) {
+                let r_compatible = r.intersection(&prev_active_fragments).all(|&x| prev_r.contains(&x));
+                let s_compatible = s.intersection(&prev_active_fragments).all(|&x| prev_s.contains(&x));
+
+                if r_compatible && s_compatible {
+                    if let Some(&prev_cost) = dp.get(&(snp - 1, prev_r.clone(), prev_s.clone())) {
+                        let current_cost = delta_cost + prev_cost;
+
+                        if current_cost < min_cost {
+                            min_cost = current_cost;
+                            best_bipartition = Some((prev_r.clone(), prev_s.clone()));
+                        }
+                    }
+                }
+            }
+
+            ((r.clone(), s.clone()), (min_cost, best_bipartition))
+        })
+        .collect();
+
+    // Update the hashmaps with the results
+    for ((r, s), (min_cost, best_bipartition)) in results {
+        dp.insert((snp, r.clone(), s.clone()), min_cost);
+        backtrack.insert((snp, r, s), best_bipartition);
     }
 }
 
@@ -178,7 +262,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
                 current_bipartition = prev_bipartition.clone();
             } else {
                 // This should not happen if the DP table is correctly filled
-                panic!("No valid previous bipartition found for SNP {}", snp);
+                panic!("No valid previous bipartition found for SNP {snp}");
             }
         }
     }
@@ -187,6 +271,7 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
 }
 
 // Main function to perform WMEC using dynamic programming
+#[must_use]
 pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>) {
     let (mut dp, mut backtrack) = initialize_dp(data);
 
@@ -195,6 +280,93 @@ pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>) {
     }
 
     backtrack_haplotypes(data, &dp, &backtrack)
+}
+
+#[must_use]
+pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec<u8>) {
+    // First, collect all window ranges
+    let mut windows: Vec<_> = (0..data.num_snps)
+        .step_by(stride)
+        .map(|start| (start, (start + window).min(data.num_snps)))
+        .collect();
+
+    // Filter out last window if it completely overlaps with previous window
+    if let Some(&(_, prev_end)) = windows.get(windows.len() - 2) {
+        if let Some(&(_, last_end)) = windows.last() {
+            if last_end == prev_end {
+                windows.pop();
+            }
+        }
+    }
+
+    let pb = crate::utils::default_bounded_progress_bar("Processing windows", windows.len() as u64);
+
+    // Process windows in parallel
+    let haplotype_pairs: Vec<_> = windows
+        // .iter()
+        .par_iter()
+        .progress_with(pb)
+        .map(|&(start, end)| {
+            let (window_reads, window_confidences): (Vec<Vec<Option<u8>>>, Vec<Vec<Option<u32>>>) = data.reads.iter().zip(data.confidences.iter())
+                .map(|(read, confidence)| {
+                    let window_read = read[start..end].to_vec();
+                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
+                    (none_count, window_read, confidence[start..end].to_vec())
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .sorted_by_key(|(none_count, _, _)| *none_count)
+                .take(10)
+                .map(|(_, window_read, window_confidence)| (window_read, window_confidence))
+                .unzip();
+
+            let window_data = WMECData::new(window_reads, window_confidences);
+            
+            let (mut dp, mut backtrack) = initialize_dp(&window_data);
+            for snp in 1..window_data.num_snps {
+                update_dp(&window_data, &mut dp, &mut backtrack, snp);
+            }
+
+            backtrack_haplotypes(&window_data, &dp, &backtrack)
+        })
+        .collect();
+
+    let mut haplotype1 = Vec::new();
+    let mut haplotype2 = Vec::new();
+
+    let overlap = window - stride;
+
+    for (hap1, hap2) in haplotype_pairs {
+        if haplotype1.len() == 0 {
+            haplotype1 = hap1;
+            haplotype2 = hap2;
+        } else {
+            // Compare overlap regions to determine orientation
+            let h1_overlap = &haplotype1[haplotype1.len()-overlap..];
+            let h2_overlap = &haplotype2[haplotype2.len()-overlap..];
+            let new_overlap = &hap1[..overlap];
+
+            // Count matches between overlapping regions
+            let h1_matches = h1_overlap.iter().zip(new_overlap.iter())
+                .filter(|(a,b)| a == b)
+                .count();
+            let h2_matches = h2_overlap.iter().zip(new_overlap.iter())
+                .filter(|(a,b)| a == b)
+                .count();
+
+            // Append new haplotypes in correct orientation based on best overlap match
+            if h1_matches >= h2_matches {
+                haplotype1.extend_from_slice(&hap1[overlap..]);
+                haplotype2.extend_from_slice(&hap2[overlap..]);
+            } else {
+                haplotype1.extend_from_slice(&hap2[overlap..]);
+                haplotype2.extend_from_slice(&hap1[overlap..]);
+            }
+
+        }
+    }
+
+    (haplotype1, haplotype2)
 }
 
 #[cfg(test)]

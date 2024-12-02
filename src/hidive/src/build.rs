@@ -2,21 +2,18 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use bio::io::fasta::{IndexedReader, Reader, Record};
+use bio::io::fasta::{Reader, Record};
 
 use flate2::read::GzDecoder;
 use serde_json::Value;
 
 // Import the skydive module, which contains the necessary functions for building graphs
-use skydive;
 
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
-use std::sync::Mutex;
 
 pub fn get_reference_kmer_profile(ref_hla: &str, k: usize) -> Vec<String> {
     let mut ref_kmer_profile: HashMap<String, i32> = HashMap::new();
@@ -191,7 +188,7 @@ pub fn get_final_anchor(
     let mut last_position = 0;
 
     for anchor in anchornames {
-        let mut position = anchor_info[anchor].pos;
+        let position = anchor_info[anchor].pos;
         if position > last_position + k {
             anchor_unadjacent_list.push(anchor.to_string());
             last_position = position;
@@ -223,10 +220,10 @@ pub fn mapping_info(
         let anchor_rev = reverse_complement(&anchor_seq);
         position_dict
             .entry(anchor_seq.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
         position_dict
             .entry(anchor_rev.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
     }
 
     for i in 0..contig.len() - k + 1 {
@@ -258,7 +255,7 @@ pub fn construct_edges(
     contig: String,
     contigname: String,
     sample: String,
-    Anchorseq: &HashMap<String, String>,
+    anchorseq: &HashMap<String, String>,
 ) -> EdgeInfo {
     let src_seq: String;
     let mut pr = false;
@@ -270,12 +267,12 @@ pub fn construct_edges(
         pr = true;
     } else {
         src_seq = contig.chars().skip(src_pos).take(k).collect();
-        src = match Anchorseq.get(&src_seq) {
+        src = match anchorseq.get(&src_seq) {
             Some(value) => value.clone(),
             None => {
                 let reversed_src_seq = reverse_complement(&src_seq);
                 pr = true;
-                Anchorseq
+                anchorseq
                     .get(&reversed_src_seq)
                     .unwrap_or(&"".to_string())
                     .clone()
@@ -292,12 +289,12 @@ pub fn construct_edges(
         sr = true;
     } else {
         dst_seq = contig.chars().skip(dst_pos).take(k).collect::<String>();
-        dst = match Anchorseq.get(&dst_seq) {
+        dst = match anchorseq.get(&dst_seq) {
             Some(value) => value.clone(),
             None => {
                 let reversed_dst_seq = reverse_complement(&dst_seq);
                 sr = true;
-                Anchorseq
+                anchorseq
                     .get(&reversed_dst_seq)
                     .unwrap_or(&"".to_string())
                     .clone()
@@ -323,8 +320,8 @@ pub fn construct_edges(
 
     EdgeInfo {
         seq: edge_seq,
-        src: src,
-        dst: dst,
+        src,
+        dst,
         reads: vec![contigname],
         samples: vec![sample].into_iter().collect(),
     }
@@ -352,7 +349,7 @@ pub fn create_edge_file(
             .last()
             .unwrap_or_default()
             .to_string();
-        let (a, svs) = mapping_info(&final_anchor, contig.to_string(), k);
+        let (a, _svs) = mapping_info(final_anchor, contig.to_string(), k);
         let mut splitposlist: Vec<_> = a.values().filter_map(|&x| x).collect();
         splitposlist.sort();
         let mut edgeindex = 0;
@@ -368,7 +365,7 @@ pub fn create_edge_file(
                 &anchorseq,
             );
             let src = &e.src;
-            let edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+            let edgelist = outgoing.entry(src.clone()).or_default();
             if let Some(pos) = edgelist
                 .iter()
                 .position(|edge| edge_info[edge].dst == e.dst && edge_info[edge].seq == e.seq)
@@ -396,7 +393,7 @@ pub fn create_edge_file(
             &anchorseq,
         );
         let src = &e.src;
-        let edgelist = outgoing.entry(src.clone()).or_insert_with(|| Vec::new());
+        let edgelist = outgoing.entry(src.clone()).or_default();
         if let Some(pos) = edgelist
             .iter()
             .position(|edge| edge_info[edge].dst == e.dst && edge_info[edge].seq == e.seq)
@@ -567,8 +564,8 @@ impl GraphicalGenome {
         Ok(GraphicalGenome {
             anchor: anchor_dict,
             edges: edge_dict,
-            outgoing: outgoing,
-            incoming: incoming,
+            outgoing,
+            incoming,
         })
     }
 }
@@ -596,7 +593,7 @@ impl FindAllPathBetweenAnchors {
         g: &GraphicalGenome,
         start: &str,
         end: &str,
-        mut sofar: Vec<String>,
+        sofar: Vec<String>,
         depth: usize,
         readset: HashSet<String>,
     ) {
@@ -651,12 +648,12 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
     for item in path {
         if item.starts_with('A') {
             if let Some(anchor) = graph.anchor.get(item) {
-                seq += &anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
+                seq += anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
                                                                     // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             }
         } else if item.starts_with("E") {
             if let Some(edge) = graph.edges.get(item) {
-                seq += &edge["seq"].as_str().unwrap_or_default(); // Assuming `edges` is a HashMap and "seq" is a key
+                seq += edge["seq"].as_str().unwrap_or_default(); // Assuming `edges` is a HashMap and "seq" is a key
             }
         }
     }
@@ -665,7 +662,7 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
 
 pub fn find_all_reads(graph: &GraphicalGenome) -> HashSet<String> {
     let mut read_sets = HashSet::new();
-    for (item, edge) in &graph.edges {
+    for (_item, edge) in &graph.edges {
         if let Some(readlist) = edge.get("reads").and_then(|r| r.as_array()) {
             for read in readlist {
                 if let Some(read_str) = read.as_str() {
@@ -738,7 +735,7 @@ impl GetSeriesParallelGraph {
         let mut node = Self::find_furthest_node(&node_candidate, subgraph, &start_node);
         nodelist.push(node.clone());
 
-        while node != end_node && node != "" {
+        while node != end_node && !node.is_empty() {
             let edgelist = &subgraph.outgoing[&node];
             let mut node_candidate: Vec<String> = Vec::new();
             for edge in edgelist {
@@ -746,7 +743,7 @@ impl GetSeriesParallelGraph {
                 if nodelist.contains(&"SINK".to_string()) {
                     continue;
                 }
-                if nodelist[0] != ""
+                if !nodelist[0].is_empty()
                     && subgraph.anchor.contains_key(&nodelist[0])
                     && subgraph.outgoing.contains_key(&nodelist[0])
                 {
@@ -788,11 +785,11 @@ impl GetSeriesParallelGraph {
                 FindAllPathBetweenAnchors::new(subgraph, start_node, end_node, initial_set.clone());
             let mut index = 0;
             for (p, rs) in path.subpath.iter() {
-                let edgename = format!(
-                    "E{:05}.{:04}",
-                    start_node[1..].parse::<usize>().unwrap(),
-                    index
-                );
+                // let edgename = format!(
+                //     "E{:05}.{:04}",
+                //     start_node[1..].parse::<usize>().unwrap(),
+                //     index
+                // );
                 let seq = reconstruct_path_seq(subgraph, &p[1..p.len() - 1]);
                 let edgelist = outgoing_dict
                     .get(start_node)
@@ -966,7 +963,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
     let anchors = get_anchors(&anchorlist, &position_dict, k, &stem);
 
     let final_anchor = get_final_anchor(&anchors, k);
-    let (edge_info, outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
+    let (edge_info, _outgoing) = create_edge_file(&hla_seq, &final_anchor, k);
 
     let dereferenced_final_anchor = final_anchor
         .iter()
@@ -974,10 +971,10 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
         .collect();
 
     // Filter edges with little read support.
-    let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 4);
+    let filtered_edges = filter_undersupported_edges(&edge_info, &stem, 30);
 
     // Write final graph to disk.
-    write_gfa(
+    let _ = write_gfa(
         &dereferenced_final_anchor,
         &filtered_edges,
         output.to_str().unwrap(),
@@ -989,7 +986,7 @@ pub fn start(output: &PathBuf, k: usize, fasta_path: &PathBuf, reference_name: S
     let mut sp_graph = GetSeriesParallelGraph::new(&graph);
     let outputfilename_str = output.with_extension("sp.gfa");
     // println!("{:?}", outputfilename_str);
-    write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);
+    let _ = write_graph_from_graph(outputfilename_str.to_str().unwrap(), &mut sp_graph);
     println!("{:?}", outputfilename_str);
     // write_graph_from_graph("HLA-A.sp.gfa", &mut sp_graph);
 }

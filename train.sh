@@ -2,23 +2,19 @@
 
 set -euxo pipefail
 
-
-#TRAIN_LOCUS="chr19:54,000,000-55,000,000"
-#TRAIN_NAME="KIR"
-
-TRAIN_LOCUS="chr19:40,000,000-40,100,000"
-TRAIN_NAME="chr19"
+export GCS_REQUESTER_PAYS_PROJECT="broad-dsp-lrma"
 
 #TRAIN_LOCUS="chr20:40,000,000-60,000,000"
 #TRAIN_NAME="chr20"
 
+TRAIN_LOCUS="chr19:53,000,000-57,000,000"
+TRAIN_NAME="KIR"
+
 #TRAIN_LOCUS="chr6:27,100,000-30,500,000"
 #TRAIN_NAME="MHC" # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-017-1207-1
 
-#TEST_LOCUS="chr6:25,726,063-33,410,226"
-#TEST_NAME="MHC"
-
-TEST_LOCUS="chr6:29,940,532-29,947,870"
+#TEST_LOCUS="chr6:29,941,260-29,949,572"
+TEST_LOCUS="chr6:29,000,000-30,000,000"
 TEST_NAME="HLA-A"
 
 SAMPLE="HG00438"
@@ -41,6 +37,7 @@ if [ ! -f $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam ]; then
   gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.maternal.GRCh38_no_alt.bam $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam
   gsutil -u $GCS_REQUESTER_PAYS_PROJECT cp gs://fc-4310e737-a388-4a10-8c9e-babe06aaf0cf/working/HPRC/$SAMPLE/assemblies/year1_f1_assembly_v2_genbank/alignment/assembly-to-reference/$SAMPLE.maternal.GRCh38_no_alt.bam.bai $OUTPUT/$SAMPLE.maternal.GRCh38_no_alt.bam.bai
 fi
+
 # if file not in folder fetch
 if [ ! -f $OUTPUT/$SAMPLE.maternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta ]; then
   $HIDIVE fetch \
@@ -50,7 +47,6 @@ if [ ! -f $OUTPUT/$SAMPLE.maternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta ]; then
 fi
 
 # maternal haplotype testing
-
 if [ ! -f $OUTPUT/$SAMPLE.maternal.test.GRCh38_no_alt.$TEST_NAME.fasta ]; then
   $HIDIVE fetch \
     -l $TEST_LOCUS \
@@ -72,7 +68,6 @@ if [ ! -f $OUTPUT/$SAMPLE.paternal.train.GRCh38_no_alt.$TRAIN_NAME.fasta ]; then
 fi
 
 # paternal haplotype testing
-
 if [ ! -f $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta ]; then
   $HIDIVE fetch \
     -l $TEST_LOCUS \
@@ -117,7 +112,7 @@ fi
 # train
 
 if [ ! -f $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json ]; then
-  $HIDIVE train \
+  $HIDIVE train -d \
     -o $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json \
     --long-read-seq-paths $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
     --short-read-seq-paths $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta \

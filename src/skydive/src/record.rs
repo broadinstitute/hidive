@@ -6,14 +6,19 @@ use crate::edges::Edges;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     coverage: u16,
+    cov_fw: u16,
+    cov_rc: u16,
     edges: Edges,
 }
 
 impl Record {
     /// Create an empty de Bruijn graph record.
+    #[must_use]
     pub fn new(coverage: u16, edges: Option<Edges>) -> Self {
         Record {
             coverage,
+            cov_fw: 0,
+            cov_rc: 0,
             edges: edges.unwrap_or(Edges::empty()),
         }
     }
@@ -27,16 +32,31 @@ impl Record {
     // }
 
     /// Return the Record's coverage.
+    #[must_use]
     pub fn coverage(&self) -> u16 {
         self.coverage
     }
 
+    /// Return the Record's forward coverage.
+    #[must_use]
+    pub fn fw_coverage(&self) -> u16 {
+        self.cov_fw
+    }
+
+    /// Return the Record's reverse complement coverage.
+    #[must_use]
+    pub fn rc_coverage(&self) -> u16 {
+        self.cov_rc
+    }
+
     // Return all edges.
+    #[must_use]
     pub fn edges(&self) -> Edges {
         self.edges
     }
 
     /// Return incoming edges
+    #[must_use]
     pub fn incoming_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
@@ -57,6 +77,7 @@ impl Record {
     }
 
     /// Return outgoing edges
+    #[must_use]
     pub fn outgoing_edges(&self) -> Vec<u8> {
         let mut edges = Vec::new();
 
@@ -79,6 +100,16 @@ impl Record {
     /// Increment the coverage value by 1.
     pub fn increment_coverage(&mut self) {
         self.coverage = self.coverage.saturating_add(1);
+    }
+
+    /// Increment the forward coverage value by 1.
+    pub fn increment_fw_coverage(&mut self) {
+        self.cov_fw = self.cov_fw.saturating_add(1);
+    }
+
+    /// Increment the reverse complement coverage value by 1.
+    pub fn increment_rc_coverage(&mut self) {
+        self.cov_rc = self.cov_rc.saturating_add(1);
     }
 
     /// Set the coverage value.
@@ -109,60 +140,29 @@ impl Record {
     }
 
     /// The in-degree of a particular k-mer.
+    #[must_use]
     pub fn in_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_A) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_C) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_G) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_IN_T) {
-            1
-        } else {
-            0
-        };
-
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_A));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_C));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_G));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_IN_T));
         degree
     }
 
     /// The out-degree of a particular k-mer.
+    #[must_use]
     pub fn out_degree(&self) -> u8 {
         let mut degree: u8 = 0;
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_A) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_C) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_G) {
-            1
-        } else {
-            0
-        };
-        degree += if self.edges.contains(Edges::FLAG_EDGE_OUT_T) {
-            1
-        } else {
-            0
-        };
-
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_A));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_C));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_G));
+        degree += u8::from(self.edges.contains(Edges::FLAG_EDGE_OUT_T));
         degree
     }
 
     /// Identifies junctions in the graph
+    #[must_use]
     pub fn is_junction(&self) -> bool {
         self.in_degree() > 1 || self.out_degree() > 1
     }

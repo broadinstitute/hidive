@@ -16,9 +16,9 @@ pub fn start(
     truth_seq_paths: &Vec<PathBuf>,
     model_path: &PathBuf,
 ) {
-    let long_read_seq_urls = skydive::parse::parse_file_names(&long_read_seq_paths);
-    let short_read_seq_urls = skydive::parse::parse_file_names(&short_read_seq_paths);
-    let truth_seq_urls = skydive::parse::parse_file_names(&truth_seq_paths);
+    let long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
+    let short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
+    let truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
 
 
     // Read all long reads.
@@ -42,7 +42,7 @@ pub fn start(
 
     // load model
     skydive::elog!("Loading GBDT model from {}...", model_path.to_str().unwrap());
-    let mut gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect("Unable to load model");
+    let gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect("Unable to load model");
 
     // Prepare test data.
     let test_kmers = l1
@@ -50,7 +50,7 @@ pub fn start(
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
-    let mut test_data: DataVec = create_dataset_for_model(
+    let test_data: DataVec = create_dataset_for_model(
         test_kmers,
         &lr_distances,
         &sr_distances,
