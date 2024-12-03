@@ -253,7 +253,7 @@ task Phase {
                 printf "GT\t%s|%s\n", h1, h2
             }' > ~{prefix}.phased.gvcf
 
-        bgzip ~{prefix}.phased.gvcf > ~{prefix}.phased.gvcf.bgz
+        bgzip -c ~{prefix}.phased.gvcf > ~{prefix}.phased.gvcf.bgz
         tabix -p vcf ~{prefix}.phased.gvcf.bgz
     >>>
 
