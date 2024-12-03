@@ -110,6 +110,7 @@ task Rescue {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
+    Int memory_gb = 2*num_cpus
 
     command <<<
         set -euxo pipefail
@@ -132,10 +133,10 @@ task Rescue {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
-        memory: "~{num_cpus} GB"
+        memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
-        maxRetries: 2
+        # maxRetries: 1
     }
 }
 
