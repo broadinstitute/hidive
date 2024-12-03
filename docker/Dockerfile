@@ -65,6 +65,14 @@ RUN wget -O bcftools-1.21.tar.bz2 https://github.com/samtools/bcftools/releases/
     cd .. && \
     rm -rf bcftools-1.21 bcftools-1.21.tar.bz2
 
+RUN wget -O htslib-1.21.tar.bz2 https://github.com/samtools/htslib/releases/download/1.21/htslib-1.21.tar.bz2 && \
+    tar -vxjf htslib-1.21.tar.bz2 && \
+    cd htslib-1.21 && \
+    make && \
+    cp tabix bgzip /usr/local/bin/ && \
+    cd .. && \
+    rm -rf htslib-1.21 htslib-1.21.tar.bz2
+
 # Final stage
 FROM python:3.9-slim
 
