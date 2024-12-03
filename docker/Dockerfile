@@ -86,6 +86,8 @@ RUN apt-get update && \
 COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
 COPY --from=builder /usr/local/bin/samtools /usr/local/bin/samtools
 COPY --from=builder /usr/local/bin/bcftools /usr/local/bin/bcftools
+COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
+COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Copy gcloud utilities from builder stage
