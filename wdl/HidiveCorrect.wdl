@@ -10,6 +10,7 @@ workflow Hidive {
         File reference
         String locus
         File model
+        String sample_name
 
         Int padding = 500
     }
@@ -45,11 +46,21 @@ workflow Hidive {
             aligned_reads_csi = Correct.corrected_csi,
     }
 
+    call Phase {
+        input:
+            reference = reference,
+            called_bam = Call.called_bam,
+            called_csi = Call.called_csi,
+            sample_name = sample_name,
+    }
+
     output {
         File corrected_bam = Correct.corrected_bam
         File corrected_csi = Correct.corrected_csi
         File called_bam = Call.called_bam
         File called_csi = Call.called_csi
+        File phased_gvcf = Phase.phased_gvcf
+        File phased_gvcf_tbi = Phase.phased_gvcf_tbi
     }
 }
 
@@ -201,6 +212,62 @@ task Call {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Phase {
+    input {
+        File called_bam
+        File called_csi
+        File reference
+
+        String sample_name
+        String prefix = "out"
+
+        Int num_cpus = 2
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([reference, called_bam, called_csi], "GB"))
+    Int memory_gb = 2*num_cpus
+
+    command <<<
+        set -x
+
+        samtools view -h ~{called_bam} | grep -e '^@' -e '^h1' | samtools view -bS --write-index -o h1.bam
+        samtools view -h ~{called_bam} | grep -e '^@' -e '^h2' | samtools view -bS --write-index -o h2.bam
+
+        bcftools mpileup -f ~{reference} -g 0 -Ou -a DP -m 1 --indel-size 30000 h1.bam | bcftools call -m --ploidy 1 -g 0 -Oz -W -o h1.variants.gvcf.bgz
+        bcftools mpileup -f ~{reference} -g 0 -Ou -a DP -m 1 --indel-size 30000 h2.bam | bcftools call -m --ploidy 1 -g 0 -Oz -W -o h2.variants.gvcf.bgz
+
+        bcftools merge -g ~{reference} -0 -Ov h1.variants.gvcf.bgz h2.variants.gvcf.bgz | \
+            awk -F'\t' '
+            $0 ~ /^##/ {print; next}
+            $0 ~ /^#CHROM/ {
+                for(i=1; i<=9; i++) printf "%s\t", $i
+                print "~{sample_name}"
+                next
+            }
+            {
+                h1 = ($10 ~ /^\./) ? "0" : substr($10,1,1)
+                h2 = ($11 ~ /^\./) ? "0" : substr($11,1,1)
+                for(i=1; i<=8; i++) printf "%s\t", $i
+                printf "GT\t%s|%s\n", h1, h2
+            }' > ~{prefix}.phased.gvcf
+
+        bgzip ~{prefix}.phased.gvcf > ~{prefix}.phased.gvcf.bgz
+        tabix -p vcf ~{prefix}.phased.gvcf.bgz
+    >>>
+
+    output {
+        File phased_gvcf = "~{prefix}.phased.gvcf.bgz"
+        File phased_gvcf_tbi = "~{prefix}.phased.gvcf.bgz.tbi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
