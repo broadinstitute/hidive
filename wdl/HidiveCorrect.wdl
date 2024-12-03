@@ -105,7 +105,6 @@ task Rescue {
         File ref_cache_tar_gz
 
         String prefix = "out"
-        String? contig
 
         Int num_cpus = 16
     }
@@ -124,11 +123,7 @@ task Rescue {
         export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
-        hidive rescue \
-            ~{true='-c' false='' defined(contig)} ~{select_first([contig, ""])} \
-            -f ~{long_reads_fasta} \
-            ~{short_reads_cram} \
-            > ~{prefix}.fa
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
     >>>
 
     output {
