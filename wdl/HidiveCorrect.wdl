@@ -237,8 +237,10 @@ task Consensus {
     command <<<
         set -x
 
-        samtools faidx ~{reference} ~{locus} | bcftools consensus -H 1pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h1.bam
-        samtools faidx ~{reference} ~{locus} | bcftools consensus -H 2pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h2.bam
+        LOCUS=$(echo "~{locus}" | sed 's/,//g' | sed 's/|.*//')
+
+        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 1pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h1.bam
+        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 2pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h2.bam
     >>>
 
     output {
