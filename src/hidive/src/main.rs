@@ -420,6 +420,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Sample name.
+        #[clap(short, long, required = true, value_parser)]
+        sample_name: String,
+
         /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
         #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
@@ -597,12 +601,14 @@ fn main() {
         }
         Commands::Call {
             output,
+            sample_name,
             loci,
             reference_fasta_path,
             bam_path,
         } => {
             call::start(
                 &output,
+                &sample_name,
                 &loci,
                 &reference_fasta_path,
                 &bam_path

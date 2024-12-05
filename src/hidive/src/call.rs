@@ -12,6 +12,7 @@ use skydive::wmec::*;
 
 pub fn start(
     output: &PathBuf,
+    sample_name: &String,
     loci_list: &Vec<String>,
     reference_fasta_path: &PathBuf,
     bam_path: &PathBuf,
@@ -42,9 +43,8 @@ pub fn start(
 
     let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
     vcf_header.push_record(header_gt_line.as_bytes());
-    vcf_header.push_sample("test_sample".as_bytes());
+    vcf_header.push_sample(sample_name.as_bytes());
 
-    // let mut vcf = Writer::from_stdout(&vcf_header, true, Format::Vcf).unwrap();
     let mut vcf = Writer::from_path(output, &vcf_header, true, Format::Vcf).unwrap();
 
     for (chr, start, stop, name) in loci {
