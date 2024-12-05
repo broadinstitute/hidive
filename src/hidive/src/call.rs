@@ -3,7 +3,10 @@ use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
 
-use rust_htslib::bam::{FetchDefinition, Read};
+use rust_htslib::bcf::record::GenotypeAllele;
+use rust_htslib::bcf::{Format, Header, Writer};
+use rust_htslib::{bam, bam::{FetchDefinition, Read}};
+use minimap2::Aligner;
 
 use skydive::wmec::*;
 
@@ -28,149 +31,274 @@ pub fn start(
     // Iterate over loci
     let loci = skydive::parse::parse_loci(loci_list, 0).into_iter().collect::<Vec<_>>();
 
-    for (chr, start, stop, name) in loci {
-        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
-        let mut bam = skydive::stage::open_bam(&bam_url).unwrap();
+    // let mut output_file = File::create(output).expect("Failed to create output file");
 
+    for (chr, start, stop, name) in loci {
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
 
-        let mut read_ids = HashMap::new();
-        let mut matrix = Vec::new();
-        let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
-        let mut mloci = Vec::new();
+        // These get renewed for each locus, but they're fast to open.
+        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+        let bam = skydive::stage::open_bam(&bam_url).unwrap();
 
-        let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
-        for p in bam.pileup() {
-            let pileup = p.unwrap();
+        let (matrix, mloci) = prepare_matrix(bam, &chr, start, stop, fasta);
 
-            if pileup.pos() + 1 < start as u32 || pileup.pos() + 1 > stop as u32 {
-                continue;
+        skydive::elog!(" - phasing {} variants...", mloci.len());
+
+        let (h1, h2) = phase_variants(&matrix);
+
+        // let (hap1, hap2) = build_haplotypes(mloci, h1, h2, reference_seq_url, start, stop, chr);
+        build_variant_records(mloci, h1, h2, reference_seq_url, chr, start, stop);
+
+        // write_haplotypes(&mut output_file, name, hap1, hap2);
+    }
+}
+
+fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start: u64, stop: u64, fasta: rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+    let mut read_ids = HashMap::new();
+    let mut matrix = Vec::new();
+    let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
+    let mut mloci = Vec::new();
+
+    let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
+    for p in bam.pileup() {
+        let pileup = p.unwrap();
+
+        if pileup.pos() + 1 < start as u32 || pileup.pos() + 1 > stop as u32 {
+            continue;
+        }
+
+        let ref_str = fasta.fetch_seq_string(chr, usize::try_from(pileup.pos()).unwrap(), usize::try_from(pileup.pos()).unwrap()).unwrap();
+        let ref_base = ref_str.as_bytes()[0];
+
+        let mut is_variant = false;
+
+        let mut allele_map: BTreeMap<usize, (String, u8)> = BTreeMap::new();
+
+        for alignment in pileup.alignments() {
+            let record = alignment.record();
+            let qname = String::from_utf8(record.qname().to_vec()).unwrap();
+
+            if !alignment.is_del() && !alignment.is_refskip() {
+                let base = record.seq()[alignment.qpos().unwrap()];
+                let seq = vec![base];
+                let qual = vec![record.qual()[alignment.qpos().unwrap()]];
+                let q = *qual.iter().min().unwrap();
+
+                let len = read_ids.len();
+                read_ids.entry(qname.clone()).or_insert(len);
+                allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&seq).to_string(), q));
+
+                if base != ref_base {
+                    is_variant = true;
+                }
             }
 
-            let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pileup.pos()).unwrap(), usize::try_from(pileup.pos()).unwrap()).unwrap();
-            let ref_base = ref_str.as_bytes()[0];
-
-            let mut is_variant = false;
-
-            let mut allele_map: BTreeMap<usize, (String, u8)> = BTreeMap::new();
-
-            for alignment in pileup.alignments() {
-                let record = alignment.record();
-                let qname = String::from_utf8(record.qname().to_vec()).unwrap();
-
-                if !alignment.is_del() && !alignment.is_refskip() {
-                    let base = record.seq()[alignment.qpos().unwrap()];
-                    let seq = vec![base];
-                    let qual = vec![record.qual()[alignment.qpos().unwrap()]];
+            match alignment.indel() {
+                rust_htslib::bam::pileup::Indel::Ins(len) => {
+                    let qpos_start = alignment.qpos().unwrap();
+                    let qpos_stop = alignment.qpos().unwrap() + 1 + (len as usize);
+                    let seq = record.seq().as_bytes()[qpos_start..qpos_stop].to_vec();
+                    let qual = record.qual()[qpos_start..qpos_stop].to_vec();
                     let q = *qual.iter().min().unwrap();
 
                     let len = read_ids.len();
                     read_ids.entry(qname.clone()).or_insert(len);
                     allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&seq).to_string(), q));
 
-                    if base != ref_base {
-                        is_variant = true;
-                    }
-                }
+                    is_variant = true;
+                },
+                rust_htslib::bam::pileup::Indel::Del(len) => {
+                    let seq = vec![b'-'; len as usize];
+                    let qual = vec![record.qual()[alignment.qpos().unwrap()]];
+                    let q = *qual.iter().min().unwrap();
 
-                match alignment.indel() {
-                    rust_htslib::bam::pileup::Indel::Ins(len) => {
-                        let qpos_start = alignment.qpos().unwrap();
-                        let qpos_stop = alignment.qpos().unwrap() + 1 + (len as usize);
-                        let seq = record.seq().as_bytes()[qpos_start..qpos_stop].to_vec();
-                        let qual = record.qual()[qpos_start..qpos_stop].to_vec();
-                        let q = *qual.iter().min().unwrap();
+                    let len = read_ids.len();
+                    read_ids.entry(qname.clone()).or_insert(len);
+                    let full_seq = [&[ref_base], seq.as_slice()].concat();
+                    allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&full_seq).to_string(), q));
 
-                        let len = read_ids.len();
-                        read_ids.entry(qname.clone()).or_insert(len);
-                        allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&seq).to_string(), q));
-
-                        is_variant = true;
-                    },
-                    rust_htslib::bam::pileup::Indel::Del(len) => {
-                        let seq = vec![b'-'; len as usize];
-                        let qual = vec![record.qual()[alignment.qpos().unwrap()]];
-                        let q = *qual.iter().min().unwrap();
-
-                        let len = read_ids.len();
-                        read_ids.entry(qname.clone()).or_insert(len);
-                        let full_seq = [&[ref_base], seq.as_slice()].concat();
-                        allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&full_seq).to_string(), q));
-
-                        is_variant = true;
-                    },
-                    rust_htslib::bam::pileup::Indel::None => ()
-                }
-            }
-
-            if is_variant {
-                matrix.push(allele_map);
-                metadata.insert(pileup.pos() + 1, String::from_utf8(vec![ref_base]).unwrap());
-                mloci.push(pileup.pos());
+                    is_variant = true;
+                },
+                rust_htslib::bam::pileup::Indel::None => ()
             }
         }
 
-        skydive::elog!(" - phasing {} variants...", mloci.len());
+        if is_variant {
+            matrix.push(allele_map);
+            metadata.insert(pileup.pos() + 1, String::from_utf8(vec![ref_base]).unwrap());
+            mloci.push(pileup.pos());
+        }
+    }
+    (matrix, mloci)
+}
 
-        let (h1, h2) = phase_variants(&matrix);
+fn write_haplotypes(output_file: &mut File, name: String, hap1: String, hap2: String) {
+    writeln!(output_file, ">hap1_{}", name).expect("Failed to write to output file");
+    writeln!(output_file, "{}_{}", hap1, name).expect("Failed to write to output file");
+    writeln!(output_file, ">hap2_{}", name).expect("Failed to write to output file");
+    writeln!(output_file, "{}_{}", hap2, name).expect("Failed to write to output file");
+}
 
-        let mut hap_alleles = HashMap::new();
-        for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
-            if a1.is_some() && a2.is_some() {
-                hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
-            } else if a1.is_some() && a2.is_none() {
-                hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
-            } else if a1.is_none() && a2.is_some() {
-                hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
+fn build_haplotypes(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, reference_seq_url: &url::Url, start: u64, stop: u64, chr: String) -> (String, String) {
+    let mut hap_alleles = HashMap::new();
+    for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
+        if a1.is_some() && a2.is_some() {
+            hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
+        } else if a1.is_some() && a2.is_none() {
+            hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
+        } else if a1.is_none() && a2.is_some() {
+            hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
+        }
+    }
+
+    let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+
+    let mut hap1 = Vec::new();
+    let mut hap2 = Vec::new();
+
+    for pos in start as u32..stop as u32 {
+        let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
+
+        if hap_alleles.contains_key(&pos) {
+            let a1 = hap_alleles.get(&pos).unwrap().0.clone();
+            let a2 = hap_alleles.get(&pos).unwrap().1.clone();
+
+            hap1.push(a1);
+            hap2.push(a2);
+        } else {
+            hap1.push(ref_str.clone());
+            hap2.push(ref_str.clone());
+        }
+    }
+
+    for i in 0..hap1.len() {
+        if hap1[i].contains("-") {
+            let len = hap1[i].len();
+
+            for j in 1..len {
+                hap1[i+j] = "".to_string();
             }
         }
 
-        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+        if hap2[i].contains("-") {
+            let len = hap2[i].len();
 
-        let mut hap1 = Vec::new();
-        let mut hap2 = Vec::new();
-
-        for pos in start as u32..stop as u32 {
-            let ref_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
-
-            if hap_alleles.contains_key(&pos) {
-                let a1 = hap_alleles.get(&pos).unwrap().0.clone();
-                let a2 = hap_alleles.get(&pos).unwrap().1.clone();
-
-                hap1.push(a1);
-                hap2.push(a2);
-            } else {
-                hap1.push(ref_str.clone());
-                hap2.push(ref_str.clone());
+            for j in 1..len {
+                hap2[i+j] = "".to_string();
             }
         }
+    }
 
-        for i in 0..hap1.len() {
-            if hap1[i].contains("-") {
-                let len = hap1[i].len();
+    let h1 = hap1.join("").replace("-", "");
+    let h2 = hap2.join("").replace("-", "");
+    (h1, h2)
+}
 
-                for j in 1..len {
-                    hap1[i+j] = "".to_string();
+fn build_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, reference_seq_url: &url::Url, chr: String, start: u64, stop: u64) {
+    let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+
+    let mut hap_alleles = HashMap::new();
+    for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
+        if a1.is_some() && a2.is_some() {
+            hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
+        } else if a1.is_some() && a2.is_none() {
+            hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
+        } else if a1.is_none() && a2.is_some() {
+            hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
+        }
+    }
+
+    let mut vcf_header = Header::new();
+
+    for seq_name in fasta.seq_names().unwrap() {
+        let header_contig_line = format!("##contig=<ID={},length={}>", seq_name, fasta.fetch_seq_len(&seq_name));
+        vcf_header.push_record(header_contig_line.as_bytes());
+    }
+
+    let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
+    vcf_header.push_record(header_gt_line.as_bytes());
+    vcf_header.push_sample("test_sample".as_bytes());
+
+    let mut vcf = Writer::from_stdout(&vcf_header, true, Format::Vcf).unwrap();
+
+    for pos in start as u32..stop as u32 {
+        let ref_base = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
+
+        if hap_alleles.contains_key(&pos) {
+            let mut record = vcf.empty_record();
+
+            // Set contig name and record position
+            let rid = vcf.header().name2rid(chr.as_bytes()).unwrap();
+            record.set_rid(Some(rid));
+            record.set_pos(pos as i64);
+
+            // Get haplotype alleles
+            let mut a1 = hap_alleles.get(&pos).unwrap().0.clone();
+            let mut a2 = hap_alleles.get(&pos).unwrap().1.clone();
+
+            // First determine the full length of the reference allele
+            let mut ref_allele = ref_base.clone();
+            if a1.contains("-") {
+                let ref_full_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos + (a1.len() as u32) - 1).unwrap()).unwrap();
+                if ref_full_str.len() > ref_allele.len() {
+                    ref_allele = ref_full_str;
+                }
+            }
+            if a2.contains("-") {
+                let ref_full_str = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos + (a2.len() as u32) - 1).unwrap()).unwrap();
+                if ref_full_str.len() > ref_allele.len() {
+                    ref_allele = ref_full_str;
                 }
             }
 
-            if hap2[i].contains("-") {
-                let len = hap2[i].len();
-
-                for j in 1..len {
-                    hap2[i+j] = "".to_string();
-                }
+            // Rewrite insertions relative to the reference allele
+            if ref_allele.len() > 1 && !a1.contains("-") && a1.len() > 1 {
+                a1 = ref_base.clone() + &a1[1..] + &ref_allele[1..];
             }
+
+            if ref_allele.len() > 1 && !a2.contains("-") && a2.len() > 1 {
+                a2 = ref_base.clone() + &a2[1..] + &ref_allele[1..];
+            }
+
+            let mut alt_alleles = HashSet::new();
+            alt_alleles.insert(a1.clone());
+            alt_alleles.insert(a2.clone());
+
+            let mut allele_set = alt_alleles.iter().map(|s| s.replace("-", "").into_bytes()).collect::<HashSet<_>>();
+            allele_set.insert(ref_allele.to_string().into_bytes());
+
+            // Make sure the reference allele is first
+            let mut alleles_vec = allele_set.into_iter().collect::<Vec<_>>();
+            alleles_vec.sort_by(|a, b| {
+                if a == ref_allele.as_bytes() {
+                    std::cmp::Ordering::Less
+                } else if b == ref_allele.as_bytes() {
+                    std::cmp::Ordering::Greater
+                } else {
+                    a.cmp(b)
+                }
+            });
+
+            let alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
+            record.set_alleles(&alleles).unwrap();
+
+            // Get allele indices
+            let i1 = record.alleles().iter().position(|&a| a == a1.replace("-", "").as_bytes()).unwrap() as i32;
+            let i2 = record.alleles().iter().position(|&a| a == a2.replace("-", "").as_bytes()).unwrap() as i32;
+
+            // Set record genotype - note first allele is always unphased
+            let genotype = &[GenotypeAllele::Unphased(i1), GenotypeAllele::Phased(i2)];
+            record.push_genotypes(genotype).unwrap();
+
+            // Trim unused alleles
+            record.trim_alleles();
+
+            // Write record
+            vcf.write(&record).unwrap()
+        } else {
+            // hap1.push(ref_str.clone());
+            // hap2.push(ref_str.clone());
         }
-
-        let h1 = hap1.join("").replace("-", "");
-        let h2 = hap2.join("").replace("-", "");
-
-        let mut output = File::create(output).expect("Failed to create output file");
-        writeln!(output, ">h1").expect("Failed to write to output file");
-        writeln!(output, "{}", h1).expect("Failed to write to output file");
-        writeln!(output, ">h2").expect("Failed to write to output file");
-        writeln!(output, "{}", h2).expect("Failed to write to output file");
     }
 }
 
