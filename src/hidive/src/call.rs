@@ -31,29 +31,42 @@ pub fn start(
     // Iterate over loci
     let loci = skydive::parse::parse_loci(loci_list, 0).into_iter().collect::<Vec<_>>();
 
-    // let mut output_file = File::create(output).expect("Failed to create output file");
+    // Initialize VCF header
+    let mut vcf_header = Header::new();
+
+    let mut fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+    for seq_name in fasta.seq_names().unwrap() {
+        let header_contig_line = format!("##contig=<ID={},length={}>", seq_name, fasta.fetch_seq_len(&seq_name));
+        vcf_header.push_record(header_contig_line.as_bytes());
+    }
+
+    let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
+    vcf_header.push_record(header_gt_line.as_bytes());
+    vcf_header.push_sample("test_sample".as_bytes());
+
+    // let mut vcf = Writer::from_stdout(&vcf_header, true, Format::Vcf).unwrap();
+    let mut vcf = Writer::from_path(output, &vcf_header, true, Format::Vcf).unwrap();
 
     for (chr, start, stop, name) in loci {
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
 
-        // These get renewed for each locus, but they're fast to open.
-        let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+        // The BAM reader gets renewed for each locus, but it's fast to open.
         let bam = skydive::stage::open_bam(&bam_url).unwrap();
 
-        let (matrix, mloci) = prepare_matrix(bam, &chr, start, stop, fasta);
+        let (matrix, mloci) = prepare_matrix(bam, &chr, start, stop, &fasta);
 
         skydive::elog!(" - phasing {} variants...", mloci.len());
 
         let (h1, h2) = phase_variants(&matrix);
 
         // let (hap1, hap2) = build_haplotypes(mloci, h1, h2, reference_seq_url, start, stop, chr);
-        build_variant_records(mloci, h1, h2, reference_seq_url, chr, start, stop);
-
         // write_haplotypes(&mut output_file, name, hap1, hap2);
+
+        add_variant_records(mloci, h1, h2, &mut fasta, chr, start, stop, &mut vcf);
     }
 }
 
-fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start: u64, stop: u64, fasta: rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start: u64, stop: u64, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
     let mut read_ids = HashMap::new();
     let mut matrix = Vec::new();
     let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
@@ -194,8 +207,8 @@ fn build_haplotypes(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<Str
     (h1, h2)
 }
 
-fn build_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, reference_seq_url: &url::Url, chr: String, start: u64, stop: u64) {
-    let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
+fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, fasta: &mut rust_htslib::faidx::Reader, chr: String, start: u64, stop: u64, vcf: &mut rust_htslib::bcf::Writer) {
+    // let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
 
     let mut hap_alleles = HashMap::new();
     for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
@@ -207,19 +220,6 @@ fn build_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Optio
             hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
         }
     }
-
-    let mut vcf_header = Header::new();
-
-    for seq_name in fasta.seq_names().unwrap() {
-        let header_contig_line = format!("##contig=<ID={},length={}>", seq_name, fasta.fetch_seq_len(&seq_name));
-        vcf_header.push_record(header_contig_line.as_bytes());
-    }
-
-    let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
-    vcf_header.push_record(header_gt_line.as_bytes());
-    vcf_header.push_sample("test_sample".as_bytes());
-
-    let mut vcf = Writer::from_stdout(&vcf_header, true, Format::Vcf).unwrap();
 
     for pos in start as u32..stop as u32 {
         let ref_base = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
@@ -258,6 +258,15 @@ fn build_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Optio
 
             if ref_allele.len() > 1 && !a2.contains("-") && a2.len() > 1 {
                 a2 = ref_base.clone() + &a2[1..] + &ref_allele[1..];
+            }
+
+            // If the alternate alleles was the same as the reference allele, replace them with the full length reference allele
+            if ref_allele.len() > 1 && a1 == ref_base {
+                a1 = ref_allele.clone();
+            }
+
+            if ref_allele.len() > 1 && a2 == ref_base {
+                a2 = ref_allele.clone();
             }
 
             let mut alt_alleles = HashSet::new();
