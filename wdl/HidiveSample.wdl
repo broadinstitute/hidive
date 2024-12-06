@@ -7,19 +7,32 @@ workflow HidiveSample {
         File short_reads_cram
         File short_reads_crai
 
-        File reference
-        String locus
+        String? locus
+        File? loci
+
         File model
         String sample_name
+
+        File reference
+        File ref_fa_with_alt
+        File ref_fai_with_alt
+        File ref_cache_tar_gz
 
         Int padding = 500
     }
 
+    if (defined(locus)) {
+        call PrepareLocus { input: locus = select_first([locus]) }
+    }
+
+    File bed = select_first([PrepareLocus.bed, loci])
+
     call Fetch {
         input:
             bam = long_reads_bam,
-            locus = locus,
+            loci = bed,
             padding = padding,
+            prefix = sample_name
     }
 
     call Rescue {
@@ -27,29 +40,35 @@ workflow HidiveSample {
             long_reads_fasta = Fetch.fasta,
             short_reads_cram = short_reads_cram,
             short_reads_crai = short_reads_crai,
+            ref_fa_with_alt = ref_fa_with_alt,
+            ref_fai_with_alt = ref_fai_with_alt,
+            ref_cache_tar_gz = ref_cache_tar_gz,
+            prefix = sample_name
     }
 
     call Correct {
         input:
-            locus = locus,
+            loci = bed,
             model = model,
             reference = reference,
             long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
+            prefix = sample_name
     }
 
     call Call {
         input:
-            locus = locus,
+            loci = bed,
             reference = reference,
             sample_name = sample_name,
             aligned_reads_bam = Correct.corrected_bam,
             aligned_reads_csi = Correct.corrected_csi,
+            prefix = sample_name
     }
 
     call Consensus {
         input:
-            locus = locus,
+            loci = bed,
             reference = reference,
             calls_vcf = Call.calls_vcf,
             calls_tbi = Call.calls_tbi,
@@ -69,10 +88,36 @@ workflow HidiveSample {
     }
 }
 
+task PrepareLocus {
+    input {
+        String locus
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        echo "~{locus}" | \
+            sed 's/,//g' | \
+            sed 's/[:\|]/\t/g' | \
+            sed 's/-/\t/' > locus.bed
+    >>>
+
+    output {
+        File bed = "locus.bed"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        memory: "1 GB"
+        cpu: 1
+        disks: "local-disk 1 SSD"
+    }
+}
+
 task Fetch {
     input {
         String bam
-        String locus
+        File loci
         Int padding
 
         String prefix = "out"
@@ -84,7 +129,7 @@ task Fetch {
     command <<<
         set -euxo pipefail
 
-        hidive fetch -l "~{locus}" -p ~{padding} ~{bam} > ~{prefix}.fa
+        hidive fetch -l ~{loci} -p ~{padding} ~{bam} > ~{prefix}.fa
     >>>
 
     output {
@@ -92,7 +137,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -137,7 +182,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -150,7 +195,7 @@ task Correct {
         File short_read_fasta
         String long_reads_bam
 
-        String locus
+        File loci
         File model
         File reference
 
@@ -165,7 +210,7 @@ task Correct {
     command <<<
         set -x
 
-        hidive correct -l "~{locus}" -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
+        hidive correct -l ~{loci} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
@@ -176,7 +221,7 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -185,7 +230,7 @@ task Correct {
 
 task Call {
     input {
-        String locus
+        File loci
         File reference
         String sample_name
 
@@ -203,7 +248,7 @@ task Call {
     command <<<
         set -x
 
-        hidive call -s "~{sample_name}" -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | bgzip -c > ~{prefix}.vcf.bgz
+        hidive call -s "~{sample_name}" -l ~{loci} -r ~{reference} ~{aligned_reads_bam} | bgzip -c > ~{prefix}.vcf.bgz
         tabix -p vcf ~{prefix}.vcf.bgz
     >>>
 
@@ -213,7 +258,7 @@ task Call {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -226,7 +271,8 @@ task Consensus {
         File calls_vcf
         File calls_tbi
 
-        String locus
+        File loci
+        String prefix
 
         Int num_cpus = 8
     }
@@ -237,21 +283,44 @@ task Consensus {
     command <<<
         set -x
 
-        LOCUS=$(echo "~{locus}" | sed 's/,//g' | sed 's/|.*//')
+        # Process each locus individually and create temporary BAMs
+        while read -r CHROM START END NAME; do
+            LOCUS="${CHROM}:${START}-${END}"
+            
+            # Create per-locus BAMs for haplotype 1
+            samtools faidx ~{reference} ${LOCUS} | \
+                bcftools consensus -H 1pIu ~{calls_vcf} | \
+                minimap2 -ayYL -x map-hifi ~{reference} - | \
+                samtools sort -O BAM -o tmp.h1.${NAME}.bam
+            
+            # Create per-locus BAMs for haplotype 2  
+            samtools faidx ~{reference} ${LOCUS} | \
+                bcftools consensus -H 2pIu ~{calls_vcf} | \
+                minimap2 -ayYL -x map-hifi ~{reference} - | \
+                samtools sort -O BAM -o tmp.h2.${NAME}.bam
+        done < ~{loci}
 
-        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 1pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h1.bam
-        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 2pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h2.bam
+        # Merge all temporary BAMs into final outputs
+        samtools merge -O BAM ~{prefix}.h1.bam tmp.h1.*.bam
+        samtools merge -O BAM ~{prefix}.h2.bam tmp.h2.*.bam
+
+        # Index final BAMs
+        samtools index -c ~{prefix}.h1.bam
+        samtools index -c ~{prefix}.h2.bam
+
+        # Cleanup temporary files
+        rm tmp.h1.*.bam tmp.h2.*.bam
     >>>
 
     output {
-        File h1_bam = "h1.bam"
-        File h1_csi = "h1.bam.csi"
-        File h2_bam = "h2.bam"
-        File h2_csi = "h2.bam.csi"
+        File h1_bam = "~{prefix}.h1.bam"
+        File h1_csi = "~{prefix}.h1.bam.csi"
+        File h2_bam = "~{prefix}.h2.bam"
+        File h2_csi = "~{prefix}.h2.bam.csi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
