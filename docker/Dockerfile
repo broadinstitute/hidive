@@ -56,6 +56,23 @@ RUN wget -O samtools-1.21.tar.bz2 https://github.com/samtools/samtools/releases/
     cd .. && \
     rm -rf samtools-1.21 samtools-1.21.tar.bz2
 
+# Install bcftools
+RUN wget -O bcftools-1.21.tar.bz2 https://github.com/samtools/bcftools/releases/download/1.21/bcftools-1.21.tar.bz2 && \
+    tar -vxjf bcftools-1.21.tar.bz2 && \
+    cd bcftools-1.21 && \
+    make && \
+    cp bcftools /usr/local/bin/ && \
+    cd .. && \
+    rm -rf bcftools-1.21 bcftools-1.21.tar.bz2
+
+RUN wget -O htslib-1.21.tar.bz2 https://github.com/samtools/htslib/releases/download/1.21/htslib-1.21.tar.bz2 && \
+    tar -vxjf htslib-1.21.tar.bz2 && \
+    cd htslib-1.21 && \
+    make && \
+    cp tabix bgzip /usr/local/bin/ && \
+    cd .. && \
+    rm -rf htslib-1.21 htslib-1.21.tar.bz2
+
 # Final stage
 FROM python:3.9-slim
 
@@ -68,6 +85,9 @@ RUN apt-get update && \
 # Copy necessary files from builder stage
 COPY --from=builder /usr/local/bin/minimap2 /usr/local/bin/minimap2
 COPY --from=builder /usr/local/bin/samtools /usr/local/bin/samtools
+COPY --from=builder /usr/local/bin/bcftools /usr/local/bin/bcftools
+COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
+COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Copy gcloud utilities from builder stage

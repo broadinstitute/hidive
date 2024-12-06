@@ -10,6 +10,7 @@ workflow Hidive {
         File reference
         String locus
         File model
+        String sample_name
 
         Int padding = 500
     }
@@ -41,15 +42,30 @@ workflow Hidive {
         input:
             locus = locus,
             reference = reference,
+            sample_name = sample_name,
             aligned_reads_bam = Correct.corrected_bam,
             aligned_reads_csi = Correct.corrected_csi,
+    }
+
+    call Consensus {
+        input:
+            locus = locus,
+            reference = reference,
+            calls_vcf = Call.calls_vcf,
+            calls_tbi = Call.calls_tbi,
     }
 
     output {
         File corrected_bam = Correct.corrected_bam
         File corrected_csi = Correct.corrected_csi
-        File called_bam = Call.called_bam
-        File called_csi = Call.called_csi
+
+        File calls_vcf = Call.calls_vcf
+        File calls_tbi = Call.calls_tbi
+
+        File h1_bam = Consensus.h1_bam
+        File h1_csi = Consensus.h1_csi
+        File h2_bam = Consensus.h2_bam
+        File h2_csi = Consensus.h2_csi
     }
 }
 
@@ -94,12 +110,12 @@ task Rescue {
         File ref_cache_tar_gz
 
         String prefix = "out"
-        String? contig
 
         Int num_cpus = 16
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
+    Int memory_gb = 2*num_cpus
 
     command <<<
         set -euxo pipefail
@@ -113,11 +129,7 @@ task Rescue {
         export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
-        hidive rescue \
-            ~{true='-c' false='' defined(contig)} ~{select_first([contig, ""])} \
-            -f ~{long_reads_fasta} \
-            ~{short_reads_cram} \
-            > ~{prefix}.fa
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fasta} ~{short_reads_cram} > ~{prefix}.fa
     >>>
 
     output {
@@ -125,8 +137,8 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
-        memory: "~{num_cpus} GB"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
+        memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
         maxRetries: 2
@@ -173,11 +185,13 @@ task Correct {
 
 task Call {
     input {
+        String locus
         File reference
+        String sample_name
+
         File aligned_reads_bam
         File aligned_reads_csi
 
-        String locus
         String prefix = "out"
 
         Int num_cpus = 8
@@ -189,18 +203,55 @@ task Call {
     command <<<
         set -x
 
-        hidive call -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | \
-            minimap2 -ayYL -x map-hifi ~{reference} - | \
-            samtools sort --write-index -O BAM -o ~{prefix}.bam
+        hidive call -s "~{sample_name}" -l "~{locus}" -r ~{reference} ~{aligned_reads_bam} | bgzip -c > ~{prefix}.vcf.bgz
+        tabix -p vcf ~{prefix}.vcf.bgz
     >>>
 
     output {
-        File called_bam = "~{prefix}.bam"
-        File called_csi = "~{prefix}.bam.csi"
+        File calls_vcf = "~{prefix}.vcf.bgz"
+        File calls_tbi = "~{prefix}.vcf.bgz.tbi"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.98"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Consensus {
+    input {
+        File reference
+        File calls_vcf
+        File calls_tbi
+
+        String locus
+
+        Int num_cpus = 8
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([reference, calls_vcf, calls_tbi], "GB"))
+    Int memory_gb = 2*num_cpus
+
+    command <<<
+        set -x
+
+        LOCUS=$(echo "~{locus}" | sed 's/,//g' | sed 's/|.*//')
+
+        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 1pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h1.bam
+        samtools faidx ~{reference} ${LOCUS} | bcftools consensus -H 2pIu ~{calls_vcf} | minimap2 -ayYL -x map-hifi ~{reference} - | samtools sort --write-index -O BAM -o h2.bam
+    >>>
+
+    output {
+        File h1_bam = "h1.bam"
+        File h1_csi = "h1.bam.csi"
+        File h2_bam = "h2.bam"
+        File h2_csi = "h2.bam.csi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
