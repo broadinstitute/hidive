@@ -24,6 +24,7 @@ pub fn start(
     // Parse reference sequence file path.
     let reference_seq_urls = skydive::parse::parse_file_names(&[reference_fasta_path.clone()]);
     let reference_seq_url = reference_seq_urls.iter().next().unwrap();
+    let mut fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
 
     // Parse BAM file path.
     let bam_urls = skydive::parse::parse_file_names(&[bam_path.clone()]);
@@ -33,21 +34,7 @@ pub fn start(
     let loci = skydive::parse::parse_loci(loci_list, 0).into_iter().collect::<Vec<_>>();
 
     // Initialize VCF header
-    let mut vcf_header = Header::new();
-
-    let mut fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
-    for seq_name in fasta.seq_names().unwrap() {
-        let header_contig_line = format!("##contig=<ID={},length={}>", seq_name, fasta.fetch_seq_len(&seq_name));
-        vcf_header.push_record(header_contig_line.as_bytes());
-    }
-
-    let header_end_line = r#"##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">"#;
-    vcf_header.push_record(header_end_line.as_bytes());
-
-    let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
-    vcf_header.push_record(header_gt_line.as_bytes());
-    vcf_header.push_sample(sample_name.as_bytes());
-
+    let vcf_header = initialize_vcf_header(&fasta, sample_name);
     let mut vcf = Writer::from_path(output, &vcf_header, true, Format::Vcf).unwrap();
 
     for (chr, start, stop, name) in loci {
@@ -67,6 +54,27 @@ pub fn start(
 
         add_variant_records(mloci, h1, h2, &mut fasta, chr, start, stop, &mut vcf);
     }
+}
+
+fn initialize_vcf_header(fasta: &rust_htslib::faidx::Reader, sample_name: &String) -> Header {
+    let mut vcf_header = Header::new();
+
+    for seq_name in fasta.seq_names().unwrap() {
+        let header_contig_line = format!("##contig=<ID={},length={}>", seq_name, fasta.fetch_seq_len(&seq_name));
+        vcf_header.push_record(header_contig_line.as_bytes());
+    }
+
+    let header_end_line = r#"##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">"#;
+    vcf_header.push_record(header_end_line.as_bytes());
+
+    let header_gq_line = r#"##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">"#;
+    vcf_header.push_record(header_gq_line.as_bytes());
+
+    let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
+    vcf_header.push_record(header_gt_line.as_bytes());
+
+    vcf_header.push_sample(sample_name.as_bytes());
+    vcf_header
 }
 
 fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start: u64, stop: u64, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
@@ -237,6 +245,7 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
                 ref_record.set_pos(ref_pos as i64);
 
                 ref_record.push_info_integer("END".as_bytes(), &[pos as i32]).unwrap();
+                ref_record.push_format_integer("GQ".as_bytes(), &[40]).unwrap();
 
                 ref_record.set_alleles(&[ref_str.to_string().as_bytes(), "<*>".as_bytes()]).unwrap();
 
@@ -314,6 +323,8 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
             let mut alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
             alleles.push("<*>".as_bytes());
             record.set_alleles(&alleles).unwrap();
+
+            record.push_format_integer("GQ".as_bytes(), &[40]).unwrap();
 
             // Get allele indices
             let i1 = record.alleles().iter().position(|&a| a == a1.replace("-", "").as_bytes()).unwrap() as i32;
