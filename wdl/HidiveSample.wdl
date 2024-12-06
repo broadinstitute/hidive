@@ -72,6 +72,7 @@ workflow HidiveSample {
             reference = reference,
             calls_vcf = Call.calls_vcf,
             calls_tbi = Call.calls_tbi,
+            prefix = sample_name
     }
 
     output {
