@@ -631,7 +631,13 @@
 <a href="#630" id="630">630</a>
 <a href="#631" id="631">631</a>
 <a href="#632" id="632">632</a>
-<a href="#633" id="633">633</a></pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a></pre></div><pre class="rust"><code><span class="doccomment">//! Hidive is a targeted genome co-assembler for biobank-scale long-read and short-read data.
 //! It is designed to assemble high-diversity loci from long-read data and to co-assemble these
 //! loci with short-read data. Hidive is built on top of the Skydive library, which provides
 //! a series-parallel graph representation of long-read data and a linked de Bruijn graph
@@ -1053,6 +1059,10 @@
         </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
         </span>output: PathBuf,
 
+        <span class="doccomment">/// Sample name.
+        </span><span class="attr">#[clap(short, long, required = <span class="bool-val">true</span>, value_parser)]
+        </span>sample_name: String,
+
         <span class="doccomment">/// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
         </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
         </span>loci: Vec&lt;String&gt;,
@@ -1230,12 +1240,14 @@
         }
         Commands::Call {
             output,
+            sample_name,
             loci,
             reference_fasta_path,
             bam_path,
         } =&gt; {
             call::start(
                 <span class="kw-2">&amp;</span>output,
+                <span class="kw-2">&amp;</span>sample_name,
                 <span class="kw-2">&amp;</span>loci,
                 <span class="kw-2">&amp;</span>reference_fasta_path,
                 <span class="kw-2">&amp;</span>bam_path
