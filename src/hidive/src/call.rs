@@ -41,6 +41,9 @@ pub fn start(
         vcf_header.push_record(header_contig_line.as_bytes());
     }
 
+    let header_end_line = r#"##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">"#;
+    vcf_header.push_record(header_end_line.as_bytes());
+
     let header_gt_line = r#"##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">"#;
     vcf_header.push_record(header_gt_line.as_bytes());
     vcf_header.push_sample(sample_name.as_bytes());
@@ -208,8 +211,6 @@ fn build_haplotypes(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<Str
 }
 
 fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, fasta: &mut rust_htslib::faidx::Reader, chr: String, start: u64, stop: u64, vcf: &mut rust_htslib::bcf::Writer) {
-    // let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
-
     let mut hap_alleles = HashMap::new();
     for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
         if a1.is_some() && a2.is_some() {
@@ -221,10 +222,32 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
         }
     }
 
+    let mut ref_start: Option<(String, u32)> = None;
+
     for pos in start as u32..stop as u32 {
         let ref_base = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
 
         if hap_alleles.contains_key(&pos) {
+            if ref_start.is_some() {
+                let (ref_str, ref_pos) = ref_start.unwrap();
+
+                let mut ref_record = vcf.empty_record();
+                let rid = vcf.header().name2rid(chr.as_bytes()).unwrap();
+                ref_record.set_rid(Some(rid));
+                ref_record.set_pos(ref_pos as i64);
+
+                ref_record.push_info_integer("END".as_bytes(), &[pos as i32]).unwrap();
+
+                ref_record.set_alleles(&[ref_str.to_string().as_bytes(), "<*>".as_bytes()]).unwrap();
+
+                let genotype = &[GenotypeAllele::Unphased(0), GenotypeAllele::Phased(0)];
+                ref_record.push_genotypes(genotype).unwrap();
+
+                vcf.write(&ref_record).unwrap();
+
+                ref_start = None;
+            }
+
             let mut record = vcf.empty_record();
 
             // Set contig name and record position
@@ -288,7 +311,8 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
                 }
             });
 
-            let alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
+            let mut alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
+            alleles.push("<*>".as_bytes());
             record.set_alleles(&alleles).unwrap();
 
             // Get allele indices
@@ -300,13 +324,14 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
             record.push_genotypes(genotype).unwrap();
 
             // Trim unused alleles
-            record.trim_alleles();
+            // record.trim_alleles();
 
             // Write record
             vcf.write(&record).unwrap()
         } else {
-            // hap1.push(ref_str.clone());
-            // hap2.push(ref_str.clone());
+            if ref_start.is_none() {
+                ref_start = Some((ref_base.clone(), pos));
+            }
         }
     }
 }
