@@ -20,6 +20,8 @@ pub mod stage;
 pub mod storage_gcs;
 pub mod storage_local;
 
+pub mod nn_model;
+
 #[macro_export]
 macro_rules! elog {
     ($($arg:tt)*) => {

@@ -8,6 +8,11 @@ use std::path::PathBuf;
 use std::iter::Chain;
 use std::collections::hash_map::Keys;
 
+use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data};
+use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, VarMap};
+use candle_core::{DType, Device, Tensor};
+const DEVICE: Device = Device::Cpu;
+
 use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
@@ -16,6 +21,7 @@ use plotters::prelude::*;
 use skydive::ldbg::LdBG;
 use skydive::record::Record;
 use std::io::Write;
+use num_format::Locale::sk;
 use url::Url;
 
 pub fn start(
@@ -38,6 +44,7 @@ pub fn start(
     let test_short_read_seq_urls = skydive::parse::parse_file_names(test_short_read_seq_paths);
     let test_truth_seq_urls = skydive::parse::parse_file_names(test_truth_seq_paths);
 
+    // Load the training data
     // Read all long reads.
     let all_lr_seqs: Vec<Vec<u8>> = process_reads(&long_read_seq_urls, "long");
     let l1 = LdBG::from_sequences(String::from("l1"), kmer_size, &all_lr_seqs);
@@ -50,16 +57,13 @@ pub fn start(
     let all_truth_seqs: Vec<Vec<u8>> = process_reads(&truth_seq_urls, "truth");
     let t1 = LdBG::from_sequences(String::from("s1"), kmer_size, &all_truth_seqs);
 
-    // let m = MLdBG::from_ldbgs(vec![l1.clone(), s1.clone()])
-    //     .collapse()
-    //     .assemble_all();
-
     let lr_contigs = l1.assemble_all();
     let lr_distances = distance_to_a_contig_end(&lr_contigs, kmer_size);
 
     let sr_contigs = s1.assemble_all();
     let sr_distances = distance_to_a_contig_end(&sr_contigs, kmer_size);
 
+    // Load the test data
     // Read all test long reads.
     let all_test_lr_seqs: Vec<Vec<u8>> = process_reads(&test_long_read_seq_urls, "test long");
     let test_l1 = LdBG::from_sequences(String::from("test_l1"), kmer_size, &all_test_lr_seqs);
@@ -79,32 +83,7 @@ pub fn start(
     let test_sr_distances = distance_to_a_contig_end(&test_sr_contigs, kmer_size);
 
 
-    // Configure GBDT.
-    let mut cfg = Config::new();
-    cfg.set_feature_size(6);
-    cfg.set_max_depth(4);
-    cfg.set_min_leaf_size(5);
-    cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
-    cfg.set_shrinkage(0.05);
-    cfg.set_iterations(iterations);
-    cfg.set_debug(debug);
-
-    skydive::elog!("Training GBDT model with:");
-    skydive::elog!(" - feature_size={}", cfg.feature_size);
-    skydive::elog!(" - max_depth={}", cfg.max_depth);
-    skydive::elog!(" - min_leaf_size={}", cfg.min_leaf_size);
-    skydive::elog!(" - loss={}", loss2string(&cfg.loss));
-    skydive::elog!(" - shrinkage={}", cfg.shrinkage);
-    skydive::elog!(" - iterations={}", cfg.iterations);
-    // skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
-
-    // Initialize GBDT algorithm.
-    let mut gbdt = GBDT::new(&cfg);
-
-    // let mut training_data: DataVec = Vec::new();
-    // let mut test_data: DataVec = Vec::new();
-
-    // let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+    // Train model
 
     let kmers = l1
         .kmers
@@ -112,7 +91,7 @@ pub fn start(
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
 
-    let mut training_data: DataVec = create_dataset_for_model(
+    let data: KmerDataVec = create_dataset_for_model(
         kmers,
         &lr_distances,
         &sr_distances,
@@ -121,81 +100,110 @@ pub fn start(
         &t1,
     );
 
-    // Train the decision trees.
-    skydive::elog!(
-        "Training GBDT model with {} training points...",
-        training_data.len().to_formatted_string(&Locale::en)
-    );
-    gbdt.fit(&mut training_data);
+    skydive::elog!("Splitting data into training and validation sets...");
+    let (training_data, validation_data) = split_data(&data);
+    // get dimensions of the training data
+    let  n_features = training_data[0].feature.len();
 
-    // Prepare test data.
-    let test_kmers = test_l1
-        .kmers
-        .keys()
-        .chain(test_s1.kmers.keys())
-        .chain(test_t1.kmers.keys());
+    // f_train  is the features and l_train is the labels
+    skydive::elog!("Preparing tensors...");
+    let (f_train, l_train) = prepare_tensors(&training_data);
+    let (f_validation, l_validation) = prepare_tensors(&validation_data);
 
-    let test_data: DataVec = create_dataset_for_model(
-        test_kmers,
-        &test_lr_distances,
-        &test_sr_distances,
-        &test_l1,
-        &test_s1,
-        &test_t1,
-    );
 
-    // Predict the test data.
-    skydive::elog!("Computing accuracy on test data...");
-    let prediction = gbdt.predict(&test_data);
-    let pred_threshold: f32 = 0.5;
+    // Create the model
+    // varmap is used to store the variables, which are the weights and biases of the model
+    let varmap = VarMap::new();
+    // vb is used to create the variables, used to create and manage the weights and biases of the model
+    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &DEVICE);
+
+    skydive::elog!("Creating model...");
+    let model = match KmerNN::new(n_features, vb) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("Error creating model: {}", e);
+            return;
+        }
+    };
+
+    // Create the Optimizer
+    let optim_config = candle_nn::ParamsAdamW{
+        lr: 1e-2,
+        ..Default::default()
+    };
+
+    skydive::elog!("Creating optimizer...");
+    let mut optimizer = match candle_nn::AdamW::new(varmap.all_vars(), optim_config) {
+        Ok(opt) => opt,
+        Err(e) => {
+            eprintln!("Error creating optimizer: {}", e);
+            return;
+        }
+    };
+
+    skydive::elog!("Training model...");
+    if let Err(e) = train_model(&model, &f_train, &l_train, &mut optimizer, 100) {
+        eprintln!("Error training model: {}", e);
+        return;
+    }
+
+    skydive::elog!("Evaluating model...");
+    if let Err(e) = evaluate_model(&model, &f_validation, &l_validation) {
+        eprintln!("Error evaluating model: {}", e);
+        return;
+    }
 
     // Evaluate accuracy of the model on the test data.
+    let test_kmers = l1
+        .kmers
+        .keys()
+        .chain(s1.kmers.keys())
+        .chain(t1.kmers.keys());
+
+    let test_data: KmerDataVec = create_dataset_for_model(
+        test_kmers,
+        &lr_distances,
+        &sr_distances,
+        &l1,
+        &s1,
+        &t1,
+    );
+
+    // f_test  is the features and l_test is the labels
+    skydive::elog!("Preparing tensors...");
     let mut num_correct = 0u32;
     let mut num_total = 0u32;
-    for (data, pred) in test_data.iter().zip(prediction.iter()) {
-        let truth = data.label;
-        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
-        if (call - truth).abs() < f32::EPSILON {
+    let mut p: Vec<f32> = Vec::new();
+    let pred_threshold: f32 = 0.5;
+
+    let (f_test, l_test) = prepare_tensors(&test_data);
+
+    let model_test_output = model.forward(&f_test).unwrap();
+    let preds: Vec<f32> = model_test_output.squeeze(1).unwrap().to_vec1().unwrap();
+
+    for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
+        p.push(*pred);
+        let call: f32 = if *pred > 0.5 { 1.0 } else { 0.0 };
+        if (call as f32 - *truth as f32).abs() < f32::EPSILON {
             num_correct += 1;
         }
         num_total += 1;
     }
 
     // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
+    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, pred_threshold);
     skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
     skydive::elog!("Precision: {:.2}%", 100.0 * precision);
     skydive::elog!("Recall: {:.2}%", 100.0 * recall);
     skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
+    skydive::elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
 
-    // TPR and FPR calculations at various thresholds.
-    skydive::elog!("Computing TPR and FPR at various thresholds...");
-    let fpr_tpr: Vec<(f32, f32)> = compute_fpr_tpr(&test_data, &prediction);
 
-    // Save TPR and FPR at various thresholds to a file.
-    let csv_output = output.with_extension("csv");
-    let mut writer = std::fs::File::create(csv_output).expect("Unable to create file");
-    for (tpr, fpr) in &fpr_tpr {
-        writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
-    }
-    skydive::elog!("TPR and FPR at various thresholds saved to {}", output.to_str().unwrap());
+    // Save the model to file
+    let tensor_output = output.with_extension("safetensor");
+    varmap.save(&tensor_output).expect("Unable to save tensor");
+    skydive::elog!("Model saved to {}", tensor_output.display());
 
-    // Create a ROC curve.
-    let png_output = output.with_extension("png");
-    plot_roc_curve(&png_output, &fpr_tpr).expect("Unable to plot ROC curve");
-    skydive::elog!("ROC curve saved to {}", png_output.to_str().unwrap());
-
-    skydive::elog!(
-        "Predicted accuracy: {}/{} ({:.2}%)",
-        num_correct.to_formatted_string(&Locale::en),
-        num_total.to_formatted_string(&Locale::en),
-        100.0 * num_correct as f32 / num_total as f32
-    );
-
-    gbdt.save_model(output.to_str().unwrap())
-        .expect("Unable to save model");
-
-    skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }
 
 pub fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
@@ -322,14 +330,14 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
 }
 
 /// Computes precision, recall, and F1 score on test data.
-pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
+pub fn compute_precision_recall_f1(test_data: &Vec<KmerData>, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
     skydive::elog!("Computing precision, recall, and F1 score on test data...");
     let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
 
     for (data, pred) in test_data.iter().zip(p.iter()) {
         let truth = data.label;
         let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
-        if (call - truth).abs() < f32::EPSILON {
+        if (call - truth).abs() < f64::EPSILON {
             if truth > 0.5 { num_true_positives += 1; }
         } else {
             if truth < 0.5 { num_false_positives += 1; }
@@ -352,7 +360,8 @@ pub fn create_dataset_for_model(
     l1: &LdBG,
     s1: &LdBG,
     t1: &LdBG,
-) -> Vec<Data> {
+) -> Vec<KmerData> {
+    skydive::elog!("Creating dataset for model...");
     let mut dataset = Vec::new();
 
     for kmer in kmers {
@@ -376,7 +385,7 @@ pub fn create_dataset_for_model(
 
         // let expected = (scov_fw + scov_rc) as f32 / 2.0;
         // let chi_square = if expected > 0.0 {
-        //     ((scov_fw as f32 - expected).powi(2) + 
+        //     ((scov_fw as f32 - expected).powi(2) +
         //     (scov_rc as f32 - expected).powi(2)) / expected
         // } else {
         //     0.0
@@ -384,7 +393,7 @@ pub fn create_dataset_for_model(
 
         let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
 
-        let data = Data::new_training_data(
+        let data = KmerData::load_data(
             vec![
                 if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
                 scov_total as f32,                   // coverage in short reads
@@ -397,7 +406,6 @@ pub fn create_dataset_for_model(
             ],
             1.0,
             if tcov > 0 { 1.0 } else { 0.0 }, // present in truth
-            None,
         );
 
         dataset.push(data);

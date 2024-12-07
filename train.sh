@@ -13,13 +13,17 @@ TRAIN_NAME="KIR"
 #TRAIN_LOCUS="chr6:27,100,000-30,500,000"
 #TRAIN_NAME="MHC" # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-017-1207-1
 
+#TRAIN_LOCUS="chr6:29,000,000-30,000,000"
+#TRAIN_NAME="HLA-A"
+
+
 #TEST_LOCUS="chr6:29,941,260-29,949,572"
 TEST_LOCUS="chr6:29,000,000-30,000,000"
 TEST_NAME="HLA-A"
 
 SAMPLE="HG00438"
-REF="Homo_sapiens_assembly38.fasta"
-OUTPUT="scratch/training/per_sample_model/$SAMPLE/$TRAIN_NAME"
+REF="scratch/ref/Homo_sapiens_assembly38.fasta"
+OUTPUT="scratch/training/nn_test/$SAMPLE/$TRAIN_NAME"
 
 export GCS_REQUESTER_PAYS_PROJECT="broad-dsp-lrma"
 export RUST_BACKTRACE=full
@@ -97,7 +101,7 @@ if [ ! -f $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta ]; then
     -o $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta \
     -r $REF \
     -f $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
-    $SAMPLE.final.cram
+    gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
 fi
 
 # fetch short reads testing
@@ -106,12 +110,12 @@ if [ ! -f $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta ]; then
     -o $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta \
     -r $REF \
     -f $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta \
-    $SAMPLE.final.cram
+    gs://fc-1ee08173-e353-4494-ad28-7a3d7bd99734/working/HPRC/$SAMPLE/raw_data/Illumina/child/$SAMPLE.final.cram
 fi
 
 # train
 
-if [ ! -f $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json ]; then
+#if [ ! -f $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json ]; then
   $HIDIVE train -d \
     -o $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json \
     --long-read-seq-paths $OUTPUT/$SAMPLE.LR.$TRAIN_NAME.fasta \
@@ -120,6 +124,6 @@ if [ ! -f $OUTPUT/training.long_and_short_reads.$TRAIN_NAME.json ]; then
     --test-long-read-seq-paths $OUTPUT/$SAMPLE.LR.$TEST_NAME.fasta \
     --test-short-read-seq-paths $OUTPUT/$SAMPLE.SR.$TEST_NAME.fasta \
     --test-truth-seq-paths $OUTPUT/$SAMPLE.maternal.test.GRCh38_no_alt.$TEST_NAME.fasta $OUTPUT/$SAMPLE.paternal.test.GRCh38_no_alt.$TEST_NAME.fasta
-fi
+#fi
 
-minimap2 -t 16 -ayYL -x sr Homo_sapiens_assembly38.fasta $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta | samtools sort --write-index -O BAM -o $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.bam
+#minimap2 -t 16 -ayYL -x sr Homo_sapiens_assembly38.fasta $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.fasta | samtools sort --write-index -O BAM -o $OUTPUT/$SAMPLE.SR.$TRAIN_NAME.bam
