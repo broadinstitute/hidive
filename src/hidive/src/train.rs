@@ -1,6 +1,3 @@
-use num_format::{Locale, ToFormattedString};
-// use rand::SeedableRng;
-// use skydive::mldbg::MLdBG;
 use skydive::utils::canonicalize_kmer;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -9,19 +6,14 @@ use std::iter::Chain;
 use std::collections::hash_map::Keys;
 
 use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data};
-use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, VarMap};
-use candle_core::{DType, Device, Tensor};
+use candle_nn::{Module, Optimizer, VarBuilder, VarMap};
+use candle_core::{DType, Device};
 const DEVICE: Device = Device::Cpu;
 
-use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
-use gbdt::gradient_boost::GBDT;
 
 use plotters::prelude::*;
 use skydive::ldbg::LdBG;
 use skydive::record::Record;
-use std::io::Write;
-use num_format::Locale::sk;
 use url::Url;
 
 pub fn start(
@@ -284,7 +276,7 @@ pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(),
 
 
 /// Computes FPR and TPR at various thresholds.
-pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
+pub fn compute_fpr_tpr(test_data: &KmerDataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
     skydive::elog!("Computing FPR and TPR at various thresholds...");
     let mut fpr_tpr: Vec<(f32, f32)> = Vec::new();
 
@@ -298,7 +290,7 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
             let truth = data.label;
             let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
 
-            if (call - truth).abs() < f32::EPSILON {
+            if (call - truth).abs() < f64::EPSILON {
                 // Correct classification
                 if truth > 0.5 { num_true_positives += 1; }  // True Positive
                 else { num_true_negatives += 1; }  // True Negative

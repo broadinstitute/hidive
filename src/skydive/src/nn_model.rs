@@ -1,6 +1,5 @@
-use candle_core::{DType, Device, Tensor};
-use candle_core::quantized::gguf_file::ValueType;
-use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, VarMap};
+use candle_core::{Device, Tensor};
+use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -67,8 +66,8 @@ pub fn train_model(
 }
 
 // This function evaluates the model
-pub fn evaluate_model(model: &KmerNN, X_test: &Tensor, y_test: &Tensor) -> anyhow::Result<()> {
-    let output = model.forward(X_test)?;
+pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor) -> anyhow::Result<()> {
+    let output = model.forward(x_test)?;
     let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
     println!("Test Loss: {}", loss.to_scalar::<f32>()?);
     Ok(())
