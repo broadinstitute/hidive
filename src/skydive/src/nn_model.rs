@@ -1,5 +1,5 @@
-use candle_core::{Device, Tensor};
-use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder};
+use candle_core::{DType, Device, Tensor};
+use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -12,7 +12,9 @@ const DEVICE: Device = Device::Cpu;
 #[derive(Debug)]
 pub struct KmerNN{
     fc1: Linear,
+    ln1: LayerNorm,
     fc2: Linear,
+    ln2: LayerNorm,
     fc3: Linear,
 }
 
@@ -24,9 +26,19 @@ pub struct KmerNN{
 impl KmerNN {
     pub fn new(in_dim: usize, vb: VarBuilder) -> candle_core::Result<Self> {
         let fc1 = linear(in_dim, 128, vb.pp("fc1"))?;
+
+        // LayerNorm is a normalization layer which is used to normalize the input data. the parameters are weight: Tensor, bias: Tensor, eps: f64
+        let ln1 = LayerNorm::new(
+            Tensor::ones(&[128], DType::F32, vb.device())?,
+            Tensor::zeros(&[128],  DType::F32,  vb.device())?, 1e-5
+        );
         let fc2 = linear(128, 64, vb.pp("fc2"))?;
+        let ln2 = LayerNorm::new(
+            Tensor::ones(&[64], DType::F32, vb.device())?,
+            Tensor::zeros(&[64],  DType::F32,  vb.device())?, 1e-5
+        );
         let fc3 = linear(64, 1, vb.pp("fc3"))?;
-        Ok(Self { fc1, fc2, fc3 })
+        Ok(Self { fc1, ln1, fc2, ln2, fc3 })
     }
 }
 
@@ -36,8 +48,10 @@ impl KmerNN {
 impl Module for KmerNN {
     fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
         let x = self.fc1.forward(xs)?;
+        let x = self.ln1.forward(&x)?;
         let x = x.relu()?;
         let x = self.fc2.forward(&x)?;
+        let x = self.ln2.forward(&x)?;
         let x = x.relu()?;
         let x = self.fc3.forward(&x)?;
         Ok(x)
@@ -102,17 +116,17 @@ impl KmerData {
 
 /// This function prepares the data for training by converting it to tensors
 /// and returning the feature and label tensors as a tuple.
-pub fn prepare_tensors(data: &[KmerData]) -> (Tensor, Tensor) {
+pub fn prepare_tensors(data: &[KmerData], device: &Device) -> (Tensor, Tensor) {
     // Convert the data to vectors while flattening the features and labels
     let features: Vec<f32> = data.iter().flat_map(|d| d.feature.clone()).collect();
     let labels: Vec<f32> = data.iter().map(|d| d.label as f32).collect();
 
     // Convert the data to tensors
     let feature_tensor = Tensor::from_slice(
-        &features, (data.len(), data[0].feature.len()), &DEVICE
+        &features, (data.len(), data[0].feature.len()), device
     ).unwrap();
     let label_tensor = Tensor::from_slice(
-        &labels, data.len(), &DEVICE
+        &labels, data.len(), device
     ).unwrap();
 
 
@@ -136,4 +150,35 @@ pub fn split_data(data: &[KmerData]) -> (Vec<KmerData>, Vec<KmerData>) {
     (train.to_vec(), test.to_vec())
 }
 
+
+/// One hot encode the seqnence data
+/// The function returns a vector of one hot encoded dna sequence
+pub fn one_hot_encode_from_dna_string(seq: &str) -> Vec<f32> {
+    let mut one_hot = vec![0.0; 4 * seq.len()];
+    for (i, c) in seq.chars().enumerate() {
+        match c {
+            'A' => one_hot[i * 4] = 1.0,
+            'C' => one_hot[i * 4 + 1] = 1.0,
+            'G' => one_hot[i * 4 + 2] = 1.0,
+            'T' => one_hot[i * 4 + 3] = 1.0,
+            _ => {}
+        }
+    }
+    one_hot
+}
+
+/// One hot encode the seqnence data from vec<u8>
+pub fn one_hot_encode_from_dna_ascii(seq: &[u8]) -> Vec<f32> {
+    let mut one_hot = vec![0.0; 4 * seq.len()];
+    for (i, c) in seq.iter().enumerate() {
+        match c {
+            65 => one_hot[i * 4] = 1.0,
+            67 => one_hot[i * 4 + 1] = 1.0,
+            84 => one_hot[i * 4 + 2] = 1.0,
+            71 => one_hot[i * 4 + 3] = 1.0,
+            _ => {}
+        }
+    }
+    one_hot
+}
 

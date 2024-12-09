@@ -99,8 +99,8 @@ pub fn start(
 
     // f_train  is the features and l_train is the labels
     skydive::elog!("Preparing tensors...");
-    let (f_train, l_train) = prepare_tensors(&training_data);
-    let (f_validation, l_validation) = prepare_tensors(&validation_data);
+    let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE);
+    let (f_validation, l_validation) = prepare_tensors(&validation_data, &DEVICE);
 
 
     // Create the model
@@ -120,7 +120,7 @@ pub fn start(
 
     // Create the Optimizer
     let optim_config = candle_nn::ParamsAdamW{
-        lr: 1e-2,
+        lr: 1e-1,
         ..Default::default()
     };
 
@@ -168,7 +168,7 @@ pub fn start(
     let mut p: Vec<f32> = Vec::new();
     let pred_threshold: f32 = 0.5;
 
-    let (f_test, l_test) = prepare_tensors(&test_data);
+    let (f_test, l_test) = prepare_tensors(&test_data, &DEVICE);
 
     let model_test_output = model.forward(&f_test).unwrap();
     let preds: Vec<f32> = model_test_output.squeeze(1).unwrap().to_vec1().unwrap();
@@ -385,17 +385,20 @@ pub fn create_dataset_for_model(
 
         let tcov = t1.kmers.get(kmer).map_or(0, |tr| tr.coverage());
 
+        let mut features = Vec::new();
+        features.extend(vec![
+            if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
+            scov_total as f32,                   // coverage in short reads
+            strand_ratio as f32,                 // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+            compressed_len_diff,                 // homopolymer compression length difference
+            entropy,                             // shannon entropy
+            gc_content,                          // gc content
+            // lr_distance,                         // distance to nearest long read contig end
+            // sr_distance,                         // distance to nearest short read contig end
+        ]);
+
         let data = KmerData::load_data(
-            vec![
-                if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
-                scov_total as f32,                   // coverage in short reads
-                strand_ratio as f32,                 // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
-                compressed_len_diff,                 // homopolymer compression length difference
-                entropy,                             // shannon entropy
-                gc_content,                          // gc content
-                // lr_distance,                         // distance to nearest long read contig end
-                // sr_distance,                         // distance to nearest short read contig end
-            ],
+            features,
             1.0,
             if tcov > 0 { 1.0 } else { 0.0 }, // present in truth
         );
