@@ -185,11 +185,11 @@ pub fn extract_aligned_bam_reads(
                     Err(_) => String::from("unknown"),
                 };
 
-                    let seq_name = format!("{qname}|{name}|{sm}");
+                let seq_name = format!("{qname}|{name}|{sm}");
 
-                    if !bmap.contains_key(&seq_name) {
-                        bmap.insert(seq_name.clone(), String::new());
-                    }
+                if !bmap.contains_key(&seq_name) {
+                    bmap.insert(seq_name.clone(), String::new());
+                }
 
                 if !alignment.is_del() && !alignment.is_refskip() {
                     if alignment.qpos().unwrap() > alignment.record().seq().len() {
