@@ -259,7 +259,7 @@ task Call {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_sample_and_cohort_wdls"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
