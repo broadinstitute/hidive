@@ -3,6 +3,7 @@ use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
 
+use rust_htslib::bam::record::Cigar;
 use rust_htslib::bcf::record::GenotypeAllele;
 use rust_htslib::bcf::{Format, Header, Writer};
 use rust_htslib::{bam, bam::{FetchDefinition, Read}};
@@ -43,7 +44,9 @@ pub fn start(
         // The BAM reader gets renewed for each locus, but it's fast to open.
         let bam = skydive::stage::open_bam(&bam_url).unwrap();
 
-        let (matrix, mloci) = prepare_matrix(bam, &chr, start, stop, &fasta);
+        // let (matrix, mloci) = prepare_matrix(&chr, start, stop, bam, &fasta);
+
+        let (matrix, mloci) = prepare_matrix_new(&chr, start, stop, bam, &fasta);
 
         skydive::elog!(" - phasing {} variants...", mloci.len());
 
@@ -77,7 +80,7 @@ fn initialize_vcf_header(fasta: &rust_htslib::faidx::Reader, sample_name: &Strin
     vcf_header
 }
 
-fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start: u64, stop: u64, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
     let mut read_ids = HashMap::new();
     let mut matrix = Vec::new();
     let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
@@ -141,6 +144,8 @@ fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start:
                     let full_seq = [&[ref_base], seq.as_slice()].concat();
                     allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&full_seq).to_string(), q));
 
+                    skydive::elog!("{} {}", pileup.pos(), len);
+
                     is_variant = true;
                 },
                 rust_htslib::bam::pileup::Indel::None => ()
@@ -153,6 +158,158 @@ fn prepare_matrix(mut bam: rust_htslib::bam::IndexedReader, chr: &String, start:
             mloci.push(pileup.pos());
         }
     }
+
+    skydive::elog!("{:?}", matrix);
+    skydive::elog!("{:?}", mloci);
+
+    (matrix, mloci)
+}
+
+fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+    //                            pos           read    allele  qual
+    let mut alleles_map: BTreeMap<u32, BTreeMap<usize, (String, u8)>> = BTreeMap::new();
+    let mut read_ids = HashMap::new();
+
+    let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
+    for (read_index, read) in bam.records().filter(|r| r.is_ok()).flatten().enumerate() {
+        let mut read_pos = 0;
+        let mut ref_pos = read.pos() as u32;
+
+        for ce in read.cigar().iter() {
+            match ce {
+                Cigar::Ins(len) => {
+                    if start as u32 <= ref_pos + 1 && ref_pos + 1 < stop as u32 {
+                        let ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - 1).unwrap(), usize::try_from(ref_pos - 1).unwrap()).unwrap();
+                        let ref_base = ref_str.as_bytes()[0];
+
+                        let qpos_start = read_pos as usize;
+                        let qpos_stop = read_pos as usize + *len as usize;
+                        let qual = read.qual()[qpos_start..qpos_stop].to_vec();
+                        let q = *qual.iter().min().unwrap();
+                        let seq = [&[ref_base], &read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
+
+                        let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
+
+                        if let Some((existing_seq, _)) = allele_map.get(&read_index) {
+                            if seq.len() > existing_seq.len() {
+                                allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                            }
+                        } else {
+                            allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                        }
+
+                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                    }
+
+                    read_pos += len;
+                }
+                Cigar::Del(len) => {
+                    if start as u32 <= ref_pos + 1 && ref_pos + 1 < stop as u32 {
+                        let ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - 1).unwrap(), usize::try_from(ref_pos - 1).unwrap()).unwrap();
+                        let ref_base = ref_str.as_bytes()[0];
+
+                        let qpos_start = read_pos as usize;
+                        let q = read.qual()[qpos_start];
+                        let seq = vec![ref_base; 1].into_iter().chain(std::iter::repeat(b'-').take(*len as usize)).collect::<Vec<_>>();
+
+                        let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
+
+                        if let Some((existing_seq, _)) = allele_map.get(&read_index) {
+                            if seq.len() > existing_seq.len() {
+                                allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                            }
+                        } else {
+                            allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                        }
+
+                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                    }
+
+                    ref_pos += len;
+                }
+                Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) => {
+                    for i in 0..*len as usize {
+                        if start as u32 <= ref_pos + i as u32 + 1 && ref_pos + i as u32 + 1 < stop as u32 {
+                            let ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos + i as u32).unwrap(), usize::try_from(ref_pos + i as u32).unwrap()).unwrap();
+                            let ref_base = ref_str.as_bytes()[0];
+
+                            let read_base = read.seq().as_bytes()[read_pos as usize + i];
+                            let q = read.qual()[read_pos as usize + i];
+
+                            // skydive::elog!(" - {} {} {}", ref_pos + i as u32 + 1, String::from_utf8_lossy(&[ref_base]), String::from_utf8_lossy(&[read_base]));
+
+                            if ref_base != read_base {
+                                let seq = vec![read_base];
+                                let allele_map = alleles_map.entry(ref_pos + i as u32 + 1).or_insert_with(BTreeMap::new);
+
+                                if let Some((existing_seq, _)) = allele_map.get(&read_index) {
+                                    if seq.len() > existing_seq.len() {
+                                        allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                                    }
+                                } else {
+                                    allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                                }
+
+                                read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                            }
+                        }
+                    }
+
+                    read_pos += len;
+                    ref_pos += len;
+                }
+                Cigar::SoftClip(len) => {
+                    read_pos += len;
+                }
+                Cigar::HardClip(_) => { }
+                Cigar::RefSkip(len) => {
+                    ref_pos += len;
+                }
+                Cigar::Pad(_) => { }
+            }
+        }
+    }
+
+    let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
+    for p in bam.pileup() {
+        let pileup = p.unwrap();
+
+        for alignment in pileup.alignments() {
+            let record = alignment.record();
+            let qname = String::from_utf8(record.qname().to_vec()).unwrap();
+
+            let read_index = *read_ids.get(&qname).unwrap();
+
+            if alleles_map.contains_key(&pileup.pos()) && !alleles_map.get(&pileup.pos()).unwrap().contains_key(&read_index) {
+                if alignment.qpos().is_none() {
+                    continue;
+                }
+
+                let base = record.seq()[alignment.qpos().unwrap() - 1];
+                let seq = vec![base];
+                let q = record.qual()[alignment.qpos().unwrap() - 1];
+
+                // skydive::elog!("{} {} {}", pileup.pos(), read_index, String::from_utf8_lossy(&seq));
+
+                let allele_map = alleles_map.entry(pileup.pos()).or_insert_with(BTreeMap::new);
+                allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+            }
+        }
+    }
+
+    // skydive::elog!("{:?}", alleles_map);
+
+    let mut matrix = Vec::new();
+    let mut mloci = Vec::new();
+
+    for (pos, allele_map) in alleles_map {
+        matrix.push(allele_map);
+        mloci.push(pos - 1);
+    }
+
+    // skydive::elog!("{:?}", matrix);
+    // skydive::elog!("{:?}", mloci);
+
     (matrix, mloci)
 }
 
