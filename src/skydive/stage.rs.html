@@ -737,11 +737,11 @@
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; String::from(<span class="string">"unknown"</span>),
                 };
 
-                    <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{qname}|{name}|{sm}"</span>);
+                <span class="kw">let </span>seq_name = <span class="macro">format!</span>(<span class="string">"{qname}|{name}|{sm}"</span>);
 
-                    <span class="kw">if </span>!bmap.contains_key(<span class="kw-2">&amp;</span>seq_name) {
-                        bmap.insert(seq_name.clone(), String::new());
-                    }
+                <span class="kw">if </span>!bmap.contains_key(<span class="kw-2">&amp;</span>seq_name) {
+                    bmap.insert(seq_name.clone(), String::new());
+                }
 
                 <span class="kw">if </span>!alignment.is_del() &amp;&amp; !alignment.is_refskip() {
                     <span class="kw">if </span>alignment.qpos().unwrap() &gt; alignment.record().seq().len() {
