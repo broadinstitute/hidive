@@ -29,7 +29,7 @@ task Align {
         Int num_cpus = 16 
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([bam, ref_fasta], "GB"))
+    Int disk_size_gb = 1 + 4*ceil(size([bam, ref_fasta], "GB"))
     Int memory_gb = 6*num_cpus
 
     command <<<
@@ -47,7 +47,7 @@ task Align {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-pb:0.1.39"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-smrttools:11.0.0.146107"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
