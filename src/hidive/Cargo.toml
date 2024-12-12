@@ -1,6 +1,6 @@
 [package]
 name = "hidive"
-version = "0.1.100"
+version = "0.1.102"
 edition = "2021"
 resolver = "2"
 
