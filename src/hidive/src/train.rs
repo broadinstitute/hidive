@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::iter::Chain;
 use std::collections::hash_map::Keys;
 
-use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data};
+use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data, one_hot_encode_from_dna_ascii};
 use candle_nn::{Module, Optimizer, VarBuilder, VarMap};
 use candle_core::{DType, Device};
 const DEVICE: Device = Device::Cpu;

@@ -1,5 +1,5 @@
 use candle_core::{DType, Device, Tensor};
-use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm};
+use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm, ops::sigmoid};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -54,6 +54,7 @@ impl Module for KmerNN {
         let x = self.ln2.forward(&x)?;
         let x = x.relu()?;
         let x = self.fc3.forward(&x)?;
+        // let x = sigmoid(&x)?;
         Ok(x)
     }
 }
@@ -154,13 +155,14 @@ pub fn split_data(data: &[KmerData]) -> (Vec<KmerData>, Vec<KmerData>) {
 /// One hot encode the seqnence data
 /// The function returns a vector of one hot encoded dna sequence
 pub fn one_hot_encode_from_dna_string(seq: &str) -> Vec<f32> {
-    let mut one_hot = vec![0.0; 4 * seq.len()];
+    let mut one_hot = vec![0.0; 5 * seq.len()];
     for (i, c) in seq.chars().enumerate() {
         match c {
-            'A' => one_hot[i * 4] = 1.0,
-            'C' => one_hot[i * 4 + 1] = 1.0,
-            'G' => one_hot[i * 4 + 2] = 1.0,
-            'T' => one_hot[i * 4 + 3] = 1.0,
+            'A' => one_hot[i * 5] = 1.0,
+            'C' => one_hot[i * 5 + 1] = 1.0,
+            'G' => one_hot[i * 5 + 2] = 1.0,
+            'T' => one_hot[i * 5 + 3] = 1.0,
+            'N' => one_hot[i * 5 + 4] = 1.0,
             _ => {}
         }
     }
@@ -169,13 +171,14 @@ pub fn one_hot_encode_from_dna_string(seq: &str) -> Vec<f32> {
 
 /// One hot encode the seqnence data from vec<u8>
 pub fn one_hot_encode_from_dna_ascii(seq: &[u8]) -> Vec<f32> {
-    let mut one_hot = vec![0.0; 4 * seq.len()];
+    let mut one_hot = vec![0.0; 5 * seq.len()];
     for (i, c) in seq.iter().enumerate() {
         match c {
-            65 => one_hot[i * 4] = 1.0,
-            67 => one_hot[i * 4 + 1] = 1.0,
-            84 => one_hot[i * 4 + 2] = 1.0,
-            71 => one_hot[i * 4 + 3] = 1.0,
+            65 => one_hot[i * 5] = 1.0,
+            67 => one_hot[i * 5 + 1] = 1.0,
+            84 => one_hot[i * 5 + 2] = 1.0,
+            71 => one_hot[i * 5 + 3] = 1.0,
+            78 => one_hot[i * 5 + 4] = 1.0,
             _ => {}
         }
     }
