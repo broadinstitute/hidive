@@ -291,10 +291,12 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
         .collect();
 
     // Filter out last window if it completely overlaps with previous window
-    if let Some(&(_, prev_end)) = windows.get(windows.len() - 2) {
-        if let Some(&(_, last_end)) = windows.last() {
-            if last_end == prev_end {
-                windows.pop();
+    if windows.len() > 1 {
+        if let Some(&(_, prev_end)) = windows.get(windows.len() - 2) {
+            if let Some(&(_, last_end)) = windows.last() {
+                if last_end == prev_end {
+                    windows.pop();
+                }
             }
         }
     }

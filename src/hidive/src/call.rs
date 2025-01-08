@@ -4,12 +4,15 @@ use std::{fs::File, path::PathBuf, io::Write};
 use itertools::Itertools;
 
 use rust_htslib::bam::record::Cigar;
+use rust_htslib::bam::Record;
 use rust_htslib::bcf::record::GenotypeAllele;
 use rust_htslib::bcf::{Format, Header, Writer};
 use rust_htslib::{bam, bam::{FetchDefinition, Read}};
 use minimap2::Aligner;
 
+use skydive::ldbg::LdBG;
 use skydive::wmec::*;
+use spoa::AlignmentType;
 
 pub fn start(
     output: &PathBuf,
@@ -44,19 +47,106 @@ pub fn start(
         // The BAM reader gets renewed for each locus, but it's fast to open.
         let bam = skydive::stage::open_bam(&bam_url).unwrap();
 
-        // let (matrix, mloci) = prepare_matrix(&chr, start, stop, bam, &fasta);
-
-        let (matrix, mloci) = prepare_matrix_new(&chr, start, stop, bam, &fasta);
+        let (matrix, mloci, _) = prepare_matrix(&chr, start, stop, bam, &fasta);
 
         skydive::elog!(" - phasing {} variants...", mloci.len());
 
         let (h1, h2) = phase_variants(&matrix);
 
-        // let (hap1, hap2) = build_haplotypes(mloci, h1, h2, reference_seq_url, start, stop, chr);
-        // write_haplotypes(&mut output_file, name, hap1, hap2);
+        let h1_filtered = filter_variants(&mloci, &chr, &h1, &fasta);
+        let h2_filtered = filter_variants(&mloci, &chr, &h2, &fasta);
 
-        add_variant_records(mloci, h1, h2, &mut fasta, chr, start, stop, &mut vcf);
+        for ((l, a), b) in mloci.iter().zip(h1_filtered.iter()).zip(h2_filtered.iter()) {
+            skydive::elog!(" - {} {:?} {:?}", l, a, b);
+        }
+
+        add_variant_records(mloci, h1_filtered, h2_filtered, &mut fasta, chr, start, stop, &mut vcf);
     }
+}
+
+fn clean_variants(mloci: &Vec<u32>, h1: &Vec<Option<String>>, h2: &Vec<Option<String>>) -> (Vec<u32>, Vec<Option<String>>, Vec<Option<String>>) {
+    let mut nloci: Vec<u32> = Vec::new();
+    let mut h1_cleaned: Vec<Option<String>> = Vec::new();
+    let mut h2_cleaned: Vec<Option<String>> = Vec::new();
+
+    for i in 0..mloci.len() {
+        if h1[i].is_some() || h2[i].is_some() {
+            nloci.push(mloci[i]);
+            h1_cleaned.push(h1[i].clone());
+            h2_cleaned.push(h2[i].clone());
+        }
+    }
+
+    (nloci, h1_cleaned, h2_cleaned)
+}
+
+/// Keeps only the longest insertion when multiple insertions are near each other
+fn filter_variants(mloci: &Vec<u32>, chr: &String, variants: &[Option<String>], fasta: &rust_htslib::faidx::Reader) -> Vec<Option<String>> {
+    let mut filtered = variants.to_vec();
+    let mut include = vec![true; variants.len()];
+
+    for i in 0..variants.len() {
+        if include[i] && filtered[i].is_some() && filtered[i].as_ref().unwrap().len() > 100 {
+            for j in (i + 1)..variants.len() {
+                if include[j] && filtered[j].is_some() {
+                    let i_len = filtered[i].as_ref().unwrap().len();
+                    let j_len = filtered[j].as_ref().unwrap().len();
+                    if (j_len as f64) >= (i_len as f64) * 0.5 && (j_len as f64) <= (i_len as f64) * 1.5 {
+                        if filtered[j].as_ref().unwrap().len() > filtered[i].as_ref().unwrap().len() {
+                            include[i] = false;
+                        } else {
+                            include[j] = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        if include[i] && filtered[i].is_some() && filtered[i].as_ref().unwrap().len() == 2 {
+            let ref_pos = mloci[i];
+            let prev_ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - 2).unwrap(), usize::try_from(ref_pos - 2).unwrap()).unwrap();
+            let next_ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos).unwrap(), usize::try_from(ref_pos).unwrap()).unwrap();
+
+            let first_allele_str = filtered[i].as_ref().unwrap().chars().next().unwrap().to_string();
+            let last_allele_str = filtered[i].as_ref().unwrap().chars().last().unwrap().to_string();
+
+            skydive::elog!(" - examine {} {} {} {} {}", ref_pos, prev_ref_str, first_allele_str, last_allele_str, next_ref_str);
+
+            if prev_ref_str == first_allele_str || next_ref_str == last_allele_str {
+                include[i] = false;
+
+                skydive::elog!(" - filtered");
+            }
+        }
+    }
+
+    for i in 0..variants.len() {
+        if !include[i] {
+            filtered[i] = None;
+        }
+    }
+
+    filtered
+}
+
+fn assemble_haplotype(reads: &Vec<Vec<u8>>) -> String {
+    let mut sg = spoa::Graph::new();
+
+    // let oriented_reads = orient_reads(ref_seqs, reads);
+
+    let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
+    reads.iter().filter(|read| read.len() > 500).for_each(|lr_seq| {
+        let seq = lr_seq.clone();
+        let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
+        let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
+
+        let a = la.align(seq_cstr.as_ref(), &sg);
+        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+    });
+
+    let consensus_cstr = sg.consensus();
+
+    consensus_cstr.to_str().unwrap().to_string()
 }
 
 fn initialize_vcf_header(fasta: &rust_htslib::faidx::Reader, sample_name: &String) -> Header {
@@ -80,7 +170,7 @@ fn initialize_vcf_header(fasta: &rust_htslib::faidx::Reader, sample_name: &Strin
     vcf_header
 }
 
-fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+fn prepare_matrix_old(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
     let mut read_ids = HashMap::new();
     let mut matrix = Vec::new();
     let mut metadata: BTreeMap<u32, String> = BTreeMap::new();
@@ -144,7 +234,7 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                     let full_seq = [&[ref_base], seq.as_slice()].concat();
                     allele_map.insert(*read_ids.get(&qname).unwrap(), (String::from_utf8_lossy(&full_seq).to_string(), q));
 
-                    skydive::elog!("{} {}", pileup.pos(), len);
+                    // skydive::elog!("{} {}", pileup.pos(), len);
 
                     is_variant = true;
                 },
@@ -159,16 +249,17 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
         }
     }
 
-    skydive::elog!("{:?}", matrix);
-    skydive::elog!("{:?}", mloci);
+    // skydive::elog!("{:?}", matrix);
+    // skydive::elog!("{:?}", mloci);
 
     (matrix, mloci)
 }
 
-fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>) {
+fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>, HashMap<usize, Record>) {
     //                            pos           read    allele  qual
     let mut alleles_map: BTreeMap<u32, BTreeMap<usize, (String, u8)>> = BTreeMap::new();
     let mut read_ids = HashMap::new();
+    let mut read_map = HashMap::new();
 
     let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
     for (read_index, read) in bam.records().filter(|r| r.is_ok()).flatten().enumerate() {
@@ -199,6 +290,7 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
                         }
 
                         read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        read_map.insert(read_index, read.clone());
                     }
 
                     read_pos += len;
@@ -212,7 +304,7 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
                         let q = read.qual()[qpos_start];
                         let seq = vec![ref_base; 1].into_iter().chain(std::iter::repeat(b'-').take(*len as usize)).collect::<Vec<_>>();
 
-                        let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
+                        let allele_map = alleles_map.entry(ref_pos - 1).or_insert_with(BTreeMap::new);
 
                         if let Some((existing_seq, _)) = allele_map.get(&read_index) {
                             if seq.len() > existing_seq.len() {
@@ -223,6 +315,7 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
                         }
 
                         read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        read_map.insert(read_index, read.clone());
                     }
 
                     ref_pos += len;
@@ -240,7 +333,7 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
 
                             if ref_base != read_base {
                                 let seq = vec![read_base];
-                                let allele_map = alleles_map.entry(ref_pos + i as u32 + 1).or_insert_with(BTreeMap::new);
+                                let allele_map = alleles_map.entry(ref_pos + i as u32).or_insert_with(BTreeMap::new);
 
                                 if let Some((existing_seq, _)) = allele_map.get(&read_index) {
                                     if seq.len() > existing_seq.len() {
@@ -251,6 +344,7 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
                                 }
 
                                 read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                                read_map.insert(read_index, read.clone());
                             }
                         }
                     }
@@ -259,6 +353,32 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
                     ref_pos += len;
                 }
                 Cigar::SoftClip(len) => {
+                    if start as u32 <= ref_pos + 1 && ref_pos + 1 < stop as u32 {
+                        let ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - 1).unwrap(), usize::try_from(ref_pos - 1).unwrap()).unwrap();
+                        let ref_base = ref_str.as_bytes()[0];
+
+                        let qpos_start = read_pos as usize;
+                        let qpos_stop = read_pos as usize + *len as usize;
+                        let qual = read.qual()[qpos_start..qpos_stop].to_vec();
+                        let q = *qual.iter().min().unwrap();
+                        let seq = [&[ref_base], &read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
+
+                        let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
+
+                        if let Some((existing_seq, _)) = allele_map.get(&read_index) {
+                            if seq.len() > existing_seq.len() {
+                                allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                            }
+                        } else {
+                            allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
+                        }
+
+                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        read_map.insert(read_index, read.clone());
+
+                        // skydive::elog!(" - softclip {} {}", ref_pos, String::from_utf8_lossy(&seq));
+                    }
+
                     read_pos += len;
                 }
                 Cigar::HardClip(_) => { }
@@ -270,6 +390,8 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
         }
     }
 
+    // skydive::elog!("{:?}", alleles_map);
+
     let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
     for p in bam.pileup() {
         let pileup = p.unwrap();
@@ -280,21 +402,23 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
 
             let read_index = *read_ids.get(&qname).unwrap();
 
-            if alleles_map.contains_key(&pileup.pos()) && !alleles_map.get(&pileup.pos()).unwrap().contains_key(&read_index) {
-                if alignment.qpos().is_none() {
+            if alleles_map.contains_key(&(pileup.pos())) && !alleles_map.get(&(pileup.pos())).unwrap().contains_key(&read_index) {
+                if alignment.qpos().is_none() || alignment.qpos().unwrap() >= record.seq().len() {
                     continue;
                 }
 
-                let base = record.seq()[alignment.qpos().unwrap() - 1];
+                let base = record.seq()[alignment.qpos().unwrap()];
                 let seq = vec![base];
-                let q = record.qual()[alignment.qpos().unwrap() - 1];
+                let q = record.qual()[alignment.qpos().unwrap()];
 
-                // skydive::elog!("{} {} {}", pileup.pos(), read_index, String::from_utf8_lossy(&seq));
-
-                let allele_map = alleles_map.entry(pileup.pos()).or_insert_with(BTreeMap::new);
+                let allele_map = alleles_map.get_mut(&pileup.pos()).expect("Position not found in alleles_map");
                 allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
             }
         }
+
+        // if alleles_map.contains_key(&pileup.pos()) {
+        //     skydive::elog!("{} {:?}", pileup.pos(), alleles_map.get(&pileup.pos()).unwrap());
+        // }
     }
 
     // skydive::elog!("{:?}", alleles_map);
@@ -304,13 +428,13 @@ fn prepare_matrix_new(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
 
     for (pos, allele_map) in alleles_map {
         matrix.push(allele_map);
-        mloci.push(pos - 1);
+        mloci.push(pos);
     }
 
     // skydive::elog!("{:?}", matrix);
     // skydive::elog!("{:?}", mloci);
 
-    (matrix, mloci)
+    (matrix, mloci, read_map)
 }
 
 fn write_haplotypes(output_file: &mut File, name: String, hap1: String, hap2: String) {
@@ -378,12 +502,16 @@ fn build_haplotypes(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<Str
 fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<String>>, fasta: &mut rust_htslib::faidx::Reader, chr: String, start: u64, stop: u64, vcf: &mut rust_htslib::bcf::Writer) {
     let mut hap_alleles = HashMap::new();
     for ((pos, a1), a2) in mloci.iter().zip(h1.iter()).zip(h2.iter()) {
+        let ref_base = fasta.fetch_seq_string(&chr, usize::try_from(*pos).unwrap(), usize::try_from(*pos).unwrap()).unwrap();
+
         if a1.is_some() && a2.is_some() {
             hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
         } else if a1.is_some() && a2.is_none() {
             hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
         } else if a1.is_none() && a2.is_some() {
             hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
+        } else {
+            skydive::elog!(" - no variant for {}", pos);
         }
     }
 
@@ -504,6 +632,7 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
     }
 }
 
+// fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<usize>, Vec<usize>) {
 fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<String>>, Vec<Option<String>>) {
     let num_snps = matrix.len();
     let num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(&0) + 1).max().unwrap_or(0);
@@ -552,6 +681,35 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
 
     let (p1, p2) = skydive::wmec::phase_all(&wmec_matrix, 40, 20);
 
+    // skydive::elog!("{:?}", wmec_matrix.reads);
+    // skydive::elog!("{:?}", p1);
+    // skydive::elog!("{:?}", p2);
+
+    let mut h1_reads = Vec::new();
+    let mut h2_reads = Vec::new();
+
+    for (read_index, read) in wmec_matrix.reads.iter().enumerate() {
+        let mut num_p1 = 0;
+        let mut num_p2 = 0;
+
+        for i in 0..p1.len() {
+            if read[i] == Some(p1[i]) && read[i] != Some(p2[i]) {
+                num_p1 += 1;
+            } else if read[i] == Some(p2[i]) && read[i] != Some(p1[i]) {
+                num_p2 += 1;
+            }
+        }
+
+        if num_p1 > num_p2 {
+            h1_reads.push(read_index);
+        } else {
+            h2_reads.push(read_index);
+        }
+    }
+
+    // skydive::elog!("{:?}", h1_reads);
+    // skydive::elog!("{:?}", h2_reads);
+
     let mut h1 = Vec::new();
     let mut h2 = Vec::new();
     for i in 0..p1.len() {
@@ -563,4 +721,6 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
     }
 
     (h1, h2)
+
+    // (h1_reads, h2_reads)
 }
