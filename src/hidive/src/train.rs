@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::iter::Chain;
 use std::collections::hash_map::Keys;
 
-use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data, one_hot_encode_from_dna_ascii};
+use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data, one_hot_encode_from_dna_ascii, calculate_class_weights};
 use candle_nn::{Module, Optimizer, VarBuilder, VarMap};
 use candle_core::{DType, Device};
 const DEVICE: Device = Device::Cpu;
@@ -92,6 +92,25 @@ pub fn start(
         &t1,
     );
 
+
+    // Save the data to a TSV file
+    skydive::elog!("Saving data to file...");
+    let mut tsv_data: Vec<String> = KmerData::to_vec_string(&data);
+    let headers = vec![
+        "lr-present",
+        "sr-coverage",
+        "strand-bias",
+        "hc-length-difference",
+        "shannon-entropy",
+        "gc-content",
+        "truth-present",
+    ];
+    tsv_data.insert(0, headers.join("\t"));
+    // Write the data to a TSV file
+    let data_output = output.with_extension("tsv");
+    std::fs::write(&data_output, tsv_data.join("\n")).expect("Unable to write data to file");
+
+
     skydive::elog!("Splitting data into training and validation sets...");
     let (training_data, validation_data) = split_data(&data);
     // get dimensions of the training data
@@ -120,7 +139,7 @@ pub fn start(
 
     // Create the Optimizer
     let optim_config = candle_nn::ParamsAdamW{
-        lr: 1e-1,
+        lr: 1e-3,
         ..Default::default()
     };
 
@@ -133,8 +152,19 @@ pub fn start(
         }
     };
 
+    // let batch_size = 32;
+    let batch_size = 512;
+    let epochs = 100;
+
+    // Calculate weights for the loss function
+    let class_weights = calculate_class_weights(&training_data);
+    eprintln!("Class weights (0, 1): {:?}", class_weights);
+
+
     skydive::elog!("Training model...");
-    if let Err(e) = train_model(&model, &f_train, &l_train, &mut optimizer, 100) {
+    if let Err(e) = train_model(
+        &model, &f_train, &l_train, &mut optimizer, epochs, batch_size, class_weights
+    ) {
         eprintln!("Error training model: {}", e);
         return;
     }
