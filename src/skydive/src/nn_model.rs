@@ -15,8 +15,6 @@ pub struct KmerNN{
     fc2: Linear,
     ln2: LayerNorm,
     fc3: Linear,
-    ln3: LayerNorm,
-    fc4: Linear,
 }
 
 
@@ -38,13 +36,8 @@ impl KmerNN {
             Tensor::ones(&[128], DType::F32, vb.device())?,
             Tensor::zeros(&[128],  DType::F32,  vb.device())?, 1e-5
         );
-        let fc3 = linear(128, 64, vb.pp("fc3"))?;
-        let ln3 = LayerNorm::new(
-            Tensor::ones(&[64], DType::F32, vb.device())?,
-            Tensor::zeros(&[64],  DType::F32,  vb.device())?, 1e-5
-        );
-        let fc4 = linear(64, 1, vb.pp("fc4"))?;
-        Ok(Self { fc1, ln1, fc2, ln2, fc3, ln3, fc4 })
+        let fc3 = linear(128, 1, vb.pp("fc3"))?;
+        Ok(Self { fc1, ln1, fc2, ln2, fc3})
     }
 }
 
@@ -60,9 +53,6 @@ impl Module for KmerNN {
         let x = self.ln2.forward(&x)?;
         let x = x.relu()?;
         let x = self.fc3.forward(&x)?;
-        let x = self.ln3.forward(&x)?;
-        let x = x.relu()?;
-        let x = self.fc4.forward(&x)?;
         let x = sigmoid(&x)?;
         Ok(x)
     }
@@ -103,9 +93,10 @@ pub fn train_model(
 }
 
 // This function evaluates the model
-pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor) -> anyhow::Result<()> {
+pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor, class_weights: (f32, f32) ) -> anyhow::Result<()> {
     let output = model.forward(x_test)?;
-    let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
+    // let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
+    let loss = weighted_mse_loss(&output.squeeze(1)?, y_test, class_weights)?;
     println!("Test Loss: {}", loss.to_scalar::<f32>()?);
     Ok(())
 }
@@ -185,45 +176,50 @@ impl KmerData {
         }).collect()
     }
 
-pub fn undersample_classes(data: &KmerDataVec) -> KmerDataVec {
-    let mut rng = rand::thread_rng();
-    let mut class_0_samples: Vec<&KmerData> = data.iter().filter(|d| d.label == 0.0).collect();
-    let mut class_1_samples: Vec<&KmerData> = data.iter().filter(|d| d.label == 1.0).collect();
+    /// This function undersamples the majority class to balance the dataset.
+    pub fn undersample_classes(data: &KmerDataVec) -> KmerDataVec {
+        let mut rng = rand::thread_rng();
+        let mut class_0_samples: Vec<&KmerData> = data.iter().filter(|d| d.label == 0.0).collect();
+        let mut class_1_samples: Vec<&KmerData> = data.iter().filter(|d| d.label == 1.0).collect();
 
-    class_0_samples.shuffle(&mut rng);
-    class_1_samples.shuffle(&mut rng);
+        class_0_samples.shuffle(&mut rng);
+        class_1_samples.shuffle(&mut rng);
 
-    let num_class_0 = class_0_samples.len();
-    let num_class_1 = class_1_samples.len();
+        let num_class_0 = class_0_samples.len();
+        let num_class_1 = class_1_samples.len();
 
-    let num_samples = num_class_0.min(num_class_1);
-    class_0_samples.iter().take(num_samples)
-        .chain(class_1_samples.iter().take(num_samples))
-        .map(|&d| d.clone())
-        .collect()
+        let num_samples = num_class_0.min(num_class_1);
+        class_0_samples.iter().take(num_samples)
+            .chain(class_1_samples.iter().take(num_samples))
+            .map(|&d| d.clone())
+            .collect()
+    }
 }
-}
-
 
 /// This function prepares the data for training by converting it to tensors
-/// and returning the feature and label tensors as a tuple.
-pub fn prepare_tensors(data: &[KmerData], device: &Device) -> (Tensor, Tensor) {
+/// and returning the feature and label tensors as a tuple. It also optionally
+/// normalizes the feature tensor.
+pub fn prepare_tensors(data: &[KmerData], device: &Device, normalize: bool) -> candle_core::Result<(Tensor, Tensor)> {
     // Convert the data to vectors while flattening the features and labels
     let features: Vec<f32> = data.iter().flat_map(|d| d.feature.clone()).collect();
     let labels: Vec<f32> = data.iter().map(|d| d.label as f32).collect();
 
     // Convert the data to tensors
-    let feature_tensor = Tensor::from_slice(
-        &features, (data.len(), data[0].feature.len()), device
-    ).unwrap();
-    let label_tensor = Tensor::from_slice(
-        &labels, data.len(), device
-    ).unwrap();
+    let feature_tensor = Tensor::from_slice(&features, (data.len(), data[0].feature.len()), device)?;
+    let label_tensor = Tensor::from_slice(&labels, data.len(), device)?;
 
+    // Normalize the feature tensor if the normalize parameter is true
+    let feature_tensor = if normalize {
+        let mean = feature_tensor.mean(0)?.broadcast_as(feature_tensor.shape())?;
+        let var = feature_tensor.var(0)?.broadcast_as(feature_tensor.shape())?;
+        let std = var.sqrt()?;
+        (feature_tensor - mean)? / std
+    } else {
+        feature_tensor
+    };
 
-    (feature_tensor, label_tensor)
+    Ok((feature_tensor, label_tensor))
 }
-
 
 
 

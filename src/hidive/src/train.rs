@@ -7,7 +7,7 @@ use std::collections::hash_map::Keys;
 
 use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data, one_hot_encode_from_dna_ascii, calculate_class_weights};
 use candle_nn::{Module, Optimizer, VarBuilder, VarMap};
-use candle_core::{DType, Device};
+use candle_core::{DType, Device, Tensor};
 const DEVICE: Device = Device::Cpu;
 
 
@@ -118,8 +118,9 @@ pub fn start(
 
     // f_train  is the features and l_train is the labels
     skydive::elog!("Preparing tensors...");
-    let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE);
-    let (f_validation, l_validation) = prepare_tensors(&validation_data, &DEVICE);
+    let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE, true).unwrap();
+    let (f_validation, l_validation) = prepare_tensors(&*KmerData::undersample_classes(&validation_data), &DEVICE, true).unwrap();
+
 
 
     // Create the model
@@ -139,7 +140,7 @@ pub fn start(
 
     // Create the Optimizer
     let optim_config = candle_nn::ParamsAdamW{
-        lr: 1e-3,
+        lr: 1e-1,
         ..Default::default()
     };
 
@@ -153,12 +154,12 @@ pub fn start(
     };
 
     // let batch_size = 32;
-    let batch_size = 512;
-    let epochs = 100;
+    let batch_size = 32;
+    let epochs = 10;
 
     // Calculate weights for the loss function
     let class_weights = calculate_class_weights(&training_data);
-    eprintln!("Class weights (0, 1): {:?}", class_weights);
+    eprintln!("Training Class weights (0, 1): {:?}", class_weights);
 
 
     skydive::elog!("Training model...");
@@ -169,8 +170,12 @@ pub fn start(
         return;
     }
 
+
+    // Calculate weights for the loss function
+    let eval_class_weights = calculate_class_weights(&*KmerData::undersample_classes(&validation_data));
+    eprintln!("Validation Class weights (0, 1): {:?}", eval_class_weights);
     skydive::elog!("Evaluating model...");
-    if let Err(e) = evaluate_model(&model, &f_validation, &l_validation) {
+    if let Err(e) = evaluate_model(&model, &f_validation, &l_validation, eval_class_weights) {
         eprintln!("Error evaluating model: {}", e);
         return;
     }
@@ -193,32 +198,42 @@ pub fn start(
 
     // f_test  is the features and l_test is the labels
     skydive::elog!("Preparing tensors...");
-    let mut num_correct = 0u32;
-    let mut num_total = 0u32;
+    // let mut num_correct = 0u32;
+    // let mut num_total = 0u32;
     let mut p: Vec<f32> = Vec::new();
-    let pred_threshold: f32 = 0.5;
+    // let pred_threshold: f32 = 0.5;
 
-    let (f_test, l_test) = prepare_tensors(&test_data, &DEVICE);
+    let (f_test, l_test) = prepare_tensors(&test_data, &DEVICE, true).unwrap();
 
     let model_test_output = model.forward(&f_test).unwrap();
     let preds: Vec<f32> = model_test_output.squeeze(1).unwrap().to_vec1().unwrap();
 
-    for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
-        p.push(*pred);
-        let call: f32 = if *pred > 0.5 { 1.0 } else { 0.0 };
-        if (call as f32 - *truth as f32).abs() < f32::EPSILON {
-            num_correct += 1;
-        }
-        num_total += 1;
-    }
-
+    // for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
+    //     p.push(*pred);
+    //     let call: f32 = if *pred > 0.5 { 1.0 } else { 0.0 };
+    //     if (call as f32 - *truth as f32).abs() < f32::EPSILON {
+    //         num_correct += 1;
+    //     }
+    //     num_total += 1;
+    // }
+    //
     // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, pred_threshold);
-    skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
-    skydive::elog!("Precision: {:.2}%", 100.0 * precision);
-    skydive::elog!("Recall: {:.2}%", 100.0 * recall);
-    skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
-    skydive::elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
+    // let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, pred_threshold);
+    // skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
+    // skydive::elog!("Precision: {:.2}%", 100.0 * precision);
+    // skydive::elog!("Recall: {:.2}%", 100.0 * recall);
+    // skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
+    // skydive::elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
+
+    // Evaluate the model on the test data
+    skydive::elog!("Computing precision, recall, and F1 score on test data...");
+    let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&preds, &l_test, &test_data);
+
+    skydive::elog!("Prediction thresholds: {:?}", thresholds);
+    skydive::elog!("Precision: {:?}", precisions.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    skydive::elog!("Recall:    {:?}", recalls.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    skydive::elog!("F1 score:  {:?}", f1_scores.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    skydive::elog!("Accuracy:  {:?}", accuracies.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
 
 
     // Save the model to file
@@ -353,7 +368,6 @@ pub fn compute_fpr_tpr(test_data: &KmerDataVec, p: &Vec<f32>) -> Vec<(f32, f32)>
 
 /// Computes precision, recall, and F1 score on test data.
 pub fn compute_precision_recall_f1(test_data: &Vec<KmerData>, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
-    skydive::elog!("Computing precision, recall, and F1 score on test data...");
     let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
 
     for (data, pred) in test_data.iter().zip(p.iter()) {
@@ -438,3 +452,39 @@ pub fn create_dataset_for_model(
 
     dataset
 }
+
+
+/// Evaluates the model on the test data.
+fn evaluate_thresholds(preds: &[f32], l_test: &Tensor, test_data: &KmerDataVec) -> (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>) {
+    let mut thresholds = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    let mut accuracies = Vec::new();
+    let mut precisions = Vec::new();
+    let mut recalls = Vec::new();
+    let mut f1_scores = Vec::new();
+
+    for threshold in thresholds.iter() {
+        let mut num_correct = 0u32;
+        let mut num_total = 0u32;
+        let mut p: Vec<f32> = Vec::new();
+
+        for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
+            p.push(*pred);
+            let call: f32 = if *pred > *threshold { 1.0 } else { 0.0 };
+            if (call as f32 - *truth as f32).abs() < f32::EPSILON {
+                num_correct += 1;
+            }
+            num_total += 1;
+        }
+
+        let accuracy = num_correct as f32 / num_total as f32;
+        let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, *threshold);
+
+        accuracies.push(accuracy);
+        precisions.push(precision);
+        recalls.push(recall);
+        f1_scores.push(f1_score);
+    }
+
+    (thresholds, accuracies, precisions, recalls, f1_scores)
+}
+
