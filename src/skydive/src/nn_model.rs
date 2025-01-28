@@ -3,6 +3,8 @@ use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm, ops::s
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
+use crate::elog;
+
 
 
 /// First we make struct of our model and mention our model architecture layers.
@@ -85,7 +87,7 @@ pub fn train_model(
         }
 
         if epoch % 10 == 0 {
-            println!("Epoch: {}, Loss: {}", epoch, epoch_loss.to_scalar::<f32>()?);
+            elog!("Epoch: {}, Loss: {}", epoch, epoch_loss.to_scalar::<f32>()?);
         }
 
     }
@@ -97,7 +99,7 @@ pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor, class_we
     let output = model.forward(x_test)?;
     // let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
     let loss = weighted_mse_loss(&output.squeeze(1)?, y_test, class_weights)?;
-    println!("Test Loss: {}", loss.to_scalar::<f32>()?);
+    elog!("Test Loss: {}", loss.to_scalar::<f32>()?);
     Ok(())
 }
 

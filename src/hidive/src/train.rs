@@ -120,7 +120,7 @@ pub fn start(
     let  n_features = training_data[0].feature.len();
 
     // f_train  is the features and l_train is the labels
-    elog!("Preparing tensors...");
+    elog!("Preparing training and validation data tensors...");
     let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE, true).unwrap();
     let (f_validation, l_validation) = prepare_tensors(&*KmerData::undersample_classes(&validation_data), &DEVICE, true).unwrap();
 
@@ -162,28 +162,32 @@ pub fn start(
 
     // Calculate weights for the loss function
     let class_weights = calculate_class_weights(&training_data);
-    eprintln!("Training Class weights (0, 1): {:?}", class_weights);
+    elog!("Training Class weights (0, 1): {:?}", class_weights);
 
 
     elog!("Training model...");
     if let Err(e) = train_model(
         &model, &f_train, &l_train, &mut optimizer, epochs, batch_size, class_weights
     ) {
-        eprintln!("Error training model: {}", e);
+        elog!("Error training model: {}", e);
         return;
     }
+    elog!("Training complete.");
 
-
+    elog!("Starting evaluation...");
     // Calculate weights for the loss function
     let eval_class_weights = calculate_class_weights(&*KmerData::undersample_classes(&validation_data));
-    eprintln!("Validation Class weights (0, 1): {:?}", eval_class_weights);
+    elog!("Validation Class weights (0, 1): {:?}", eval_class_weights);
+
     elog!("Evaluating model...");
     if let Err(e) = evaluate_model(&model, &f_validation, &l_validation, eval_class_weights) {
         eprintln!("Error evaluating model: {}", e);
         return;
     }
 
-    // Evaluate accuracy of the model on the test data.
+    elog!("Starting model testing using test data...");
+    // Evaluate accuracy of the model on the test data. The test data is the union of the
+    // long reads, short reads, and truth sequences from the test data from the command line.
     let test_kmers = l1
         .kmers
         .keys()
@@ -200,33 +204,12 @@ pub fn start(
     );
 
     // f_test  is the features and l_test is the labels
-    elog!("Preparing tensors...");
-    // let mut num_correct = 0u32;
-    // let mut num_total = 0u32;
-    let mut p: Vec<f32> = Vec::new();
-    // let pred_threshold: f32 = 0.5;
-
+    elog!("Preparing test data tensors...");
     let (f_test, l_test) = prepare_tensors(&test_data, &DEVICE, true).unwrap();
 
+    elog!("Evaluating model on test data...");
     let model_test_output = model.forward(&f_test).unwrap();
     let preds: Vec<f32> = model_test_output.squeeze(1).unwrap().to_vec1().unwrap();
-
-    // for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
-    //     p.push(*pred);
-    //     let call: f32 = if *pred > 0.5 { 1.0 } else { 0.0 };
-    //     if (call as f32 - *truth as f32).abs() < f32::EPSILON {
-    //         num_correct += 1;
-    //     }
-    //     num_total += 1;
-    // }
-    //
-    // Precision, Recall, and F1 score calculations.
-    // let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, pred_threshold);
-    // elog!("Prediction threshold: {:.2}", pred_threshold);
-    // elog!("Precision: {:.2}%", 100.0 * precision);
-    // elog!("Recall: {:.2}%", 100.0 * recall);
-    // elog!("F1 score: {:.2}%", 100.0 * f1_score);
-    // elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
 
     // Evaluate the model on the test data
     elog!("Computing precision, recall, and F1 score on test data...");
