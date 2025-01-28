@@ -215,10 +215,10 @@ pub fn prepare_tensors(data: &[KmerData], device: &Device, normalize: bool) -> c
         let std = var.sqrt()?;
         (feature_tensor - mean)? / std
     } else {
-        feature_tensor
+        Ok(feature_tensor)
     };
 
-    Ok((feature_tensor, label_tensor))
+    Ok((feature_tensor?, label_tensor))
 }
 
 

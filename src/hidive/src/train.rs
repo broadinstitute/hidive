@@ -8,6 +8,8 @@ use std::collections::hash_map::Keys;
 use skydive::nn_model::{KmerData, KmerDataVec, KmerNN, train_model, evaluate_model, prepare_tensors, split_data, one_hot_encode_from_dna_ascii, calculate_class_weights};
 use candle_nn::{Module, Optimizer, VarBuilder, VarMap};
 use candle_core::{DType, Device, Tensor};
+use num_format::Locale::el;
+
 const DEVICE: Device = Device::Cpu;
 
 
@@ -15,6 +17,7 @@ use plotters::prelude::*;
 use skydive::ldbg::LdBG;
 use skydive::record::Record;
 use url::Url;
+use skydive::elog;
 
 pub fn start(
     output: &PathBuf,
@@ -94,7 +97,7 @@ pub fn start(
 
 
     // Save the data to a TSV file
-    skydive::elog!("Saving data to file...");
+    elog!("Saving data to file...");
     let mut tsv_data: Vec<String> = KmerData::to_vec_string(&data);
     let headers = vec![
         "lr-present",
@@ -111,13 +114,13 @@ pub fn start(
     std::fs::write(&data_output, tsv_data.join("\n")).expect("Unable to write data to file");
 
 
-    skydive::elog!("Splitting data into training and validation sets...");
+    elog!("Splitting data into training and validation sets...");
     let (training_data, validation_data) = split_data(&data);
     // get dimensions of the training data
     let  n_features = training_data[0].feature.len();
 
     // f_train  is the features and l_train is the labels
-    skydive::elog!("Preparing tensors...");
+    elog!("Preparing tensors...");
     let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE, true).unwrap();
     let (f_validation, l_validation) = prepare_tensors(&*KmerData::undersample_classes(&validation_data), &DEVICE, true).unwrap();
 
@@ -129,7 +132,7 @@ pub fn start(
     // vb is used to create the variables, used to create and manage the weights and biases of the model
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &DEVICE);
 
-    skydive::elog!("Creating model...");
+    elog!("Creating model...");
     let model = match KmerNN::new(n_features, vb) {
         Ok(m) => m,
         Err(e) => {
@@ -144,7 +147,7 @@ pub fn start(
         ..Default::default()
     };
 
-    skydive::elog!("Creating optimizer...");
+    elog!("Creating optimizer...");
     let mut optimizer = match candle_nn::AdamW::new(varmap.all_vars(), optim_config) {
         Ok(opt) => opt,
         Err(e) => {
@@ -154,15 +157,15 @@ pub fn start(
     };
 
     // let batch_size = 32;
-    let batch_size = 32;
-    let epochs = 10;
+    let batch_size = 512;
+    let epochs = 100;
 
     // Calculate weights for the loss function
     let class_weights = calculate_class_weights(&training_data);
     eprintln!("Training Class weights (0, 1): {:?}", class_weights);
 
 
-    skydive::elog!("Training model...");
+    elog!("Training model...");
     if let Err(e) = train_model(
         &model, &f_train, &l_train, &mut optimizer, epochs, batch_size, class_weights
     ) {
@@ -174,7 +177,7 @@ pub fn start(
     // Calculate weights for the loss function
     let eval_class_weights = calculate_class_weights(&*KmerData::undersample_classes(&validation_data));
     eprintln!("Validation Class weights (0, 1): {:?}", eval_class_weights);
-    skydive::elog!("Evaluating model...");
+    elog!("Evaluating model...");
     if let Err(e) = evaluate_model(&model, &f_validation, &l_validation, eval_class_weights) {
         eprintln!("Error evaluating model: {}", e);
         return;
@@ -197,7 +200,7 @@ pub fn start(
     );
 
     // f_test  is the features and l_test is the labels
-    skydive::elog!("Preparing tensors...");
+    elog!("Preparing tensors...");
     // let mut num_correct = 0u32;
     // let mut num_total = 0u32;
     let mut p: Vec<f32> = Vec::new();
@@ -219,27 +222,27 @@ pub fn start(
     //
     // Precision, Recall, and F1 score calculations.
     // let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, pred_threshold);
-    // skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
-    // skydive::elog!("Precision: {:.2}%", 100.0 * precision);
-    // skydive::elog!("Recall: {:.2}%", 100.0 * recall);
-    // skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
-    // skydive::elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
+    // elog!("Prediction threshold: {:.2}", pred_threshold);
+    // elog!("Precision: {:.2}%", 100.0 * precision);
+    // elog!("Recall: {:.2}%", 100.0 * recall);
+    // elog!("F1 score: {:.2}%", 100.0 * f1_score);
+    // elog!("Accuracy: {:.2}%", 100.0 * num_correct as f32 / num_total as f32);
 
     // Evaluate the model on the test data
-    skydive::elog!("Computing precision, recall, and F1 score on test data...");
+    elog!("Computing precision, recall, and F1 score on test data...");
     let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&preds, &l_test, &test_data);
 
-    skydive::elog!("Prediction thresholds: {:?}", thresholds);
-    skydive::elog!("Precision: {:?}", precisions.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
-    skydive::elog!("Recall:    {:?}", recalls.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
-    skydive::elog!("F1 score:  {:?}", f1_scores.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
-    skydive::elog!("Accuracy:  {:?}", accuracies.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
-
+    elog!("Prediction thresholds: {:?}", thresholds);
+    elog!("Precision: {:?}", precisions.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Recall:    {:?}", recalls.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("F1 score:  {:?}", f1_scores.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Accuracy:  {:?}", accuracies.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("ROC AUC:   {:.2}", roc_auc_score(&preds, &l_test.to_vec1::<f32>().unwrap()) );
 
     // Save the model to file
     let tensor_output = output.with_extension("safetensor");
     varmap.save(&tensor_output).expect("Unable to save tensor");
-    skydive::elog!("Model saved to {}", tensor_output.display());
+    elog!("Model saved to {}", tensor_output.display());
 
 }
 
@@ -266,7 +269,7 @@ pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<
         );
         let fasta_path = read_seq_url.to_file_path().unwrap();
 
-        skydive::elog!("Processing {}-read sample {}...", read_type, basename);
+        elog!("Processing {}-read sample {}...", read_type, basename);
 
         let reader = bio::io::fasta::Reader::from_file(&fasta_path).unwrap();
         let all_reads: Vec<bio::io::fasta::Record> = reader.records().map(|r| r.unwrap()).collect();
@@ -322,7 +325,7 @@ pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(),
 
 /// Computes FPR and TPR at various thresholds.
 pub fn compute_fpr_tpr(test_data: &KmerDataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
-    skydive::elog!("Computing FPR and TPR at various thresholds...");
+    elog!("Computing FPR and TPR at various thresholds...");
     let mut fpr_tpr: Vec<(f32, f32)> = Vec::new();
 
     // Iterate over different thresholds
@@ -397,7 +400,7 @@ pub fn create_dataset_for_model(
     s1: &LdBG,
     t1: &LdBG,
 ) -> Vec<KmerData> {
-    skydive::elog!("Creating dataset for model...");
+    elog!("Creating dataset for model...");
     let mut dataset = Vec::new();
 
     for kmer in kmers {
@@ -487,4 +490,60 @@ fn evaluate_thresholds(preds: &[f32], l_test: &Tensor, test_data: &KmerDataVec) 
 
     (thresholds, accuracies, precisions, recalls, f1_scores)
 }
+
+/// Calculate the ROC AUC score. This is the area under the ROC curve.
+/// The ROC curve is a plot of the true positive rate (TPR) against the false positive rate (FPR)
+/// for the different possible thresholds of a binary classifier.
+pub fn roc_auc_score(preds: &Vec<f32>, labels: &Vec<f32>) -> f32 {
+    let mut roc_points: Vec<(f32, f32)> = Vec::new();
+    let mut num_true_positives = 0u32;
+    let mut num_false_positives = 0u32;
+    let mut num_true_negatives = 0u32;
+    let mut num_false_negatives = 0u32;
+
+    // Iterate over different thresholds
+    for threshold in 0..100 {
+        let pred_threshold = threshold as f32 / 100.0;
+        for (pred, truth) in preds.iter().zip(labels.iter()) {
+            let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+            if (call - *truth).abs() < f32::EPSILON {
+                if *truth > 0.5 { num_true_positives += 1; }  // True Positive
+                else { num_true_negatives += 1; }  // True Negative
+            } else {
+                if *truth < 0.5 { num_false_positives += 1; }  // False Positive
+                if *truth > 0.5 { num_false_negatives += 1; }  // False Negative
+            }
+        }
+
+        // Calculate FPR (False Positive Rate)
+        let fpr = if num_false_positives + num_true_negatives > 0 {
+            num_false_positives as f32 / (num_false_positives + num_true_negatives) as f32
+        } else {
+            0.0
+        };
+
+        // Calculate TPR (True Positive Rate)
+        let tpr = if num_true_positives + num_false_negatives > 0 {
+            num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32
+        } else {
+            0.0
+        };
+
+        roc_points.push((fpr, tpr));
+    }
+
+    // Sort the ROC points by FPR
+    roc_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    // Calculate the area under the ROC curve
+    let mut auc = 0.0;
+    for i in 1..roc_points.len() {
+        let (fpr1, tpr1) = roc_points[i - 1];
+        let (fpr2, tpr2) = roc_points[i];
+        auc += (tpr1 + tpr2) * (fpr2 - fpr1) / 2.0;
+    }
+
+    auc
+}
+
 
