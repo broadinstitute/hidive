@@ -224,14 +224,18 @@ pub fn prepare_tensors(data: &[KmerData], device: &Device, normalize: bool) -> c
 
 
 /// Split the data into training and testing data randomly.
-/// The data is split into 80% training and 20% testing data.
+/// The split ratio is used to determine the percentage of data to use for training.
 /// The function returns a tuple of training and testing data.
-pub fn split_data(data: &[KmerData]) -> (Vec<KmerData>, Vec<KmerData>) {
+pub fn split_data(
+    data: &[KmerData],
+    split_ratio: f64 ,
+) -> (Vec<KmerData>, Vec<KmerData>) {
     let mut rng = thread_rng();
     let mut data = data.to_vec();
+    let split = (data.len() as f64 * split_ratio) as usize;
 
     data.shuffle(&mut rng);
-    let split = (data.len() as f64 * 0.8) as usize;
+    let split = (data.len() as f64 * split_ratio) as usize;
     let (train, test) = data.split_at(split);
 
     (train.to_vec(), test.to_vec())

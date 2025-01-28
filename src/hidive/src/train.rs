@@ -115,7 +115,7 @@ pub fn start(
 
 
     elog!("Splitting data into training and validation sets...");
-    let (training_data, validation_data) = split_data(&data);
+    let (training_data, validation_data) = split_data(&data, 0.8);
     // get dimensions of the training data
     let  n_features = training_data[0].feature.len();
 
