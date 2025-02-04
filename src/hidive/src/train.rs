@@ -141,9 +141,17 @@ pub fn start(
         }
     };
 
+    // Training parameters
+    let epochs = 100;
+    let batch_size = 512;
+    let learning_rate = 1e-1;
+
+    elog!("Training parameters:\
+    Epochs: {}, Batch size: {}, Learning rate: {}", epochs, batch_size, learning_rate);
+
     // Create the Optimizer
     let optim_config = candle_nn::ParamsAdamW{
-        lr: 1e-1,
+        lr: learning_rate,
         ..Default::default()
     };
 
@@ -155,10 +163,6 @@ pub fn start(
             return;
         }
     };
-
-    // let batch_size = 32;
-    let batch_size = 512;
-    let epochs = 100;
 
     // Calculate weights for the loss function
     let class_weights = calculate_class_weights(&training_data);
@@ -180,7 +184,7 @@ pub fn start(
     elog!("Validation Class weights (0, 1): {:?}", eval_class_weights);
 
     elog!("Evaluating model...");
-    if let Err(e) = evaluate_model(&model, &f_validation, &l_validation, eval_class_weights) {
+    if let Err(e) = evaluate_model(&model, &f_validation, &l_validation, validation_data, eval_class_weights) {
         eprintln!("Error evaluating model: {}", e);
         return;
     }

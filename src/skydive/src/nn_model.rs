@@ -1,5 +1,6 @@
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm, ops::sigmoid};
+use candle_nn::loss::cross_entropy;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -95,11 +96,26 @@ pub fn train_model(
 }
 
 // This function evaluates the model
-pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor, class_weights: (f32, f32) ) -> anyhow::Result<()> {
+pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor, x_test_table: KmerDataVec, class_weights: (f32, f32) ) -> anyhow::Result<()> {
     let output = model.forward(x_test)?;
     // let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
     let loss = weighted_mse_loss(&output.squeeze(1)?, y_test, class_weights)?;
     elog!("Test Loss: {}", loss.to_scalar::<f32>()?);
+
+    // Convert the output tensor to a vector of predictions
+    let preds: Vec<f32> = output.squeeze(1)?.to_vec1::<f32>()?.to_vec();
+
+    // Evaluate the model on the test data
+    elog!("Computing precision, recall, and F1 score on test data...");
+    let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&preds, &y_test, &x_test_table);
+
+    elog!("Prediction thresholds: {:?}", thresholds);
+    elog!("Precision: {:?}", precisions.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Recall:    {:?}", recalls.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("F1 score:  {:?}", f1_scores.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Accuracy:  {:?}", accuracies.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("ROC AUC:   {:.2}", roc_auc_score(&preds, &y_test.to_vec1::<f32>().unwrap()) );
+
     Ok(())
 }
 
@@ -294,3 +310,113 @@ pub fn one_hot_encode_from_dna_ascii(seq: &[u8]) -> Vec<f32> {
     one_hot
 }
 
+/// Evaluates the model on the test data.
+fn evaluate_thresholds(preds: &[f32], l_test: &Tensor, test_data: &KmerDataVec) -> (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>) {
+    let mut thresholds = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    let mut accuracies = Vec::new();
+    let mut precisions = Vec::new();
+    let mut recalls = Vec::new();
+    let mut f1_scores = Vec::new();
+
+    for threshold in thresholds.iter() {
+        let mut num_correct = 0u32;
+        let mut num_total = 0u32;
+        let mut p: Vec<f32> = Vec::new();
+
+        for (pred, truth) in preds.iter().zip(l_test.to_vec1::<f32>().unwrap().iter()) {
+            p.push(*pred);
+            let call: f32 = if *pred > *threshold { 1.0 } else { 0.0 };
+            if (call as f32 - *truth as f32).abs() < f32::EPSILON {
+                num_correct += 1;
+            }
+            num_total += 1;
+        }
+
+        let accuracy = num_correct as f32 / num_total as f32;
+        let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &p, *threshold);
+
+        accuracies.push(accuracy);
+        precisions.push(precision);
+        recalls.push(recall);
+        f1_scores.push(f1_score);
+    }
+
+    (thresholds, accuracies, precisions, recalls, f1_scores)
+}
+
+/// Computes precision, recall, and F1 score on test data.
+pub fn compute_precision_recall_f1(test_data: &Vec<KmerData>, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
+    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
+
+    for (data, pred) in test_data.iter().zip(p.iter()) {
+        let truth = data.label;
+        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+        if (call - truth).abs() < f64::EPSILON {
+            if truth > 0.5 { num_true_positives += 1; }
+        } else {
+            if truth < 0.5 { num_false_positives += 1; }
+            if truth > 0.5 { num_false_negatives += 1; }
+        }
+    }
+
+    let precision = num_true_positives as f32 / (num_true_positives + num_false_positives) as f32;
+    let recall = num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32;
+    let f1_score = 2.0 * precision * recall / (precision + recall);
+
+    (precision, recall, f1_score)
+}
+
+/// Calculate the ROC AUC score. This is the area under the ROC curve.
+/// The ROC curve is a plot of the true positive rate (TPR) against the false positive rate (FPR)
+/// for the different possible thresholds of a binary classifier.
+pub fn roc_auc_score(preds: &Vec<f32>, labels: &Vec<f32>) -> f32 {
+    let mut roc_points: Vec<(f32, f32)> = Vec::new();
+    let mut num_true_positives = 0u32;
+    let mut num_false_positives = 0u32;
+    let mut num_true_negatives = 0u32;
+    let mut num_false_negatives = 0u32;
+
+    // Iterate over different thresholds
+    for threshold in 0..100 {
+        let pred_threshold = threshold as f32 / 100.0;
+        for (pred, truth) in preds.iter().zip(labels.iter()) {
+            let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+            if (call - *truth).abs() < f32::EPSILON {
+                if *truth > 0.5 { num_true_positives += 1; }  // True Positive
+                else { num_true_negatives += 1; }  // True Negative
+            } else {
+                if *truth < 0.5 { num_false_positives += 1; }  // False Positive
+                if *truth > 0.5 { num_false_negatives += 1; }  // False Negative
+            }
+        }
+
+        // Calculate FPR (False Positive Rate)
+        let fpr = if num_false_positives + num_true_negatives > 0 {
+            num_false_positives as f32 / (num_false_positives + num_true_negatives) as f32
+        } else {
+            0.0
+        };
+
+        // Calculate TPR (True Positive Rate)
+        let tpr = if num_true_positives + num_false_negatives > 0 {
+            num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32
+        } else {
+            0.0
+        };
+
+        roc_points.push((fpr, tpr));
+    }
+
+    // Sort the ROC points by FPR
+    roc_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    // Calculate the area under the ROC curve
+    let mut auc = 0.0;
+    for i in 1..roc_points.len() {
+        let (fpr1, tpr1) = roc_points[i - 1];
+        let (fpr2, tpr2) = roc_points[i];
+        auc += (tpr1 + tpr2) * (fpr2 - fpr1) / 2.0;
+    }
+
+    auc
+}
