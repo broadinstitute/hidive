@@ -67,6 +67,7 @@ mod train;
 mod trim;
 mod eval_model;
 mod call;
+mod genotype;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -436,6 +437,34 @@ enum Commands {
         #[clap(required = true, value_parser)]
         bam_path: PathBuf,
     },
+
+    /// Re-genotype variants.
+    #[clap(arg_required_else_help = true)]
+    Genotype {
+        /// Output path for assembled short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Sample name.
+        #[clap(short, long, required = true, value_parser)]
+        sample_name: String,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// FASTA reference sequence.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_path: PathBuf,
+
+        /// VCF file
+        #[clap(required = true, value_parser)]
+        vcf_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
+    },
 }
 
 fn main() {
@@ -611,6 +640,23 @@ fn main() {
                 &sample_name,
                 &loci,
                 &reference_fasta_path,
+                &bam_path
+            );
+        },
+        Commands::Genotype {
+            output,
+            sample_name,
+            loci,
+            reference_fasta_path,
+            vcf_path,
+            bam_path,
+        } => {
+            genotype::start(
+                &output,
+                &sample_name,
+                &loci,
+                &reference_fasta_path,
+                &vcf_path,
                 &bam_path
             );
         }

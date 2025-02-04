@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::{fs::File, path::PathBuf, io::Write};
 
 use itertools::Itertools;
@@ -38,8 +38,11 @@ pub fn start(
     let loci = skydive::parse::parse_loci(loci_list, 0).into_iter().collect::<Vec<_>>();
 
     // Initialize VCF header
-    let vcf_header = initialize_vcf_header(&fasta, sample_name);
-    let mut vcf = Writer::from_path(output, &vcf_header, true, Format::Vcf).unwrap();
+    let vcf_header1 = initialize_vcf_header(&fasta, sample_name);
+    let mut vcf1 = Writer::from_path(PathBuf::from("phased1.vcf"), &vcf_header1, true, Format::Vcf).unwrap();
+
+    let vcf_header2 = initialize_vcf_header(&fasta, sample_name);
+    let mut vcf2 = Writer::from_path(PathBuf::from("phased2.vcf"), &vcf_header2, true, Format::Vcf).unwrap();
 
     for (chr, start, stop, name) in loci {
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
@@ -47,20 +50,51 @@ pub fn start(
         // The BAM reader gets renewed for each locus, but it's fast to open.
         let bam = skydive::stage::open_bam(&bam_url).unwrap();
 
-        let (matrix, mloci, _) = prepare_matrix(&chr, start, stop, bam, &fasta);
+        // Initialize BAM header and writer for output
+        let mut bam1_writer = bam::Writer::from_path("phased1.bam", &bam::Header::from_template(&bam.header()), bam::Format::Bam).unwrap();
+        let mut bam2_writer = bam::Writer::from_path("phased2.bam", &bam::Header::from_template(&bam.header()), bam::Format::Bam).unwrap();
+
+        let (matrix, mloci, read_map) = prepare_matrix(&chr, start, stop, bam, &fasta);
+
+        // for (read_idx, record) in &read_map {
+        //     skydive::elog!("read: {} {}", read_idx, String::from_utf8_lossy(record.qname()));
+        // }
 
         skydive::elog!(" - phasing {} variants...", mloci.len());
 
-        let (h1, h2) = phase_variants(&matrix);
+        let (h1_reads, h2_reads, h1, h2) = phase_variants(&matrix);
+
+        for read in h1_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+            bam1_writer.write(read).unwrap();
+        }
+
+        for read in h2_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+            bam2_writer.write(read).unwrap();
+        }
 
         let h1_filtered = filter_variants(&mloci, &chr, &h1, &fasta);
         let h2_filtered = filter_variants(&mloci, &chr, &h2, &fasta);
 
+        let mut h1_repaired = Vec::new();
+        let mut h2_repaired = Vec::new();
+
         for ((l, a), b) in mloci.iter().zip(h1_filtered.iter()).zip(h2_filtered.iter()) {
-            skydive::elog!(" - {} {:?} {:?}", l, a, b);
+            if a.is_some() && b.is_none() {
+                h1_repaired.push(a.clone());
+                h2_repaired.push(a.clone());
+            } else if a.is_none() && b.is_some() {
+                h1_repaired.push(b.clone());
+                h2_repaired.push(b.clone());
+            } else {
+                h1_repaired.push(a.clone());
+                h2_repaired.push(b.clone());
+            }
         }
 
-        add_variant_records(mloci, h1_filtered, h2_filtered, &mut fasta, chr, start, stop, &mut vcf);
+        let none_vec = vec![None; h1_filtered.len()];
+
+        add_variant_records(mloci.clone(), h1_repaired, none_vec.clone(), &mut fasta, chr.clone(), start, stop, &mut vcf1);
+        add_variant_records(mloci.clone(), none_vec.clone(), h2_repaired, &mut fasta, chr.clone(), start, stop, &mut vcf2);
     }
 }
 
@@ -110,12 +144,12 @@ fn filter_variants(mloci: &Vec<u32>, chr: &String, variants: &[Option<String>], 
             let first_allele_str = filtered[i].as_ref().unwrap().chars().next().unwrap().to_string();
             let last_allele_str = filtered[i].as_ref().unwrap().chars().last().unwrap().to_string();
 
-            skydive::elog!(" - examine {} {} {} {} {}", ref_pos, prev_ref_str, first_allele_str, last_allele_str, next_ref_str);
+            // skydive::elog!(" - examine {} {} {} {} {}", ref_pos, prev_ref_str, first_allele_str, last_allele_str, next_ref_str);
 
             if prev_ref_str == first_allele_str || next_ref_str == last_allele_str {
                 include[i] = false;
 
-                skydive::elog!(" - filtered");
+                // skydive::elog!(" - filtered");
             }
         }
     }
@@ -249,20 +283,20 @@ fn prepare_matrix_old(chr: &String, start: u64, stop: u64, mut bam: rust_htslib:
         }
     }
 
-    // skydive::elog!("{:?}", matrix);
-    // skydive::elog!("{:?}", mloci);
-
     (matrix, mloci)
 }
 
-fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>, HashMap<usize, Record>) {
+fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam::IndexedReader, fasta: &rust_htslib::faidx::Reader) -> (Vec<BTreeMap<usize, (String, u8)>>, Vec<u32>, BTreeMap<usize, Record>) {
     //                            pos           read    allele  qual
     let mut alleles_map: BTreeMap<u32, BTreeMap<usize, (String, u8)>> = BTreeMap::new();
     let mut read_ids = HashMap::new();
-    let mut read_map = HashMap::new();
+    let mut read_map = BTreeMap::new();
 
     let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
     for (read_index, read) in bam.records().filter(|r| r.is_ok()).flatten().enumerate() {
+        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+        read_map.insert(read_index, read.clone());
+
         let mut read_pos = 0;
         let mut ref_pos = read.pos() as u32;
 
@@ -276,7 +310,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                         let qpos_start = read_pos as usize;
                         let qpos_stop = read_pos as usize + *len as usize;
                         let qual = read.qual()[qpos_start..qpos_stop].to_vec();
-                        let q = *qual.iter().min().unwrap();
+                        // let q = *qual.iter().min().unwrap();
+                        let q = 10;
                         let seq = [&[ref_base], &read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
 
                         let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
@@ -289,8 +324,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                             allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
                         }
 
-                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
-                        read_map.insert(read_index, read.clone());
+                        // read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
                     }
 
                     read_pos += len;
@@ -301,7 +336,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                         let ref_base = ref_str.as_bytes()[0];
 
                         let qpos_start = read_pos as usize;
-                        let q = read.qual()[qpos_start];
+                        // let q = read.qual()[qpos_start];
+                        let q = 10;
                         let seq = vec![ref_base; 1].into_iter().chain(std::iter::repeat(b'-').take(*len as usize)).collect::<Vec<_>>();
 
                         let allele_map = alleles_map.entry(ref_pos - 1).or_insert_with(BTreeMap::new);
@@ -314,8 +350,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                             allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
                         }
 
-                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
-                        read_map.insert(read_index, read.clone());
+                        // read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
                     }
 
                     ref_pos += len;
@@ -327,9 +363,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                             let ref_base = ref_str.as_bytes()[0];
 
                             let read_base = read.seq().as_bytes()[read_pos as usize + i];
-                            let q = read.qual()[read_pos as usize + i];
-
-                            // skydive::elog!(" - {} {} {}", ref_pos + i as u32 + 1, String::from_utf8_lossy(&[ref_base]), String::from_utf8_lossy(&[read_base]));
+                            // let q = read.qual()[read_pos as usize + i];
+                            let q = 10;
 
                             if ref_base != read_base {
                                 let seq = vec![read_base];
@@ -343,8 +378,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                                     allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
                                 }
 
-                                read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
-                                read_map.insert(read_index, read.clone());
+                                // read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                                // read_map.insert(read_index, read.clone());
                             }
                         }
                     }
@@ -360,7 +395,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                         let qpos_start = read_pos as usize;
                         let qpos_stop = read_pos as usize + *len as usize;
                         let qual = read.qual()[qpos_start..qpos_stop].to_vec();
-                        let q = *qual.iter().min().unwrap();
+                        // let q = *qual.iter().min().unwrap();
+                        let q = 10;
                         let seq = [&[ref_base], &read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
 
                         let allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
@@ -373,10 +409,8 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
                             allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
                         }
 
-                        read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
-                        read_map.insert(read_index, read.clone());
-
-                        // skydive::elog!(" - softclip {} {}", ref_pos, String::from_utf8_lossy(&seq));
+                        // read_ids.insert(String::from_utf8_lossy(&read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
                     }
 
                     read_pos += len;
@@ -390,8 +424,6 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
         }
     }
 
-    // skydive::elog!("{:?}", alleles_map);
-
     let _ = bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start as i64, stop as i64));
     for p in bam.pileup() {
         let pileup = p.unwrap();
@@ -400,39 +432,76 @@ fn prepare_matrix(chr: &String, start: u64, stop: u64, mut bam: rust_htslib::bam
             let record = alignment.record();
             let qname = String::from_utf8(record.qname().to_vec()).unwrap();
 
-            let read_index = *read_ids.get(&qname).unwrap();
+            if read_ids.contains_key(&qname) {
+                let read_index = *read_ids.get(&qname).unwrap();
 
-            if alleles_map.contains_key(&(pileup.pos())) && !alleles_map.get(&(pileup.pos())).unwrap().contains_key(&read_index) {
-                if alignment.qpos().is_none() || alignment.qpos().unwrap() >= record.seq().len() {
-                    continue;
+                if alleles_map.contains_key(&(pileup.pos())) && !alleles_map.get(&(pileup.pos())).unwrap().contains_key(&read_index) {
+                    if alignment.qpos().is_none() || alignment.qpos().unwrap() >= record.seq().len() {
+                        continue;
+                    }
+
+                    let base = record.seq()[alignment.qpos().unwrap()];
+                    let seq = vec![base];
+                    // let q = record.qual()[alignment.qpos().unwrap()];
+                    let q = 10;
+
+                    let allele_map = alleles_map.get_mut(&pileup.pos()).expect("Position not found in alleles_map");
+                    allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
                 }
-
-                let base = record.seq()[alignment.qpos().unwrap()];
-                let seq = vec![base];
-                let q = record.qual()[alignment.qpos().unwrap()];
-
-                let allele_map = alleles_map.get_mut(&pileup.pos()).expect("Position not found in alleles_map");
-                allele_map.insert(read_index, (String::from_utf8_lossy(&seq).to_string(), q));
             }
         }
-
-        // if alleles_map.contains_key(&pileup.pos()) {
-        //     skydive::elog!("{} {:?}", pileup.pos(), alleles_map.get(&pileup.pos()).unwrap());
-        // }
     }
-
-    // skydive::elog!("{:?}", alleles_map);
 
     let mut matrix = Vec::new();
     let mut mloci = Vec::new();
 
-    for (pos, allele_map) in alleles_map {
-        matrix.push(allele_map);
-        mloci.push(pos);
-    }
+    let mut last_pos = 0;
+    for (pos, mut allele_map) in alleles_map {
+        // skydive::elog!("before {} {:?}", pos, allele_map);
 
-    // skydive::elog!("{:?}", matrix);
-    // skydive::elog!("{:?}", mloci);
+        for id in read_map.keys() {
+            let mut allele_set = HashMap::new();
+            for (_, (allele, _)) in &allele_map {
+                if !allele_set.contains_key(allele) {
+                    allele_set.insert(allele.clone(), 0);
+                }
+
+                if let Some(x) = allele_set.get_mut(allele) {
+                    *x += 1;
+                }
+            }
+
+            let mut most_frequent_allele = allele_set.keys().next().unwrap().clone();
+            let mut most_frequent_count = 0;
+            for (allele, count) in allele_set {
+                if count > most_frequent_count {
+                    most_frequent_count = count;
+                    most_frequent_allele = allele;
+                }
+            }
+
+            if !allele_map.contains_key(id) {
+                allele_map.insert(*id, (most_frequent_allele, 0));
+            }
+        }
+
+        // skydive::elog!("after  {} {:?}", pos, allele_map);
+
+        // let score = allele_map.values().map(|(a, s)| *s as f32).sum::<f32>() / allele_map.len() as f32;
+
+        let allele_set = allele_map.values().map(|(a, _)| a.clone()).collect::<HashSet<String>>();
+
+        // skydive::elog!("{:?}", allele_set);
+
+        // if allele_map.len() == read_map.len() {
+        // if score > 5.0 {
+        if allele_set.len() == 2 && allele_set.iter().map(|a| a.len() - 1).sum::<usize>() == 0 && pos - last_pos > 20 {
+            matrix.push(allele_map);
+            mloci.push(pos);
+        }
+
+        last_pos = pos;
+    }
 
     (matrix, mloci, read_map)
 }
@@ -511,7 +580,7 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
         } else if a1.is_none() && a2.is_some() {
             hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
         } else {
-            skydive::elog!(" - no variant for {}", pos);
+            // skydive::elog!(" - no variant for {}", pos);
         }
     }
 
@@ -521,6 +590,7 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
         let ref_base = fasta.fetch_seq_string(&chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
 
         if hap_alleles.contains_key(&pos) {
+            /*
             if ref_start.is_some() {
                 let (ref_str, ref_pos) = ref_start.unwrap();
 
@@ -541,6 +611,7 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
 
                 ref_start = None;
             }
+            */
 
             let mut record = vcf.empty_record();
 
@@ -605,25 +676,28 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
                 }
             });
 
-            let mut alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
-            alleles.push("<*>".as_bytes());
-            record.set_alleles(&alleles).unwrap();
+            let alleles: Vec<&[u8]> = alleles_vec.iter().map(|v| v.as_slice()).collect();
 
-            record.push_format_integer("GQ".as_bytes(), &[40]).unwrap();
+            if alleles.len() > 1 {
+                // alleles.push("<*>".as_bytes());
+                record.set_alleles(&alleles).unwrap();
 
-            // Get allele indices
-            let i1 = record.alleles().iter().position(|&a| a == a1.replace("-", "").as_bytes()).unwrap() as i32;
-            let i2 = record.alleles().iter().position(|&a| a == a2.replace("-", "").as_bytes()).unwrap() as i32;
+                record.push_format_integer("GQ".as_bytes(), &[40]).unwrap();
 
-            // Set record genotype - note first allele is always unphased
-            let genotype = &[GenotypeAllele::Unphased(i1), GenotypeAllele::Phased(i2)];
-            record.push_genotypes(genotype).unwrap();
+                // Get allele indices
+                let i1 = record.alleles().iter().position(|&a| a == a1.replace("-", "").as_bytes()).unwrap() as i32;
+                let i2 = record.alleles().iter().position(|&a| a == a2.replace("-", "").as_bytes()).unwrap() as i32;
 
-            // Trim unused alleles
-            // record.trim_alleles();
+                // Set record genotype - note first allele is always unphased
+                let genotype = &[GenotypeAllele::Unphased(i1), GenotypeAllele::Phased(i2)];
+                record.push_genotypes(genotype).unwrap();
 
-            // Write record
-            vcf.write(&record).unwrap()
+                // Trim unused alleles
+                // record.trim_alleles();
+
+                // Write record
+                vcf.write(&record).unwrap()
+            }
         } else {
             if ref_start.is_none() {
                 ref_start = Some((ref_base.clone(), pos));
@@ -632,10 +706,12 @@ fn add_variant_records(mloci: Vec<u32>, h1: Vec<Option<String>>, h2: Vec<Option<
     }
 }
 
-// fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<usize>, Vec<usize>) {
-fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<String>>, Vec<Option<String>>) {
+fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (BTreeSet<usize>, BTreeSet<usize>, Vec<Option<String>>, Vec<Option<String>>) {
     let num_snps = matrix.len();
     let num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(&0) + 1).max().unwrap_or(0);
+
+    skydive::elog!("num_reads: {}", num_reads);
+    skydive::elog!("num_snps: {}", num_snps);
 
     let mut reads = vec![vec![None; num_snps]; num_reads];
     let mut confidences = vec![vec![None; num_snps]; num_reads];
@@ -677,39 +753,18 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
         all_alleles[snp_idx] = index_map;
     }
 
-    let wmec_matrix = WMECData::new(reads, confidences);
+    let wmec_matrix = WMECData::new(reads.clone(), confidences);
 
-    let (p1, p2) = skydive::wmec::phase_all(&wmec_matrix, 40, 20);
+    let (p1, p2, r1, r2) = skydive::wmec::phase_all(&wmec_matrix, 52, 25);
+    // let (p1, p2, r1, r2) = skydive::wmec::phase(&wmec_matrix);
 
-    // skydive::elog!("{:?}", wmec_matrix.reads);
-    // skydive::elog!("{:?}", p1);
-    // skydive::elog!("{:?}", p2);
+    // skydive::elog!("aa: {:?}", all_alleles);
+    skydive::elog!("p1: {:?}", p1);
+    skydive::elog!("p2: {:?}", p2);
+    skydive::elog!("r1: {:?}", r1);
+    skydive::elog!("r2: {:?}", r2);
 
-    let mut h1_reads = Vec::new();
-    let mut h2_reads = Vec::new();
-
-    for (read_index, read) in wmec_matrix.reads.iter().enumerate() {
-        let mut num_p1 = 0;
-        let mut num_p2 = 0;
-
-        for i in 0..p1.len() {
-            if read[i] == Some(p1[i]) && read[i] != Some(p2[i]) {
-                num_p1 += 1;
-            } else if read[i] == Some(p2[i]) && read[i] != Some(p1[i]) {
-                num_p2 += 1;
-            }
-        }
-
-        if num_p1 > num_p2 {
-            h1_reads.push(read_index);
-        } else {
-            h2_reads.push(read_index);
-        }
-    }
-
-    // skydive::elog!("{:?}", h1_reads);
-    // skydive::elog!("{:?}", h2_reads);
-
+    // Convert phased variants to allele strings as before
     let mut h1 = Vec::new();
     let mut h2 = Vec::new();
     for i in 0..p1.len() {
@@ -720,7 +775,6 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (Vec<Option<St
         h2.push(a2);
     }
 
-    (h1, h2)
-
-    // (h1_reads, h2_reads)
+    // Return both the read assignments and the phased variants
+    (r1, r2, h1, h2)
 }

@@ -199,7 +199,7 @@ fn cluster_reads(l: &LdBG, all_seqs: &[Vec<u8>]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>)
     skydive::elog!("Found {} bubbles.", bubbles.len());
 
     let lr_mat = assign_reads_to_bubbles(&bubbles, &all_seqs, l, &g);
-    let (h1, h2) = skydive::wmec::phase(&lr_mat);
+    let (h1, h2, r1, r2) = skydive::wmec::phase(&lr_mat);
 
     let all_mat = assign_reads_to_bubbles(&bubbles, &all_seqs, l, &g);
 

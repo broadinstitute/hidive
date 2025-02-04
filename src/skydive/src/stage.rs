@@ -46,7 +46,7 @@ use crate::env::{gcs_authorize_data_access, local_guess_curl_ca_bundle};
 ///
 /// This function panics if the URL scheme is not recognized.
 pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
-    if env::var("GCS_OAUTH_TOKEN").is_err() {
+    if seqs_url.to_string().starts_with("gs://") && env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
     }
 
@@ -96,7 +96,7 @@ pub fn open_bam(seqs_url: &Url) -> Result<IndexedReader> {
 ///
 /// This function panics if the URL scheme is not recognized.
 pub fn open_fasta(seqs_url: &Url) -> Result<Reader> {
-    if env::var("GCS_OAUTH_TOKEN").is_err() {
+    if seqs_url.to_string().starts_with("gs://") && env::var("GCS_OAUTH_TOKEN").is_err() {
         gcs_authorize_data_access();
     }
 
