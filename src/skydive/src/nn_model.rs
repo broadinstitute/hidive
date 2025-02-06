@@ -1,6 +1,7 @@
+use std::path::PathBuf;
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{linear, Linear, Module, Optimizer, VarBuilder, LayerNorm, ops::sigmoid};
-use candle_nn::loss::cross_entropy;
+use candle_nn::loss::{binary_cross_entropy_with_logit};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -56,7 +57,7 @@ impl Module for KmerNN {
         let x = self.ln2.forward(&x)?;
         let x = x.relu()?;
         let x = self.fc3.forward(&x)?;
-        let x = sigmoid(&x)?;
+        // let x = sigmoid(&x)?;
         Ok(x)
     }
 }
@@ -66,13 +67,19 @@ pub fn train_model(
     model: &KmerNN,
     x_train: &Tensor,
     y_train: &Tensor,
+    f_train_test: &Tensor,
+    l_train_test: &Tensor,
     optimizer: &mut candle_nn::AdamW,
     epochs: usize,
     batch_size: usize,
     class_weights: (f32, f32),
+    output: &PathBuf,
 ) -> anyhow::Result<()> {
     let f_batches = create_batches(&x_train, batch_size);
     let l_batches = create_batches(&y_train, batch_size);
+
+    let mut batch_loss = Vec::new();
+    let mut batch_roc_auc = Vec::new();
 
     for epoch in 0..epochs {
         // Todo:  encapsulate epoch-loss computation in a helper function to keep the loop cleaner
@@ -81,17 +88,47 @@ pub fn train_model(
         for (f_batch, l_batch) in f_batches.iter().zip(l_batches.iter()) {
             let output = model.forward(f_batch)?;
             // let loss = candle_nn::loss::mse(&output.squeeze(1)?, l_batch)?;
-            let loss = weighted_mse_loss(&output.squeeze(1)?, l_batch, class_weights)?;
+            // let loss = weighted_mse_loss(&output.squeeze(1)?, l_batch, class_weights)?;
+            let loss = binary_cross_entropy_with_logit(&output.squeeze(1)?, l_batch)?;
+            // let loss = weighted_bce_loss(&output.squeeze(1)?, l_batch, class_weights)?;
+
+            batch_loss.push(loss.to_scalar::<f32>()?);
 
             optimizer.backward_step(&loss)?;
             epoch_loss = loss.clone();
         }
 
-        if epoch % 10 == 0 {
+
+        // Lock the model in evaluation mode
+        let output = sigmoid(&model.forward(f_train_test)?)?;
+
+        // Calculate ROC AUC for the batch
+        let preds: Vec<f32> = output.squeeze(1)?.to_vec1::<f32>()?.to_vec();
+        let labels: Vec<f32> = l_train_test.to_vec1::<f32>()?.to_vec();
+        let roc_auc = roc_auc_score(&preds, &labels);
+
+        // Save the loss and ROC AUC into variables
+        batch_roc_auc.push(roc_auc);
+
+
+        // if epoch % 10 == 0 {
             elog!("Epoch: {}, Loss: {}", epoch, epoch_loss.to_scalar::<f32>()?);
-        }
+        // }
 
     }
+
+
+    // Save batch loss and roc_auc to separate files
+    elog!("Training completed. Saving batch loss and ROC AUC to files. in {:?}", output);
+    let loss_file = &output.with_file_name("batch_loss.txt");
+    let roc_auc_file = &output.with_file_name("batch_roc_auc.txt");
+
+    // Write the batch loss to a file
+    std::fs::write(loss_file, batch_loss.iter().map(|l| l.to_string()).collect::<Vec<String>>().join("\n"))?;
+    // Write the batch roc_auc to a file
+    std::fs::write(roc_auc_file, batch_roc_auc.iter().map(|r| r.to_string()).collect::<Vec<String>>().join("\n"))?;
+
+
     Ok(())
 }
 
@@ -99,9 +136,12 @@ pub fn train_model(
 pub fn evaluate_model(model: &KmerNN, x_test: &Tensor, y_test: &Tensor, x_test_table: KmerDataVec, class_weights: (f32, f32) ) -> anyhow::Result<()> {
     let output = model.forward(x_test)?;
     // let loss = candle_nn::loss::mse(&output.squeeze(1)?, y_test)?;
-    let loss = weighted_mse_loss(&output.squeeze(1)?, y_test, class_weights)?;
+    // let loss = weighted_mse_loss(&output.squeeze(1)?, y_test, class_weights)?;
+    let loss = binary_cross_entropy_with_logit(&output.squeeze(1)?, y_test)?;
     elog!("Test Loss: {}", loss.to_scalar::<f32>()?);
 
+    // apply the sigmoid function to the output
+    let output = sigmoid(&output)?;
     // Convert the output tensor to a vector of predictions
     let preds: Vec<f32> = output.squeeze(1)?.to_vec1::<f32>()?.to_vec();
 
@@ -260,7 +300,7 @@ pub fn split_data(
 }
 
 
-/// Create batches of tensor data for training
+/// Create batches of tensor data for training TODO: batch should be shuffled
 pub fn create_batches(data: &Tensor, batch_size: usize) -> Vec<Tensor> {
     let mut batches = Vec::new();
     let num_samples = data.shape().dims()[0];

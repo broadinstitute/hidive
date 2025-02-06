@@ -86,7 +86,7 @@ pub fn start(
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
 
-    let data: KmerDataVec = create_dataset_for_model(
+    let pre_data: KmerDataVec = create_dataset_for_model(
         kmers,
         &lr_distances,
         &sr_distances,
@@ -94,6 +94,7 @@ pub fn start(
         &s1,
         &t1,
     );
+    let data = KmerData::undersample_classes(&pre_data);
 
 
     // Save the data to a TSV file
@@ -115,13 +116,15 @@ pub fn start(
 
 
     elog!("Splitting data into training and validation sets...");
-    let (training_data, validation_data) = split_data(&data, 0.8);
+    let (pre_training_data, validation_data) = split_data(&data, 0.8);
+    let (training_data, training_test_data) = split_data(&pre_training_data, 0.8);
     // get dimensions of the training data
     let  n_features = training_data[0].feature.len();
 
     // f_train  is the features and l_train is the labels
     elog!("Preparing training and validation data tensors...");
     let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE, true).unwrap();
+    let (f_train_test, l_train_test) = prepare_tensors(&training_test_data, &DEVICE, true).unwrap();
     let (f_validation, l_validation) = prepare_tensors(&*KmerData::undersample_classes(&validation_data), &DEVICE, true).unwrap();
 
 
@@ -142,9 +145,9 @@ pub fn start(
     };
 
     // Training parameters
-    let epochs = 100;
-    let batch_size = 512;
-    let learning_rate = 1e-1;
+    let epochs = 50;
+    let batch_size = 500;
+    let learning_rate = 1e-4;
 
     elog!("Training parameters:\
     Epochs: {}, Batch size: {}, Learning rate: {}", epochs, batch_size, learning_rate);
@@ -171,7 +174,7 @@ pub fn start(
 
     elog!("Training model...");
     if let Err(e) = train_model(
-        &model, &f_train, &l_train, &mut optimizer, epochs, batch_size, class_weights
+        &model, &f_train, &l_train, &f_train_test, &l_train_test ,&mut optimizer, epochs, batch_size, class_weights, output
     ) {
         elog!("Error training model: {}", e);
         return;
@@ -211,8 +214,9 @@ pub fn start(
     elog!("Preparing test data tensors...");
     let (f_test, l_test) = prepare_tensors(&test_data, &DEVICE, true).unwrap();
 
-    elog!("Evaluating model on test data...");
-    evaluate_model(&model, &f_test, &l_test, test_data, eval_class_weights).expect("Error evaluating model");
+    // Todo: enable the code below later when testing is done out different genome region
+    // elog!("Evaluating model on test data...");
+    // evaluate_model(&model, &f_test, &l_test, test_data, eval_class_weights).expect("Error evaluating model");
 
     // Save the model to file
     let tensor_output = output.with_extension("safetensor");
