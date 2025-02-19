@@ -9,14 +9,17 @@ use std::iter::Chain;
 use std::collections::hash_map::Keys;
 
 use gbdt::config::{loss2string, Config, Loss};
-use gbdt::decision_tree::{Data, DataVec};
+use gbdt::decision_tree::{Data, DataVec, PredVec};
 use gbdt::gradient_boost::GBDT;
 
 use plotters::prelude::*;
 use skydive::ldbg::LdBG;
 use skydive::record::Record;
 use std::io::Write;
+use rand::seq::SliceRandom;
 use url::Url;
+
+use skydive::elog;
 
 pub fn start(
     output: &PathBuf,
@@ -87,32 +90,33 @@ pub fn start(
     cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
     cfg.set_shrinkage(0.05);
     cfg.set_iterations(iterations);
-    cfg.set_debug(debug);
+    // cfg.set_debug(debug);
 
-    skydive::elog!("Training GBDT model with:");
-    skydive::elog!(" - feature_size={}", cfg.feature_size);
-    skydive::elog!(" - max_depth={}", cfg.max_depth);
-    skydive::elog!(" - min_leaf_size={}", cfg.min_leaf_size);
-    skydive::elog!(" - loss={}", loss2string(&cfg.loss));
-    skydive::elog!(" - shrinkage={}", cfg.shrinkage);
-    skydive::elog!(" - iterations={}", cfg.iterations);
-    // skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
+    elog!("Training GBDT model with:");
+    elog!(" - feature_size={}", cfg.feature_size);
+    elog!(" - max_depth={}", cfg.max_depth);
+    elog!(" - min_leaf_size={}", cfg.min_leaf_size);
+    elog!(" - loss={}", loss2string(&cfg.loss));
+    elog!(" - shrinkage={}", cfg.shrinkage);
+    elog!(" - iterations={}", cfg.iterations);
+    // elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
 
     // Initialize GBDT algorithm.
-    let mut gbdt = GBDT::new(&cfg);
+    // let mut gbdt = GBDT::new(&cfg);
 
-    // let mut training_data: DataVec = Vec::new();
-    // let mut test_data: DataVec = Vec::new();
+    // There are three types of data: training, validation, test.
+    // The training data is used to train the model.
+    // The validation data is used to tune the model.
+    // The test data is used to evaluate the model.
 
-    // let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-
+    // Create a dataset for the ML model.
     let kmers = l1
         .kmers
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
 
-    let mut training_data: DataVec = create_dataset_for_model(
+    let pre_kmer_with_feature_data: DataVec = create_dataset_for_model(
         kmers,
         &lr_distances,
         &sr_distances,
@@ -120,13 +124,133 @@ pub fn start(
         &s1,
         &t1,
     );
+    let kmer_with_feature_data: DataVec = undersample_classes(&pre_kmer_with_feature_data);
+
+
+    // Save the data to a TSV file
+    elog!("Saving data to file...");
+    let mut tsv_data: Vec<String> = Vec::new();
+    let headers = vec![
+        "lr-present",
+        "sr-coverage",
+        "strand-bias",
+        "hc-length-difference",
+        "shannon-entropy",
+        "gc-content",
+        "truth-present",
+    ];
+    tsv_data.insert(0, headers.join("\t"));
+    for data in &kmer_with_feature_data {
+        tsv_data.push(
+            data.feature
+                .iter()
+                .map(|f| f.to_string())
+                .chain(vec![data.label.to_string()])
+                .collect::<Vec<String>>()
+                .join("\t"),
+        );
+    }
+    let data_output = output.with_file_name("kmer_feature_data.tsv");
+    std::fs::write(&data_output, tsv_data.join("\n")).expect("Unable to write data to file");
+
+
+    // split data 80 : 20 for training and testing
+    let mut training_data: DataVec;
+    let mut validation_data: DataVec;
+    (training_data, validation_data) = split_data(kmer_with_feature_data, 0.8);
+
+    elog!("Training data size: {}", &training_data.len().to_formatted_string(&Locale::en));
+    elog!("Validation data size: {}", &validation_data.len().to_formatted_string(&Locale::en));
+
 
     // Train the decision trees.
-    skydive::elog!(
-        "Training GBDT model with {} training points...",
-        training_data.len().to_formatted_string(&Locale::en)
+    elog!("Training GBDT model with {} training points...",
+        &training_data.len().to_formatted_string(&Locale::en)
     );
+
+    ////////////////
+    //// This section is for training the model with different depths.
+    //// The model is trained with different depths and the accuracy and roc are calculated and
+    //// written to a file.
+    //// This can be removed in production.
+    ///////////////
+
+    // varialbe to hold validation evaluation
+    let mut training_validation_accuracy: Vec<Vec<f32>> = Vec::new();
+    let mut training_validation_roc: Vec<Vec<f32>> = Vec::new();
+    // let mut training_validation_loss: Vec<PredVec> = Vec::new();
+    let validation_truth = &validation_data.iter().map(|d| d.label).collect::<Vec<f32>>();
+    let training_data_truth = &training_data.iter().map(|d| d.label).collect::<Vec<f32>>();
+    for depth in 1..10 {
+        let mut cfg = Config::new();
+        cfg.set_feature_size(6);
+        cfg.set_min_leaf_size(5);
+        cfg.set_loss(&loss2string(&Loss::BinaryLogitraw));
+        cfg.set_shrinkage(0.05);
+        cfg.set_iterations(iterations);
+        cfg.set_max_depth(depth);
+
+        let mut gbdt = GBDT::new(&cfg);
+        gbdt.fit(&mut training_data);
+        let training_validation_prediction = gbdt.predict(&validation_data);
+        let training_data_prediction = gbdt.predict(&training_data);
+
+        // Evaluate the model on the validation data
+        let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&training_validation_prediction, &validation_truth);
+        let (precision, recall, f1_score) = compute_precision_recall_f1(&validation_truth, &training_validation_prediction, 0.5);
+        let val_roc_auc = roc_auc_score(&training_validation_prediction, &validation_truth);
+        let train_roc_auc = roc_auc_score(&training_data_prediction, &training_data_truth);
+        elog!("Validation data evaluation at depth {}:", depth);
+
+        training_validation_accuracy.push(accuracies);
+        training_validation_roc.push(vec![val_roc_auc, train_roc_auc]);
+
+        //Todo: retrieve loss
+
+    }
+
+    // Save accuracy to a TSV file
+    let mut accuracy_tsv_data: Vec<String> = Vec::new();
+    let accuracy_headers = vec!["accuracy_0.1", "accuracy_0.2", "accuracy_0.3", "accuracy_0.4", "accuracy_0.5", "accuracy_0.6", "accuracy_0.7", "accuracy_0.8", "accuracy_0.9"];
+    accuracy_tsv_data.push(accuracy_headers.join("\t"));
+    for accuracy in training_validation_accuracy {
+        accuracy_tsv_data.push(accuracy.iter().map(|a| a.to_string()).collect::<Vec<String>>().join("\t"));
+    }
+    let accuracy_data_output = output.with_file_name("training_validation_accuracy.tsv");
+    std::fs::write(&accuracy_data_output, accuracy_tsv_data.join("\n")).expect("Unable to write data to file");
+
+    // Save roc to a TSV file
+    let roc_tsv_output = output.with_file_name("training_validation_roc.tsv");
+    let roc_headers = vec!["validation_roc_auc", "training_roc_auc"];
+    let mut roc_tsv_data: Vec<String> = Vec::new();
+    roc_tsv_data.push(roc_headers.join("\t"));
+    for roc in training_validation_roc {
+        roc_tsv_data.push(roc.iter().map(|a| a.to_string()).collect::<Vec<String>>().join("\t"));
+    }
+    std::fs::write(&roc_tsv_output, roc_tsv_data.join("\n")).expect("Unable to write data to file");
+    ////////////////////////
+    //// End of training with different depths
+    ////////////////////////
+
+
+    // Initialize GBDT algorithm.
+    let mut gbdt = GBDT::new(&cfg);
     gbdt.fit(&mut training_data);
+
+    // Run model on validation data
+    elog!("Computing accuracy on validation data...");
+    let validation_prediction = gbdt.predict(&validation_data);
+    let validation_truth = &validation_data.iter().map(|d| d.label).collect::<Vec<f32>>();
+
+    // Evaluate the model on the test data
+    elog!("Computing precision, recall, and F1 score on test data...");
+    let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&validation_prediction, &validation_truth);
+
+    log_evaluation_metrics(&thresholds, &precisions, &recalls, &f1_scores, &accuracies, &validation_prediction, &validation_truth);
+
+    compute_and_save_tpr_fpr_roc(&output, &validation_data, &validation_prediction, "validation"
+    ).expect("Unable to compute and save TPR, FPR, and ROC curve");
+
 
     // Prepare test data.
     let test_kmers = test_l1
@@ -145,57 +269,23 @@ pub fn start(
     );
 
     // Predict the test data.
-    skydive::elog!("Computing accuracy on test data...");
-    let prediction = gbdt.predict(&test_data);
-    let pred_threshold: f32 = 0.5;
+    elog!("Computing accuracy on test data...");
+    let test_prediction = gbdt.predict(&test_data);
+    let test_truth = test_data.iter().map(|d| d.label).collect::<Vec<f32>>();
 
-    // Evaluate accuracy of the model on the test data.
-    let mut num_correct = 0u32;
-    let mut num_total = 0u32;
-    for (data, pred) in test_data.iter().zip(prediction.iter()) {
-        let truth = data.label;
-        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
-        if (call - truth).abs() < f32::EPSILON {
-            num_correct += 1;
-        }
-        num_total += 1;
-    }
+    // Evaluate the model on the test data
+    elog!("Computing precision, recall, and F1 score on test data...");
+    let (thresholds, accuracies, precisions, recalls, f1_scores) = evaluate_thresholds(&test_prediction, &test_truth);
 
-    // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
-    skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
-    skydive::elog!("Precision: {:.2}%", 100.0 * precision);
-    skydive::elog!("Recall: {:.2}%", 100.0 * recall);
-    skydive::elog!("F1 score: {:.2}%", 100.0 * f1_score);
+    log_evaluation_metrics(&thresholds, &precisions, &recalls, &f1_scores, &accuracies, &test_prediction, &test_truth);
 
-    // TPR and FPR calculations at various thresholds.
-    skydive::elog!("Computing TPR and FPR at various thresholds...");
-    let fpr_tpr: Vec<(f32, f32)> = compute_fpr_tpr(&test_data, &prediction);
-
-    // Save TPR and FPR at various thresholds to a file.
-    let csv_output = output.with_extension("csv");
-    let mut writer = std::fs::File::create(csv_output).expect("Unable to create file");
-    for (tpr, fpr) in &fpr_tpr {
-        writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
-    }
-    skydive::elog!("TPR and FPR at various thresholds saved to {}", output.to_str().unwrap());
-
-    // Create a ROC curve.
-    let png_output = output.with_extension("png");
-    plot_roc_curve(&png_output, &fpr_tpr).expect("Unable to plot ROC curve");
-    skydive::elog!("ROC curve saved to {}", png_output.to_str().unwrap());
-
-    skydive::elog!(
-        "Predicted accuracy: {}/{} ({:.2}%)",
-        num_correct.to_formatted_string(&Locale::en),
-        num_total.to_formatted_string(&Locale::en),
-        100.0 * num_correct as f32 / num_total as f32
+    compute_and_save_tpr_fpr_roc(&output, &test_data, &test_prediction, "test").expect(
+        "Unable to compute and save TPR, FPR, and ROC curve"
     );
 
-    gbdt.save_model(output.to_str().unwrap())
-        .expect("Unable to save model");
-
-    skydive::elog!("Model saved to {}", output.to_str().unwrap());
+    // Save the model to a file.
+    gbdt.save_model(output.to_str().unwrap()).expect("Unable to save model");
+    elog!("Model saved to {}", output.to_str().unwrap());
 }
 
 pub fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
@@ -321,30 +411,52 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
     fpr_tpr
 }
 
-/// Computes precision, recall, and F1 score on test data.
-pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
-    skydive::elog!("Computing precision, recall, and F1 score on test data...");
-    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
+/// Computes and saves TPR and FPR at various thresholds and plots the ROC curve.
+///
+/// # Arguments
+/// * `output` - The output path for the ROC curve image.
+/// * `test_data` - The test data used for evaluation.
+/// * `prediction` - The predicted values from the model.
+///
+/// # Returns
+/// None
+fn compute_and_save_tpr_fpr_roc(output: &PathBuf, test_data: &DataVec, prediction: &Vec<f32>, basename: &str )-> Result<(), Box<dyn std::error::Error>> {
+    // TPR and FPR calculations at various thresholds.
+    elog!("Computing TPR and FPR at various thresholds...");
+    let fpr_tpr: Vec<(f32, f32)> = compute_fpr_tpr(test_data, prediction);
 
-    for (data, pred) in test_data.iter().zip(p.iter()) {
-        let truth = data.label;
-        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
-        if (call - truth).abs() < f32::EPSILON {
-            if truth > 0.5 { num_true_positives += 1; }
-        } else {
-            if truth < 0.5 { num_false_positives += 1; }
-            if truth > 0.5 { num_false_negatives += 1; }
-        }
+    // Save TPR and FPR at various thresholds to a file.
+    let csv_output = output.with_file_name(format!("{}.data_tpr_fpr.csv", basename));
+    let mut writer = std::fs::File::create(&csv_output).expect("Unable to create file");
+    for (tpr, fpr) in &fpr_tpr {
+        writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
     }
+    elog!("TPR and FPR at various thresholds saved to {}", &csv_output.to_str().unwrap());
 
-    let precision = num_true_positives as f32 / (num_true_positives + num_false_positives) as f32;
-    let recall = num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32;
-    let f1_score = 2.0 * precision * recall / (precision + recall);
+    // Create a ROC curve.
+    let png_output = output.with_file_name(format!("{}.data_roc_curve.png", basename));
+    plot_roc_curve(&png_output, &fpr_tpr).expect("Unable to plot ROC curve");
+    elog!("ROC curve saved to {}", &png_output.to_str().unwrap());
 
-    (precision, recall, f1_score)
+    Ok(())
 }
 
+
+
 /// Creates a dataset for the ML model.
+///
+/// The dataset is created by iterating over all kmers and computing the features for each kmer.
+/// The features are:
+/// - present in long reads
+/// - coverage in short reads
+/// - measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+/// - homopolymer compression length difference
+/// - shannon entropy
+/// - gc content
+/// - distance to nearest long read contig end
+/// - distance to nearest short read contig end
+///
+/// returns a vector of Data objects.
 pub fn create_dataset_for_model(
     kmers: Chain<Chain<Keys<Vec<u8>, Record>, Keys<Vec<u8>, Record>>, Keys<Vec<u8>, Record>>,
     lr_distances: &HashMap<Vec<u8>, usize>,
@@ -405,3 +517,173 @@ pub fn create_dataset_for_model(
 
     dataset
 }
+
+/// Splits the data into training and testing sets.
+fn split_data(data: DataVec, ratio: f32) -> (DataVec, DataVec) {
+    let split_index = (data.len() as f32 * ratio) as usize;
+    let (train_data, test_data) = data.split_at(split_index);
+    (train_data.to_vec(), test_data.to_vec())
+}
+
+
+/// Calculate the ROC AUC score. This is the area under the ROC curve.
+/// The ROC curve is a plot of the true positive rate (TPR) against the false positive rate (FPR)
+/// for the different possible thresholds of a binary classifier.
+pub fn roc_auc_score(preds: &Vec<f32>, labels: &Vec<f32>) -> f32 {
+    let mut roc_points: Vec<(f32, f32)> = Vec::new();
+    let mut num_true_positives = 0u32;
+    let mut num_false_positives = 0u32;
+    let mut num_true_negatives = 0u32;
+    let mut num_false_negatives = 0u32;
+
+    // Iterate over different thresholds
+    for threshold in 0..100 {
+        let pred_threshold = threshold as f32 / 100.0;
+        for (pred, truth) in preds.iter().zip(labels.iter()) {
+            let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+            if (call - *truth).abs() < f32::EPSILON {
+                if *truth > 0.5 { num_true_positives += 1; }  // True Positive
+                else { num_true_negatives += 1; }  // True Negative
+            } else {
+                if *truth < 0.5 { num_false_positives += 1; }  // False Positive
+                if *truth > 0.5 { num_false_negatives += 1; }  // False Negative
+            }
+        }
+
+        // Calculate FPR (False Positive Rate)
+        let fpr = if num_false_positives + num_true_negatives > 0 {
+            num_false_positives as f32 / (num_false_positives + num_true_negatives) as f32
+        } else {
+            0.0
+        };
+
+        // Calculate TPR (True Positive Rate)
+        let tpr = if num_true_positives + num_false_negatives > 0 {
+            num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32
+        } else {
+            0.0
+        };
+
+        roc_points.push((fpr, tpr));
+    }
+
+    // Sort the ROC points by FPR
+    roc_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    // Calculate the area under the ROC curve
+    let mut auc = 0.0;
+    for i in 1..roc_points.len() {
+        let (fpr1, tpr1) = roc_points[i - 1];
+        let (fpr2, tpr2) = roc_points[i];
+        auc += (tpr1 + tpr2) * (fpr2 - fpr1) / 2.0;
+    }
+
+    auc
+}
+
+/// Evaluates the model on the test data.
+fn evaluate_thresholds(preds: &[f32], truth_lables: &Vec<f32>) -> (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>) {
+    let mut thresholds = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    let mut accuracies = Vec::new();
+    let mut precisions = Vec::new();
+    let mut recalls = Vec::new();
+    let mut f1_scores = Vec::new();
+
+    for threshold in thresholds.iter() {
+        let mut num_correct = 0u32;
+        let mut num_total = 0u32;
+        let mut p: Vec<f32> = Vec::new();
+
+        for (pred, truth) in preds.iter().zip(truth_lables.iter()) {
+            p.push(*pred);
+            let call: f32 = if *pred > *threshold { 1.0 } else { 0.0 };
+            if (call as f32 - truth).abs() < f32::EPSILON {
+                num_correct += 1;
+            }
+            num_total += 1;
+        }
+
+        // elog!(
+        // "Predicted accuracy: {}/{} ({:.2}%)",
+        // num_correct.to_formatted_string(&Locale::en),
+        // num_total.to_formatted_string(&Locale::en),
+        // 100.0 * num_correct as f32 / num_total as f32
+        // );
+
+        let accuracy = num_correct as f32 / num_total as f32;
+        let (precision, recall, f1_score) = compute_precision_recall_f1(&truth_lables, &p, *threshold);
+
+        accuracies.push(accuracy);
+        precisions.push(precision);
+        recalls.push(recall);
+        f1_scores.push(f1_score);
+    }
+
+    (thresholds, accuracies, precisions, recalls, f1_scores)
+}
+
+
+fn log_evaluation_metrics(
+    thresholds: &Vec<f32>,
+    precisions: &Vec<f32>,
+    recalls: &Vec<f32>,
+    f1_scores: &Vec<f32>,
+    accuracies: &Vec<f32>,
+    prediction: &Vec<f32>,
+    test_truth: &Vec<f32>,
+) {
+    elog!("Prediction thresholds: {:?}", thresholds);
+    elog!("Precision: {:?}", precisions.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Recall:    {:?}", recalls.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("F1 score:  {:?}", f1_scores.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("Accuracy:  {:?}", accuracies.iter().map(|&x| format!("{:.2}%", 100.0 * x)).collect::<Vec<String>>());
+    elog!("ROC AUC:   {:.2}", roc_auc_score(&prediction, &test_truth));
+}
+
+
+/// Computes precision, recall, and F1 score on test data.
+pub fn compute_precision_recall_f1(truth_labels: &Vec<f32>, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
+    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
+
+    for (truth, pred) in truth_labels.iter().zip(p.iter()) {
+        let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
+        if (call - truth).abs() < f32::EPSILON {
+            if truth > &0.5 { num_true_positives += 1; }
+        } else {
+            if truth < &0.5 { num_false_positives += 1; }
+            if truth > &0.5 { num_false_negatives += 1; }
+        }
+    }
+
+    let precision = num_true_positives as f32 / (num_true_positives + num_false_positives) as f32;
+    let recall = num_true_positives as f32 / (num_true_positives + num_false_negatives) as f32;
+    let f1_score = 2.0 * precision * recall / (precision + recall);
+
+    (precision, recall, f1_score)
+}
+
+pub fn undersample_classes(data: &DataVec) -> DataVec {
+    let mut rng = rand::thread_rng();
+    let mut class_0_samples: Vec<&Data> = data.iter().filter(|d| d.label == 0.0).collect();
+    let mut class_1_samples: Vec<&Data> = data.iter().filter(|d| d.label == 1.0).collect();
+
+    // Shuffle the samples
+    class_0_samples.shuffle(&mut rng);
+    class_1_samples.shuffle(&mut rng);
+
+    let num_class_0 = class_0_samples.len();
+    let num_class_1 = class_1_samples.len();
+
+    // Take the minimum number of samples from each class
+    let num_samples = num_class_0.min(num_class_1);
+
+    // combined dataset of the two classes using the minimum number of samples from each class
+    let mut undersampled_data: DataVec = Vec::new();
+    undersampled_data.extend(class_0_samples.into_iter().take(num_samples).cloned());
+    undersampled_data.extend(class_1_samples.into_iter().take(num_samples).cloned());
+    undersampled_data.shuffle(&mut rng);
+
+    undersampled_data
+}
+
+

@@ -62,6 +62,7 @@ pub fn start(
     // Predict the test data.
     skydive::elog!("Computing accuracy on test data...");
     let prediction = gbdt.predict(&test_data);
+    let truth = test_data.iter().map(|x| x.label).collect::<Vec<f32>>();
     let pred_threshold = 0.5;
 
     // Evaluate accuracy of the model on the test data.
@@ -77,7 +78,7 @@ pub fn start(
     }
 
     // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = crate::train::compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
+    let (precision, recall, f1_score) = crate::train::compute_precision_recall_f1(&truth, &prediction, pred_threshold);
     skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
     skydive::elog!("Precision: {:.2}%", 100.0 * precision);
     skydive::elog!("Recall: {:.2}%", 100.0 * recall);
