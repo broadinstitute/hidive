@@ -5,7 +5,7 @@
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Write;
 
@@ -288,7 +288,7 @@ pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<us
 
 #[must_use]
 pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<usize>) {
-    // data.write_reads_matrix("mat.tsv");
+    data.write_reads_matrix("mat.tsv");
 
     // First, collect all window ranges
     let mut windows: Vec<_> = (0..data.num_snps)
@@ -314,38 +314,43 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
         // .iter()
         .par_iter()
         .progress_with(pb)
-        .inspect(|&&f| crate::elog!("window {} {}", f.0, f.1))
         .map(|&(start, end)| {
             let (window_indices, window_reads): (Vec<usize>, Vec<Vec<Option<u8>>>) = data.reads.iter().zip(data.confidences.iter()).enumerate()
                 .map(|(read_idx, (read, confidence))| {
                     let window_read = read[start..end].to_vec();
-                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
                     let window_confidence = confidence[start..end].to_vec();
-                    (none_count, read_idx, window_read, window_confidence)
+
+                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
+                    let lowqual_count = window_confidence.iter().filter(|&&x| x.is_some() && x.unwrap() == 0).count();
+
+                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
-                .sorted_by_key(|(none_count, _, _, _)| *none_count)
-                .take(10)
+                .sorted_by_key(|(bad_count, _, _, _)| *bad_count)
+                .take(12)
                 .map(|(_, read_idx, window_read, _)| (read_idx, window_read))
                 .unzip();
 
             let (_, window_confidences): (Vec<usize>, Vec<Vec<Option<u32>>>) = data.reads.iter().zip(data.confidences.iter()).enumerate()
                 .map(|(read_idx, (read, confidence))| {
                     let window_read = read[start..end].to_vec();
-                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
                     let window_confidence = confidence[start..end].to_vec();
-                    (none_count, read_idx, window_read, window_confidence)
+
+                    let none_count = window_read.iter().filter(|x| x.is_none()).count();
+                    let lowqual_count = window_confidence.iter().filter(|&&x| x.is_some() && x.unwrap() == 0).count();
+
+                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
-                .sorted_by_key(|(none_count, _, _, _)| *none_count)
-                .take(10)
+                .sorted_by_key(|(bad_count, _, _, _)| *bad_count)
+                .take(12)
                 .map(|(_, read_idx, _, window_confidences)| (read_idx, window_confidences))
                 .unzip();
 
-            crate::elog!("window_reads: {}", window_reads.len());
-            crate::elog!("window_indices: {:?}", window_indices);
+            crate::elog!("window_reads: {} {} {}", start, end, window_reads.len());
+            crate::elog!("window_indices: {} {} {:?}", start, end, window_indices);
 
             let window_data = WMECData::new(window_reads, window_confidences);
             
@@ -354,7 +359,15 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
                 update_dp(&window_data, &mut dp, &mut backtrack, snp);
             }
 
-            backtrack_haplotypes(&window_data, &dp, &backtrack)
+            let (hap1, hap2, part1, part2) = backtrack_haplotypes(&window_data, &dp, &backtrack);
+
+            let re1: BTreeSet<_> = part1.iter().map(|&i| window_indices[i as usize]).collect();
+            let re2: BTreeSet<_> = part2.iter().map(|&i| window_indices[i as usize]).collect();
+
+            crate::elog!("window_re1: {} {} {:?} {:?}", start, end, part1, re1);
+            crate::elog!("window_re2: {} {} {:?} {:?}", start, end, part2, re2);
+
+            (hap1, hap2, re1, re2)
         })
         .collect();
 
@@ -365,24 +378,36 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
 
     let overlap = window - stride;
 
+    let mut all_read_assignments = BTreeMap::new();
+
     let mut i = 0;
     for (hap1, hap2, reads1, reads2) in haplotype_pairs {
-        crate::elog!("{}", i);
-        crate::elog!("{:?}", reads1);
-        crate::elog!("{:?}", reads2);
+        // crate::elog!("{}", i);
+        // crate::elog!("{:?}", reads1);
+        // crate::elog!("{:?}", reads2);
 
         i += 1;
 
         if haplotype1.len() == 0 {
+            for read_num in reads1.clone() {
+                all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+            }
+
+            for read_num in reads2.clone() {
+                all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+            }
+
             haplotype1 = hap1;
             haplotype2 = hap2;
             part1 = reads1;
             part2 = reads2;
         } else {
             // Compare overlap regions to determine orientation
+            crate::elog!("haplotypes: {} {} {}", haplotype1.len(), haplotype2.len(), overlap);
+
             let h1_overlap = &haplotype1[haplotype1.len()-overlap..];
             let h2_overlap = &haplotype2[haplotype2.len()-overlap..];
-            let new_overlap = &hap1[..overlap];
+            let new_overlap = &hap1[..std::cmp::min(overlap, hap1.len())];
 
             // Count matches between overlapping regions
             let h1_matches = h1_overlap.iter().zip(new_overlap.iter())
@@ -394,16 +419,56 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
 
             // Append new haplotypes in correct orientation based on best overlap match
             if h1_matches >= h2_matches {
-                haplotype1.extend_from_slice(&hap1[overlap..]);
-                haplotype2.extend_from_slice(&hap2[overlap..]);
+                haplotype1.extend_from_slice(&hap1[std::cmp::min(overlap, hap1.len())..]);
+                haplotype2.extend_from_slice(&hap2[std::cmp::min(overlap, hap2.len())..]);
+
+                for read_num in reads1.clone() {
+                    all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+                }
+
+                for read_num in reads2.clone() {
+                    all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+                }
             } else {
-                haplotype1.extend_from_slice(&hap2[overlap..]);
-                haplotype2.extend_from_slice(&hap1[overlap..]);
+                haplotype1.extend_from_slice(&hap2[std::cmp::min(overlap, hap2.len())..]);
+                haplotype2.extend_from_slice(&hap1[std::cmp::min(overlap, hap1.len())..]);
+
+                for read_num in reads1.clone() {
+                    all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+                }
+
+                for read_num in reads2.clone() {
+                    all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+                }
             }
         }
     }
 
-    (haplotype1, haplotype2, part1, part2)
+    let mut final_part1 = BTreeSet::new();
+    let mut final_part2 = BTreeSet::new();
+
+    crate::elog!("all_read_assignments: {:?}", &all_read_assignments);
+
+    for (read_num, assignments) in all_read_assignments {
+        // Count frequency of assignments (1 or 2) for this read
+        let most_common = assignments.iter()
+            .fold(HashMap::new(), |mut counts, &value| {
+                *counts.entry(value).or_insert(0) += 1;
+                counts
+            })
+            .into_iter()
+            .max_by_key(|&(_, count)| count)
+            .map(|(value, _)| value)
+            .unwrap_or(0); // Default to 0 if no assignments
+
+        if most_common == 1 {
+            final_part1.insert(read_num);
+        } else if most_common == 2 {
+            final_part2.insert(read_num);
+        }
+    }
+
+    (haplotype1, haplotype2, final_part1, final_part2)
 }
 
 #[cfg(test)]

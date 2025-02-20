@@ -178,26 +178,25 @@ pub fn extract_aligned_bam_reads(
         let pileup = p.unwrap();
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
-            for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
+            // for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
+            for alignment in pileup.alignments() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
                     Err(_) => String::from("unknown"),
                 };
 
-                let seq_name = format!("{qname}|{name}|{sm}");
+                let is_secondary = alignment.record().is_secondary();
+                let is_supplementary = alignment.record().is_supplementary();
+                let seq_name = format!("{qname}|{name}|{sm}|{is_secondary}|{is_supplementary}");
+
+                // crate::elog!("{}", seq_name);
 
                 if !bmap.contains_key(&seq_name) {
                     bmap.insert(seq_name.clone(), String::new());
                 }
 
                 if !alignment.is_del() && !alignment.is_refskip() {
-                    if alignment.qpos().unwrap() > alignment.record().seq().len() {
-                        crate::elog!("qpos {} > seq len {}", alignment.qpos().unwrap(), alignment.record().seq().len());
-                        crate::elog!("{} {} {} {}", String::from_utf8_lossy(alignment.record().qname()), alignment.record().mapq(), alignment.record().is_secondary(), alignment.record().is_supplementary());
-                        crate::elog!("{:?}", alignment.record());
-                    }
-
                     let a = alignment.record().seq()[alignment.qpos().unwrap()];
 
                     bmap.get_mut(&seq_name).unwrap().push(a as char);

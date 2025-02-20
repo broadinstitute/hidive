@@ -755,8 +755,7 @@ fn phase_variants(matrix: &Vec<BTreeMap<usize, (String, u8)>>) -> (BTreeSet<usiz
 
     let wmec_matrix = WMECData::new(reads.clone(), confidences);
 
-    let (p1, p2, r1, r2) = skydive::wmec::phase_all(&wmec_matrix, 52, 25);
-    // let (p1, p2, r1, r2) = skydive::wmec::phase(&wmec_matrix);
+    let (p1, p2, r1, r2) = skydive::wmec::phase_all(&wmec_matrix, 60, 15);
 
     // skydive::elog!("aa: {:?}", all_alleles);
     skydive::elog!("p1: {:?}", p1);
