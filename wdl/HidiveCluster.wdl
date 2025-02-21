@@ -287,6 +287,8 @@ task Cluster {
     command <<<
         set -x
 
+        samtools index ~{hap_bam}
+
         hidive cluster -f ~{loci} -t ~{loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
 
