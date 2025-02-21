@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use itertools::Itertools;
 
 use minimap2::Aligner;
+use needletail::Sequence;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::record::Cigar;
 use rust_htslib::{bam, bam::{FetchDefinition, Read}};
@@ -24,14 +25,9 @@ pub fn start(
     skydive::elog!("Intermediate data will be stored at {:?}.", cache_path);
 
     // Parse reference sequence file path.
-    // let reference_seq_urls = skydive::parse::parse_file_names(&[reference_fasta_path.clone()]);
-    // let reference_seq_url = reference_seq_urls.iter().next().unwrap();
-    // let mut fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
-    let mut aligner = Aligner::builder()
-        .map_hifi()
-        .with_cigar()
-        .with_index(reference_fasta_path, None)
-        .unwrap();
+    let reference_seq_urls = skydive::parse::parse_file_names(&[reference_fasta_path.clone()]);
+    let reference_seq_url = reference_seq_urls.iter().next().unwrap();
+    let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
 
     // Parse BAM file path.
     let bam_urls = skydive::parse::parse_file_names(&[bam_path.clone()]);
@@ -44,6 +40,18 @@ pub fn start(
     for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
         skydive::elog!("Processing locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
 
+        // Extract the reference sequence for the current locus.
+        let reference_seq = fasta.fetch_seq_string(to_chr.clone(), usize::try_from(*to_start).unwrap(), usize::try_from(*to_stop).unwrap()).unwrap();
+
+        // Initialize aligner
+        let mut aligner = Aligner::builder()
+            .map_hifi()
+            .with_cigar()
+            .with_seq(reference_seq.as_bytes())
+            .unwrap();
+
+        aligner.mapopt.flag |= minimap2::ffi::MM_F_EQX as i64;
+
         // The BAM reader gets renewed for each locus, but it's fast to open.
         let mut bam = skydive::stage::open_bam(&bam_url).unwrap();
 
@@ -52,44 +60,57 @@ pub fn start(
 
         let _ = bam.fetch(FetchDefinition::RegionString(from_chr.as_bytes(), *from_start as i64, *from_stop as i64));
         for read in bam.records().filter(|r| r.is_ok()).flatten().filter(|r| !r.is_secondary() && !r.is_supplementary()) {
-            let mut variants = HashMap::new();
-            let mut ref_pos = read.pos();
-
-            let alignments = aligner
+            let mappings = aligner
                 .map(&read.seq().as_bytes(), false, false, None, None, Some(read.qname()))
                 .unwrap();
 
-            skydive::elog!("{:?}", alignments);
+            for mapping in mappings {
+                skydive::elog!("{:?}", mapping);
 
-            for cigar_element in read.cigar().iter() {
-                match cigar_element {
-                    Cigar::Match(len) => {
-                        ref_pos += *len as i64;
-                    }
-                    Cigar::Equal(len) => {
-                        ref_pos += *len as i64;
-                    }
-                    Cigar::Diff(len) => {
-                        variants.insert(ref_pos, 1);
-                        ref_pos += *len as i64;
-                    }
-                    Cigar::Ins(len) => {
-                        if *len > 5 {
+                let mut variants = BTreeMap::new();
+                let mut ref_pos = mapping.target_start as i64 + 1;
+
+                let cigar = mapping.alignment.unwrap().cigar_str.unwrap();
+                let mut trim_left = 0;
+                let mut trim_right = 0;
+
+                let re = regex::Regex::new(r"(\d+)([MIDSNX=])").unwrap();
+                for (cap_idx, cap) in re.captures_iter(&cigar).enumerate() {
+                    let cigar_len = cap[1].parse::<u32>().unwrap();
+                    match &cap[2] {
+                        "M" | "=" => { ref_pos += cigar_len as i64; },
+                        "I" => {
+                            if cigar_len > 5 {
+                                variants.insert(ref_pos, 1);
+                            }
+                        },
+                        "D" => {
+                            if cigar_len > 5 {
+                                variants.insert(ref_pos, 1);
+                            }
+                            ref_pos += cigar_len as i64;
+                        },
+                        "X" => {
                             variants.insert(ref_pos, 1);
+                            ref_pos += cigar_len as i64;
+                        },
+                        "S" => {
+                            if cap_idx == 0 {
+                                trim_left = cigar_len as usize;
+                            } else {
+                                trim_right = cigar_len as usize;
+                            }
                         }
+                        _ => {}
                     }
-                    Cigar::Del(len) => {
-                        if *len > 5 {
-                            variants.insert(ref_pos, 1);
-                        }
-                        ref_pos += *len as i64;
-                    }
-                    _ => {}
                 }
-            }
 
-            read_vectors.push(variants);
-            reads.push(read);
+                let seq = if mapping.strand == minimap2::Strand::Forward { read.seq().as_bytes() } else { read.seq().as_bytes().reverse_complement() };
+                let subseq = seq[trim_left..seq.len() - trim_right].to_vec();
+
+                read_vectors.push(variants);
+                reads.push(subseq);
+            }
         }
 
         let all_positions = read_vectors.iter()
@@ -119,24 +140,12 @@ pub fn start(
         // Configure HDBSCAN parameters
         let params = HdbscanHyperParams::builder()
             .min_cluster_size(2)
-            .dist_metric(DistanceMetric::Euclidean) // Since we're passing a distance matrix
+            .dist_metric(DistanceMetric::Euclidean)
             .build();
 
         // Create and run clusterer
         let clusterer = Hdbscan::new(&data, params);
         let labels = clusterer.cluster().unwrap();
-
-        // Initialize BAM writer for output
-        let mut bam_writer = bam::Writer::from_path("clustered.bam", &bam::Header::from_template(&bam.header()), bam::Format::Bam).unwrap();
-
-        for (label, read) in labels.iter().zip(reads.iter()) {
-            let mut tagged_read = read.clone();
-            let _ = tagged_read.push_aux(b"CL", bam::record::Aux::I32(*label));
-
-            skydive::elog!("{} {} {:?}", label, String::from_utf8_lossy(read.qname()), tagged_read.aux(b"CL"));
-
-            bam_writer.write(&tagged_read).unwrap();
-        }
 
         let unique_labels = labels.iter().unique().collect::<Vec<_>>();
 
@@ -146,26 +155,27 @@ pub fn start(
 
             for (label, read) in labels.iter().zip(reads.iter()) {
                 if label == unique_label {
-                    let seq = read.seq().as_bytes();
+                    // let seq = read.seq().as_bytes();
 
-                    let mut trim_left = 0;
-                    // let first_cigar_element = read.cigar().first().unwrap();
-                    match read.cigar().first().unwrap() {
-                        Cigar::SoftClip(len) => {
-                            trim_left = *len as usize;
-                        }
-                        _ => {}
-                    }
+                    // let mut trim_left = 0;
+                    // match read.cigar().first().unwrap() {
+                    //     Cigar::SoftClip(len) => {
+                    //         trim_left = *len as usize;
+                    //     }
+                    //     _ => {}
+                    // }
 
-                    let mut trim_right = 0;
-                    match read.cigar().last().unwrap() {
-                        Cigar::SoftClip(len) => {
-                            trim_right = *len as usize;
-                        }
-                        _ => {}
-                    }
+                    // let mut trim_right = 0;
+                    // match read.cigar().last().unwrap() {
+                    //     Cigar::SoftClip(len) => {
+                    //         trim_right = *len as usize;
+                    //     }
+                    //     _ => {}
+                    // }
 
-                    let subseq = seq[trim_left..seq.len() - trim_right].to_vec();
+                    // let subseq = seq[trim_left..seq.len() - trim_right].to_vec();
+
+                    let subseq = read.clone();
 
                     let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
                     let seq_qual = std::ffi::CString::new(vec![b'I'; subseq.len()]).unwrap();
