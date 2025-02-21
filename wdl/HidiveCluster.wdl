@@ -282,7 +282,7 @@ task Cluster {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([reference, hap_bam], "GB"))
-    Int memory_gb = 2*num_cpus
+    Int memory_gb = 4*num_cpus
 
     command <<<
         set -x
