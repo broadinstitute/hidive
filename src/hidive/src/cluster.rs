@@ -155,26 +155,6 @@ pub fn start(
 
             for (label, read) in labels.iter().zip(reads.iter()) {
                 if label == unique_label {
-                    // let seq = read.seq().as_bytes();
-
-                    // let mut trim_left = 0;
-                    // match read.cigar().first().unwrap() {
-                    //     Cigar::SoftClip(len) => {
-                    //         trim_left = *len as usize;
-                    //     }
-                    //     _ => {}
-                    // }
-
-                    // let mut trim_right = 0;
-                    // match read.cigar().last().unwrap() {
-                    //     Cigar::SoftClip(len) => {
-                    //         trim_right = *len as usize;
-                    //     }
-                    //     _ => {}
-                    // }
-
-                    // let subseq = seq[trim_left..seq.len() - trim_right].to_vec();
-
                     let subseq = read.clone();
 
                     let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();

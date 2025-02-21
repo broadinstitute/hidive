@@ -38,21 +38,22 @@ pub fn start(
     let loci = skydive::parse::parse_loci(loci_list, 0).into_iter().collect::<Vec<_>>();
 
     // Initialize VCF header
-    let vcf_header1 = initialize_vcf_header(&fasta, sample_name);
-    let mut vcf1 = Writer::from_path(PathBuf::from("phased1.vcf"), &vcf_header1, true, Format::Vcf).unwrap();
+    // let vcf_header1 = initialize_vcf_header(&fasta, sample_name);
+    // let mut vcf1 = Writer::from_path(PathBuf::from("phased1.vcf"), &vcf_header1, true, Format::Vcf).unwrap();
 
-    let vcf_header2 = initialize_vcf_header(&fasta, sample_name);
-    let mut vcf2 = Writer::from_path(PathBuf::from("phased2.vcf"), &vcf_header2, true, Format::Vcf).unwrap();
+    // let vcf_header2 = initialize_vcf_header(&fasta, sample_name);
+    // let mut vcf2 = Writer::from_path(PathBuf::from("phased2.vcf"), &vcf_header2, true, Format::Vcf).unwrap();
+
+    // Initialize BAM header and writer for output
+    let input_bam = skydive::stage::open_bam(&bam_url).unwrap();
+    let mut bam1_writer = bam::Writer::from_path(output.join(".phased1.bam"), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
+    let mut bam2_writer = bam::Writer::from_path(output.join(".phased2.bam"), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
 
     for (chr, start, stop, name) in loci {
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
 
         // The BAM reader gets renewed for each locus, but it's fast to open.
         let bam = skydive::stage::open_bam(&bam_url).unwrap();
-
-        // Initialize BAM header and writer for output
-        let mut bam1_writer = bam::Writer::from_path("phased1.bam", &bam::Header::from_template(&bam.header()), bam::Format::Bam).unwrap();
-        let mut bam2_writer = bam::Writer::from_path("phased2.bam", &bam::Header::from_template(&bam.header()), bam::Format::Bam).unwrap();
 
         let (matrix, mloci, read_map) = prepare_matrix(&chr, start, stop, bam, &fasta);
 
@@ -72,29 +73,29 @@ pub fn start(
             bam2_writer.write(read).unwrap();
         }
 
-        let h1_filtered = filter_variants(&mloci, &chr, &h1, &fasta);
-        let h2_filtered = filter_variants(&mloci, &chr, &h2, &fasta);
+        // let h1_filtered = filter_variants(&mloci, &chr, &h1, &fasta);
+        // let h2_filtered = filter_variants(&mloci, &chr, &h2, &fasta);
 
-        let mut h1_repaired = Vec::new();
-        let mut h2_repaired = Vec::new();
+        // let mut h1_repaired = Vec::new();
+        // let mut h2_repaired = Vec::new();
 
-        for ((l, a), b) in mloci.iter().zip(h1_filtered.iter()).zip(h2_filtered.iter()) {
-            if a.is_some() && b.is_none() {
-                h1_repaired.push(a.clone());
-                h2_repaired.push(a.clone());
-            } else if a.is_none() && b.is_some() {
-                h1_repaired.push(b.clone());
-                h2_repaired.push(b.clone());
-            } else {
-                h1_repaired.push(a.clone());
-                h2_repaired.push(b.clone());
-            }
-        }
+        // for ((l, a), b) in mloci.iter().zip(h1_filtered.iter()).zip(h2_filtered.iter()) {
+        //     if a.is_some() && b.is_none() {
+        //         h1_repaired.push(a.clone());
+        //         h2_repaired.push(a.clone());
+        //     } else if a.is_none() && b.is_some() {
+        //         h1_repaired.push(b.clone());
+        //         h2_repaired.push(b.clone());
+        //     } else {
+        //         h1_repaired.push(a.clone());
+        //         h2_repaired.push(b.clone());
+        //     }
+        // }
 
-        let none_vec = vec![None; h1_filtered.len()];
+        // let none_vec = vec![None; h1_filtered.len()];
 
-        add_variant_records(mloci.clone(), h1_repaired, none_vec.clone(), &mut fasta, chr.clone(), start, stop, &mut vcf1);
-        add_variant_records(mloci.clone(), none_vec.clone(), h2_repaired, &mut fasta, chr.clone(), start, stop, &mut vcf2);
+        // add_variant_records(mloci.clone(), h1_repaired, none_vec.clone(), &mut fasta, chr.clone(), start, stop, &mut vcf1);
+        // add_variant_records(mloci.clone(), none_vec.clone(), h2_repaired, &mut fasta, chr.clone(), start, stop, &mut vcf2);
     }
 }
 

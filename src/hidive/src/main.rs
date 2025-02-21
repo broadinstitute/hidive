@@ -66,7 +66,7 @@ mod recruit;
 mod train;
 mod trim;
 mod eval_model;
-mod call;
+mod phase;
 mod genotype;
 
 #[derive(Debug, Parser)]
@@ -418,9 +418,9 @@ enum Commands {
         short_read_fasta_path: PathBuf,
     },
 
-    /// Call and phase variants.
+    /// Phase reads.
     #[clap(arg_required_else_help = true)]
-    Call {
+    Phase {
         /// Output path for assembled short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -633,14 +633,14 @@ fn main() {
                 short_read_fasta_path
             );
         }
-        Commands::Call {
+        Commands::Phase {
             output,
             sample_name,
             loci,
             reference_fasta_path,
             bam_path,
         } => {
-            call::start(
+            phase::start(
                 &output,
                 &sample_name,
                 &loci,
