@@ -1,6 +1,6 @@
 version 1.0
 
-workflow HidiveSample {
+workflow HidiveCluster {
     input {
         File long_reads_bam
         File long_reads_bai
