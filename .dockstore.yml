@@ -6,6 +6,9 @@ workflows:
 - name: HidiveCohort
   subclass: wdl
   primaryDescriptorPath: /wdl/HidiveCohort.wdl
+- name: HidiveCluster
+  subclass: wdl
+  primaryDescriptorPath: /wdl/HidiveCluster.wdl
 - name: AlignPacbioBam
   subclass: wdl
   primaryDescriptorPath: /wdl/AlignPacbioBam.wdl
