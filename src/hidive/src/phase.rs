@@ -46,8 +46,8 @@ pub fn start(
 
     // Initialize BAM header and writer for output
     let input_bam = skydive::stage::open_bam(&bam_url).unwrap();
-    let mut bam1_writer = bam::Writer::from_path(output.join(".phased1.bam"), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
-    let mut bam2_writer = bam::Writer::from_path(output.join(".phased2.bam"), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
+    let mut bam1_writer = bam::Writer::from_path(format!("{}.phased1.bam", output.display()), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
+    let mut bam2_writer = bam::Writer::from_path(format!("{}.phased2.bam", output.display()), &bam::Header::from_template(&input_bam.header()), bam::Format::Bam).unwrap();
 
     for (chr, start, stop, name) in loci {
         skydive::elog!("Processing locus {} ({}:{}-{})...", name, chr, start, stop);
