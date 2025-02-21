@@ -10,7 +10,7 @@ resolver = "2"
 # anyhow = "1.0"
 #arrow2 = "*"
 # base64 = "0.22.1"
-abpoa-rs = "0.2.0"
+# abpoa-rs = "0.2.0"
 bio = "2.0.1"
 chrono = "0.4.38"
 clap = { version = "4.5.1", features = ["derive"] }
