@@ -68,7 +68,8 @@ workflow HidiveCluster {
 
     call Cluster as Cluster1 {
         input:
-            loci = bed,
+            from_loci = bed,
+            to_loci = "chr22:42,126,480-42,130,820",
             reference = reference,
             hap_bam = Phase.hap1_bam,
             prefix = sample_name + ".hap1"
@@ -76,7 +77,8 @@ workflow HidiveCluster {
 
     call Cluster as Cluster2 {
         input:
-            loci = bed,
+            from_loci = bed,
+            to_loci = "chr22:42,126,480-42,130,820",
             reference = reference,
             hap_bam = Phase.hap2_bam,
             prefix = sample_name + ".hap2"
@@ -275,7 +277,8 @@ task Cluster {
         File reference
         File hap_bam
 
-        File loci
+        File from_loci
+        String to_loci
         String prefix
 
         Int num_cpus = 8
@@ -289,7 +292,7 @@ task Cluster {
 
         samtools index ~{hap_bam}
 
-        hidive cluster -f ~{loci} -t ~{loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
+        hidive cluster -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
 
     output {
