@@ -7,8 +7,11 @@ workflow HidiveCluster {
         File short_reads_cram
         File short_reads_crai
 
-        String? locus
-        File? loci
+        String? from_locus
+        File? from_loci
+
+        String? to_locus
+        File? to_loci
 
         File model
         String sample_name
@@ -21,16 +24,16 @@ workflow HidiveCluster {
         Int padding = 500
     }
 
-    if (defined(locus)) {
-        call PrepareLocus { input: locus = select_first([locus]) }
-    }
+    if (defined(from_locus)) { call PrepareLocus as PrepareFromLocus { input: locus = select_first([from_locus]) } }
+    File from_bed = select_first([PrepareFromLocus.bed, from_loci])
 
-    File bed = select_first([PrepareLocus.bed, loci])
+    if (defined(to_locus)) { call PrepareLocus as PrepareToLocus { input: locus = select_first([to_locus]) } }
+    File to_bed = select_first([PrepareToLocus.bed, to_loci])
 
     call Fetch {
         input:
             bam = long_reads_bam,
-            loci = bed,
+            loci = from_bed,
             padding = padding,
             prefix = sample_name
     }
@@ -48,7 +51,7 @@ workflow HidiveCluster {
 
     call Correct {
         input:
-            loci = bed,
+            loci = from_bed,
             model = model,
             reference = reference,
             long_reads_bam = long_reads_bam,
@@ -58,7 +61,7 @@ workflow HidiveCluster {
 
     call Phase {
         input:
-            loci = bed,
+            loci = from_bed,
             reference = reference,
             sample_name = sample_name,
             aligned_reads_bam = Correct.corrected_bam,
@@ -68,19 +71,21 @@ workflow HidiveCluster {
 
     call Cluster as Cluster1 {
         input:
-            from_loci = bed,
-            to_loci = "chr22:42,126,480-42,130,820",
+            from_loci = from_bed,
+            to_loci = to_bed,
             reference = reference,
             hap_bam = Phase.hap1_bam,
+            hap_bai = Phase.hap1_bai,
             prefix = sample_name + ".hap1"
     }
 
     call Cluster as Cluster2 {
         input:
-            from_loci = bed,
-            to_loci = "chr22:42,126,480-42,130,820",
+            from_loci = from_bed,
+            to_loci = to_bed,
             reference = reference,
             hap_bam = Phase.hap2_bam,
+            hap_bai = Phase.hap2_bai,
             prefix = sample_name + ".hap2"
     }
 
@@ -89,9 +94,11 @@ workflow HidiveCluster {
         File corrected_csi = Correct.corrected_csi
 
         File hap1_bam = Phase.hap1_bam
-        File hap2_bam = Phase.hap2_bam
-
+        File hap1_bai = Phase.hap1_bai
         File hap1_fa = Cluster1.cluster_fa
+
+        File hap2_bam = Phase.hap2_bam
+        File hap2_bai = Phase.hap2_bai
         File hap2_fa = Cluster2.cluster_fa
     }
 }
@@ -257,11 +264,17 @@ task Phase {
         set -x
 
         hidive phase -s "~{sample_name}" -l ~{loci} -r ~{reference} -o ~{prefix} ~{aligned_reads_bam}
+
+        samtools index ~{prefix}.phased1.bam
+        samtools index ~{prefix}.phased2.bam
     >>>
 
     output {
         File hap1_bam = "~{prefix}.phased1.bam"
+        File hap1_bai = "~{prefix}.phased1.bam.bai"
+
         File hap2_bam = "~{prefix}.phased2.bam"
+        File hap2_bai = "~{prefix}.phased2.bam.bai"
     }
 
     runtime {
@@ -276,6 +289,7 @@ task Cluster {
     input {
         File reference
         File hap_bam
+        File hap_bai
 
         File from_loci
         String to_loci
@@ -289,8 +303,6 @@ task Cluster {
 
     command <<<
         set -x
-
-        samtools index ~{hap_bam}
 
         hidive cluster -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
