@@ -292,13 +292,13 @@ task Cluster {
         File hap_bai
 
         File from_loci
-        String to_loci
+        File to_loci
         String prefix
 
         Int num_cpus = 8
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([reference, hap_bam], "GB"))
+    Int disk_size_gb = 1 + 2*ceil(size([reference, hap_bam, hap_bai, from_loci, to_loci], "GB"))
     Int memory_gb = 4*num_cpus
 
     command <<<
