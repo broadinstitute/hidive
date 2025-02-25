@@ -223,7 +223,7 @@ task Correct {
     Int memory_gb = 2*num_cpus
 
     command <<<
-        set -x
+        set -euxo pipefail
 
         hidive correct -l ~{loci} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
@@ -261,7 +261,7 @@ task Phase {
     Int memory_gb = 2*num_cpus
 
     command <<<
-        set -x
+        set -euxo pipefail
 
         hidive phase -s "~{sample_name}" -l ~{loci} -r ~{reference} -o ~{prefix} ~{aligned_reads_bam}
 
@@ -302,7 +302,7 @@ task Cluster {
     Int memory_gb = 4*num_cpus
 
     command <<<
-        set -x
+        set -euxo pipefail
 
         hidive cluster -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
