@@ -72,8 +72,7 @@ task SubsetAndAlign {
     command <<<
         set -euxo pipefail
 
-        samtools view -b -L ~{to_bed} ~{bam} | \
-            samtools fastq - | \
+        hidive fetch -l ~{to_bed} ~{bam} | \
             minimap2 -ayYL --eqx -x map-hifi ~{ref_fasta} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
