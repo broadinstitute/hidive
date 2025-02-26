@@ -12,3 +12,6 @@ workflows:
 - name: AlignPacbioBam
   subclass: wdl
   primaryDescriptorPath: /wdl/AlignPacbioBam.wdl
+- name: SubsetAndAlignBam
+  subclass: wdl
+  primaryDescriptorPath: /wdl/SubsetAndAlignBam.wdl
