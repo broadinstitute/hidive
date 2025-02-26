@@ -6,9 +6,15 @@ workflow SubsetAndAlignBam {
         File bai
         File reference
 
+        String? from_locus
+        File? from_loci
+
         String? to_locus
         File? to_loci
     }
+
+    if (defined(from_locus)) { call PrepareLocus as PrepareFromLocus { input: locus = select_first([from_locus]) } }
+    File from_bed = select_first([PrepareFromLocus.bed, from_loci])
 
     if (defined(to_locus)) { call PrepareLocus as PrepareToLocus { input: locus = select_first([to_locus]) } }
     File to_bed = select_first([PrepareToLocus.bed, to_loci])
@@ -18,10 +24,12 @@ workflow SubsetAndAlignBam {
             bam = bam,
             bai = bai,
             ref_fasta = reference,
+            from_bed = from_bed,
             to_bed = to_bed
     }
 
     output {
+        File subset_fa = SubsetAndAlign.subset_fa
         File pb_aligned_bam = SubsetAndAlign.aligned_bam
         File pb_aligned_bai = SubsetAndAlign.aligned_bai
     }
@@ -59,9 +67,10 @@ task SubsetAndAlign {
         File bai
         File ref_fasta
 
+        File from_bed
         File to_bed
 
-        String prefix = "out"
+        String prefix = "subset"
 
         Int num_cpus = 16 
     }
@@ -72,12 +81,15 @@ task SubsetAndAlign {
     command <<<
         set -euxo pipefail
 
-        hidive fetch -l ~{to_bed} ~{bam} | \
-            minimap2 -ayYL --eqx -x map-hifi ~{ref_fasta} - | \
+        awk '{ print $1 ":" $2 "-" $3 }' ~{to_bed} | samtools faidx -r - ~{ref_fasta} > ~{prefix}.fa
+
+        hidive fetch -l ~{from_bed} ~{bam} | \
+            minimap2 -ayYL --eqx -x map-hifi ~{prefix}.fa - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
+        File subset_fa = "~{prefix}.fa"
         File aligned_bam = "~{prefix}.bam"
         File aligned_bai = "~{prefix}.bam.csi"
     }
