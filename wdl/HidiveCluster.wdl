@@ -119,6 +119,9 @@ workflow HidiveCluster {
         File hap2_bam = Phase.hap2_bam
         File hap2_bai = Phase.hap2_bai
 
+        File ref_subset_fa = SubsetReference.ref_subset_fa
+        File ref_subset_fai = SubsetReference.ref_subset_fai
+
         File cluster1_fa = Cluster1.cluster_fa
         File cluster1_bam = AlignCluster1.cluster_bam
         File cluster1_csi = AlignCluster1.cluster_csi
@@ -359,10 +362,12 @@ task SubsetReference {
         set -euxo pipefail
 
         awk '{ print $1 ":" $2 "-" $3 }' ~{to_loci} | samtools faidx -r - ~{reference} > ref.subset.fa
+        samtools faidx ref.subset.fa
     >>>
 
     output {
         File ref_subset_fa = "ref.subset.fa"
+        File ref_subset_fai = "ref.subset.fa.fai"
     }
 
     runtime {
