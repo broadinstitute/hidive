@@ -89,17 +89,43 @@ workflow HidiveCluster {
             prefix = sample_name + ".hap2"
     }
 
+    call SubsetReference {
+        input:
+            reference = reference,
+            to_loci = to_bed
+    }
+
+    call Align as AlignCluster1 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = Cluster1.cluster_fa,
+            prefix = sample_name + ".hap1"
+    }
+
+    call Align as AlignCluster2 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = Cluster2.cluster_fa,
+            prefix = sample_name + ".hap2"
+    }
+
     output {
         File corrected_bam = Correct.corrected_bam
         File corrected_csi = Correct.corrected_csi
 
         File hap1_bam = Phase.hap1_bam
         File hap1_bai = Phase.hap1_bai
-        File hap1_fa = Cluster1.cluster_fa
 
         File hap2_bam = Phase.hap2_bam
         File hap2_bai = Phase.hap2_bai
-        File hap2_fa = Cluster2.cluster_fa
+
+        File cluster1_fa = Cluster1.cluster_fa
+        File cluster1_bam = AlignCluster1.cluster_bam
+        File cluster1_csi = AlignCluster1.cluster_csi
+
+        File cluster2_fa = Cluster2.cluster_fa
+        File cluster2_bam = AlignCluster2.cluster_bam
+        File cluster2_csi = AlignCluster2.cluster_csi
     }
 }
 
@@ -309,6 +335,65 @@ task Cluster {
 
     output {
         File cluster_fa = "~{prefix}.fa"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task SubsetReference {
+    input {
+        File reference
+        File to_loci
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([reference, to_loci], "GB"))
+    Int num_cpus = 1
+    Int memory_gb = 2
+
+    command <<<
+        set -euxo pipefail
+
+        awk '{ print $1 ":" $2 "-" $3 }' ~{to_loci} | samtools faidx -r - ~{reference} > ref.subset.fa
+    >>>
+
+    output {
+        File ref_subset_fa = "ref.subset.fa"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Align {
+    input {
+        File reference
+        File fasta
+
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([reference, fasta], "GB"))
+    Int num_cpus = 1
+    Int memory_gb = 2
+
+    command <<<
+        set -euxo pipefail
+
+        minimap2 -ayYL --eqx -x map-hifi ~{reference} ~{fasta} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+    >>>
+
+    output {
+        File cluster_bam = "~{prefix}.bam"
+        File cluster_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
