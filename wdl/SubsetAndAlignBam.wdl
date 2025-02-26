@@ -3,6 +3,7 @@ version 1.0
 workflow SubsetAndAlignBam {
     input {
         File bam
+        File bai
         File reference
 
         String? to_locus
@@ -15,6 +16,7 @@ workflow SubsetAndAlignBam {
     call SubsetAndAlign {
         input:
             bam = bam,
+            bai = bai,
             ref_fasta = reference,
             to_bed = to_bed
     }
@@ -54,6 +56,7 @@ task PrepareLocus {
 task SubsetAndAlign {
     input {
         File bam
+        File bai
         File ref_fasta
 
         File to_bed
