@@ -393,7 +393,9 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+        minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | \
+            awk -F'\t' '!($2 ~ /2048/) && ($6 !~ /^[0-9]+S.*[0-9]{250,}S$/) && ($6 !~ /^[0-9]{250,}S/) && ($6 !~ /[0-9]{250,}S$/)' | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
