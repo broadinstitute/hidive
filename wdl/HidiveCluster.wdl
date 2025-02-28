@@ -393,7 +393,7 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x map-hifi ~{reference} ~{fasta} | samtools sort --write-index -O BAM -o ~{prefix}.bam
+        minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {

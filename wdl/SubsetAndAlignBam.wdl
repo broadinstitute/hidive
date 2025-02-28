@@ -84,7 +84,7 @@ task SubsetAndAlign {
         awk '{ print $1 ":" $2 "-" $3 }' ~{to_bed} | samtools faidx -r - ~{ref_fasta} > ~{prefix}.fa
 
         hidive fetch -l ~{from_bed} ~{bam} | \
-            minimap2 -ayYL --eqx -x map-hifi ~{prefix}.fa - | \
+            minimap2 -ayYL --eqx -x asm20 ~{prefix}.fa - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
