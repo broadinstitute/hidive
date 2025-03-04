@@ -95,7 +95,8 @@ COPY --from=builder /google-cloud-sdk /google-cloud-sdk
 
 # Copy scripts from local directory
 RUN mkdir -p /scripts
-COPY scripts/*.py /scripts/
+COPY *.py /scripts/
+RUN pip3 install yattag
 
 # Set environment variables
 ENV PATH="/root/.cargo/bin:/google-cloud-sdk/bin:${PATH}"
