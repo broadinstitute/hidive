@@ -95,7 +95,7 @@ COPY --from=builder /google-cloud-sdk /google-cloud-sdk
 
 # Copy scripts from local directory
 RUN mkdir -p /scripts
-COPY *.py /scripts/
+COPY *.py *.json *.fa /scripts/
 RUN pip3 install yattag
 
 # Set environment variables

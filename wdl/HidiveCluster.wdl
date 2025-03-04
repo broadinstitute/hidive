@@ -109,6 +109,18 @@ workflow HidiveCluster {
             prefix = sample_name + ".hap2"
     }
 
+    call Plot as PlotCluster1 {
+        input:
+            cluster_fa = Cluster1.cluster_fa,
+            prefix = sample_name + ".hap1"
+    }
+
+    call Plot as PlotCluster2 {
+        input:
+            cluster_fa = Cluster2.cluster_fa,
+            prefix = sample_name + ".hap2"
+    }
+    
     output {
         File corrected_bam = Correct.corrected_bam
         File corrected_csi = Correct.corrected_csi
@@ -129,6 +141,9 @@ workflow HidiveCluster {
         File cluster2_fa = Cluster2.cluster_fa
         File cluster2_bam = AlignCluster2.cluster_bam
         File cluster2_csi = AlignCluster2.cluster_csi
+
+        File cluster1_html = PlotCluster1.cluster_html
+        File cluster2_html = PlotCluster2.cluster_html
     }
 }
 
@@ -401,6 +416,36 @@ task Align {
     output {
         File cluster_bam = "~{prefix}.bam"
         File cluster_csi = "~{prefix}.bam.csi"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Plot {
+    input {
+        File cluster_fa
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([cluster_fa], "GB"))
+    Int num_cpus = 1
+    Int memory_gb = 2
+
+    command <<<
+        set -euxo pipefail
+
+        python3 /scripts/divide_fasta_into_kmers.py ~{cluster_fa} hidive_clusters_hprc_kmers.fa
+        minimap2 -a -Y -x map-hifi -A 2 -B 4 /scripts/CYP2D6_and_7_T2T_w_grch38_rep_and_spacer.fa hidive_clusters_hprc_kmers.fa > kmer_align.sam
+        python3 /scripts/make_kmer_plot.py kmer_align.sam /scripts/cyp2d6_plot_opts.json cyp2d6_plot.~{prefix}.html
+    >>>
+
+    output {
+        File cluster_html = "cyp2d6_plot.~{prefix}.html"
     }
 
     runtime {
