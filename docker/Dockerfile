@@ -93,6 +93,10 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/
 # Copy gcloud utilities from builder stage
 COPY --from=builder /google-cloud-sdk /google-cloud-sdk
 
+# Copy scripts from local directory
+RUN mkdir -p /scripts
+COPY scripts/*.py /scripts/
+
 # Set environment variables
 ENV PATH="/root/.cargo/bin:/google-cloud-sdk/bin:${PATH}"
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
