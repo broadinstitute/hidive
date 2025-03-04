@@ -1,0 +1,15 @@
+{
+	"main_genes": ["CYP2D6", "CYP2D7"],
+	"colors" : {
+		"CYP2D6": "gold",
+		"CYP2D7": "dodgerblue",
+		"REP6": "pink",
+		"Spacer": "lightskyblue",
+		"CYP2D8": "mediumorchid",
+		"Both": "green",
+		"None": "lightgray",
+		"Past_end": "ghostwhite"
+	},
+	"kmer_shape": "▉",
+	"sort_by": "sample"
+}

@@ -147,3 +147,5 @@ scratch/
 *.xml
 *.dict
 *.ipynb
+*.DS_Store
+*.swp

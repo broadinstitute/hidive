@@ -66,7 +66,8 @@ mod recruit;
 mod train;
 mod trim;
 mod eval_model;
-mod call;
+mod phase;
+mod genotype;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -264,17 +265,21 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
-        /// Kmer-size
-        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
-        kmer_size: usize,
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        from_loci: Vec<String>,
 
-        /// Jaccard threshold
-        #[clap(short, long, value_parser, default_value_t = 0.9)]
-        jaccard_threshold: f64,
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to which extracted reads should be aligned.
+        #[clap(short, long, value_parser, required = true)]
+        to_loci: Vec<String>,
 
-        /// Multi-sample FASTA file with reads spanning locus of interest.
+        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        #[clap(short, long, value_parser, required = true)]
+        ref_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
-        fasta_path: PathBuf,
+        bam_path: PathBuf,
     },
 
     /// Trim reads to a specific window around locus.
@@ -413,9 +418,9 @@ enum Commands {
         short_read_fasta_path: PathBuf,
     },
 
-    /// Call and phase variants.
+    /// Phase reads.
     #[clap(arg_required_else_help = true)]
-    Call {
+    Phase {
         /// Output path for assembled short-read sequences.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
@@ -431,6 +436,34 @@ enum Commands {
         /// FASTA reference sequence.
         #[clap(short, long, required = true, value_parser)]
         reference_fasta_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
+    },
+
+    /// Re-genotype variants.
+    #[clap(arg_required_else_help = true)]
+    Genotype {
+        /// Output path for assembled short-read sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Sample name.
+        #[clap(short, long, required = true, value_parser)]
+        sample_name: String,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// FASTA reference sequence.
+        #[clap(short, long, required = true, value_parser)]
+        reference_fasta_path: PathBuf,
+
+        /// VCF file
+        #[clap(required = true, value_parser)]
+        vcf_path: PathBuf,
 
         /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
@@ -529,11 +562,12 @@ fn main() {
         }
         Commands::Cluster {
             output,
-            kmer_size,
-            jaccard_threshold,
-            fasta_path,
+            from_loci,
+            to_loci,
+            ref_path,
+            bam_path,
         } => {
-            cluster::start(&output, kmer_size, jaccard_threshold, &fasta_path);
+            cluster::start(&output, &from_loci, &to_loci, &ref_path, &bam_path);
         }
         Commands::Trim {
             output,
@@ -599,18 +633,35 @@ fn main() {
                 short_read_fasta_path
             );
         }
-        Commands::Call {
+        Commands::Phase {
             output,
             sample_name,
             loci,
             reference_fasta_path,
             bam_path,
         } => {
-            call::start(
+            phase::start(
                 &output,
                 &sample_name,
                 &loci,
                 &reference_fasta_path,
+                &bam_path
+            );
+        },
+        Commands::Genotype {
+            output,
+            sample_name,
+            loci,
+            reference_fasta_path,
+            vcf_path,
+            bam_path,
+        } => {
+            genotype::start(
+                &output,
+                &sample_name,
+                &loci,
+                &reference_fasta_path,
+                &vcf_path,
                 &bam_path
             );
         }
