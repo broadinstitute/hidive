@@ -449,7 +449,7 @@ task Plot {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
