@@ -405,9 +405,10 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
             // Compare overlap regions to determine orientation
             crate::elog!("haplotypes: {} {} {}", haplotype1.len(), haplotype2.len(), overlap);
 
-            let h1_overlap = &haplotype1[haplotype1.len()-overlap..];
-            let h2_overlap = &haplotype2[haplotype2.len()-overlap..];
-            let new_overlap = &hap1[..std::cmp::min(overlap, hap1.len())];
+            let new_overlap_len = std::cmp::min(overlap, hap1.len());
+            let h1_overlap = &haplotype1[haplotype1.len()-new_overlap_len..];
+            let h2_overlap = &haplotype2[haplotype2.len()-new_overlap_len..];
+            let new_overlap = &hap1[..new_overlap_len];
 
             // Count matches between overlapping regions
             let h1_matches = h1_overlap.iter().zip(new_overlap.iter())
