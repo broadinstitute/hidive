@@ -75,28 +75,32 @@ pub fn train_model(
     class_weights: (f32, f32),
     output: &PathBuf,
 ) -> anyhow::Result<()> {
-    let f_batches = create_batches(&x_train, batch_size);
-    let l_batches = create_batches(&y_train, batch_size);
-
+    // Create new shuffled batches for each epoch in the training loop
     let mut batch_loss = Vec::new();
     let mut batch_roc_auc = Vec::new();
 
     for epoch in 0..epochs {
-        // Todo:  encapsulate epoch-loss computation in a helper function to keep the loop cleaner
-        let mut epoch_loss = Tensor::zeros(&[], DType::F32, x_train.device())?; // Initialize epoch loss, used to print the loss
+        // Create shuffled batches for this epoch
+        let batches = create_shuffled_batches(x_train, y_train, batch_size)?;
 
-        for (f_batch, l_batch) in f_batches.iter().zip(l_batches.iter()) {
-            let output = model.forward(f_batch)?;
-            // let loss = candle_nn::loss::mse(&output.squeeze(1)?, l_batch)?;
-            // let loss = weighted_mse_loss(&output.squeeze(1)?, l_batch, class_weights)?;
-            let loss = binary_cross_entropy_with_logit(&output.squeeze(1)?, l_batch)?;
-            // let loss = weighted_bce_loss(&output.squeeze(1)?, l_batch, class_weights)?;
+        let mut epoch_total_loss = 0.0;
+        let mut batch_count = 0;
 
-            batch_loss.push(loss.to_scalar::<f32>()?);
+        for (f_batch, l_batch) in batches {
+            let output = model.forward(&f_batch)?;
+            let loss = binary_cross_entropy_with_logit(&output.squeeze(1)?, &l_batch)?;
+
+            let loss_val = loss.to_scalar::<f32>()?;
+            batch_loss.push(loss_val);
+            epoch_total_loss += loss_val;
 
             optimizer.backward_step(&loss)?;
-            epoch_loss = loss.clone();
+            batch_count += 1;
         }
+
+        let epoch_avg_loss = epoch_total_loss / batch_count as f32;
+
+        elog!("Epoch: {}, Loss: {:.6}", epoch, epoch_avg_loss);
 
 
         // Lock the model in evaluation mode
@@ -112,7 +116,7 @@ pub fn train_model(
 
 
         // if epoch % 10 == 0 {
-            elog!("Epoch: {}, Loss: {}", epoch, epoch_loss.to_scalar::<f32>()?);
+            elog!("Epoch: {}, Loss: {}", epoch, epoch_avg_loss);
         // }
 
     }
@@ -300,19 +304,37 @@ pub fn split_data(
 }
 
 
-/// Create batches of tensor data for training TODO: batch should be shuffled
-pub fn create_batches(data: &Tensor, batch_size: usize) -> Vec<Tensor> {
-    let mut batches = Vec::new();
-    let num_samples = data.shape().dims()[0];
-    let num_batches = (num_samples + batch_size - 1) / batch_size; // Round up for partial batch
+/// Create shuffled batches of tensor data for training
+pub fn create_shuffled_batches(
+    x_train: &Tensor,
+    y_train: &Tensor,
+    batch_size: usize
+) -> candle_core::Result<Vec<(Tensor, Tensor)>> {
+    let mut rng = thread_rng();
 
-    for i in 0..num_batches {
-        let start = i * batch_size;
-        let length = batch_size.min(num_samples - start); // Ensure we don't exceed remaining samples
-        let batch = data.narrow(0, start, length).unwrap(); // Slice with start and length
-        batches.push(batch);
+    // Create shuffled indices
+    let indices: Vec<usize> = (0..x_train.shape().dims()[0]).collect();
+    let mut shuffled_indices = indices.clone();
+    shuffled_indices.shuffle(&mut rng);
+
+    // Create batches from shuffled indices
+    let mut batches = Vec::new();
+
+    for chunk in shuffled_indices.chunks(batch_size) {
+        // Extract batch data using indices
+        let indices_tensor = Tensor::from_slice(
+            &chunk.iter().map(|&i| i as i64).collect::<Vec<_>>(),
+            (chunk.len(),),
+            x_train.device()
+        )?;
+
+        let f_batch = x_train.index_select(&indices_tensor, 0)?;
+        let l_batch = y_train.index_select(&indices_tensor, 0)?;
+
+        batches.push((f_batch, l_batch));
     }
-    batches
+
+    Ok(batches)
 }
 
 

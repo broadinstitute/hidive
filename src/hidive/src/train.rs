@@ -125,7 +125,7 @@ pub fn start(
     elog!("Preparing training and validation data tensors...");
     let (f_train, l_train) = prepare_tensors(&training_data, &DEVICE, true).unwrap();
     let (f_train_test, l_train_test) = prepare_tensors(&training_test_data, &DEVICE, true).unwrap();
-    let (f_validation, l_validation) = prepare_tensors(&*KmerData::undersample_classes(&validation_data), &DEVICE, true).unwrap();
+    let (f_validation, l_validation) = prepare_tensors(&validation_data, &DEVICE, true).unwrap();
 
 
 
