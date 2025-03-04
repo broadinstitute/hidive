@@ -441,7 +441,7 @@ task Plot {
 
         python3 /scripts/divide_fasta_into_kmers.py ~{cluster_fa} hidive_clusters_hprc_kmers.fa
         minimap2 -a -Y -x map-hifi -A 2 -B 4 /scripts/CYP2D6_and_7_T2T_w_grch38_rep_and_spacer.fa hidive_clusters_hprc_kmers.fa > kmer_align.sam
-        python3 /scripts/make_kmer_plot.py kmer_align.sam /scripts/cyp2d6_plot_opts.json cyp2d6_plot.~{prefix}.html
+        python3 /scripts/make_kmer_plot.py kmer_align.sam /scripts/cyp2d6_plot_opts.json 10 CYP2D cyp2d6_plot.~{prefix}.html
     >>>
 
     output {
