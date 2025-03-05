@@ -974,6 +974,8 @@ impl LdBG {
         let mut b = seq.windows(self.kmer_size).map(|kmer| kmer.to_vec()).collect::<Vec<_>>();
 
         for (read_path, replacement_path) in replacements {
+            crate::elog!("Replacing {:?} with {:?}", read_path, replacement_path);
+
             let start_pos = b.iter().position(|kmer| kmer == &read_path[0]).unwrap();
             let end_pos = b.iter().position(|kmer| kmer == &read_path[read_path.len()-1]).unwrap();
 
