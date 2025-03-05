@@ -286,6 +286,7 @@ task Correct {
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 2
     }
 }
 
