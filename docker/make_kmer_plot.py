@@ -73,6 +73,12 @@ def process_sam(sam_fname):
             gene = r.reference_name.split('_')[0]  # assume seq name starts w/ gene
             # Highest mapq = best-mapping gene
             alignments[sample][window_start].add((gene, int(r.mapq)))
+
+    if window_size is None:
+        window_size = 1
+
+    print(f'window {max_window} {window_size}')
+
     all_windows = range(0, max_window, window_size)
     return all_windows, alignments
 

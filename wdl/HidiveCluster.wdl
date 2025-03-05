@@ -71,6 +71,7 @@ workflow HidiveCluster {
 
     call Cluster as Cluster1 {
         input:
+            sample_name = sample_name,
             from_loci = from_bed,
             to_loci = to_bed,
             reference = reference,
@@ -81,6 +82,7 @@ workflow HidiveCluster {
 
     call Cluster as Cluster2 {
         input:
+            sample_name = sample_name,
             from_loci = from_bed,
             to_loci = to_bed,
             reference = reference,
@@ -335,6 +337,8 @@ task Cluster {
         File hap_bam
         File hap_bai
 
+        String sample_name
+
         File from_loci
         File to_loci
         String prefix
@@ -348,7 +352,7 @@ task Cluster {
     command <<<
         set -euxo pipefail
 
-        hidive cluster -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
+        hidive cluster -s "~{sample_name}" -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
 
     output {
@@ -409,7 +413,6 @@ task Align {
         set -euxo pipefail
 
         minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | \
-            awk -F'\t' '!($2 ~ /2048/) && ($6 !~ /^[0-9]+S.*[0-9]{250,}S$/) && ($6 !~ /^[0-9]{250,}S/) && ($6 !~ /[0-9]{250,}S$/)' | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
