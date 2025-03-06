@@ -265,6 +265,10 @@ enum Commands {
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
+        /// Sample name.
+        #[clap(short, long, required = true, value_parser)]
+        sample_name: String,
+
         /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
         #[clap(short, long, value_parser, required = true)]
         from_loci: Vec<String>,
@@ -562,12 +566,13 @@ fn main() {
         }
         Commands::Cluster {
             output,
+            sample_name,
             from_loci,
             to_loci,
             ref_path,
             bam_path,
         } => {
-            cluster::start(&output, &from_loci, &to_loci, &ref_path, &bam_path);
+            cluster::start(&output, &sample_name, &from_loci, &to_loci, &ref_path, &bam_path);
         }
         Commands::Trim {
             output,
@@ -676,7 +681,6 @@ fn elapsed_time(start_time: std::time::Instant) -> String {
     let elapsed_time = end_time.duration_since(start_time);
 
     let elapsed_secs = elapsed_time.as_secs_f64();
-
 
     if elapsed_secs < 60.0 {
         format!("{:.2} seconds", elapsed_secs)

@@ -14,7 +14,7 @@ use spoa::AlignmentType;
 
 pub fn start(
     output: &PathBuf,
-    // sample_name: &String,
+    sample_name: &String,
     from_loci_list: &Vec<String>,
     to_loci_list: &Vec<String>,
     reference_fasta_path: &PathBuf,
@@ -166,7 +166,7 @@ pub fn start(
 
             if *unique_label >= 0 {
                 let consensus_cstr = sg.consensus();
-                println!(">{}\n{}", unique_label, consensus_cstr.to_str().unwrap());
+                println!(">{}.{}\n{}", sample_name, unique_label, consensus_cstr.to_str().unwrap());
             }
         }
     }

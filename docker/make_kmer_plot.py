@@ -15,7 +15,7 @@ def main():
     ])
     kmer_windows, alignments = process_sam(args.sam)
     out_lines = get_out_lines(
-        alignments, kmer_windows, main_genes, colors, kmer_shape, sort_by
+        alignments, kmer_windows, main_genes, colors, kmer_shape, sort_by, args.min_kmers, args.color_key_prefix
     )
     output_plot(args.out, out_lines, main_genes, colors, kmer_shape)
 
@@ -35,6 +35,14 @@ def parse_args():
         'plot_options', type=Path, help='JSON containing plotting parameters. '
         'Keys are "main_genes", "colors", "kmer_shape", and "sort_by" (can be '
         '"colored_blocks" or "sample").'
+    )
+    p.add_argument(
+        'min_kmers', type=int, help='Minimum number of kmers to require '
+        'in order to plot a contig. Default is 10.'
+    )
+    p.add_argument(
+        'color_key_prefix', type=str, help='Prefix of kmer color key. '
+        'Default is "CYP2D".'
     )
     p.add_argument('out', type=Path, help='HTML plot output path.')
     if len(sys.argv) < 4:
@@ -65,24 +73,39 @@ def process_sam(sam_fname):
             gene = r.reference_name.split('_')[0]  # assume seq name starts w/ gene
             # Highest mapq = best-mapping gene
             alignments[sample][window_start].add((gene, int(r.mapq)))
+
+    if window_size is None:
+        window_size = 1
+
+    print(f'window {max_window} {window_size}')
+
     all_windows = range(0, max_window, window_size)
     return all_windows, alignments
 
 
 def get_out_lines(
     alignments, kmer_windows, main_genes, colors, kmer_shape='▉',
-    sort_by='colored_blocks'
+    sort_by='colored_blocks', min_kmers=10, color_key_prefix='CYP2D'
 ):
     '''Make list with output HTML string for each sample'''
     out_lines = []
     for sample in alignments:
+        num_good_kmers = 0
         out_str = ''
+
         for window in kmer_windows:
-            color = assign_kmer_color(
+            color, color_key = assign_kmer_color(
                 alignments, sample, window, main_genes, colors
             )
+
+            # Check if color_key starts with color key prefix
+            if color_key.startswith(color_key_prefix):
+                num_good_kmers += 1
+            
             out_str += f'<span style="color: {color};">{kmer_shape}</span>'
-        out_lines.append((sample, out_str))
+
+        if num_good_kmers >= min_kmers:
+            out_lines.append((sample, out_str))
     if sort_by == 'colored_blocks':
         # sort by most mapped blocks for main genes
         out_lines = sorted(out_lines, key=lambda x:sum([
@@ -120,7 +143,7 @@ def assign_kmer_color(alignments, sample, window, main_genes, colors):
                 color_key = best_mapping_genes[0]
     else:
         color_key = 'Past_end'
-    return colors[color_key]
+    return colors[color_key], color_key
 
 
 def output_plot(out_fname, out_lines, main_genes, colors, kmer_shape='▉'):

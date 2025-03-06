@@ -974,31 +974,33 @@ impl LdBG {
         let mut b = seq.windows(self.kmer_size).map(|kmer| kmer.to_vec()).collect::<Vec<_>>();
 
         for (read_path, replacement_path) in replacements {
-            let start_pos = b.iter().position(|kmer| kmer == &read_path[0]).unwrap();
-            let end_pos = b.iter().position(|kmer| kmer == &read_path[read_path.len()-1]).unwrap();
+            let start_pos = b.iter().position(|kmer| kmer == &read_path[0]);
+            let end_pos = b.iter().position(|kmer| kmer == &read_path[read_path.len()-1]);
 
-            let mut q1 = String::new();
-            for kmer in read_path.iter() {
-                if q1.is_empty() {
-                    q1.push_str(&String::from_utf8_lossy(kmer));
-                } else {
-                    q1.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+            if let (Some(start_pos), Some(end_pos)) = (start_pos, end_pos) {
+                let mut q1 = String::new();
+                for kmer in read_path.iter() {
+                    if q1.is_empty() {
+                        q1.push_str(&String::from_utf8_lossy(kmer));
+                    } else {
+                        q1.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                    }
                 }
-            }
 
-            let mut r1 = String::new();
-            for kmer in replacement_path.iter() {
-                if r1.is_empty() {
-                    r1.push_str(&String::from_utf8_lossy(kmer));
-                } else {
-                    r1.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                let mut r1 = String::new();
+                for kmer in replacement_path.iter() {
+                    if r1.is_empty() {
+                        r1.push_str(&String::from_utf8_lossy(kmer));
+                    } else {
+                        r1.push_str(&String::from_utf8_lossy(&kmer[self.kmer_size - 1..]));
+                    }
                 }
-            }
 
-            // crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
+                // crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
 
-            if start_pos <= end_pos {
-                b.splice(start_pos..=end_pos, replacement_path);
+                if start_pos <= end_pos {
+                    b.splice(start_pos..=end_pos, replacement_path);
+                }
             }
         }
 

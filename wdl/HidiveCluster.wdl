@@ -71,6 +71,7 @@ workflow HidiveCluster {
 
     call Cluster as Cluster1 {
         input:
+            sample_name = sample_name,
             from_loci = from_bed,
             to_loci = to_bed,
             reference = reference,
@@ -81,6 +82,7 @@ workflow HidiveCluster {
 
     call Cluster as Cluster2 {
         input:
+            sample_name = sample_name,
             from_loci = from_bed,
             to_loci = to_bed,
             reference = reference,
@@ -280,10 +282,11 @@ task Correct {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 2
     }
 }
 
@@ -322,7 +325,7 @@ task Phase {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -334,6 +337,8 @@ task Cluster {
         File reference
         File hap_bam
         File hap_bai
+
+        String sample_name
 
         File from_loci
         File to_loci
@@ -348,7 +353,7 @@ task Cluster {
     command <<<
         set -euxo pipefail
 
-        hidive cluster -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
+        hidive cluster -s "~{sample_name}" -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
     >>>
 
     output {
@@ -356,7 +361,7 @@ task Cluster {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -409,7 +414,6 @@ task Align {
         set -euxo pipefail
 
         minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | \
-            awk -F'\t' '!($2 ~ /2048/) && ($6 !~ /^[0-9]+S.*[0-9]{250,}S$/) && ($6 !~ /^[0-9]{250,}S/) && ($6 !~ /[0-9]{250,}S$/)' | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
@@ -441,7 +445,7 @@ task Plot {
 
         python3 /scripts/divide_fasta_into_kmers.py ~{cluster_fa} hidive_clusters_hprc_kmers.fa
         minimap2 -a -Y -x map-hifi -A 2 -B 4 /scripts/CYP2D6_and_7_T2T_w_grch38_rep_and_spacer.fa hidive_clusters_hprc_kmers.fa > kmer_align.sam
-        python3 /scripts/make_kmer_plot.py kmer_align.sam /scripts/cyp2d6_plot_opts.json cyp2d6_plot.~{prefix}.html
+        python3 /scripts/make_kmer_plot.py kmer_align.sam /scripts/cyp2d6_plot_opts.json 10 CYP2D cyp2d6_plot.~{prefix}.html
     >>>
 
     output {
@@ -449,7 +453,7 @@ task Plot {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"

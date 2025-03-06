@@ -1,0 +1,7 @@
+@HD	VN:1.6	SO:unsorted	GO:query
+@SQ	SN:CYP2D6_T2T_chr22_42605990_to_42610301	LN:4312
+@SQ	SN:CYP2D7_T2T_chr22_42619075_to_42623972	LN:4898
+@SQ	SN:REP6_GRCh38	LN:2870
+@SQ	SN:Spacer_GRCh38	LN:1610
+@SQ	SN:CYP2D8	LN:5152
+@PG	ID:minimap2	PN:minimap2	VN:2.28-r1209	CL:minimap2 -a -Y -x map-hifi -A 2 -B 4 CYP2D6_and_7_T2T_w_grch38_rep_and_spacer.fa hidive_clusters_hprc_kmers.fa
