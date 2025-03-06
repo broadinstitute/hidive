@@ -468,7 +468,7 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | \
+        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
@@ -523,7 +523,7 @@ task MergeAlignments {
 
     Int disk_size_gb = 1 + 2*ceil(size(bams, "GB"))
     Int num_cpus = 4
-    Int memory_gb = 16 
+    Int memory_gb = 8 
 
     command <<<
         set -euxo pipefail
