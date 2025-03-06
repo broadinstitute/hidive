@@ -156,6 +156,17 @@ workflow HidiveCluster {
                 fasta = FetchPat.fasta,
                 prefix = sample_name + ".pat"
         }
+
+        call MergeAlignments {
+            input:
+                bams = [
+                    AlignMatReads.cluster_bam,
+                    AlignPatReads.cluster_bam,
+                    AlignCluster1.cluster_bam,
+                    AlignCluster2.cluster_bam
+                ],
+                prefix = sample_name
+        }
     }
     
     output {
@@ -187,6 +198,9 @@ workflow HidiveCluster {
 
         File? cluster_pat_bam = AlignPatReads.cluster_bam
         File? cluster_pat_csi = AlignPatReads.cluster_csi
+
+        File? merged_bam = MergeAlignments.merged_bam
+        File? merged_csi = MergeAlignments.merged_csi
     }
 }
 
@@ -491,6 +505,35 @@ task Plot {
 
     output {
         File cluster_html = "cyp2d6_plot.~{prefix}.html"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task MergeAlignments {
+    input {
+        Array[File] bams
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size(bams, "GB"))
+    Int num_cpus = 4
+    Int memory_gb = 16 
+
+    command <<<
+        set -euxo pipefail
+
+        samtools merge --write-index -O BAM -o ~{prefix}.merged.bam ~{bams}
+    >>>
+
+    output {
+        File merged_bam = "~{prefix}.merged.bam"
+        File merged_csi = "~{prefix}.merged.bam.csi"
     }
 
     runtime {
