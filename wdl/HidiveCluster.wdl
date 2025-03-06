@@ -22,6 +22,9 @@ workflow HidiveCluster {
         File ref_cache_tar_gz
 
         Int padding = 500
+
+        File? mat_aln_bam
+        File? pat_aln_bam
     }
 
     if (defined(from_locus)) { call PrepareLocus as PrepareFromLocus { input: locus = select_first([from_locus]) } }
@@ -122,6 +125,38 @@ workflow HidiveCluster {
             cluster_fa = Cluster2.cluster_fa,
             prefix = sample_name + ".hap2"
     }
+
+    if (defined(mat_aln_bam) && defined(pat_aln_bam)) {
+        call Fetch as FetchMat {
+            input:
+                bam = select_first([mat_aln_bam]),
+                loci = from_bed,
+                padding = padding,
+                prefix = sample_name + ".mat"
+        }
+
+        call Align as AlignMatReads {
+            input:
+                reference = SubsetReference.ref_subset_fa,
+                fasta = FetchMat.fasta,
+                prefix = sample_name + ".mat"
+        }
+
+        call Fetch as FetchPat {
+            input:
+                bam = select_first([pat_aln_bam]),
+                loci = from_bed,
+                padding = padding,
+                prefix = sample_name + ".pat"
+        }
+
+        call Align as AlignPatReads {
+            input:
+                reference = SubsetReference.ref_subset_fa,
+                fasta = FetchPat.fasta,
+                prefix = sample_name + ".pat"
+        }
+    }
     
     output {
         File corrected_bam = Correct.corrected_bam
@@ -146,6 +181,12 @@ workflow HidiveCluster {
 
         File cluster1_html = PlotCluster1.cluster_html
         File cluster2_html = PlotCluster2.cluster_html
+
+        File? cluster_mat_bam = AlignMatReads.cluster_bam
+        File? cluster_mat_csi = AlignMatReads.cluster_csi
+
+        File? cluster_pat_bam = AlignPatReads.cluster_bam
+        File? cluster_pat_csi = AlignPatReads.cluster_csi
     }
 }
 
