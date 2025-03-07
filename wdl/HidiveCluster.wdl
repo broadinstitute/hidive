@@ -528,7 +528,7 @@ task MergeAlignments {
     command <<<
         set -euxo pipefail
 
-        samtools merge --write-index -O BAM -o ~{prefix}.merged.bam ~{bams}
+        samtools merge --write-index -O BAM -o ~{prefix}.merged.bam ~{sep=' ' bams}
     >>>
 
     output {
