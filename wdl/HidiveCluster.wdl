@@ -100,6 +100,23 @@ workflow HidiveCluster {
             to_loci = to_bed
     }
 
+    call BamToFasta as BamToFasta1 { input: bam = Phase.hap1_bam, prefix = sample_name + ".reads1" }
+    call BamToFasta as BamToFasta2 { input: bam = Phase.hap2_bam, prefix = sample_name + ".reads2" }
+
+    call Align as AlignReads1 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = BamToFasta1.fasta,
+            prefix = sample_name + ".reads1"
+    }
+
+    call Align as AlignReads2 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = BamToFasta2.fasta,
+            prefix = sample_name + ".reads2"
+    }
+
     call Align as AlignCluster1 {
         input:
             reference = SubsetReference.ref_subset_fa,
@@ -163,7 +180,9 @@ workflow HidiveCluster {
                     AlignMatReads.cluster_bam,
                     AlignPatReads.cluster_bam,
                     AlignCluster1.cluster_bam,
-                    AlignCluster2.cluster_bam
+                    AlignCluster2.cluster_bam,
+                    AlignReads1.cluster_bam,
+                    AlignReads2.cluster_bam
                 ],
                 prefix = sample_name
         }
@@ -443,6 +462,35 @@ task SubsetReference {
     output {
         File ref_subset_fa = "ref.subset.fa"
         File ref_subset_fai = "ref.subset.fa.fai"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task BamToFasta {
+    input {
+        File bam
+
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([bam], "GB"))
+    Int num_cpus = 1
+    Int memory_gb = 2
+
+    command <<<
+        set -euxo pipefail
+
+        samtools fasta ~{bam} > ~{prefix}.fa
+    >>>
+
+    output {
+        File fasta = "~{prefix}.fa"
     }
 
     runtime {
