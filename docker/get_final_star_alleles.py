@@ -237,7 +237,10 @@ def get_best_site_matches(sites):
             site.total == best_num_sites
         ):  # float equals
             best_site_matches.append(site)
-        elif site.star_allele == best_site_matches[0].star_allele:
+        elif (
+            site.star_allele.split('.')[0] in
+            [z.star_allele.split('.')[0] for z in best_site_matches]
+        ):
             continue
         elif second_best_percentage is None:
             second_best_percentage = match_frac(site)
