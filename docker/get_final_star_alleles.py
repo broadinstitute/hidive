@@ -65,13 +65,20 @@ def parse_args():
         help='Starting position of star allele sequences on the chromosome '
         '(42124499)'
     )
+    # exact same sequence as *n.001 or *n.002
+    star_alleles_w_dups = [
+        '*1', '*106', '*107', '*108', '*110', '*112', '*113', '*114',
+        '*115', '*116', '*120', '*122', '*124', '*137', '*140', '*167',
+        '*169', '*170', '*173', '*174', '*18', '*19', '*2', '*23', '*24',
+        '*25', '*26', '*27', '*3', '*33', '*34', '*38', '*39', '*4', '*43',
+        '*44', '*48', '*50', '*62', '*7', '*71', '*75', '*81', '*86', '*89',
+        '*9', '*91', '*92', '*93', '*96', '*97'
+    ]
     p.add_argument(
         '--ignore_alleles', nargs='+',
-        help='List of star alleles to ignore, e.g. duplicates '
-        '(*1, *3, *9, *27, *34, *106, *115)',
-        default=[
-            '*1', '*3', '*9', '*27', '*34', '*106', '*115'
-        ]
+        help=f"List of star alleles to ignore, e.g. duplicates "
+        f"({', '.join(star_alleles_w_dups)})",
+        default=star_alleles_w_dups
     )
     p.add_argument(
         '--exclude_haps', nargs='+',
