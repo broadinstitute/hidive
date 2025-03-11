@@ -21,6 +21,9 @@ workflow HidiveCluster {
         File ref_fai_with_alt
         File ref_cache_tar_gz
 
+        File cyp2d6_catalog
+        File cyp2d6_haplotypes
+
         Int padding = 500
 
         File? mat_aln_bam
@@ -141,6 +144,22 @@ workflow HidiveCluster {
         input:
             cluster_fa = Cluster2.cluster_fa,
             prefix = sample_name + ".hap2"
+    }
+
+    call Type as TypeCluster1 {
+        input:
+            cluster_fa = Cluster1.cluster_fa,
+            cyp2d6_catalog = cyp2d6_catalog,
+            cyp2d6_haplotypes = cyp2d6_haplotypes,
+            prefix = sample_name + ".hap1",
+    }
+
+    call Type as TypeCluster2 {
+        input:
+            cluster_fa = Cluster2.cluster_fa,
+            cyp2d6_catalog = cyp2d6_catalog,
+            cyp2d6_haplotypes = cyp2d6_haplotypes,
+            prefix = sample_name + ".hap2",
     }
 
     if (defined(mat_aln_bam) && defined(pat_aln_bam)) {
@@ -586,6 +605,43 @@ task MergeAlignments {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Type {
+    input {
+        File cluster_fa
+
+        File cyp2d6_catalog
+        File cyp2d6_haplotypes
+
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([cluster_fa, cyp2d6_catalog, cyp2d6_haplotypes], "GB"))
+    Int num_cpus = 4
+    Int memory_gb = 8 
+
+    command <<<
+        set -euxo pipefail
+
+        unzip ~{cyp2d6_catalog}
+        CATALOG_DIR=$(basename ~{cyp2d6_catalog} .zip)
+
+        minimap2 -x asm20 -a -Y -P --MD --eqx --sam-hit-only ~{cluster_fa} ~{cyp2d6_haplotypes} > star_alleles_aligned_haps.sam
+        python get_star_allele_site_matches.py star_alleles_aligned_haps.sam $CATALOG_DIR/GRCh38 site_matches.tsv
+        python get_final_star_alleles.py star_alleles_aligned_haps.sam site_matches.tsv $CATALOG_DIR/GRCh38 ~{prefix}.star_alleles.tsv
+    >>>
+
+    output {
+        File star_alleles = "~{prefix}.star_alleles.tsv"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
