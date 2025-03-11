@@ -22,6 +22,9 @@ workflow HidiveCluster {
         File ref_cache_tar_gz
 
         Int padding = 500
+
+        File? mat_aln_bam
+        File? pat_aln_bam
     }
 
     if (defined(from_locus)) { call PrepareLocus as PrepareFromLocus { input: locus = select_first([from_locus]) } }
@@ -97,6 +100,23 @@ workflow HidiveCluster {
             to_loci = to_bed
     }
 
+    call BamToFasta as BamToFasta1 { input: bam = Phase.hap1_bam, prefix = sample_name + ".reads1" }
+    call BamToFasta as BamToFasta2 { input: bam = Phase.hap2_bam, prefix = sample_name + ".reads2" }
+
+    call Align as AlignReads1 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = BamToFasta1.fasta,
+            prefix = sample_name + ".reads1"
+    }
+
+    call Align as AlignReads2 {
+        input:
+            reference = SubsetReference.ref_subset_fa,
+            fasta = BamToFasta2.fasta,
+            prefix = sample_name + ".reads2"
+    }
+
     call Align as AlignCluster1 {
         input:
             reference = SubsetReference.ref_subset_fa,
@@ -122,6 +142,51 @@ workflow HidiveCluster {
             cluster_fa = Cluster2.cluster_fa,
             prefix = sample_name + ".hap2"
     }
+
+    if (defined(mat_aln_bam) && defined(pat_aln_bam)) {
+        call Fetch as FetchMat {
+            input:
+                bam = select_first([mat_aln_bam]),
+                loci = from_bed,
+                padding = padding,
+                prefix = sample_name + ".mat"
+        }
+
+        call Align as AlignMatReads {
+            input:
+                reference = SubsetReference.ref_subset_fa,
+                fasta = FetchMat.fasta,
+                prefix = sample_name + ".mat"
+        }
+
+        call Fetch as FetchPat {
+            input:
+                bam = select_first([pat_aln_bam]),
+                loci = from_bed,
+                padding = padding,
+                prefix = sample_name + ".pat"
+        }
+
+        call Align as AlignPatReads {
+            input:
+                reference = SubsetReference.ref_subset_fa,
+                fasta = FetchPat.fasta,
+                prefix = sample_name + ".pat"
+        }
+
+        call MergeAlignments {
+            input:
+                bams = [
+                    AlignMatReads.cluster_bam,
+                    AlignPatReads.cluster_bam,
+                    AlignCluster1.cluster_bam,
+                    AlignCluster2.cluster_bam,
+                    AlignReads1.cluster_bam,
+                    AlignReads2.cluster_bam
+                ],
+                prefix = sample_name
+        }
+    }
     
     output {
         File corrected_bam = Correct.corrected_bam
@@ -146,6 +211,15 @@ workflow HidiveCluster {
 
         File cluster1_html = PlotCluster1.cluster_html
         File cluster2_html = PlotCluster2.cluster_html
+
+        File? cluster_mat_bam = AlignMatReads.cluster_bam
+        File? cluster_mat_csi = AlignMatReads.cluster_csi
+
+        File? cluster_pat_bam = AlignPatReads.cluster_bam
+        File? cluster_pat_csi = AlignPatReads.cluster_csi
+
+        File? merged_bam = MergeAlignments.merged_bam
+        File? merged_csi = MergeAlignments.merged_csi
     }
 }
 
@@ -398,6 +472,35 @@ task SubsetReference {
     }
 }
 
+task BamToFasta {
+    input {
+        File bam
+
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([bam], "GB"))
+    Int num_cpus = 1
+    Int memory_gb = 2
+
+    command <<<
+        set -euxo pipefail
+
+        samtools fasta ~{bam} > ~{prefix}.fa
+    >>>
+
+    output {
+        File fasta = "~{prefix}.fa"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
 task Align {
     input {
         File reference
@@ -413,7 +516,7 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x asm20 ~{reference} ~{fasta} | \
+        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
@@ -450,6 +553,35 @@ task Plot {
 
     output {
         File cluster_html = "cyp2d6_plot.~{prefix}.html"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task MergeAlignments {
+    input {
+        Array[File] bams
+        String prefix
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size(bams, "GB"))
+    Int num_cpus = 4
+    Int memory_gb = 8 
+
+    command <<<
+        set -euxo pipefail
+
+        samtools merge --write-index -O BAM -o ~{prefix}.merged.bam ~{sep=' ' bams}
+    >>>
+
+    output {
+        File merged_bam = "~{prefix}.merged.bam"
+        File merged_csi = "~{prefix}.merged.bam.csi"
     }
 
     runtime {
