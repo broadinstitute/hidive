@@ -1,8 +1,8 @@
 [package]
 name = "pydive"
-version = { workspace = true }
-edition = { workspace = true }
-resolver = { workspace = true }
+version = "0.1.107"
+edition = "2021"
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,6 +11,6 @@ name = "pydive"
 crate-type = ["cdylib"]
 
 [dependencies]
-chrono = { workspace = true }
+chrono = "0.4.38"
 skydive = { path = "../skydive" }
-pyo3 = { workspace = true }
+pyo3 = { version = "0.20.0", features = ["extension-module"] }
