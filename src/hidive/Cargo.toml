@@ -1,8 +1,8 @@
 [package]
 name = "hidive"
-version = "0.1.107"
-edition = "2021"
-resolver = "2"
+version = { workspace = true }
+edition = { workspace = true }
+resolver = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,7 +12,7 @@ resolver = "2"
 # base64 = "0.22.1"
 # abpoa-rs = "0.2.0"
 bio = "2.0.1"
-chrono = "0.4.38"
+chrono = { workspace = true }
 clap = { version = "4.5.1", features = ["derive"] }
 # env_logger = "*"
 # eyre = "0.6.8"
@@ -38,20 +38,20 @@ petgraph = "0.6.5"
 #poasta = { path = "/Users/kiran/repositories/poasta" }
 #polars = "*"
 rand = "0.8.5"
-rayon = "1.10.0"
+rayon = { workspace = true }
 #recgraph = { git = "https://github.com/AlgoLab/RecGraph" }
-regex = "1.10.5"
+regex = { workspace = true }
 #russcip = "0.3.4"
-rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
+rust-htslib = { workspace = true, features = ["gcs", "serde_feature"] }
 # rust-spoa = { git = "https://github.com/pjedge/rust-spoa" }
 # rust-wfa2 = {git = "https://github.com/pairwise-alignment/rust-wfa2.git"}
 sdust = "=0.1.0"
 serde = "1.0.204"
-serde_json = "1.0.120"
-spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}
+serde_json = { workspace = true }
+spoa = { git = "https://github.com/nlhepler/spoa-rs.git" }
 skydive = { path = "../skydive" }
 tempfile = "3.6.1"
-url = "2.5.2"
+url = { workspace = true }
 plotters = "0.3.7"
 #xgboost = "0.1.4"
 # cmake = "0.1"
