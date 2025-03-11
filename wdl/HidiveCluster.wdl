@@ -231,6 +231,9 @@ workflow HidiveCluster {
         File cluster1_html = PlotCluster1.cluster_html
         File cluster2_html = PlotCluster2.cluster_html
 
+        File cluster1_star_alleles = TypeCluster1.star_alleles
+        File cluster2_star_alleles = TypeCluster2.star_alleles
+
         File? cluster_mat_bam = AlignMatReads.cluster_bam
         File? cluster_mat_csi = AlignMatReads.cluster_csi
 
