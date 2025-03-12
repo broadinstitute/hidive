@@ -27,6 +27,7 @@ petgraph = "0.6.5"
 rand = "0.8.5"
 rayon = "1.10.0"
 regex = "1.10.5"
+reqwest = { workspace = true }
 rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
 sdust = "=0.1.0"
 serde = "1.0.204"
