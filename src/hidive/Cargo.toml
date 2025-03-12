@@ -19,7 +19,7 @@ itertools = "0.13.0"
 linked-hash-map = "0.5.6"
 minimap2 = "0.1.21"
 needletail = "0.5.1"
-ndarray = "0.16.1"
+ndarray = { version = "0.16.1", features = ["rayon"] }
 ndarray-stats = "0.6.0"
 num-format = "0.4.4"
 path-absolutize = "3.1.1"
@@ -31,7 +31,7 @@ rust-htslib = { version = "0.47.0", features = ["gcs", "serde_feature"] }
 sdust = "=0.1.0"
 serde = "1.0.204"
 serde_json = "1.0.120"
-spoa = {git = "https://github.com/nlhepler/spoa-rs.git"}
+spoa = { git = "https://github.com/nlhepler/spoa-rs.git", rev = "d546870f172e8dace40cbcc41a7fe32a97afe138" }
 skydive = { path = "../skydive" }
 tempfile = "3.6.1"
 url = "2.5.2"
