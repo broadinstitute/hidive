@@ -635,8 +635,8 @@ task Type {
         CATALOG_DIR=$(basename ~{cyp2d6_catalog} .zip)
 
         minimap2 -x asm20 -a -Y -P --MD --eqx --sam-hit-only ~{cluster_fa} ~{cyp2d6_haplotypes} > star_alleles_aligned_haps.sam
-        python get_star_allele_site_matches.py star_alleles_aligned_haps.sam $CATALOG_DIR/GRCh38 site_matches.tsv
-        python get_final_star_alleles.py star_alleles_aligned_haps.sam site_matches.tsv $CATALOG_DIR/GRCh38 ~{prefix}.star_alleles.tsv
+        python /scripts/get_star_allele_site_matches.py star_alleles_aligned_haps.sam $CATALOG_DIR/GRCh38 site_matches.tsv
+        python /scripts/get_final_star_alleles.py star_alleles_aligned_haps.sam site_matches.tsv $CATALOG_DIR/GRCh38 ~{prefix}.star_alleles.tsv
     >>>
 
     output {

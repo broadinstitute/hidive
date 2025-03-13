@@ -65,6 +65,8 @@ pub fn start(
 
         let (h1_reads, h2_reads, h1, h2) = phase_variants(&matrix);
 
+
+
         for read in h1_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
             bam1_writer.write(read).unwrap();
         }
