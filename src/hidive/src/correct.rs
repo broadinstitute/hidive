@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::{fs::File, path::PathBuf, io::Write};
 
 use indicatif::{ProgressIterator, ParallelProgressIterator};
+use linked_hash_set::LinkedHashSet;
 use rayon::prelude::*;
 // use rayon::iter::IntoParallelRefIterator;
 // use rayon::iter::ParallelIterator;
@@ -59,7 +60,8 @@ pub fn start(
                 .filter_map(|window_start| {
                     let window_end = window_start + window as u64;
 
-                    let locus = HashSet::from([(chrom.clone(), window_start, window_end, name.clone())]);
+                    let mut locus = LinkedHashSet::new();
+                    locus.insert((chrom.clone(), window_start, window_end, name.clone()));
 
                     let r = skydive::stage::stage_data_in_memory(&locus, &long_read_seq_urls, false, &cache_path);
 
