@@ -185,7 +185,7 @@ workflow HidiveCluster {
                 bam = AlignMatReads.cluster_bam,
                 locus = "'chr22:42121531-42135680:1-14150'",
                 # loci = PrepareSubsetLocus.bed,
-                padding = padding,
+                padding = 0,
                 prefix = sample_name + ".subset.mat"
         }
 
@@ -217,7 +217,7 @@ workflow HidiveCluster {
                 bam = AlignPatReads.cluster_bam,
                 locus = "'chr22:42121531-42135680:1-14150'",
                 # loci = PrepareSubsetLocus.bed,
-                padding = padding,
+                padding = 0,
                 prefix = sample_name + ".subset.pat"
         }
 
