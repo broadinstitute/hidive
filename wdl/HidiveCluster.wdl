@@ -183,7 +183,7 @@ workflow HidiveCluster {
         call Fetch as FetchMatSubset {
             input:
                 bam = AlignMatReads.cluster_bam,
-                locus = "chr22:42121531-42135680:1-14150",
+                locus = "'chr22:42121531-42135680:1-14150'",
                 # loci = PrepareSubsetLocus.bed,
                 padding = padding,
                 prefix = sample_name + ".subset.mat"
@@ -215,7 +215,7 @@ workflow HidiveCluster {
         call Fetch as FetchPatSubset {
             input:
                 bam = AlignPatReads.cluster_bam,
-                locus = "chr22:42121531-42135680:1-14150",
+                locus = "'chr22:42121531-42135680:1-14150'",
                 # loci = PrepareSubsetLocus.bed,
                 padding = padding,
                 prefix = sample_name + ".subset.pat"
