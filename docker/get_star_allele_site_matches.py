@@ -18,16 +18,19 @@ def main():
     matched_sites = defaultdict(lambda: defaultdict(set))
 
     sam = args.sam
-    align_f = pysam.AlignmentFile(sam, 'rb') if (
-        sam.suffix == '.bam'
-    ) else pysam.AlignmentFile(sam, check_sq=False)
-    for i, r in enumerate(align_f):
-        if i % 10000 == 0:
-            print(i)
-        process_alignment(
-            r, sites_per_star_allele, matched_sites, args.exclude_haps,
-            args.indel_buffer
-        )
+
+    # Check if SAM file is empty
+    if os.path.getsize(sam) != 0:
+        align_f = pysam.AlignmentFile(sam, 'rb') if (
+            sam.suffix == '.bam'
+        ) else pysam.AlignmentFile(sam, check_sq=False)
+        for i, r in enumerate(align_f):
+            if i % 10000 == 0:
+                print(i)
+            process_alignment(
+                r, sites_per_star_allele, matched_sites, args.exclude_haps,
+                args.indel_buffer
+            )
 
     write_output(matched_sites, args.out)
 
