@@ -63,16 +63,16 @@ pub fn start(
 
         skydive::elog!(" - phasing {} variants...", mloci.len());
 
-        let (h1_reads, h2_reads, h1, h2) = phase_variants(&matrix);
+        if mloci.len() > 0 {
+            let (h1_reads, h2_reads, h1, h2) = phase_variants(&matrix);
 
+            for read in h1_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+                bam1_writer.write(read).unwrap();
+            }
 
-
-        for read in h1_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
-            bam1_writer.write(read).unwrap();
-        }
-
-        for read in h2_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
-            bam2_writer.write(read).unwrap();
+            for read in h2_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+                bam2_writer.write(read).unwrap();
+            }
         }
 
         // let h1_filtered = filter_variants(&mloci, &chr, &h1, &fasta);
