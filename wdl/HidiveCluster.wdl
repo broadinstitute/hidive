@@ -462,7 +462,7 @@ task Phase {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_dep_fix"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
