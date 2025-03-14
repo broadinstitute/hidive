@@ -258,6 +258,10 @@ mod tests {
         // Contig name with dash in it
         let result = parse_locus("chr10-A:130000-140000|chr10-A", 0);
         assert_eq!(result.ok(), Some(("chr10-A".to_string(), 130000 as u64, 140000 as u64, "chr10-A".to_string())));
+
+        // Locus with multiple colons and dashes
+        let result = parse_locus("chr22:42121531-42135680:1-14150", 0);
+        assert_eq!(result.ok(), Some(("chr22:42121531-42135680".to_string(), 1 as u64, 14150 as u64, "chr22:42121531-42135680:1-14150".to_string())));
     }
 }
 

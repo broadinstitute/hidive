@@ -335,7 +335,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.107"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
