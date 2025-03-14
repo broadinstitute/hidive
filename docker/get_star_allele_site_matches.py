@@ -19,8 +19,16 @@ def main():
 
     sam = args.sam
 
+    # Count non-header lines in SAM file
+    num_alignments = 0
+    with open(sam) as f:
+        for line in f:
+            if not line.startswith('@'):
+                num_alignments += 1
+    print(f"Found {num_alignments} alignments")
+
     # Check if SAM file is empty
-    if os.path.getsize(sam) != 0:
+    if num_alignments > 0:
         align_f = pysam.AlignmentFile(sam, 'rb') if (
             sam.suffix == '.bam'
         ) else pysam.AlignmentFile(sam, check_sq=False)
