@@ -178,12 +178,13 @@ workflow HidiveCluster {
                 prefix = sample_name + ".mat"
         }
 
-        call PrepareLocus as PrepareSubsetLocus { input: locus = "chr22:42121531-42135680:1-14150" }
+        # call PrepareLocus as PrepareSubsetLocus { input: locus = "chr22:42121531-42135680:1-14150" }
 
         call Fetch as FetchMatSubset {
             input:
                 bam = AlignMatReads.cluster_bam,
-                loci = PrepareSubsetLocus.bed,
+                locus = "chr22:42121531-42135680:1-14150",
+                # loci = PrepareSubsetLocus.bed,
                 padding = padding,
                 prefix = sample_name + ".subset.mat"
         }
@@ -214,7 +215,8 @@ workflow HidiveCluster {
         call Fetch as FetchPatSubset {
             input:
                 bam = AlignPatReads.cluster_bam,
-                loci = PrepareSubsetLocus.bed,
+                locus = "chr22:42121531-42135680:1-14150",
+                # loci = PrepareSubsetLocus.bed,
                 padding = padding,
                 prefix = sample_name + ".subset.pat"
         }
@@ -312,7 +314,8 @@ task PrepareLocus {
 task Fetch {
     input {
         String bam
-        File loci
+        String? locus
+        File? loci
         Int padding
 
         String prefix = "out"
@@ -324,7 +327,7 @@ task Fetch {
     command <<<
         set -euxo pipefail
 
-        hidive fetch -l ~{loci} -p ~{padding} ~{bam} > ~{prefix}.fa
+        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fa
     >>>
 
     output {
