@@ -179,7 +179,7 @@ pub fn extract_aligned_bam_reads(
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
             // for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
-            for alignment in pileup.alignments() {
+            for (i, alignment) in pileup.alignments().enumerate() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
@@ -188,7 +188,7 @@ pub fn extract_aligned_bam_reads(
 
                 let is_secondary = alignment.record().is_secondary();
                 let is_supplementary = alignment.record().is_supplementary();
-                let seq_name = format!("{qname}|{name}|{sm}|{is_secondary}|{is_supplementary}");
+                let seq_name = format!("{qname}|{name}|{sm}|{i}|{is_secondary}|{is_supplementary}");
 
                 // crate::elog!("{}", seq_name);
 
