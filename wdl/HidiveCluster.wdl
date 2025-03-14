@@ -178,6 +178,22 @@ workflow HidiveCluster {
                 prefix = sample_name + ".mat"
         }
 
+        call Fetch as FetchMatSubset {
+            input:
+                bam = AlignMatReads.cluster_bam,
+                loci = to_bed,
+                padding = padding,
+                prefix = sample_name + ".subset.mat"
+        }
+
+        call Type as TypeClusterMat {
+            input:
+                cluster_fa = FetchMatSubset.fasta,
+                cyp2d6_catalog = cyp2d6_catalog,
+                cyp2d6_haplotypes = cyp2d6_haplotypes,
+                prefix = sample_name + ".subset.mat",
+        }
+
         call Fetch as FetchPat {
             input:
                 bam = select_first([pat_aln_bam]),
@@ -191,6 +207,22 @@ workflow HidiveCluster {
                 reference = SubsetReference.ref_subset_fa,
                 fasta = FetchPat.fasta,
                 prefix = sample_name + ".pat"
+        }
+
+        call Fetch as FetchPatSubset {
+            input:
+                bam = AlignPatReads.cluster_bam,
+                loci = to_bed,
+                padding = padding,
+                prefix = sample_name + ".subset.pat"
+        }
+
+        call Type as TypeClusterPat {
+            input:
+                cluster_fa = FetchPatSubset.fasta,
+                cyp2d6_catalog = cyp2d6_catalog,
+                cyp2d6_haplotypes = cyp2d6_haplotypes,
+                prefix = sample_name + ".subset.pat",
         }
 
         call MergeAlignments {
@@ -233,6 +265,9 @@ workflow HidiveCluster {
 
         File cluster1_star_alleles = TypeCluster1.star_alleles
         File cluster2_star_alleles = TypeCluster2.star_alleles
+
+        File? cluster_mat_star_alleles = TypeClusterMat.star_alleles
+        File? cluster_pat_star_alleles = TypeClusterPat.star_alleles
 
         File? cluster_mat_bam = AlignMatReads.cluster_bam
         File? cluster_mat_csi = AlignMatReads.cluster_csi
