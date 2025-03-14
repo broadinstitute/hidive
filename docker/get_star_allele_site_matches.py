@@ -40,7 +40,10 @@ def main():
                 args.indel_buffer
             )
 
-    write_output(matched_sites, args.out)
+        write_output(matched_sites, args.out)
+    else:
+        with open(args.out, 'w') as out_f:
+            out_f.write('Sample_hap\tStar_allele\tMatched_sites\n')
 
 
 def parse_args():
