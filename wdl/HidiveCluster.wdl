@@ -292,8 +292,9 @@ task PrepareLocus {
 
         echo "~{locus}" | \
             sed 's/,//g' | \
-            sed 's/[:\|]/\t/g' | \
-            sed 's/-/\t/' > locus.bed
+            sed 's/\|/\t/g' | \
+            sed 's/\(.*\):/\1\t/' | \
+            sed 's/\(.*\)-\(.*\)/\1\t\2/' > locus.bed
     >>>
 
     output {
