@@ -20,7 +20,7 @@ def main():
     sam = args.sam
     align_f = pysam.AlignmentFile(sam, 'rb') if (
         sam.suffix == '.bam'
-    ) else pysam.AlignmentFile(sam)
+    ) else pysam.AlignmentFile(sam, check_sq=False)
     for i, r in enumerate(align_f):
         if i % 10000 == 0:
             print(i)
