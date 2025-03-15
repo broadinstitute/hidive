@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::PathBuf;
 
+use bio::io::fasta;
 use itertools::Itertools;
 
 use minimap2::Aligner;
@@ -36,6 +39,10 @@ pub fn start(
     // Iterate over loc
     let from_loci = skydive::parse::parse_loci(from_loci_list, 0).into_iter().collect::<Vec<_>>();
     let to_loci = skydive::parse::parse_loci(to_loci_list, 0).into_iter().collect::<Vec<_>>();
+
+    // Open FASTA file for writing.
+    let mut buf_writer = BufWriter::new(File::create(output).unwrap());
+    let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
 
     for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
         skydive::elog!("Found locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
@@ -144,6 +151,7 @@ pub fn start(
         // Configure HDBSCAN parameters
         let params = HdbscanHyperParams::builder()
             .min_cluster_size(2)
+            .allow_single_cluster(true)
             .dist_metric(DistanceMetric::Euclidean)
             .build();
 
@@ -171,7 +179,10 @@ pub fn start(
 
                 if *unique_label >= 0 {
                     let consensus_cstr = sg.consensus();
-                    println!(">{}.{}\n{}", sample_name, unique_label, consensus_cstr.to_str().unwrap());
+                    let name = format!("{}.{}.{}", from_name, sample_name, unique_label);
+
+                    let record = fasta::Record::with_attrs(name.as_str(), None, consensus_cstr.to_str().unwrap().as_bytes());
+                    fasta_writer.write_record(&record).unwrap();
                 }
             }
         }
