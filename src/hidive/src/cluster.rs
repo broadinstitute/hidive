@@ -69,7 +69,7 @@ pub fn start(
                 .unwrap();
 
             for mapping in mappings {
-                skydive::elog!("{:?}", mapping);
+                // skydive::elog!("{:?}", mapping);
 
                 let mut variants = BTreeMap::new();
                 let mut ref_pos = mapping.target_start as i64 + 1;
@@ -149,28 +149,30 @@ pub fn start(
 
         // Create and run clusterer
         let clusterer = Hdbscan::new(&data, params);
-        let labels = clusterer.cluster().unwrap();
+        let cluster = clusterer.cluster();
 
-        let unique_labels = labels.iter().unique().collect::<Vec<_>>();
+        if let Ok(labels) = cluster {
+            let unique_labels = labels.iter().unique().collect::<Vec<_>>();
 
-        for unique_label in unique_labels {
-            let mut sg = spoa::Graph::new();
-            let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
+            for unique_label in unique_labels {
+                let mut sg = spoa::Graph::new();
+                let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
 
-            for (label, read) in labels.iter().zip(reads.iter()) {
-                if label == unique_label {
-                    let subseq = read.clone();
+                for (label, read) in labels.iter().zip(reads.iter()) {
+                    if label == unique_label {
+                        let subseq = read.clone();
 
-                    let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
-                    let seq_qual = std::ffi::CString::new(vec![b'I'; subseq.len()]).unwrap();
-                    let a = la.align(seq_cstr.as_ref(), &sg);
-                    sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                        let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
+                        let seq_qual = std::ffi::CString::new(vec![b'I'; subseq.len()]).unwrap();
+                        let a = la.align(seq_cstr.as_ref(), &sg);
+                        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                    }
                 }
-            }
 
-            if *unique_label >= 0 {
-                let consensus_cstr = sg.consensus();
-                println!(">{}.{}\n{}", sample_name, unique_label, consensus_cstr.to_str().unwrap());
+                if *unique_label >= 0 {
+                    let consensus_cstr = sg.consensus();
+                    println!(">{}.{}\n{}", sample_name, unique_label, consensus_cstr.to_str().unwrap());
+                }
             }
         }
     }
