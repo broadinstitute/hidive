@@ -14,6 +14,8 @@ workflow HidiveTrain {
         File ref_fai_with_alt
         File ref_cache_tar_gz
 
+        Int kmer_size
+
         String train_locus = "chr19:53,000,000-57,000,000" # KIR
         String test_locus  = "chr6:29,000,000-30,000,000"  # HLA-A
     }
@@ -50,28 +52,21 @@ workflow HidiveTrain {
             ref_cache_tar_gz = ref_cache_tar_gz,
     }
 
-    scatter (kmer_size in [17, 37, 57, 77, 97, 117]) {
-        call Train {
-            input:
-                long_read_train_fa = FetchSampleTrain.fasta,
-                long_read_test_fa = FetchSampleTest.fasta,
-                short_read_train_fa = RescueSampleTrain.fasta,
-                short_read_test_fa = RescueSampleTest.fasta,
-                mat_train_fa = FetchMatTrain.fasta,
-                mat_test_fa = FetchMatTest.fasta,
-                pat_train_fa = FetchPatTrain.fasta,
-                pat_test_fa = FetchPatTest.fasta,
-                kmer_size = kmer_size
-        }
+    call Train {
+        input:
+            long_read_train_fa = FetchSampleTrain.fasta,
+            long_read_test_fa = FetchSampleTest.fasta,
+            short_read_train_fa = RescueSampleTrain.fasta,
+            short_read_test_fa = RescueSampleTest.fasta,
+            mat_train_fa = FetchMatTrain.fasta,
+            mat_test_fa = FetchMatTest.fasta,
+            pat_train_fa = FetchPatTrain.fasta,
+            pat_test_fa = FetchPatTest.fasta,
+            kmer_size = kmer_size
     }
 
     output {
-        File model_k17  = Train.model[0]
-        File model_k37  = Train.model[1]
-        File model_k57  = Train.model[2]
-        File model_k77  = Train.model[3]
-        File model_k97  = Train.model[4]
-        File model_k117 = Train.model[5]
+        File model = Train.model
     }
 }
 
