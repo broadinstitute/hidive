@@ -103,66 +103,13 @@ workflow HidiveRepeats {
             short_read_fasta = Rescue.fasta,
             prefix = sample_name + ".hap2"
     }
-
-    if (defined(mat_aln_bam) && defined(pat_aln_bam)) {
-        call Fetch as FetchMat {
-            input:
-                bam = select_first([mat_aln_bam]),
-                loci = bed,
-                padding = padding,
-                prefix = sample_name + ".mat"
-        }
-
-        call Align as AlignMatReads {
-            input:
-                reference = reference,
-                fasta = FetchMat.fasta,
-                prefix = sample_name + ".mat"
-        }
-
-        call Fetch as FetchPat {
-            input:
-                bam = select_first([pat_aln_bam]),
-                loci = bed,
-                padding = padding,
-                prefix = sample_name + ".pat"
-        }
-
-        call Align as AlignPatReads {
-            input:
-                reference = reference,
-                fasta = FetchPat.fasta,
-                prefix = sample_name + ".pat"
-        }
-    }
     
     output {
-        # File corrected_bam = Correct.corrected_bam
-        # File corrected_csi = Correct.corrected_csi
-
-        # File hap1_bam = Phase.hap1_bam
-        # File hap1_bai = Phase.hap1_bai
-
-        # File hap2_bam = Phase.hap2_bam
-        # File hap2_bai = Phase.hap2_bai
-
-        # File hap1_consensus_bam = Consensus1.consensus_bam
-        # File hap1_consensus_bai = Consensus1.consensus_bai
-
-        # File hap2_consensus_bam = Consensus2.consensus_bam
-        # File hap2_consensus_bai = Consensus2.consensus_bai
-
         File repeats_hap1_bam = Correct1.corrected_bam
         File repeats_hap1_csi = Correct1.corrected_csi
 
         File repeats_hap2_bam = Correct2.corrected_bam
         File repeats_hap2_csi = Correct2.corrected_csi
-
-        File? repeats_mat_bam = AlignMatReads.cluster_bam
-        File? repeats_mat_csi = AlignMatReads.cluster_csi
-
-        File? repeats_pat_bam = AlignPatReads.cluster_bam
-        File? repeats_pat_csi = AlignPatReads.cluster_csi
     }
 }
 
