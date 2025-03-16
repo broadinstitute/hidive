@@ -137,32 +137,32 @@ workflow HidiveRepeats {
     }
     
     output {
-        File corrected_bam = Correct.corrected_bam
-        File corrected_csi = Correct.corrected_csi
+        # File corrected_bam = Correct.corrected_bam
+        # File corrected_csi = Correct.corrected_csi
 
-        File hap1_bam = Phase.hap1_bam
-        File hap1_bai = Phase.hap1_bai
+        # File hap1_bam = Phase.hap1_bam
+        # File hap1_bai = Phase.hap1_bai
 
-        File hap2_bam = Phase.hap2_bam
-        File hap2_bai = Phase.hap2_bai
+        # File hap2_bam = Phase.hap2_bam
+        # File hap2_bai = Phase.hap2_bai
 
-        File hap1_consensus_bam = Consensus1.consensus_bam
-        File hap1_consensus_bai = Consensus1.consensus_bai
+        # File hap1_consensus_bam = Consensus1.consensus_bam
+        # File hap1_consensus_bai = Consensus1.consensus_bai
 
-        File hap2_consensus_bam = Consensus2.consensus_bam
-        File hap2_consensus_bai = Consensus2.consensus_bai
+        # File hap2_consensus_bam = Consensus2.consensus_bam
+        # File hap2_consensus_bai = Consensus2.consensus_bai
 
-        File hap1_corrected_bam = Correct1.corrected_bam
-        File hap1_corrected_csi = Correct1.corrected_csi
+        File repeats_hap1_bam = Correct1.corrected_bam
+        File repeats_hap1_csi = Correct1.corrected_csi
 
-        File hap2_corrected_bam = Correct2.corrected_bam
-        File hap2_corrected_csi = Correct2.corrected_csi
+        File repeats_hap2_bam = Correct2.corrected_bam
+        File repeats_hap2_csi = Correct2.corrected_csi
 
-        File? mat_bam = AlignMatReads.cluster_bam
-        File? mat_csi = AlignMatReads.cluster_csi
+        File? repeats_mat_bam = AlignMatReads.cluster_bam
+        File? repeats_mat_csi = AlignMatReads.cluster_csi
 
-        File? pat_bam = AlignPatReads.cluster_bam
-        File? pat_csi = AlignPatReads.cluster_csi
+        File? repeats_pat_bam = AlignPatReads.cluster_bam
+        File? repeats_pat_csi = AlignPatReads.cluster_csi
     }
 }
 

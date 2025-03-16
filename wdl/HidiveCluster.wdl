@@ -244,23 +244,23 @@ workflow HidiveCluster {
     }
     
     output {
-        File corrected_bam = Correct.corrected_bam
-        File corrected_csi = Correct.corrected_csi
+        # File corrected_bam = Correct.corrected_bam
+        # File corrected_csi = Correct.corrected_csi
 
-        File hap1_bam = Phase.hap1_bam
-        File hap1_bai = Phase.hap1_bai
+        # File hap1_bam = Phase.hap1_bam
+        # File hap1_bai = Phase.hap1_bai
 
-        File hap2_bam = Phase.hap2_bam
-        File hap2_bai = Phase.hap2_bai
+        # File hap2_bam = Phase.hap2_bam
+        # File hap2_bai = Phase.hap2_bai
 
-        File ref_subset_fa = SubsetReference.ref_subset_fa
-        File ref_subset_fai = SubsetReference.ref_subset_fai
+        # File ref_subset_fa = SubsetReference.ref_subset_fa
+        # File ref_subset_fai = SubsetReference.ref_subset_fai
 
-        File cluster1_fa = Cluster1.cluster_fa
+        # File cluster1_fa = Cluster1.cluster_fa
         File cluster1_bam = AlignCluster1.cluster_bam
         File cluster1_csi = AlignCluster1.cluster_csi
 
-        File cluster2_fa = Cluster2.cluster_fa
+        # File cluster2_fa = Cluster2.cluster_fa
         File cluster2_bam = AlignCluster2.cluster_bam
         File cluster2_csi = AlignCluster2.cluster_csi
 
