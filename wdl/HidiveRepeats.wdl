@@ -72,7 +72,7 @@ workflow HidiveRepeats {
             reference = reference,
             aligned_reads_bam = Phase.hap1_bam,
             aligned_reads_csi = Phase.hap1_bai,
-            prefix = sample_name
+            prefix = sample_name + ".hap1"
     }
 
     call Correct as Correct1 {
@@ -82,7 +82,7 @@ workflow HidiveRepeats {
             reference = reference,
             long_reads_bam = Consensus1.consensus_bam,
             short_read_fasta = Rescue.fasta,
-            prefix = sample_name
+            prefix = sample_name + ".hap1"
     }
 
     call Consensus as Consensus2 {
@@ -91,7 +91,7 @@ workflow HidiveRepeats {
             reference = reference,
             aligned_reads_bam = Phase.hap2_bam,
             aligned_reads_csi = Phase.hap2_bai,
-            prefix = sample_name + ".hap1"
+            prefix = sample_name + ".hap2"
     }
 
     call Correct as Correct2 {
@@ -325,7 +325,7 @@ task Consensus {
 
     output {
         File consensus_bam = "~{prefix}.consensus.bam"
-        File consensus_bai = "~{prefix}.consensus.bam.bai"
+        File consensus_csi = "~{prefix}.consensus.bam.csi"
     }
 
     runtime {
