@@ -10,7 +10,12 @@ workflow HidiveRepeats {
         String? locus
         File? loci
 
-        File model
+        Int low_k
+        File low_k_model
+
+        Int high_k
+        File high_k_model
+
         String sample_name
 
         File reference
@@ -49,7 +54,7 @@ workflow HidiveRepeats {
     call Correct {
         input:
             loci = bed,
-            model = model,
+            model = low_k_model,
             reference = reference,
             long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
@@ -78,7 +83,8 @@ workflow HidiveRepeats {
     call Correct as Correct1 {
         input:
             loci = bed,
-            model = model,
+            k = low_k,
+            model = low_k_model,
             reference = reference,
             long_reads_bam = Consensus1.consensus_bam,
             short_read_fasta = Rescue.fasta,
@@ -97,7 +103,8 @@ workflow HidiveRepeats {
     call Correct as Correct2 {
         input:
             loci = bed,
-            model = model,
+            k = high_k,
+            model = high_k_model,
             reference = reference,
             long_reads_bam = Consensus2.consensus_bam,
             short_read_fasta = Rescue.fasta,
@@ -223,6 +230,7 @@ task Correct {
         String long_reads_bam
 
         File loci
+        Int k
         File model
         File reference
 
@@ -237,7 +245,7 @@ task Correct {
     command <<<
         set -euxo pipefail
 
-        hidive correct -l ~{loci} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
+        hidive correct -l ~{loci} -k ~{k} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
