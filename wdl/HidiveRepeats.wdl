@@ -318,7 +318,7 @@ task Consensus {
     command <<<
         set -euxo pipefail
 
-        hidive consensus -l ~{loci} ~{aligned_reads_bam} | \
+        hidive consensus -l ~{loci} -r ~{reference} ~{aligned_reads_bam} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
