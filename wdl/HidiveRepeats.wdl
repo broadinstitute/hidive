@@ -316,12 +316,14 @@ task Consensus {
     Int memory_gb = 2*num_cpus
 
     command <<<
-        set -euxo pipefail
+        set -x
 
         hidive consensus -l ~{loci} -r ~{reference} -o ~{prefix}.fa ~{aligned_reads_bam}
 
         minimap2 -ayYL -x map-hifi ~{reference} ~{prefix}.fa | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
+
+        ls -lah *
     >>>
 
     output {
