@@ -54,6 +54,7 @@ workflow HidiveRepeats {
     call Correct {
         input:
             loci = bed,
+            k = low_k,
             model = low_k_model,
             reference = reference,
             long_reads_bam = long_reads_bam,
