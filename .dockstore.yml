@@ -12,6 +12,9 @@ workflows:
 - name: HidiveRepeats
   subclass: wdl
   primaryDescriptorPath: /wdl/HidiveRepeats.wdl
+- name: HidiveTrain
+  subclass: wdl
+  primaryDescriptorPath: /wdl/HidiveTrain.wdl
 - name: AlignPacbioBam
   subclass: wdl
   primaryDescriptorPath: /wdl/AlignPacbioBam.wdl
