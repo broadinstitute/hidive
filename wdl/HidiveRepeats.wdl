@@ -84,8 +84,8 @@ workflow HidiveRepeats {
     call Correct as Correct1 {
         input:
             loci = bed,
-            k = low_k,
-            model = low_k_model,
+            k = high_k,
+            model = high_k_model,
             reference = reference,
             long_reads_bam = Consensus1.consensus_bam,
             short_read_fasta = Rescue.fasta,
