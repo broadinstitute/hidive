@@ -324,8 +324,8 @@ task Consensus {
     >>>
 
     output {
-        File consensus_bam = "~{prefix}.consensus.bam"
-        File consensus_csi = "~{prefix}.consensus.bam.csi"
+        File consensus_bam = "~{prefix}.bam"
+        File consensus_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
