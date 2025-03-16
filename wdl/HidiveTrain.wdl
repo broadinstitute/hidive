@@ -142,7 +142,7 @@ task Rescue {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
-    Int memory_gb = 2*num_cpus
+    Int memory_gb = 4*num_cpus
 
     command <<<
         set -euxo pipefail
