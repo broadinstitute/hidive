@@ -105,7 +105,7 @@ task Fetch {
     input {
         String bam
         File loci
-        Int padding
+        Int padding = 0
 
         String prefix = "out"
 
