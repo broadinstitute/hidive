@@ -432,8 +432,8 @@ task Align {
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} | \
-            samtools sort --write-index -O BAM -o ~{prefix}.bam
+        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} > out.sam
+        samtools sort --write-index -O BAM -o ~{prefix}.bam out.sam
     >>>
 
     output {
