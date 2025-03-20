@@ -427,7 +427,7 @@ task Align {
 
     Int disk_size_gb = 1 + 2*ceil(size([reference, fasta], "GB"))
     Int num_cpus = 1
-    Int memory_gb = 2
+    Int memory_gb = 8
 
     command <<<
         set -euxo pipefail
