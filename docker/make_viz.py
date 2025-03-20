@@ -159,6 +159,9 @@ def read_in_asm(asm_sequences_fname):
         for hap_obj in SeqIO.parse(f, format="fasta"):
             if len(hap_obj.seq) < MIN_SEQ_LEN:
                 continue
+
+            print(hap_obj.name)
+
             hap = hap_obj.name.split('[')[0]
             assert hap not in seq_per_hap
             # trim to exact region for output

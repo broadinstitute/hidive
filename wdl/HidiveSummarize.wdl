@@ -45,15 +45,19 @@ for hap1_bam, hap2_bam in zip(hap1_files, hap2_files):
     # Open both BAM files and output fasta file
     with open("out.fasta", "a") as fasta_out:
         with pysam.AlignmentFile(hap1_bam, "rb") as h1, pysam.AlignmentFile(hap2_bam, "rb") as h2:
+            seen = set()
+
             # Process hap1 reads
             for read in h1:
-                if read.query_name.startswith("~{gene_name}"):
+                if read.query_name.startswith("~{gene_name}") and read.query_name not in seen:
                     fasta_out.write(f">{sample_name}_hap1\n{read.query_sequence}\n")
+                    seen.add(read.query_name)
                     
             # Process hap2 reads  
             for read in h2:
-                if read.query_name.startswith("~{gene_name}"):
+                if read.query_name.startswith("~{gene_name}") and read.query_name not in seen:
                     fasta_out.write(f">{sample_name}_hap2\n{read.query_sequence}\n")
+                    seen.add(read.query_name)
 CODE
     >>>
 
