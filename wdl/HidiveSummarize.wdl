@@ -4,15 +4,53 @@ workflow HidiveSummarize {
     input {
         Array[File] hap1_bams
         Array[File] hap2_bams
+
+        Array[File] truth_hap1_bams
+        Array[File] truth_hap2_bams
     }
 
     call CombineContigs as CombineHTT { input: hap1_bams = hap1_bams, hap2_bams = hap2_bams, gene_name = "HTT" }
 
     call SummarizeHTT { input: fasta = CombineHTT.fasta }
+
+    call FetchAll as FetchTruthHap1 { input: bams = truth_hap1_bams, locus = "" }
+    call FetchAll as FetchTruthHap2 { input: bams = truth_hap1_bams, locus = "" }
     
     output {
         File report_html = SummarizeHTT.report_html
         File legend_html = SummarizeHTT.legend_html
+    }
+}
+
+task FetchAll {
+    input {
+        Array[String] bams
+        String locus
+
+        String prefix = "out"
+
+        Int disk_size_gb = 2
+        Int num_cpus = 4
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        # Write bams to a file
+        echo '~{sep="," bams}' | tr ',' '\n' > bams.txt
+
+        hidive fetch -l ~{locus} -o ~{prefix}.fa bams.txt
+    >>>
+
+    output {
+        File fasta = "~{prefix}.fa"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.107"
+        memory: "2 GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
 
