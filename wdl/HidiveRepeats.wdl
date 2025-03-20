@@ -111,13 +111,53 @@ workflow HidiveRepeats {
             short_read_fasta = Rescue.fasta,
             prefix = sample_name + ".hap2"
     }
-    
+
+    if (defined(mat_aln_bam)) {
+        call Fetch as FetchMat {
+            input:
+                bam = select_first([mat_aln_bam]),
+                loci = bed,
+                padding = padding,
+                prefix = sample_name
+        }
+
+        call Align as AlignMat {
+            input:
+                fasta = FetchMat.fasta,
+                reference = reference,
+                prefix = sample_name
+        }
+    }
+
+    if (defined(pat_aln_bam)) {
+        call Fetch as FetchPat {
+            input:
+                bam = select_first([pat_aln_bam]),
+                loci = bed,
+                padding = padding,
+                prefix = sample_name
+        }
+
+        call Align as AlignPat {
+            input:
+                fasta = FetchPat.fasta,
+                reference = reference,
+                prefix = sample_name
+        }
+    }
+
     output {
         File repeats_hap1_bam = Correct1.corrected_bam
         File repeats_hap1_csi = Correct1.corrected_csi
 
         File repeats_hap2_bam = Correct2.corrected_bam
         File repeats_hap2_csi = Correct2.corrected_csi
+
+        File? mat_hap1_bam = AlignMat.cluster_bam
+        File? mat_hap1_csi = AlignMat.cluster_csi
+
+        File? pat_hap1_bam = AlignPat.cluster_bam
+        File? pat_hap1_csi = AlignPat.cluster_csi
     }
 }
 
