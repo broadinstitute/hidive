@@ -58,7 +58,7 @@ CODE
     >>>
 
     output {
-        File fasta = "out.fa"
+        File fasta = "out.fasta"
     }
 
     runtime {
