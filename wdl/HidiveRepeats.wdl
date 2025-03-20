@@ -153,11 +153,11 @@ workflow HidiveRepeats {
         File repeats_hap2_bam = Correct2.corrected_bam
         File repeats_hap2_csi = Correct2.corrected_csi
 
-        File? mat_hap1_bam = AlignMat.cluster_bam
-        File? mat_hap1_csi = AlignMat.cluster_csi
+        File? repeats_mat_bam = AlignMat.cluster_bam
+        File? repeats_mat_csi = AlignMat.cluster_csi
 
-        File? pat_hap1_bam = AlignPat.cluster_bam
-        File? pat_hap1_csi = AlignPat.cluster_csi
+        File? repeats_pat_bam = AlignPat.cluster_bam
+        File? repeats_pat_csi = AlignPat.cluster_csi
     }
 }
 
