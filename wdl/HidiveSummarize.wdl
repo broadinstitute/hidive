@@ -31,7 +31,13 @@ task CombineContigs {
 import pysam
 
 # Iterate over both hap1 and hap2 bams together
-for hap1_bam, hap2_bam in zip("~{sep='","' hap1_bams}".split(","), "~{sep='","' hap2_bams}".split(",")):
+hap1_files = "~{sep=',' hap1_bams}".split(",")
+hap2_files = "~{sep=',' hap2_bams}".split(",")
+
+print("Hap1 files:", hap1_files)
+print("Hap2 files:", hap2_files)
+
+for hap1_bam, hap2_bam in zip(hap1_files, hap2_files): 
     # Extract sample name from hap1 bam filename
     sample_name = hap1_bam.split("/")[-1].split(".")[0]
     print(f"Processing sample: {sample_name}")
