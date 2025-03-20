@@ -13,12 +13,16 @@ workflow HidiveSummarize {
 
     call SummarizeHTT { input: fasta = CombineHTT.fasta }
 
-    call FetchAll as FetchTruthHap1 { input: bams = truth_hap1_bams, locus = "" }
-    call FetchAll as FetchTruthHap2 { input: bams = truth_hap1_bams, locus = "" }
-    
+    call CombineContigs as CombineTruthHTT { input: hap1_bams = truth_hap1_bams, hap2_bams = truth_hap2_bams, gene_name = "HTT" }
+
+    call SummarizeHTT as SummarizeTruthHTT { input: fasta = CombineTruthHTT.fasta }
+
     output {
         File report_html = SummarizeHTT.report_html
         File legend_html = SummarizeHTT.legend_html
+
+        File truth_report_html = SummarizeTruthHTT.report_html
+        File truth_legend_html = SummarizeTruthHTT.legend_html
     }
 }
 
