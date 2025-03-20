@@ -302,6 +302,10 @@ enum Commands {
         #[clap(short, long, value_parser, required = true)]
         ref_path: PathBuf,
 
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
+
         /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
         bam_path: PathBuf,
@@ -599,9 +603,10 @@ fn main() {
             output,
             loci,
             ref_path,
+            short_read_fasta_path,
             bam_path,
         } => {
-            consensus::start(&output, &loci, &ref_path, &bam_path);
+            consensus::start(&output, &loci, &ref_path, &short_read_fasta_path, &bam_path);
         }
         Commands::Trim {
             output,
