@@ -11,8 +11,8 @@ workflow HidiveSummarize {
     call SummarizeHTT { input: fasta = CombineHTT.fasta }
     
     output {
-        # File repeats_hap1_bam = Correct1.corrected_bam
-        # File repeats_hap1_csi = Correct1.corrected_csi
+        File report_html = SummarizeHTT.report_html
+        File legend_html = SummarizeHTT.legend_html
     }
 }
 
@@ -84,7 +84,7 @@ task SummarizeHTT {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.107"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
         memory: "2 GB"
         cpu: 1
         disks: "local-disk ~{disk_size_gb} SSD"
