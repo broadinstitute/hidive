@@ -1,6 +1,7 @@
 use std::{collections::HashSet, io::BufRead, path::PathBuf};
 
 use anyhow::Result;
+use linked_hash_set::LinkedHashSet;
 use url::Url;
 use regex::Regex;
 
@@ -28,9 +29,9 @@ use path_absolutize::Absolutize;
 /// It will also panic if it cannot read a given file path.
 ///
 #[must_use]
-pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> HashSet<(String, u64, u64, String)> {
+pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> LinkedHashSet<(String, u64, u64, String)> {
     // Initialize a HashSet to store unique loci after parsing
-    let mut loci = HashSet::new();
+    let mut loci = LinkedHashSet::new();
 
     // Iterate over each locus in the provided list
     for locus in loci_list {
@@ -258,6 +259,10 @@ mod tests {
         // Contig name with dash in it
         let result = parse_locus("chr10-A:130000-140000|chr10-A", 0);
         assert_eq!(result.ok(), Some(("chr10-A".to_string(), 130000 as u64, 140000 as u64, "chr10-A".to_string())));
+
+        // Locus with multiple colons and dashes
+        let result = parse_locus("chr22:42121531-42135680:1-14150", 0);
+        assert_eq!(result.ok(), Some(("chr22:42121531-42135680".to_string(), 1 as u64, 14150 as u64, "chr22:42121531-42135680:1-14150".to_string())));
     }
 }
 

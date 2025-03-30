@@ -95,33 +95,42 @@ def find_best_genomic_matches(sam, exclude_haps=[], ignore_alleles=[]):
     '''Find best-matching star allele(s) for each haplotype by scoring CIGAR 
     string over the genomic locus
     '''
+    # Count non-header lines in SAM file
+    num_alignments = 0
+    with open(sam) as f:
+        for line in f:
+            if not line.startswith('@'):
+                num_alignments += 1
+    print(f"Found {num_alignments} alignments")
+
     best_genomic_matches = defaultdict(list)
-    align_f = AlignmentFile(sam, 'rb') if (
-        sam.suffix == '.bam'
-    ) else AlignmentFile(sam)
-    for r in align_f:
-        hap = r.reference_name
-        star_allele = r.query_name.replace('CYP2D6', '')
-        if hap in exclude_haps or star_allele in ignore_alleles:
-            continue
-        # genomic match score = num bases match - (mismatch + del + indel)
-        score = 0
-        for op, op_len in r.cigartuples:
-            if op == CEQUAL:
-                score += op_len
-            elif op in [CDIFF, CINS, CDEL]:
-                score -= op_len
-        # Reset best matches if star allele is higher-scoring
-        if (
-            (hap not in best_genomic_matches) or
-            (score > best_genomic_matches[hap][0][1])
-        ):
-            best_genomic_matches[hap] = [(star_allele, score)]
-        # Add to best matches if same score
-        elif score == best_genomic_matches[hap][0][1] and (
-            (star_allele, score) not in best_genomic_matches[hap]
-        ):
-            best_genomic_matches[hap].append((star_allele, score))
+    if num_alignments > 0:
+        align_f = AlignmentFile(sam, 'rb') if (
+            sam.suffix == '.bam'
+        ) else AlignmentFile(sam, check_sq=False)
+        for r in align_f:
+            hap = r.reference_name
+            star_allele = r.query_name.replace('CYP2D6', '')
+            if hap in exclude_haps or star_allele in ignore_alleles:
+                continue
+            # genomic match score = num bases match - (mismatch + del + indel)
+            score = 0
+            for op, op_len in r.cigartuples:
+                if op == CEQUAL:
+                    score += op_len
+                elif op in [CDIFF, CINS, CDEL]:
+                    score -= op_len
+            # Reset best matches if star allele is higher-scoring
+            if (
+                (hap not in best_genomic_matches) or
+                (score > best_genomic_matches[hap][0][1])
+            ):
+                best_genomic_matches[hap] = [(star_allele, score)]
+            # Add to best matches if same score
+            elif score == best_genomic_matches[hap][0][1] and (
+                (star_allele, score) not in best_genomic_matches[hap]
+            ):
+                best_genomic_matches[hap].append((star_allele, score))
     return best_genomic_matches
 
 

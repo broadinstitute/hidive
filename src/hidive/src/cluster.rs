@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::PathBuf;
 
+use bio::io::fasta;
 use itertools::Itertools;
 
 use minimap2::Aligner;
@@ -37,6 +40,14 @@ pub fn start(
     let from_loci = skydive::parse::parse_loci(from_loci_list, 0).into_iter().collect::<Vec<_>>();
     let to_loci = skydive::parse::parse_loci(to_loci_list, 0).into_iter().collect::<Vec<_>>();
 
+    // Open FASTA file for writing.
+    let mut buf_writer = BufWriter::new(File::create(output).unwrap());
+    let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
+
+    for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
+        skydive::elog!("Found locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
+    }
+
     for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
         skydive::elog!("Processing locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
 
@@ -65,7 +76,7 @@ pub fn start(
                 .unwrap();
 
             for mapping in mappings {
-                skydive::elog!("{:?}", mapping);
+                // skydive::elog!("{:?}", mapping);
 
                 let mut variants = BTreeMap::new();
                 let mut ref_pos = mapping.target_start as i64 + 1;
@@ -140,33 +151,39 @@ pub fn start(
         // Configure HDBSCAN parameters
         let params = HdbscanHyperParams::builder()
             .min_cluster_size(2)
+            .allow_single_cluster(true)
             .dist_metric(DistanceMetric::Euclidean)
             .build();
 
         // Create and run clusterer
         let clusterer = Hdbscan::new(&data, params);
-        let labels = clusterer.cluster().unwrap();
+        let cluster = clusterer.cluster();
 
-        let unique_labels = labels.iter().unique().collect::<Vec<_>>();
+        if let Ok(labels) = cluster {
+            let unique_labels = labels.iter().unique().collect::<Vec<_>>();
 
-        for unique_label in unique_labels {
-            let mut sg = spoa::Graph::new();
-            let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
+            for unique_label in unique_labels {
+                let mut sg = spoa::Graph::new();
+                let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
 
-            for (label, read) in labels.iter().zip(reads.iter()) {
-                if label == unique_label {
-                    let subseq = read.clone();
+                for (label, read) in labels.iter().zip(reads.iter()) {
+                    if label == unique_label {
+                        let subseq = read.clone();
 
-                    let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
-                    let seq_qual = std::ffi::CString::new(vec![b'I'; subseq.len()]).unwrap();
-                    let a = la.align(seq_cstr.as_ref(), &sg);
-                    sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                        let seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
+                        let seq_qual = std::ffi::CString::new(vec![b'I'; subseq.len()]).unwrap();
+                        let a = la.align(seq_cstr.as_ref(), &sg);
+                        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                    }
                 }
-            }
 
-            if *unique_label >= 0 {
-                let consensus_cstr = sg.consensus();
-                println!(">{}.{}\n{}", sample_name, unique_label, consensus_cstr.to_str().unwrap());
+                if *unique_label >= 0 {
+                    let consensus_cstr = sg.consensus();
+                    let name = format!("{}.{}.{}", from_name, sample_name, unique_label);
+
+                    let record = fasta::Record::with_attrs(name.as_str(), None, consensus_cstr.to_str().unwrap().as_bytes());
+                    fasta_writer.write_record(&record).unwrap();
+                }
             }
         }
     }

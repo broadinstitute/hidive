@@ -18,18 +18,32 @@ def main():
     matched_sites = defaultdict(lambda: defaultdict(set))
 
     sam = args.sam
-    align_f = pysam.AlignmentFile(sam, 'rb') if (
-        sam.suffix == '.bam'
-    ) else pysam.AlignmentFile(sam)
-    for i, r in enumerate(align_f):
-        if i % 10000 == 0:
-            print(i)
-        process_alignment(
-            r, sites_per_star_allele, matched_sites, args.exclude_haps,
-            args.indel_buffer
-        )
 
-    write_output(matched_sites, args.out)
+    # Count non-header lines in SAM file
+    num_alignments = 0
+    with open(sam) as f:
+        for line in f:
+            if not line.startswith('@'):
+                num_alignments += 1
+    print(f"Found {num_alignments} alignments")
+
+    # Check if SAM file is empty
+    if num_alignments > 0:
+        align_f = pysam.AlignmentFile(sam, 'rb') if (
+            sam.suffix == '.bam'
+        ) else pysam.AlignmentFile(sam, check_sq=False)
+        for i, r in enumerate(align_f):
+            if i % 10000 == 0:
+                print(i)
+            process_alignment(
+                r, sites_per_star_allele, matched_sites, args.exclude_haps,
+                args.indel_buffer
+            )
+
+        write_output(matched_sites, args.out)
+    else:
+        with open(args.out, 'w') as out_f:
+            out_f.write('Sample_hap\tStar_allele\tMatched_sites\n')
 
 
 def parse_args():

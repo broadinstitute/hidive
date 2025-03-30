@@ -1,19 +1,21 @@
 version 1.0
 
-workflow HidiveCluster {
+workflow HidiveRepeats {
     input {
         File long_reads_bam
         File long_reads_bai
         File short_reads_cram
         File short_reads_crai
 
-        String? from_locus
-        File? from_loci
+        String? locus
+        File? loci
 
-        String? to_locus
-        File? to_loci
+        Int low_k
+        File low_k_model
 
-        File model
+        Int high_k
+        File high_k_model
+
         String sample_name
 
         File reference
@@ -21,25 +23,19 @@ workflow HidiveCluster {
         File ref_fai_with_alt
         File ref_cache_tar_gz
 
-        File cyp2d6_catalog
-        File cyp2d6_haplotypes
-
         Int padding = 500
 
         File? mat_aln_bam
         File? pat_aln_bam
     }
 
-    if (defined(from_locus)) { call PrepareLocus as PrepareFromLocus { input: locus = select_first([from_locus]) } }
-    File from_bed = select_first([PrepareFromLocus.bed, from_loci])
-
-    if (defined(to_locus)) { call PrepareLocus as PrepareToLocus { input: locus = select_first([to_locus]) } }
-    File to_bed = select_first([PrepareToLocus.bed, to_loci])
+    if (defined(locus)) { call PrepareLocus { input: locus = select_first([locus]) } }
+    File bed = select_first([PrepareLocus.bed, loci])
 
     call Fetch {
         input:
             bam = long_reads_bam,
-            loci = from_bed,
+            loci = bed,
             padding = padding,
             prefix = sample_name
     }
@@ -57,8 +53,9 @@ workflow HidiveCluster {
 
     call Correct {
         input:
-            loci = from_bed,
-            model = model,
+            loci = bed,
+            k = low_k,
+            model = low_k_model,
             reference = reference,
             long_reads_bam = long_reads_bam,
             short_read_fasta = Rescue.fasta,
@@ -67,7 +64,7 @@ workflow HidiveCluster {
 
     call Phase {
         input:
-            loci = from_bed,
+            loci = bed,
             reference = reference,
             sample_name = sample_name,
             aligned_reads_bam = Correct.corrected_bam,
@@ -75,212 +72,92 @@ workflow HidiveCluster {
             prefix = sample_name
     }
 
-    call Cluster as Cluster1 {
+    call Consensus as Consensus1 {
         input:
-            sample_name = sample_name,
-            from_loci = from_bed,
-            to_loci = to_bed,
+            loci = bed,
             reference = reference,
-            hap_bam = Phase.hap1_bam,
-            hap_bai = Phase.hap1_bai,
+            aligned_reads_bam = Phase.hap1_bam,
+            aligned_reads_csi = Phase.hap1_bai,
             prefix = sample_name + ".hap1"
     }
 
-    call Cluster as Cluster2 {
+    call Correct as Correct1 {
         input:
-            sample_name = sample_name,
-            from_loci = from_bed,
-            to_loci = to_bed,
+            loci = bed,
+            k = high_k,
+            model = high_k_model,
             reference = reference,
-            hap_bam = Phase.hap2_bam,
-            hap_bai = Phase.hap2_bai,
-            prefix = sample_name + ".hap2"
-    }
-
-    call SubsetReference {
-        input:
-            reference = reference,
-            to_loci = to_bed
-    }
-
-    call BamToFasta as BamToFasta1 { input: bam = Phase.hap1_bam, prefix = sample_name + ".reads1" }
-    call BamToFasta as BamToFasta2 { input: bam = Phase.hap2_bam, prefix = sample_name + ".reads2" }
-
-    call Align as AlignReads1 {
-        input:
-            reference = SubsetReference.ref_subset_fa,
-            fasta = BamToFasta1.fasta,
-            prefix = sample_name + ".reads1"
-    }
-
-    call Align as AlignReads2 {
-        input:
-            reference = SubsetReference.ref_subset_fa,
-            fasta = BamToFasta2.fasta,
-            prefix = sample_name + ".reads2"
-    }
-
-    call Align as AlignCluster1 {
-        input:
-            reference = SubsetReference.ref_subset_fa,
-            fasta = Cluster1.cluster_fa,
+            long_reads_bam = Consensus1.consensus_bam,
+            short_read_fasta = Rescue.fasta,
             prefix = sample_name + ".hap1"
     }
 
-    call Align as AlignCluster2 {
+    call Consensus as Consensus2 {
         input:
-            reference = SubsetReference.ref_subset_fa,
-            fasta = Cluster2.cluster_fa,
+            loci = bed,
+            reference = reference,
+            aligned_reads_bam = Phase.hap2_bam,
+            aligned_reads_csi = Phase.hap2_bai,
             prefix = sample_name + ".hap2"
     }
 
-    call Plot as PlotCluster1 {
+    call Correct as Correct2 {
         input:
-            cluster_fa = Cluster1.cluster_fa,
-            prefix = sample_name + ".hap1"
-    }
-
-    call Plot as PlotCluster2 {
-        input:
-            cluster_fa = Cluster2.cluster_fa,
+            loci = bed,
+            k = high_k,
+            model = high_k_model,
+            reference = reference,
+            long_reads_bam = Consensus2.consensus_bam,
+            short_read_fasta = Rescue.fasta,
             prefix = sample_name + ".hap2"
     }
 
-    call Type as TypeCluster1 {
-        input:
-            cluster_fa = Cluster1.cluster_fa,
-            cyp2d6_catalog = cyp2d6_catalog,
-            cyp2d6_haplotypes = cyp2d6_haplotypes,
-            prefix = sample_name + ".hap1",
-    }
-
-    call Type as TypeCluster2 {
-        input:
-            cluster_fa = Cluster2.cluster_fa,
-            cyp2d6_catalog = cyp2d6_catalog,
-            cyp2d6_haplotypes = cyp2d6_haplotypes,
-            prefix = sample_name + ".hap2",
-    }
-
-    if (defined(mat_aln_bam) && defined(pat_aln_bam)) {
+    if (defined(mat_aln_bam)) {
         call Fetch as FetchMat {
             input:
                 bam = select_first([mat_aln_bam]),
-                loci = from_bed,
+                loci = bed,
                 padding = padding,
-                prefix = sample_name + ".mat"
+                prefix = sample_name
         }
 
-        call Align as AlignMatReads {
+        call Align as AlignMat {
             input:
-                reference = SubsetReference.ref_subset_fa,
                 fasta = FetchMat.fasta,
-                prefix = sample_name + ".mat"
-        }
-
-        # call PrepareLocus as PrepareSubsetLocus { input: locus = "chr22:42121531-42135680:1-14150" }
-
-        call Fetch as FetchMatSubset {
-            input:
-                bam = AlignMatReads.cluster_bam,
-                locus = "'chr22:42121531-42135680:1-14150'",
-                # loci = PrepareSubsetLocus.bed,
-                padding = 0,
-                prefix = sample_name + ".subset.mat"
-        }
-
-        call Type as TypeClusterMat {
-            input:
-                cluster_fa = FetchMatSubset.fasta,
-                cyp2d6_catalog = cyp2d6_catalog,
-                cyp2d6_haplotypes = cyp2d6_haplotypes,
-                prefix = sample_name + ".subset.mat",
-        }
-
-        call Fetch as FetchPat {
-            input:
-                bam = select_first([pat_aln_bam]),
-                loci = from_bed,
-                padding = padding,
-                prefix = sample_name + ".pat"
-        }
-
-        call Align as AlignPatReads {
-            input:
-                reference = SubsetReference.ref_subset_fa,
-                fasta = FetchPat.fasta,
-                prefix = sample_name + ".pat"
-        }
-
-        call Fetch as FetchPatSubset {
-            input:
-                bam = AlignPatReads.cluster_bam,
-                locus = "'chr22:42121531-42135680:1-14150'",
-                # loci = PrepareSubsetLocus.bed,
-                padding = 0,
-                prefix = sample_name + ".subset.pat"
-        }
-
-        call Type as TypeClusterPat {
-            input:
-                cluster_fa = FetchPatSubset.fasta,
-                cyp2d6_catalog = cyp2d6_catalog,
-                cyp2d6_haplotypes = cyp2d6_haplotypes,
-                prefix = sample_name + ".subset.pat",
-        }
-
-        call MergeAlignments {
-            input:
-                bams = [
-                    AlignMatReads.cluster_bam,
-                    AlignPatReads.cluster_bam,
-                    AlignCluster1.cluster_bam,
-                    AlignCluster2.cluster_bam,
-                    AlignReads1.cluster_bam,
-                    AlignReads2.cluster_bam
-                ],
+                reference = reference,
                 prefix = sample_name
         }
     }
-    
+
+    if (defined(pat_aln_bam)) {
+        call Fetch as FetchPat {
+            input:
+                bam = select_first([pat_aln_bam]),
+                loci = bed,
+                padding = padding,
+                prefix = sample_name
+        }
+
+        call Align as AlignPat {
+            input:
+                fasta = FetchPat.fasta,
+                reference = reference,
+                prefix = sample_name
+        }
+    }
+
     output {
-        # File corrected_bam = Correct.corrected_bam
-        # File corrected_csi = Correct.corrected_csi
+        File repeats_hap1_bam = Correct1.corrected_bam
+        File repeats_hap1_csi = Correct1.corrected_csi
 
-        # File hap1_bam = Phase.hap1_bam
-        # File hap1_bai = Phase.hap1_bai
+        File repeats_hap2_bam = Correct2.corrected_bam
+        File repeats_hap2_csi = Correct2.corrected_csi
 
-        # File hap2_bam = Phase.hap2_bam
-        # File hap2_bai = Phase.hap2_bai
+        File? repeats_mat_bam = AlignMat.cluster_bam
+        File? repeats_mat_csi = AlignMat.cluster_csi
 
-        # File ref_subset_fa = SubsetReference.ref_subset_fa
-        # File ref_subset_fai = SubsetReference.ref_subset_fai
-
-        # File cluster1_fa = Cluster1.cluster_fa
-        File cluster1_bam = AlignCluster1.cluster_bam
-        File cluster1_csi = AlignCluster1.cluster_csi
-
-        # File cluster2_fa = Cluster2.cluster_fa
-        File cluster2_bam = AlignCluster2.cluster_bam
-        File cluster2_csi = AlignCluster2.cluster_csi
-
-        File cluster1_html = PlotCluster1.cluster_html
-        File cluster2_html = PlotCluster2.cluster_html
-
-        File cluster1_star_alleles = TypeCluster1.star_alleles
-        File cluster2_star_alleles = TypeCluster2.star_alleles
-
-        File? cluster_mat_star_alleles = TypeClusterMat.star_alleles
-        File? cluster_pat_star_alleles = TypeClusterPat.star_alleles
-
-        File? cluster_mat_bam = AlignMatReads.cluster_bam
-        File? cluster_mat_csi = AlignMatReads.cluster_csi
-
-        File? cluster_pat_bam = AlignPatReads.cluster_bam
-        File? cluster_pat_csi = AlignPatReads.cluster_csi
-
-        File? merged_bam = MergeAlignments.merged_bam
-        File? merged_csi = MergeAlignments.merged_csi
+        File? repeats_pat_bam = AlignPat.cluster_bam
+        File? repeats_pat_csi = AlignPat.cluster_csi
     }
 }
 
@@ -394,6 +271,7 @@ task Correct {
         String long_reads_bam
 
         File loci
+        Int k
         File model
         File reference
 
@@ -408,7 +286,7 @@ task Correct {
     command <<<
         set -euxo pipefail
 
-        hidive correct -l ~{loci} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
+        hidive correct -l ~{loci} -k ~{k} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
@@ -469,66 +347,41 @@ task Phase {
     }
 }
 
-task Cluster {
+task Consensus {
     input {
+        File loci
+
         File reference
-        File hap_bam
-        File hap_bai
 
-        String sample_name
+        File aligned_reads_bam
+        File aligned_reads_csi
 
-        File from_loci
-        File to_loci
-        String prefix
+        String prefix = "out"
 
         Int num_cpus = 8
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([reference, hap_bam, hap_bai, from_loci, to_loci], "GB"))
-    Int memory_gb = 4*num_cpus
+    Int disk_size_gb = 1 + 2*ceil(size([reference, aligned_reads_bam, aligned_reads_csi], "GB"))
+    Int memory_gb = 2*num_cpus
 
     command <<<
-        set -euxo pipefail
+        set -x
 
-        hidive cluster -s "~{sample_name}" -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
+        hidive consensus -l ~{loci} -r ~{reference} -o ~{prefix}.fa ~{aligned_reads_bam}
+
+        minimap2 -ayYL -x map-hifi ~{reference} ~{prefix}.fa | \
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
+
+        ls -lah *
     >>>
 
     output {
-        File cluster_fa = "~{prefix}.fa"
+        File consensus_bam = "~{prefix}.bam"
+        File consensus_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
-        memory: "~{memory_gb} GB"
-        cpu: num_cpus
-        disks: "local-disk ~{disk_size_gb} SSD"
-    }
-}
-
-task SubsetReference {
-    input {
-        File reference
-        File to_loci
-    }
-
-    Int disk_size_gb = 1 + 2*ceil(size([reference, to_loci], "GB"))
-    Int num_cpus = 1
-    Int memory_gb = 2
-
-    command <<<
-        set -euxo pipefail
-
-        awk '{ print $1 ":" $2 "-" $3 }' ~{to_loci} | samtools faidx -r - ~{reference} > ref.subset.fa
-        samtools faidx ref.subset.fa
-    >>>
-
-    output {
-        File ref_subset_fa = "ref.subset.fa"
-        File ref_subset_fai = "ref.subset.fa.fai"
-    }
-
-    runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_eval"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -574,13 +427,13 @@ task Align {
 
     Int disk_size_gb = 1 + 2*ceil(size([reference, fasta], "GB"))
     Int num_cpus = 1
-    Int memory_gb = 2
+    Int memory_gb = 8
 
     command <<<
         set -euxo pipefail
 
-        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} | \
-            samtools sort --write-index -O BAM -o ~{prefix}.bam
+        minimap2 -ayYL --eqx -x asm20 -R '@RG\tID:~{prefix}\tSM:~{prefix}' ~{reference} ~{fasta} > out.sam
+        samtools sort --write-index -O BAM -o ~{prefix}.bam out.sam
     >>>
 
     output {

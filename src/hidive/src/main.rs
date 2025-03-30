@@ -55,6 +55,7 @@ use clap::{Parser, Subcommand};
 
 mod build;
 mod cluster;
+mod consensus;
 mod coassemble;
 mod assemble;
 mod correct;
@@ -280,6 +281,30 @@ enum Commands {
         /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
         #[clap(short, long, value_parser, required = true)]
         ref_path: PathBuf,
+
+        /// BAM file with integrated long- and short-read data.
+        #[clap(required = true, value_parser)]
+        bam_path: PathBuf,
+    },
+
+    /// Compute consensus sequences from aligned reads.
+    #[clap(arg_required_else_help = true)]
+    Consensus {
+        /// Output path for clustered sequences.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// One or more genomic loci ("contig:start-stop[|name]", or BED format) to extract from WGS BAM files.
+        #[clap(short, long, value_parser, required = true)]
+        loci: Vec<String>,
+
+        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        #[clap(short, long, value_parser, required = true)]
+        ref_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
 
         /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
@@ -573,6 +598,15 @@ fn main() {
             bam_path,
         } => {
             cluster::start(&output, &sample_name, &from_loci, &to_loci, &ref_path, &bam_path);
+        }
+        Commands::Consensus {
+            output,
+            loci,
+            ref_path,
+            short_read_fasta_path,
+            bam_path,
+        } => {
+            consensus::start(&output, &loci, &ref_path, &short_read_fasta_path, &bam_path);
         }
         Commands::Trim {
             output,

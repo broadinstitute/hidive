@@ -1,5 +1,6 @@
 // Import the Result type from the anyhow crate for error handling.
 use anyhow::Result;
+use linked_hash_set::LinkedHashSet;
 use parquet::data_type::AsBytes;
 use rust_htslib::bam::record::Aux;
 
@@ -179,7 +180,7 @@ pub fn extract_aligned_bam_reads(
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
             // for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
-            for alignment in pileup.alignments() {
+            for (i, alignment) in pileup.alignments().enumerate() {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
@@ -188,7 +189,7 @@ pub fn extract_aligned_bam_reads(
 
                 let is_secondary = alignment.record().is_secondary();
                 let is_supplementary = alignment.record().is_supplementary();
-                let seq_name = format!("{qname}|{name}|{sm}|{is_secondary}|{is_supplementary}");
+                let seq_name = format!("{qname}|{name}|{sm}|{i}|{is_secondary}|{is_supplementary}");
 
                 // crate::elog!("{}", seq_name);
 
@@ -278,7 +279,7 @@ fn extract_fasta_seqs(
 // Function to stage data from a single file.
 fn stage_data_from_one_file(
     seqs_url: &Url,
-    loci: &HashSet<(String, u64, u64, String)>,
+    loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
     let mut all_seqs = Vec::new();
@@ -345,7 +346,7 @@ fn stage_data_from_one_file(
 // Function to stage data from multiple BAM files.
 fn stage_data_from_all_files(
     seq_urls: &HashSet<Url>,
-    loci: &HashSet<(String, u64, u64, String)>,
+    loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
 ) -> Result<Vec<fasta::Record>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
@@ -426,7 +427,7 @@ pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>
 ///
 pub fn stage_data(
     output_path: &PathBuf,
-    loci: &HashSet<(String, u64, u64, String)>,
+    loci: &LinkedHashSet<(String, u64, u64, String)>,
     seq_urls: &HashSet<Url>,
     unmapped: bool,
     cache_path: &PathBuf,
@@ -458,7 +459,7 @@ pub fn stage_data(
 }
 
 pub fn stage_data_in_memory(
-    loci: &HashSet<(String, u64, u64, String)>,
+    loci: &LinkedHashSet<(String, u64, u64, String)>,
     seq_urls: &HashSet<Url>,
     unmapped: bool,
     cache_path: &PathBuf,
@@ -503,7 +504,9 @@ mod tests {
         let seqs_url = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
+        let mut loci = LinkedHashSet::new();
+        // let loci = LinkedHashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
+        loci.insert(("chr15".to_string(), 23960193, 23963918, "test".to_string()));
 
         let result = stage_data_from_one_file(&seqs_url, &loci, false);
 
@@ -515,7 +518,9 @@ mod tests {
         let cache_path = std::env::temp_dir();
         let output_path = cache_path.join("test.bam");
 
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
+        let mut loci = LinkedHashSet::new();
+        loci.insert(("chr15".to_string(), 23960193, 23963918, "test".to_string()));
+
         let seqs_url = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
@@ -539,7 +544,9 @@ mod tests {
         let seqs_url_2 = Url::parse(
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84043_230901_211947_s1/reads/ccs/aligned/m84043_230901_211947_s1.hifi_reads.bc2080.bam"
         ).unwrap();
-        let loci = HashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
+        let mut loci = LinkedHashSet::new();
+        loci.insert(("chr15".to_string(), 23960193, 23963918, "test".to_string()));
+
         let seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         let result = stage_data(&output_path, &loci, &seq_urls, false, &cache_path);
