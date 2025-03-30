@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/cluster.rs`."><title>cluster.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hidive/</div>cluster.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/cluster.rs`."><title>cluster.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.1 (4eb161250 2025-03-15)" data-channel="1.85.1" data-search-js="search-75f5ac3e.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hidive/</div>cluster.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -60,66 +60,321 @@
 <a href="#59" id="59">59</a>
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
-<a href="#62" id="62">62</a></pre></div><pre class="rust"><code><span class="comment">// Import necessary standard library modules
-</span><span class="kw">use </span>std::collections::HashSet;
-<span class="kw">use </span>std::io::Write;
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{BTreeMap, HashMap, HashSet};
+<span class="kw">use </span>std::fs::File;
+<span class="kw">use </span>std::io::BufWriter;
 <span class="kw">use </span>std::path::PathBuf;
 
-<span class="kw">use </span>bio::io::fasta::{Reader, Record};
+<span class="kw">use </span>bio::io::fasta;
+<span class="kw">use </span>itertools::Itertools;
+
+<span class="kw">use </span>minimap2::Aligner;
 <span class="kw">use </span>needletail::Sequence;
+<span class="kw">use </span>rust_htslib::bam::ext::BamRecordExtensions;
+<span class="kw">use </span>rust_htslib::bam::record::Cigar;
+<span class="kw">use </span>rust_htslib::{bam, bam::{FetchDefinition, Read}};
 
-<span class="kw">use </span>gaoya::minhash::{MinHashIndex, MinHasher, MinHasher32};
+<span class="kw">use </span>hdbscan::{DistanceMetric, Hdbscan, HdbscanHyperParams};
+<span class="kw">use </span>spoa::AlignmentType;
 
-<span class="comment">// Import the skydive module, which contains the necessary functions for building graphs
-// use skydive;
+<span class="kw">pub fn </span>start(
+    output: <span class="kw-2">&amp;</span>PathBuf,
+    sample_name: <span class="kw-2">&amp;</span>String,
+    from_loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+    to_loci_list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+    reference_fasta_path: <span class="kw-2">&amp;</span>PathBuf,
+    bam_path: <span class="kw-2">&amp;</span>PathBuf,
+) {
+    <span class="comment">// Get the system's temporary directory path
+    </span><span class="kw">let </span>cache_path = std::env::temp_dir();
+    <span class="macro">skydive::elog!</span>(<span class="string">"Intermediate data will be stored at {:?}."</span>, cache_path);
 
-</span><span class="kw">pub fn </span>start(output: <span class="kw-2">&amp;</span>PathBuf, k: usize, jaccard_threshold: f64, fasta_path: <span class="kw-2">&amp;</span>PathBuf) {
-    <span class="comment">// Read the reads records (name and sequence) into a vector.
-    </span><span class="kw">let </span>reader = Reader::from_file(fasta_path).unwrap();
-    <span class="kw">let </span>all_reads: Vec&lt;Record&gt; = reader.records().map(|r| r.unwrap()).collect();
+    <span class="comment">// Parse reference sequence file path.
+    </span><span class="kw">let </span>reference_seq_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[reference_fasta_path.clone()]);
+    <span class="kw">let </span>reference_seq_url = reference_seq_urls.iter().next().unwrap();
+    <span class="kw">let </span>fasta = skydive::stage::open_fasta(<span class="kw-2">&amp;</span>reference_seq_url).unwrap();
 
-    <span class="comment">// Get and store sample name.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>sample_names = Vec::new();
-    <span class="kw">for </span>record <span class="kw">in </span><span class="kw-2">&amp;</span>all_reads {
-        <span class="kw">let </span>id = record.id().to_string();
+    <span class="comment">// Parse BAM file path.
+    </span><span class="kw">let </span>bam_urls = skydive::parse::parse_file_names(<span class="kw-2">&amp;</span>[bam_path.clone()]);
+    <span class="kw">let </span>bam_url = bam_urls.iter().next().unwrap();
 
-        <span class="comment">//let v: Vec&lt;String&gt; = id.split('|').map(|s| s.to_string()).collect();
-        // sample_names.push(v[1].clone());
-        </span>sample_names.push(id);
+    <span class="comment">// Iterate over loc
+    </span><span class="kw">let </span>from_loci = skydive::parse::parse_loci(from_loci_list, <span class="number">0</span>).into_iter().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+    <span class="kw">let </span>to_loci = skydive::parse::parse_loci(to_loci_list, <span class="number">0</span>).into_iter().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+    <span class="comment">// Open FASTA file for writing.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>buf_writer = BufWriter::new(File::create(output).unwrap());
+    <span class="kw">let </span><span class="kw-2">mut </span>fasta_writer = fasta::Writer::new(<span class="kw-2">&amp;mut </span>buf_writer);
+
+    <span class="kw">for </span>((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) <span class="kw">in </span>from_loci.iter().zip(to_loci.iter()) {
+        <span class="macro">skydive::elog!</span>(<span class="string">"Found locus {} ({}:{}-{}) -&gt; {} ({}:{}-{})..."</span>, from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
     }
 
-    <span class="comment">// Iterate over all reads.
-    </span><span class="kw">let </span>sequences: Vec&lt;String&gt; = all_reads
-        .iter()
-        .map(|record| String::from_utf8_lossy(record.seq()).to_string().to_uppercase())
-        .collect();
+    <span class="kw">for </span>((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) <span class="kw">in </span>from_loci.iter().zip(to_loci.iter()) {
+        <span class="macro">skydive::elog!</span>(<span class="string">"Processing locus {} ({}:{}-{}) -&gt; {} ({}:{}-{})..."</span>, from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
 
-    <span class="kw">let </span>(num_bands, band_width) = (<span class="number">42</span>, <span class="number">3</span>);
-    <span class="kw">let </span>minhasher = MinHasher32::new(num_bands * band_width);
-    <span class="kw">let </span><span class="kw-2">mut </span>index = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
-    <span class="kw">for </span>(i, doc) <span class="kw">in </span>sequences.iter().enumerate() {
-        index.insert(i, minhasher.create_signature(doc.as_bytes().kmers(k <span class="kw">as </span>u8)));
-    }
+        <span class="comment">// Extract the reference sequence for the current locus.
+        </span><span class="kw">let </span>reference_seq = fasta.fetch_seq_string(to_chr.clone(), usize::try_from(<span class="kw-2">*</span>to_start).unwrap(), usize::try_from(<span class="kw-2">*</span>to_stop).unwrap()).unwrap();
 
-    <span class="comment">// Open a new file to write the k-mer matrix to.
-    </span><span class="kw">let </span>file = std::fs::File::create(output).unwrap();
-    <span class="kw">let </span><span class="kw-2">mut </span>writer = std::io::BufWriter::new(<span class="kw-2">&amp;</span>file);
+        <span class="comment">// Initialize aligner
+        </span><span class="kw">let </span><span class="kw-2">mut </span>aligner = Aligner::builder()
+            .map_hifi()
+            .with_cigar()
+            .with_seq(reference_seq.as_bytes())
+            .unwrap();
 
-    <span class="kw">let </span><span class="kw-2">mut </span>used = HashSet::new();
-    <span class="kw">for </span>(i, sequence) <span class="kw">in </span>sequences.iter().enumerate() {
-        <span class="kw">if </span>used.contains(<span class="kw-2">&amp;</span>i) {
-            <span class="kw">continue</span>;
+        aligner.mapopt.flag |= minimap2::ffi::MM_F_EQX <span class="kw">as </span>i64;
+
+        <span class="comment">// The BAM reader gets renewed for each locus, but it's fast to open.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>bam = skydive::stage::open_bam(<span class="kw-2">&amp;</span>bam_url).unwrap();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>read_vectors = Vec::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>reads = Vec::new();
+
+        <span class="kw">let _ </span>= bam.fetch(FetchDefinition::RegionString(from_chr.as_bytes(), <span class="kw-2">*</span>from_start <span class="kw">as </span>i64, <span class="kw-2">*</span>from_stop <span class="kw">as </span>i64));
+        <span class="kw">for </span>read <span class="kw">in </span>bam.records().filter(|r| r.is_ok()).flatten().filter(|r| !r.is_secondary() &amp;&amp; !r.is_supplementary()) {
+            <span class="kw">let </span>mappings = aligner
+                .map(<span class="kw-2">&amp;</span>read.seq().as_bytes(), <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(read.qname()))
+                .unwrap();
+
+            <span class="kw">for </span>mapping <span class="kw">in </span>mappings {
+                <span class="comment">// skydive::elog!("{:?}", mapping);
+
+                </span><span class="kw">let </span><span class="kw-2">mut </span>variants = BTreeMap::new();
+                <span class="kw">let </span><span class="kw-2">mut </span>ref_pos = mapping.target_start <span class="kw">as </span>i64 + <span class="number">1</span>;
+
+                <span class="kw">let </span>cigar = mapping.alignment.unwrap().cigar_str.unwrap();
+                <span class="kw">let </span><span class="kw-2">mut </span>trim_left = <span class="number">0</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>trim_right = <span class="number">0</span>;
+
+                <span class="kw">let </span>re = regex::Regex::new(<span class="string">r"(\d+)([MIDSNX=])"</span>).unwrap();
+                <span class="kw">for </span>(cap_idx, cap) <span class="kw">in </span>re.captures_iter(<span class="kw-2">&amp;</span>cigar).enumerate() {
+                    <span class="kw">let </span>cigar_len = cap[<span class="number">1</span>].parse::&lt;u32&gt;().unwrap();
+                    <span class="kw">match </span><span class="kw-2">&amp;</span>cap[<span class="number">2</span>] {
+                        <span class="string">"M" </span>| <span class="string">"=" </span>=&gt; { ref_pos += cigar_len <span class="kw">as </span>i64; },
+                        <span class="string">"I" </span>=&gt; {
+                            <span class="kw">if </span>cigar_len &gt; <span class="number">5 </span>{
+                                variants.insert(ref_pos, <span class="number">1</span>);
+                            }
+                        },
+                        <span class="string">"D" </span>=&gt; {
+                            <span class="kw">if </span>cigar_len &gt; <span class="number">5 </span>{
+                                variants.insert(ref_pos, <span class="number">1</span>);
+                            }
+                            ref_pos += cigar_len <span class="kw">as </span>i64;
+                        },
+                        <span class="string">"X" </span>=&gt; {
+                            variants.insert(ref_pos, <span class="number">1</span>);
+                            ref_pos += cigar_len <span class="kw">as </span>i64;
+                        },
+                        <span class="string">"S" </span>=&gt; {
+                            <span class="kw">if </span>cap_idx == <span class="number">0 </span>{
+                                trim_left = cigar_len <span class="kw">as </span>usize;
+                            } <span class="kw">else </span>{
+                                trim_right = cigar_len <span class="kw">as </span>usize;
+                            }
+                        }
+                        <span class="kw">_ </span>=&gt; {}
+                    }
+                }
+
+                <span class="kw">let </span>seq = <span class="kw">if </span>mapping.strand == minimap2::Strand::Forward { read.seq().as_bytes() } <span class="kw">else </span>{ read.seq().as_bytes().reverse_complement() };
+                <span class="kw">let </span>subseq = seq[trim_left..seq.len() - trim_right].to_vec();
+
+                read_vectors.push(variants);
+                reads.push(subseq);
+            }
         }
 
-        <span class="kw">let </span>indices = index.query_owned(<span class="kw-2">&amp;</span>minhasher.create_signature(sequence.as_bytes().kmers(k <span class="kw">as </span>u8)));
+        <span class="kw">let </span>all_positions = read_vectors.iter()
+            .flat_map(|r| r.keys())
+            .collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;()
+            .into_iter()
+            .sorted()
+            .cloned()
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="comment">// println!("{} {:?}", sample_names[i], a);
-        </span><span class="kw">for </span>index <span class="kw">in </span>indices {
-            <span class="comment">// println!("&gt;cluster_{}_sequence_{}\n{}", i, index, sequences[index]);
-            </span><span class="kw">let _ </span>= <span class="macro">writeln!</span>(writer, <span class="string">"&gt;cluster{}_sequence{}\n{}"</span>, i, index, sequences[index]);
+        <span class="kw">let </span>pos_to_idx = all_positions.iter()
+            .enumerate()
+            .map(|(i, p)| (p, i))
+            .collect::&lt;BTreeMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
 
-            used.insert(index);
+        <span class="kw">let </span><span class="kw-2">mut </span>data = Vec::with_capacity(read_vectors.len());
+        <span class="kw">for </span>read <span class="kw">in </span>read_vectors.iter() {
+            <span class="kw">let </span><span class="kw-2">mut </span>row = <span class="macro">vec!</span>[<span class="number">0.0</span>; all_positions.len()];
+            <span class="kw">for </span>(<span class="kw-2">&amp;</span>pos, <span class="kw-2">&amp;</span>value) <span class="kw">in </span>read {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>idx) = pos_to_idx.get(<span class="kw-2">&amp;</span>pos) {
+                    row[idx] = value <span class="kw">as </span>f32;
+                }
+            }
+            data.push(row);
+        }
+
+        <span class="comment">// Configure HDBSCAN parameters
+        </span><span class="kw">let </span>params = HdbscanHyperParams::builder()
+            .min_cluster_size(<span class="number">2</span>)
+            .allow_single_cluster(<span class="bool-val">true</span>)
+            .dist_metric(DistanceMetric::Euclidean)
+            .build();
+
+        <span class="comment">// Create and run clusterer
+        </span><span class="kw">let </span>clusterer = Hdbscan::new(<span class="kw-2">&amp;</span>data, params);
+        <span class="kw">let </span>cluster = clusterer.cluster();
+
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(labels) = cluster {
+            <span class="kw">let </span>unique_labels = labels.iter().unique().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+            <span class="kw">for </span>unique_label <span class="kw">in </span>unique_labels {
+                <span class="kw">let </span><span class="kw-2">mut </span>sg = spoa::Graph::new();
+                <span class="kw">let </span><span class="kw-2">mut </span>la = spoa::AlignmentEngine::new(AlignmentType::kOV, <span class="number">5</span>, -<span class="number">4</span>, -<span class="number">8</span>, -<span class="number">6</span>, -<span class="number">8</span>, -<span class="number">4</span>);
+
+                <span class="kw">for </span>(label, read) <span class="kw">in </span>labels.iter().zip(reads.iter()) {
+                    <span class="kw">if </span>label == unique_label {
+                        <span class="kw">let </span>subseq = read.clone();
+
+                        <span class="kw">let </span>seq_cstr = std::ffi::CString::new(subseq.clone()).unwrap();
+                        <span class="kw">let </span>seq_qual = std::ffi::CString::new(<span class="macro">vec!</span>[<span class="string">b'I'</span>; subseq.len()]).unwrap();
+                        <span class="kw">let </span>a = la.align(seq_cstr.as_ref(), <span class="kw-2">&amp;</span>sg);
+                        sg.add_alignment(<span class="kw-2">&amp;</span>a, seq_cstr.as_ref(), seq_qual.as_ref());
+                    }
+                }
+
+                <span class="kw">if </span><span class="kw-2">*</span>unique_label &gt;= <span class="number">0 </span>{
+                    <span class="kw">let </span>consensus_cstr = sg.consensus();
+                    <span class="kw">let </span>name = <span class="macro">format!</span>(<span class="string">"{}.{}.{}"</span>, from_name, sample_name, unique_label);
+
+                    <span class="kw">let </span>record = fasta::Record::with_attrs(name.as_str(), <span class="prelude-val">None</span>, consensus_cstr.to_str().unwrap().as_bytes());
+                    fasta_writer.write_record(<span class="kw-2">&amp;</span>record).unwrap();
+                }
+            }
         }
     }
-}
-</code></pre></div></section></main></body></html>
+}</code></pre></div></section></main></body></html>

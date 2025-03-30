@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["add_variant_records","build_haplotypes","initialize_vcf_header","phase_variants","prepare_matrix","prepare_matrix_new","start","write_haplotypes"]};

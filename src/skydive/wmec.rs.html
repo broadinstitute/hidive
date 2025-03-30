@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/wmec.rs`."><title>wmec.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">skydive/</div>wmec.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/wmec.rs`."><title>wmec.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.1 (4eb161250 2025-03-15)" data-channel="1.85.1" data-search-js="search-75f5ac3e.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">skydive/</div>wmec.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -497,14 +497,117 @@
 <a href="#496" id="496">496</a>
 <a href="#497" id="497">497</a>
 <a href="#498" id="498">498</a>
-<a href="#499" id="499">499</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module implements the `WhatsHap` phasing algorithm as described in:
+<a href="#499" id="499">499</a>
+<a href="#500" id="500">500</a>
+<a href="#501" id="501">501</a>
+<a href="#502" id="502">502</a>
+<a href="#503" id="503">503</a>
+<a href="#504" id="504">504</a>
+<a href="#505" id="505">505</a>
+<a href="#506" id="506">506</a>
+<a href="#507" id="507">507</a>
+<a href="#508" id="508">508</a>
+<a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
+<a href="#511" id="511">511</a>
+<a href="#512" id="512">512</a>
+<a href="#513" id="513">513</a>
+<a href="#514" id="514">514</a>
+<a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module implements the `WhatsHap` phasing algorithm as described in:
 //! Murray Patterson, Tobias Marschall, Nadia Pisanti, Leo van Iersel, Leen Stougie, et al.
 //! `WhatsHap`: Weighted Haplotype Assembly for Future-Generation Sequencing Reads.
 //! Journal of Computational Biology, 2015, 22 (6), pp.498-509.
 //! DOI: 10.1089/cmb.2014.0157
 //! HAL ID: hal-01225988
 
-</span><span class="kw">use </span>std::collections::{BTreeSet, HashMap};
+</span><span class="kw">use </span>std::collections::{BTreeMap, BTreeSet, HashMap};
 <span class="kw">use </span>std::fs::File;
 <span class="kw">use </span>std::io::Write;
 
@@ -575,14 +678,14 @@
         <span class="macro">writeln!</span>(file)<span class="question-mark">?</span>;
 
         <span class="comment">// Write each read's data
-        </span><span class="kw">for </span>(i, read) <span class="kw">in </span><span class="self">self</span>.reads.iter().enumerate() {
+        </span><span class="kw">for </span>(i, (read, conf)) <span class="kw">in </span><span class="self">self</span>.reads.iter().zip(<span class="self">self</span>.confidences.iter()).enumerate() {
             <span class="macro">write!</span>(file, <span class="string">"Read_{}"</span>, i)<span class="question-mark">?</span>;
-            <span class="kw">for </span>allele <span class="kw">in </span>read {
+            <span class="kw">for </span>(allele, qual) <span class="kw">in </span>read.iter().zip(conf.iter()) {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(allele) = allele {
-                    <span class="kw">if </span><span class="kw-2">*</span>allele == <span class="number">0 </span>{ <span class="macro">write!</span>(file, <span class="string">"\t0"</span>)<span class="question-mark">? </span>};
-                    <span class="kw">if </span><span class="kw-2">*</span>allele == <span class="number">1 </span>{ <span class="macro">write!</span>(file, <span class="string">"\t1"</span>)<span class="question-mark">? </span>};
+                    <span class="kw">if </span><span class="kw-2">*</span>allele == <span class="number">0 </span>{ <span class="macro">write!</span>(file, <span class="string">"\t0,{}"</span>, qual.unwrap())<span class="question-mark">? </span>};
+                    <span class="kw">if </span><span class="kw-2">*</span>allele == <span class="number">1 </span>{ <span class="macro">write!</span>(file, <span class="string">"\t1,{}"</span>, qual.unwrap())<span class="question-mark">? </span>};
                 } <span class="kw">else </span>{
-                    <span class="macro">write!</span>(file, <span class="string">"\t-"</span>)<span class="question-mark">?</span>;
+                    <span class="macro">write!</span>(file, <span class="string">"\t-,1"</span>)<span class="question-mark">?</span>;
                 }
             }
             <span class="macro">writeln!</span>(file)<span class="question-mark">?</span>;
@@ -722,10 +825,12 @@
     }
 }
 
-<span class="kw">fn </span>backtrack_haplotypes(data: <span class="kw-2">&amp;</span>WMECData, dp: <span class="kw-2">&amp;</span>HashMap&lt;(usize, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;), u32&gt;, backtrack: <span class="kw-2">&amp;</span>HashMap&lt;(usize, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;), <span class="prelude-ty">Option</span>&lt;(BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;)&gt;&gt;) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;) {
+<span class="kw">fn </span>backtrack_haplotypes(data: <span class="kw-2">&amp;</span>WMECData, dp: <span class="kw-2">&amp;</span>HashMap&lt;(usize, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;), u32&gt;, backtrack: <span class="kw-2">&amp;</span>HashMap&lt;(usize, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;), <span class="prelude-ty">Option</span>&lt;(BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;)&gt;&gt;) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;) {
     <span class="kw">let </span><span class="kw-2">mut </span>best_cost = u32::MAX;
     <span class="kw">let </span><span class="kw-2">mut </span>best_bipartition = <span class="prelude-val">None</span>;
-    <span class="kw">let </span>final_active_fragments: BTreeSet&lt;usize&gt; = data.reads.iter().enumerate()
+
+    <span class="comment">// Restrict processing to reads that span variants within the window.
+    </span><span class="kw">let </span>final_active_fragments: BTreeSet&lt;usize&gt; = data.reads.iter().enumerate()
         .filter(|(<span class="kw">_</span>, read)| read[data.num_snps - <span class="number">1</span>].is_some())
         .map(|(index, <span class="kw">_</span>)| index)
         .collect();
@@ -766,12 +871,14 @@
         }
     }
 
-    (haplotype1, haplotype2)
+    <span class="macro">crate::elog!</span>(<span class="string">"wmec score: {}"</span>, best_cost);
+
+    (haplotype1, haplotype2, current_bipartition.<span class="number">0</span>, current_bipartition.<span class="number">1</span>)
 }
 
 <span class="comment">// Main function to perform WMEC using dynamic programming
 </span><span class="attr">#[must_use]
-</span><span class="kw">pub fn </span>phase(data: <span class="kw-2">&amp;</span>WMECData) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;) {
+</span><span class="kw">pub fn </span>phase(data: <span class="kw-2">&amp;</span>WMECData) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;) {
     <span class="kw">let </span>(<span class="kw-2">mut </span>dp, <span class="kw-2">mut </span>backtrack) = initialize_dp(data);
 
     <span class="kw">for </span>snp <span class="kw">in </span><span class="number">1</span>..data.num_snps {
@@ -782,7 +889,9 @@
 }
 
 <span class="attr">#[must_use]
-</span><span class="kw">pub fn </span>phase_all(data: <span class="kw-2">&amp;</span>WMECData, window: usize, stride: usize) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;) {
+</span><span class="kw">pub fn </span>phase_all(data: <span class="kw-2">&amp;</span>WMECData, window: usize, stride: usize) -&gt; (Vec&lt;u8&gt;, Vec&lt;u8&gt;, BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;) {
+    data.write_reads_matrix(<span class="string">"mat.tsv"</span>);
+
     <span class="comment">// First, collect all window ranges
     </span><span class="kw">let </span><span class="kw-2">mut </span>windows: Vec&lt;<span class="kw">_</span>&gt; = (<span class="number">0</span>..data.num_snps)
         .step_by(stride)
@@ -790,10 +899,12 @@
         .collect();
 
     <span class="comment">// Filter out last window if it completely overlaps with previous window
-    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(<span class="kw">_</span>, prev_end)) = windows.get(windows.len() - <span class="number">2</span>) {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(<span class="kw">_</span>, last_end)) = windows.last() {
-            <span class="kw">if </span>last_end == prev_end {
-                windows.pop();
+    </span><span class="kw">if </span>windows.len() &gt; <span class="number">1 </span>{
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(<span class="kw">_</span>, prev_end)) = windows.get(windows.len() - <span class="number">2</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(<span class="kw">_</span>, last_end)) = windows.last() {
+                <span class="kw">if </span>last_end == prev_end {
+                    windows.pop();
+                }
             }
         }
     }
@@ -806,18 +917,42 @@
         </span>.par_iter()
         .progress_with(pb)
         .map(|<span class="kw-2">&amp;</span>(start, end)| {
-            <span class="kw">let </span>(window_reads, window_confidences): (Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt;&gt;, Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt;&gt;) = data.reads.iter().zip(data.confidences.iter())
-                .map(|(read, confidence)| {
+            <span class="kw">let </span>(window_indices, window_reads): (Vec&lt;usize&gt;, Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt;&gt;) = data.reads.iter().zip(data.confidences.iter()).enumerate()
+                .map(|(read_idx, (read, confidence))| {
                     <span class="kw">let </span>window_read = read[start..end].to_vec();
+                    <span class="kw">let </span>window_confidence = confidence[start..end].to_vec();
+
                     <span class="kw">let </span>none_count = window_read.iter().filter(|x| x.is_none()).count();
-                    (none_count, window_read, confidence[start..end].to_vec())
+                    <span class="kw">let </span>lowqual_count = window_confidence.iter().filter(|&amp;&amp;x| x.is_some() &amp;&amp; x.unwrap() == <span class="number">0</span>).count();
+
+                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
                 })
                 .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
                 .into_iter()
-                .sorted_by_key(|(none_count, <span class="kw">_</span>, <span class="kw">_</span>)| <span class="kw-2">*</span>none_count)
-                .take(<span class="number">10</span>)
-                .map(|(<span class="kw">_</span>, window_read, window_confidence)| (window_read, window_confidence))
+                .sorted_by_key(|(bad_count, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>)| <span class="kw-2">*</span>bad_count)
+                .take(<span class="number">12</span>)
+                .map(|(<span class="kw">_</span>, read_idx, window_read, <span class="kw">_</span>)| (read_idx, window_read))
                 .unzip();
+
+            <span class="kw">let </span>(<span class="kw">_</span>, window_confidences): (Vec&lt;usize&gt;, Vec&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt;&gt;) = data.reads.iter().zip(data.confidences.iter()).enumerate()
+                .map(|(read_idx, (read, confidence))| {
+                    <span class="kw">let </span>window_read = read[start..end].to_vec();
+                    <span class="kw">let </span>window_confidence = confidence[start..end].to_vec();
+
+                    <span class="kw">let </span>none_count = window_read.iter().filter(|x| x.is_none()).count();
+                    <span class="kw">let </span>lowqual_count = window_confidence.iter().filter(|&amp;&amp;x| x.is_some() &amp;&amp; x.unwrap() == <span class="number">0</span>).count();
+
+                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
+                })
+                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                .into_iter()
+                .sorted_by_key(|(bad_count, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>)| <span class="kw-2">*</span>bad_count)
+                .take(<span class="number">12</span>)
+                .map(|(<span class="kw">_</span>, read_idx, <span class="kw">_</span>, window_confidences)| (read_idx, window_confidences))
+                .unzip();
+
+            <span class="macro">crate::elog!</span>(<span class="string">"window_reads: {} {} {}"</span>, start, end, window_reads.len());
+            <span class="macro">crate::elog!</span>(<span class="string">"window_indices: {} {} {:?}"</span>, start, end, window_indices);
 
             <span class="kw">let </span>window_data = WMECData::new(window_reads, window_confidences);
             
@@ -826,24 +961,56 @@
                 update_dp(<span class="kw-2">&amp;</span>window_data, <span class="kw-2">&amp;mut </span>dp, <span class="kw-2">&amp;mut </span>backtrack, snp);
             }
 
-            backtrack_haplotypes(<span class="kw-2">&amp;</span>window_data, <span class="kw-2">&amp;</span>dp, <span class="kw-2">&amp;</span>backtrack)
+            <span class="kw">let </span>(hap1, hap2, part1, part2) = backtrack_haplotypes(<span class="kw-2">&amp;</span>window_data, <span class="kw-2">&amp;</span>dp, <span class="kw-2">&amp;</span>backtrack);
+
+            <span class="kw">let </span>re1: BTreeSet&lt;<span class="kw">_</span>&gt; = part1.iter().map(|<span class="kw-2">&amp;</span>i| window_indices[i <span class="kw">as </span>usize]).collect();
+            <span class="kw">let </span>re2: BTreeSet&lt;<span class="kw">_</span>&gt; = part2.iter().map(|<span class="kw-2">&amp;</span>i| window_indices[i <span class="kw">as </span>usize]).collect();
+
+            <span class="macro">crate::elog!</span>(<span class="string">"window_re1: {} {} {:?} {:?}"</span>, start, end, part1, re1);
+            <span class="macro">crate::elog!</span>(<span class="string">"window_re2: {} {} {:?} {:?}"</span>, start, end, part2, re2);
+
+            (hap1, hap2, re1, re2)
         })
         .collect();
 
     <span class="kw">let </span><span class="kw-2">mut </span>haplotype1 = Vec::new();
     <span class="kw">let </span><span class="kw-2">mut </span>haplotype2 = Vec::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>part1 = BTreeSet::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>part2 = BTreeSet::new();
 
     <span class="kw">let </span>overlap = window - stride;
 
-    <span class="kw">for </span>(hap1, hap2) <span class="kw">in </span>haplotype_pairs {
+    <span class="kw">let </span><span class="kw-2">mut </span>all_read_assignments = BTreeMap::new();
+
+    <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+    <span class="kw">for </span>(hap1, hap2, reads1, reads2) <span class="kw">in </span>haplotype_pairs {
+        <span class="comment">// crate::elog!("{}", i);
+        // crate::elog!("{:?}", reads1);
+        // crate::elog!("{:?}", reads2);
+
+        </span>i += <span class="number">1</span>;
+
         <span class="kw">if </span>haplotype1.len() == <span class="number">0 </span>{
+            <span class="kw">for </span>read_num <span class="kw">in </span>reads1.clone() {
+                all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">1</span>);
+            }
+
+            <span class="kw">for </span>read_num <span class="kw">in </span>reads2.clone() {
+                all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">2</span>);
+            }
+
             haplotype1 = hap1;
             haplotype2 = hap2;
+            part1 = reads1;
+            part2 = reads2;
         } <span class="kw">else </span>{
             <span class="comment">// Compare overlap regions to determine orientation
-            </span><span class="kw">let </span>h1_overlap = <span class="kw-2">&amp;</span>haplotype1[haplotype1.len()-overlap..];
-            <span class="kw">let </span>h2_overlap = <span class="kw-2">&amp;</span>haplotype2[haplotype2.len()-overlap..];
-            <span class="kw">let </span>new_overlap = <span class="kw-2">&amp;</span>hap1[..overlap];
+            </span><span class="macro">crate::elog!</span>(<span class="string">"haplotypes: {} {} {}"</span>, haplotype1.len(), haplotype2.len(), overlap);
+
+            <span class="kw">let </span>new_overlap_len = std::cmp::min(overlap, hap1.len());
+            <span class="kw">let </span>h1_overlap = <span class="kw-2">&amp;</span>haplotype1[haplotype1.len()-new_overlap_len..];
+            <span class="kw">let </span>h2_overlap = <span class="kw-2">&amp;</span>haplotype2[haplotype2.len()-new_overlap_len..];
+            <span class="kw">let </span>new_overlap = <span class="kw-2">&amp;</span>hap1[..new_overlap_len];
 
             <span class="comment">// Count matches between overlapping regions
             </span><span class="kw">let </span>h1_matches = h1_overlap.iter().zip(new_overlap.iter())
@@ -855,17 +1022,56 @@
 
             <span class="comment">// Append new haplotypes in correct orientation based on best overlap match
             </span><span class="kw">if </span>h1_matches &gt;= h2_matches {
-                haplotype1.extend_from_slice(<span class="kw-2">&amp;</span>hap1[overlap..]);
-                haplotype2.extend_from_slice(<span class="kw-2">&amp;</span>hap2[overlap..]);
-            } <span class="kw">else </span>{
-                haplotype1.extend_from_slice(<span class="kw-2">&amp;</span>hap2[overlap..]);
-                haplotype2.extend_from_slice(<span class="kw-2">&amp;</span>hap1[overlap..]);
-            }
+                haplotype1.extend_from_slice(<span class="kw-2">&amp;</span>hap1[std::cmp::min(overlap, hap1.len())..]);
+                haplotype2.extend_from_slice(<span class="kw-2">&amp;</span>hap2[std::cmp::min(overlap, hap2.len())..]);
 
+                <span class="kw">for </span>read_num <span class="kw">in </span>reads1.clone() {
+                    all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">1</span>);
+                }
+
+                <span class="kw">for </span>read_num <span class="kw">in </span>reads2.clone() {
+                    all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">2</span>);
+                }
+            } <span class="kw">else </span>{
+                haplotype1.extend_from_slice(<span class="kw-2">&amp;</span>hap2[std::cmp::min(overlap, hap2.len())..]);
+                haplotype2.extend_from_slice(<span class="kw-2">&amp;</span>hap1[std::cmp::min(overlap, hap1.len())..]);
+
+                <span class="kw">for </span>read_num <span class="kw">in </span>reads1.clone() {
+                    all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">2</span>);
+                }
+
+                <span class="kw">for </span>read_num <span class="kw">in </span>reads2.clone() {
+                    all_read_assignments.entry(read_num).or_insert(<span class="macro">vec!</span>[]).push(<span class="number">1</span>);
+                }
+            }
         }
     }
 
-    (haplotype1, haplotype2)
+    <span class="kw">let </span><span class="kw-2">mut </span>final_part1 = BTreeSet::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>final_part2 = BTreeSet::new();
+
+    <span class="macro">crate::elog!</span>(<span class="string">"all_read_assignments: {:?}"</span>, <span class="kw-2">&amp;</span>all_read_assignments);
+
+    <span class="kw">for </span>(read_num, assignments) <span class="kw">in </span>all_read_assignments {
+        <span class="comment">// Count frequency of assignments (1 or 2) for this read
+        </span><span class="kw">let </span>most_common = assignments.iter()
+            .fold(HashMap::new(), |<span class="kw-2">mut </span>counts, <span class="kw-2">&amp;</span>value| {
+                <span class="kw-2">*</span>counts.entry(value).or_insert(<span class="number">0</span>) += <span class="number">1</span>;
+                counts
+            })
+            .into_iter()
+            .max_by_key(|<span class="kw-2">&amp;</span>(<span class="kw">_</span>, count)| count)
+            .map(|(value, <span class="kw">_</span>)| value)
+            .unwrap_or(<span class="number">0</span>); <span class="comment">// Default to 0 if no assignments
+
+        </span><span class="kw">if </span>most_common == <span class="number">1 </span>{
+            final_part1.insert(read_num);
+        } <span class="kw">else if </span>most_common == <span class="number">2 </span>{
+            final_part2.insert(read_num);
+        }
+    }
+
+    (haplotype1, haplotype2, final_part1, final_part2)
 }
 
 <span class="attr">#[cfg(test)]
@@ -987,7 +1193,7 @@
         </span><span class="kw">let </span>data = WMECData::new(reads, confidences);
 
         <span class="comment">// Perform the WMEC algorithm using dynamic programming
-        </span><span class="kw">let </span>(haplotype1, haplotype2) = phase(<span class="kw-2">&amp;</span>data);
+        </span><span class="kw">let </span>(haplotype1, haplotype2, part1, part2) = phase(<span class="kw-2">&amp;</span>data);
 
         <span class="kw">let </span>expected_haplotype1 = <span class="macro">vec!</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">1</span>, <span class="number">0</span>, <span class="number">1</span>];
         <span class="kw">let </span>expected_haplotype2 = <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0</span>];

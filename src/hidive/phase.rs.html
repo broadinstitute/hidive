@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/call.rs`."><title>call.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hidive/</div>call.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/hidive/src/phase.rs`."><title>phase.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hidive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.1 (4eb161250 2025-03-15)" data-channel="1.85.1" data-search-js="search-75f5ac3e.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hidive/</div>phase.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -564,18 +564,237 @@
 <a href="#563" id="563">563</a>
 <a href="#564" id="564">564</a>
 <a href="#565" id="565">565</a>
-<a href="#566" id="566">566</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{BTreeMap, HashMap, HashSet};
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
+<a href="#651" id="651">651</a>
+<a href="#652" id="652">652</a>
+<a href="#653" id="653">653</a>
+<a href="#654" id="654">654</a>
+<a href="#655" id="655">655</a>
+<a href="#656" id="656">656</a>
+<a href="#657" id="657">657</a>
+<a href="#658" id="658">658</a>
+<a href="#659" id="659">659</a>
+<a href="#660" id="660">660</a>
+<a href="#661" id="661">661</a>
+<a href="#662" id="662">662</a>
+<a href="#663" id="663">663</a>
+<a href="#664" id="664">664</a>
+<a href="#665" id="665">665</a>
+<a href="#666" id="666">666</a>
+<a href="#667" id="667">667</a>
+<a href="#668" id="668">668</a>
+<a href="#669" id="669">669</a>
+<a href="#670" id="670">670</a>
+<a href="#671" id="671">671</a>
+<a href="#672" id="672">672</a>
+<a href="#673" id="673">673</a>
+<a href="#674" id="674">674</a>
+<a href="#675" id="675">675</a>
+<a href="#676" id="676">676</a>
+<a href="#677" id="677">677</a>
+<a href="#678" id="678">678</a>
+<a href="#679" id="679">679</a>
+<a href="#680" id="680">680</a>
+<a href="#681" id="681">681</a>
+<a href="#682" id="682">682</a>
+<a href="#683" id="683">683</a>
+<a href="#684" id="684">684</a>
+<a href="#685" id="685">685</a>
+<a href="#686" id="686">686</a>
+<a href="#687" id="687">687</a>
+<a href="#688" id="688">688</a>
+<a href="#689" id="689">689</a>
+<a href="#690" id="690">690</a>
+<a href="#691" id="691">691</a>
+<a href="#692" id="692">692</a>
+<a href="#693" id="693">693</a>
+<a href="#694" id="694">694</a>
+<a href="#695" id="695">695</a>
+<a href="#696" id="696">696</a>
+<a href="#697" id="697">697</a>
+<a href="#698" id="698">698</a>
+<a href="#699" id="699">699</a>
+<a href="#700" id="700">700</a>
+<a href="#701" id="701">701</a>
+<a href="#702" id="702">702</a>
+<a href="#703" id="703">703</a>
+<a href="#704" id="704">704</a>
+<a href="#705" id="705">705</a>
+<a href="#706" id="706">706</a>
+<a href="#707" id="707">707</a>
+<a href="#708" id="708">708</a>
+<a href="#709" id="709">709</a>
+<a href="#710" id="710">710</a>
+<a href="#711" id="711">711</a>
+<a href="#712" id="712">712</a>
+<a href="#713" id="713">713</a>
+<a href="#714" id="714">714</a>
+<a href="#715" id="715">715</a>
+<a href="#716" id="716">716</a>
+<a href="#717" id="717">717</a>
+<a href="#718" id="718">718</a>
+<a href="#719" id="719">719</a>
+<a href="#720" id="720">720</a>
+<a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
+<a href="#723" id="723">723</a>
+<a href="#724" id="724">724</a>
+<a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a>
+<a href="#728" id="728">728</a>
+<a href="#729" id="729">729</a>
+<a href="#730" id="730">730</a>
+<a href="#731" id="731">731</a>
+<a href="#732" id="732">732</a>
+<a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a>
+<a href="#770" id="770">770</a>
+<a href="#771" id="771">771</a>
+<a href="#772" id="772">772</a>
+<a href="#773" id="773">773</a>
+<a href="#774" id="774">774</a>
+<a href="#775" id="775">775</a>
+<a href="#776" id="776">776</a>
+<a href="#777" id="777">777</a>
+<a href="#778" id="778">778</a>
+<a href="#779" id="779">779</a>
+<a href="#780" id="780">780</a>
+<a href="#781" id="781">781</a>
+<a href="#782" id="782">782</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 <span class="kw">use </span>std::{fs::File, path::PathBuf, io::Write};
 
 <span class="kw">use </span>itertools::Itertools;
 
 <span class="kw">use </span>rust_htslib::bam::record::Cigar;
+<span class="kw">use </span>rust_htslib::bam::Record;
 <span class="kw">use </span>rust_htslib::bcf::record::GenotypeAllele;
 <span class="kw">use </span>rust_htslib::bcf::{Format, Header, Writer};
 <span class="kw">use </span>rust_htslib::{bam, bam::{FetchDefinition, Read}};
 <span class="kw">use </span>minimap2::Aligner;
 
+<span class="kw">use </span>skydive::ldbg::LdBG;
 <span class="kw">use </span>skydive::wmec::<span class="kw-2">*</span>;
+<span class="kw">use </span>spoa::AlignmentType;
 
 <span class="kw">pub fn </span>start(
     output: <span class="kw-2">&amp;</span>PathBuf,
@@ -601,8 +820,16 @@
     </span><span class="kw">let </span>loci = skydive::parse::parse_loci(loci_list, <span class="number">0</span>).into_iter().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
     <span class="comment">// Initialize VCF header
-    </span><span class="kw">let </span>vcf_header = initialize_vcf_header(<span class="kw-2">&amp;</span>fasta, sample_name);
-    <span class="kw">let </span><span class="kw-2">mut </span>vcf = Writer::from_path(output, <span class="kw-2">&amp;</span>vcf_header, <span class="bool-val">true</span>, Format::Vcf).unwrap();
+    // let vcf_header1 = initialize_vcf_header(&amp;fasta, sample_name);
+    // let mut vcf1 = Writer::from_path(PathBuf::from("phased1.vcf"), &amp;vcf_header1, true, Format::Vcf).unwrap();
+
+    // let vcf_header2 = initialize_vcf_header(&amp;fasta, sample_name);
+    // let mut vcf2 = Writer::from_path(PathBuf::from("phased2.vcf"), &amp;vcf_header2, true, Format::Vcf).unwrap();
+
+    // Initialize BAM header and writer for output
+    </span><span class="kw">let </span>input_bam = skydive::stage::open_bam(<span class="kw-2">&amp;</span>bam_url).unwrap();
+    <span class="kw">let </span><span class="kw-2">mut </span>bam1_writer = bam::Writer::from_path(<span class="macro">format!</span>(<span class="string">"{}.phased1.bam"</span>, output.display()), <span class="kw-2">&amp;</span>bam::Header::from_template(<span class="kw-2">&amp;</span>input_bam.header()), bam::Format::Bam).unwrap();
+    <span class="kw">let </span><span class="kw-2">mut </span>bam2_writer = bam::Writer::from_path(<span class="macro">format!</span>(<span class="string">"{}.phased2.bam"</span>, output.display()), <span class="kw-2">&amp;</span>bam::Header::from_template(<span class="kw-2">&amp;</span>input_bam.header()), bam::Format::Bam).unwrap();
 
     <span class="kw">for </span>(chr, start, stop, name) <span class="kw">in </span>loci {
         <span class="macro">skydive::elog!</span>(<span class="string">"Processing locus {} ({}:{}-{})..."</span>, name, chr, start, stop);
@@ -610,19 +837,135 @@
         <span class="comment">// The BAM reader gets renewed for each locus, but it's fast to open.
         </span><span class="kw">let </span>bam = skydive::stage::open_bam(<span class="kw-2">&amp;</span>bam_url).unwrap();
 
-        <span class="comment">// let (matrix, mloci) = prepare_matrix(&amp;chr, start, stop, bam, &amp;fasta);
+        <span class="kw">let </span>(matrix, mloci, read_map) = prepare_matrix(<span class="kw-2">&amp;</span>chr, start, stop, bam, <span class="kw-2">&amp;</span>fasta);
 
-        </span><span class="kw">let </span>(matrix, mloci) = prepare_matrix_new(<span class="kw-2">&amp;</span>chr, start, stop, bam, <span class="kw-2">&amp;</span>fasta);
+        <span class="comment">// for (read_idx, record) in &amp;read_map {
+        //     skydive::elog!("read: {} {}", read_idx, String::from_utf8_lossy(record.qname()));
+        // }
 
-        <span class="macro">skydive::elog!</span>(<span class="string">" - phasing {} variants..."</span>, mloci.len());
+        </span><span class="macro">skydive::elog!</span>(<span class="string">" - phasing {} variants..."</span>, mloci.len());
 
-        <span class="kw">let </span>(h1, h2) = phase_variants(<span class="kw-2">&amp;</span>matrix);
+        <span class="kw">if </span>mloci.len() &gt; <span class="number">0 </span>{
+            <span class="kw">let </span>(h1_reads, h2_reads, h1, h2) = phase_variants(<span class="kw-2">&amp;</span>matrix);
 
-        <span class="comment">// let (hap1, hap2) = build_haplotypes(mloci, h1, h2, reference_seq_url, start, stop, chr);
-        // write_haplotypes(&amp;mut output_file, name, hap1, hap2);
+            <span class="kw">for </span>read <span class="kw">in </span>h1_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+                bam1_writer.write(read).unwrap();
+            }
 
-        </span>add_variant_records(mloci, h1, h2, <span class="kw-2">&amp;mut </span>fasta, chr, start, stop, <span class="kw-2">&amp;mut </span>vcf);
+            <span class="kw">for </span>read <span class="kw">in </span>h2_reads.iter().filter(|idx| read_map.contains_key(idx)).map(|idx| read_map.get(idx).unwrap()) {
+                bam2_writer.write(read).unwrap();
+            }
+        }
+
+        <span class="comment">// let h1_filtered = filter_variants(&amp;mloci, &amp;chr, &amp;h1, &amp;fasta);
+        // let h2_filtered = filter_variants(&amp;mloci, &amp;chr, &amp;h2, &amp;fasta);
+
+        // let mut h1_repaired = Vec::new();
+        // let mut h2_repaired = Vec::new();
+
+        // for ((l, a), b) in mloci.iter().zip(h1_filtered.iter()).zip(h2_filtered.iter()) {
+        //     if a.is_some() &amp;&amp; b.is_none() {
+        //         h1_repaired.push(a.clone());
+        //         h2_repaired.push(a.clone());
+        //     } else if a.is_none() &amp;&amp; b.is_some() {
+        //         h1_repaired.push(b.clone());
+        //         h2_repaired.push(b.clone());
+        //     } else {
+        //         h1_repaired.push(a.clone());
+        //         h2_repaired.push(b.clone());
+        //     }
+        // }
+
+        // let none_vec = vec![None; h1_filtered.len()];
+
+        // add_variant_records(mloci.clone(), h1_repaired, none_vec.clone(), &amp;mut fasta, chr.clone(), start, stop, &amp;mut vcf1);
+        // add_variant_records(mloci.clone(), none_vec.clone(), h2_repaired, &amp;mut fasta, chr.clone(), start, stop, &amp;mut vcf2);
+    </span>}
+}
+
+<span class="kw">fn </span>clean_variants(mloci: <span class="kw-2">&amp;</span>Vec&lt;u32&gt;, h1: <span class="kw-2">&amp;</span>Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, h2: <span class="kw-2">&amp;</span>Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;) -&gt; (Vec&lt;u32&gt;, Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;) {
+    <span class="kw">let </span><span class="kw-2">mut </span>nloci: Vec&lt;u32&gt; = Vec::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>h1_cleaned: Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt; = Vec::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>h2_cleaned: Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt; = Vec::new();
+
+    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..mloci.len() {
+        <span class="kw">if </span>h1[i].is_some() || h2[i].is_some() {
+            nloci.push(mloci[i]);
+            h1_cleaned.push(h1[i].clone());
+            h2_cleaned.push(h2[i].clone());
+        }
     }
+
+    (nloci, h1_cleaned, h2_cleaned)
+}
+
+<span class="doccomment">/// Keeps only the longest insertion when multiple insertions are near each other
+</span><span class="kw">fn </span>filter_variants(mloci: <span class="kw-2">&amp;</span>Vec&lt;u32&gt;, chr: <span class="kw-2">&amp;</span>String, variants: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span>&lt;String&gt;], fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader) -&gt; Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>filtered = variants.to_vec();
+    <span class="kw">let </span><span class="kw-2">mut </span>include = <span class="macro">vec!</span>[<span class="bool-val">true</span>; variants.len()];
+
+    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..variants.len() {
+        <span class="kw">if </span>include[i] &amp;&amp; filtered[i].is_some() &amp;&amp; filtered[i].as_ref().unwrap().len() &gt; <span class="number">100 </span>{
+            <span class="kw">for </span>j <span class="kw">in </span>(i + <span class="number">1</span>)..variants.len() {
+                <span class="kw">if </span>include[j] &amp;&amp; filtered[j].is_some() {
+                    <span class="kw">let </span>i_len = filtered[i].as_ref().unwrap().len();
+                    <span class="kw">let </span>j_len = filtered[j].as_ref().unwrap().len();
+                    <span class="kw">if </span>(j_len <span class="kw">as </span>f64) &gt;= (i_len <span class="kw">as </span>f64) * <span class="number">0.5 </span>&amp;&amp; (j_len <span class="kw">as </span>f64) &lt;= (i_len <span class="kw">as </span>f64) * <span class="number">1.5 </span>{
+                        <span class="kw">if </span>filtered[j].as_ref().unwrap().len() &gt; filtered[i].as_ref().unwrap().len() {
+                            include[i] = <span class="bool-val">false</span>;
+                        } <span class="kw">else </span>{
+                            include[j] = <span class="bool-val">false</span>;
+                        }
+                    }
+                }
+            }
+        }
+
+        <span class="kw">if </span>include[i] &amp;&amp; filtered[i].is_some() &amp;&amp; filtered[i].as_ref().unwrap().len() == <span class="number">2 </span>{
+            <span class="kw">let </span>ref_pos = mloci[i];
+            <span class="kw">let </span>prev_ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - <span class="number">2</span>).unwrap(), usize::try_from(ref_pos - <span class="number">2</span>).unwrap()).unwrap();
+            <span class="kw">let </span>next_ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos).unwrap(), usize::try_from(ref_pos).unwrap()).unwrap();
+
+            <span class="kw">let </span>first_allele_str = filtered[i].as_ref().unwrap().chars().next().unwrap().to_string();
+            <span class="kw">let </span>last_allele_str = filtered[i].as_ref().unwrap().chars().last().unwrap().to_string();
+
+            <span class="comment">// skydive::elog!(" - examine {} {} {} {} {}", ref_pos, prev_ref_str, first_allele_str, last_allele_str, next_ref_str);
+
+            </span><span class="kw">if </span>prev_ref_str == first_allele_str || next_ref_str == last_allele_str {
+                include[i] = <span class="bool-val">false</span>;
+
+                <span class="comment">// skydive::elog!(" - filtered");
+            </span>}
+        }
+    }
+
+    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..variants.len() {
+        <span class="kw">if </span>!include[i] {
+            filtered[i] = <span class="prelude-val">None</span>;
+        }
+    }
+
+    filtered
+}
+
+<span class="kw">fn </span>assemble_haplotype(reads: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;) -&gt; String {
+    <span class="kw">let </span><span class="kw-2">mut </span>sg = spoa::Graph::new();
+
+    <span class="comment">// let oriented_reads = orient_reads(ref_seqs, reads);
+
+    </span><span class="kw">let </span><span class="kw-2">mut </span>la = spoa::AlignmentEngine::new(AlignmentType::kOV, <span class="number">5</span>, -<span class="number">4</span>, -<span class="number">8</span>, -<span class="number">6</span>, -<span class="number">8</span>, -<span class="number">4</span>);
+    reads.iter().filter(|read| read.len() &gt; <span class="number">500</span>).for_each(|lr_seq| {
+        <span class="kw">let </span>seq = lr_seq.clone();
+        <span class="kw">let </span>seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
+        <span class="kw">let </span>seq_qual = std::ffi::CString::new(<span class="macro">vec!</span>[<span class="string">b'I'</span>; seq.len()]).unwrap();
+
+        <span class="kw">let </span>a = la.align(seq_cstr.as_ref(), <span class="kw-2">&amp;</span>sg);
+        sg.add_alignment(<span class="kw-2">&amp;</span>a, seq_cstr.as_ref(), seq_qual.as_ref());
+    });
+
+    <span class="kw">let </span>consensus_cstr = sg.consensus();
+
+    consensus_cstr.to_str().unwrap().to_string()
 }
 
 <span class="kw">fn </span>initialize_vcf_header(fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader, sample_name: <span class="kw-2">&amp;</span>String) -&gt; Header {
@@ -646,7 +989,7 @@
     vcf_header
 }
 
-<span class="kw">fn </span>prepare_matrix(chr: <span class="kw-2">&amp;</span>String, start: u64, stop: u64, <span class="kw-2">mut </span>bam: rust_htslib::bam::IndexedReader, fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader) -&gt; (Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;, Vec&lt;u32&gt;) {
+<span class="kw">fn </span>prepare_matrix_old(chr: <span class="kw-2">&amp;</span>String, start: u64, stop: u64, <span class="kw-2">mut </span>bam: rust_htslib::bam::IndexedReader, fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader) -&gt; (Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;, Vec&lt;u32&gt;) {
     <span class="kw">let </span><span class="kw-2">mut </span>read_ids = HashMap::new();
     <span class="kw">let </span><span class="kw-2">mut </span>matrix = Vec::new();
     <span class="kw">let </span><span class="kw-2">mut </span>metadata: BTreeMap&lt;u32, String&gt; = BTreeMap::new();
@@ -710,9 +1053,9 @@
                     <span class="kw">let </span>full_seq = [<span class="kw-2">&amp;</span>[ref_base], seq.as_slice()].concat();
                     allele_map.insert(<span class="kw-2">*</span>read_ids.get(<span class="kw-2">&amp;</span>qname).unwrap(), (String::from_utf8_lossy(<span class="kw-2">&amp;</span>full_seq).to_string(), q));
 
-                    <span class="macro">skydive::elog!</span>(<span class="string">"{} {}"</span>, pileup.pos(), len);
+                    <span class="comment">// skydive::elog!("{} {}", pileup.pos(), len);
 
-                    is_variant = <span class="bool-val">true</span>;
+                    </span>is_variant = <span class="bool-val">true</span>;
                 },
                 rust_htslib::bam::pileup::Indel::None =&gt; ()
             }
@@ -725,19 +1068,20 @@
         }
     }
 
-    <span class="macro">skydive::elog!</span>(<span class="string">"{:?}"</span>, matrix);
-    <span class="macro">skydive::elog!</span>(<span class="string">"{:?}"</span>, mloci);
-
     (matrix, mloci)
 }
 
-<span class="kw">fn </span>prepare_matrix_new(chr: <span class="kw-2">&amp;</span>String, start: u64, stop: u64, <span class="kw-2">mut </span>bam: rust_htslib::bam::IndexedReader, fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader) -&gt; (Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;, Vec&lt;u32&gt;) {
+<span class="kw">fn </span>prepare_matrix(chr: <span class="kw-2">&amp;</span>String, start: u64, stop: u64, <span class="kw-2">mut </span>bam: rust_htslib::bam::IndexedReader, fasta: <span class="kw-2">&amp;</span>rust_htslib::faidx::Reader) -&gt; (Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;, Vec&lt;u32&gt;, BTreeMap&lt;usize, Record&gt;) {
     <span class="comment">//                            pos           read    allele  qual
     </span><span class="kw">let </span><span class="kw-2">mut </span>alleles_map: BTreeMap&lt;u32, BTreeMap&lt;usize, (String, u8)&gt;&gt; = BTreeMap::new();
     <span class="kw">let </span><span class="kw-2">mut </span>read_ids = HashMap::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>read_map = BTreeMap::new();
 
     <span class="kw">let _ </span>= bam.fetch(FetchDefinition::RegionString(chr.as_bytes(), start <span class="kw">as </span>i64, stop <span class="kw">as </span>i64));
     <span class="kw">for </span>(read_index, read) <span class="kw">in </span>bam.records().filter(|r| r.is_ok()).flatten().enumerate() {
+        read_ids.insert(String::from_utf8_lossy(<span class="kw-2">&amp;</span>read.qname()).to_string(), read_index);
+        read_map.insert(read_index, read.clone());
+
         <span class="kw">let </span><span class="kw-2">mut </span>read_pos = <span class="number">0</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>ref_pos = read.pos() <span class="kw">as </span>u32;
 
@@ -751,7 +1095,8 @@
                         <span class="kw">let </span>qpos_start = read_pos <span class="kw">as </span>usize;
                         <span class="kw">let </span>qpos_stop = read_pos <span class="kw">as </span>usize + <span class="kw-2">*</span>len <span class="kw">as </span>usize;
                         <span class="kw">let </span>qual = read.qual()[qpos_start..qpos_stop].to_vec();
-                        <span class="kw">let </span>q = <span class="kw-2">*</span>qual.iter().min().unwrap();
+                        <span class="comment">// let q = *qual.iter().min().unwrap();
+                        </span><span class="kw">let </span>q = <span class="number">10</span>;
                         <span class="kw">let </span>seq = [<span class="kw-2">&amp;</span>[ref_base], <span class="kw-2">&amp;</span>read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
 
                         <span class="kw">let </span>allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
@@ -764,8 +1109,9 @@
                             allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
                         }
 
-                        read_ids.insert(String::from_utf8_lossy(<span class="kw-2">&amp;</span>read.qname()).to_string(), read_index);
-                    }
+                        <span class="comment">// read_ids.insert(String::from_utf8_lossy(&amp;read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
+                    </span>}
 
                     read_pos += len;
                 }
@@ -775,8 +1121,68 @@
                         <span class="kw">let </span>ref_base = ref_str.as_bytes()[<span class="number">0</span>];
 
                         <span class="kw">let </span>qpos_start = read_pos <span class="kw">as </span>usize;
-                        <span class="kw">let </span>q = read.qual()[qpos_start];
+                        <span class="comment">// let q = read.qual()[qpos_start];
+                        </span><span class="kw">let </span>q = <span class="number">10</span>;
                         <span class="kw">let </span>seq = <span class="macro">vec!</span>[ref_base; <span class="number">1</span>].into_iter().chain(std::iter::repeat(<span class="string">b'-'</span>).take(<span class="kw-2">*</span>len <span class="kw">as </span>usize)).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+                        <span class="kw">let </span>allele_map = alleles_map.entry(ref_pos - <span class="number">1</span>).or_insert_with(BTreeMap::new);
+
+                        <span class="kw">if let </span><span class="prelude-val">Some</span>((existing_seq, <span class="kw">_</span>)) = allele_map.get(<span class="kw-2">&amp;</span>read_index) {
+                            <span class="kw">if </span>seq.len() &gt; existing_seq.len() {
+                                allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
+                            }
+                        } <span class="kw">else </span>{
+                            allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
+                        }
+
+                        <span class="comment">// read_ids.insert(String::from_utf8_lossy(&amp;read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
+                    </span>}
+
+                    ref_pos += len;
+                }
+                Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) =&gt; {
+                    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="kw-2">*</span>len <span class="kw">as </span>usize {
+                        <span class="kw">if </span>start <span class="kw">as </span>u32 &lt;= ref_pos + i <span class="kw">as </span>u32 + <span class="number">1 </span>&amp;&amp; ref_pos + i <span class="kw">as </span>u32 + <span class="number">1 </span>&lt; stop <span class="kw">as </span>u32 {
+                            <span class="kw">let </span>ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos + i <span class="kw">as </span>u32).unwrap(), usize::try_from(ref_pos + i <span class="kw">as </span>u32).unwrap()).unwrap();
+                            <span class="kw">let </span>ref_base = ref_str.as_bytes()[<span class="number">0</span>];
+
+                            <span class="kw">let </span>read_base = read.seq().as_bytes()[read_pos <span class="kw">as </span>usize + i];
+                            <span class="comment">// let q = read.qual()[read_pos as usize + i];
+                            </span><span class="kw">let </span>q = <span class="number">10</span>;
+
+                            <span class="kw">if </span>ref_base != read_base {
+                                <span class="kw">let </span>seq = <span class="macro">vec!</span>[read_base];
+                                <span class="kw">let </span>allele_map = alleles_map.entry(ref_pos + i <span class="kw">as </span>u32).or_insert_with(BTreeMap::new);
+
+                                <span class="kw">if let </span><span class="prelude-val">Some</span>((existing_seq, <span class="kw">_</span>)) = allele_map.get(<span class="kw-2">&amp;</span>read_index) {
+                                    <span class="kw">if </span>seq.len() &gt; existing_seq.len() {
+                                        allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
+                                    }
+                                } <span class="kw">else </span>{
+                                    allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
+                                }
+
+                                <span class="comment">// read_ids.insert(String::from_utf8_lossy(&amp;read.qname()).to_string(), read_index);
+                                // read_map.insert(read_index, read.clone());
+                            </span>}
+                        }
+                    }
+
+                    read_pos += len;
+                    ref_pos += len;
+                }
+                Cigar::SoftClip(len) =&gt; {
+                    <span class="kw">if </span>start <span class="kw">as </span>u32 &lt;= ref_pos + <span class="number">1 </span>&amp;&amp; ref_pos + <span class="number">1 </span>&lt; stop <span class="kw">as </span>u32 {
+                        <span class="kw">let </span>ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos - <span class="number">1</span>).unwrap(), usize::try_from(ref_pos - <span class="number">1</span>).unwrap()).unwrap();
+                        <span class="kw">let </span>ref_base = ref_str.as_bytes()[<span class="number">0</span>];
+
+                        <span class="kw">let </span>qpos_start = read_pos <span class="kw">as </span>usize;
+                        <span class="kw">let </span>qpos_stop = read_pos <span class="kw">as </span>usize + <span class="kw-2">*</span>len <span class="kw">as </span>usize;
+                        <span class="kw">let </span>qual = read.qual()[qpos_start..qpos_stop].to_vec();
+                        <span class="comment">// let q = *qual.iter().min().unwrap();
+                        </span><span class="kw">let </span>q = <span class="number">10</span>;
+                        <span class="kw">let </span>seq = [<span class="kw-2">&amp;</span>[ref_base], <span class="kw-2">&amp;</span>read.seq().as_bytes()[qpos_start..qpos_stop]].concat();
 
                         <span class="kw">let </span>allele_map = alleles_map.entry(ref_pos).or_insert_with(BTreeMap::new);
 
@@ -788,43 +1194,10 @@
                             allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
                         }
 
-                        read_ids.insert(String::from_utf8_lossy(<span class="kw-2">&amp;</span>read.qname()).to_string(), read_index);
-                    }
+                        <span class="comment">// read_ids.insert(String::from_utf8_lossy(&amp;read.qname()).to_string(), read_index);
+                        // read_map.insert(read_index, read.clone());
+                    </span>}
 
-                    ref_pos += len;
-                }
-                Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) =&gt; {
-                    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="kw-2">*</span>len <span class="kw">as </span>usize {
-                        <span class="kw">if </span>start <span class="kw">as </span>u32 &lt;= ref_pos + i <span class="kw">as </span>u32 + <span class="number">1 </span>&amp;&amp; ref_pos + i <span class="kw">as </span>u32 + <span class="number">1 </span>&lt; stop <span class="kw">as </span>u32 {
-                            <span class="kw">let </span>ref_str = fasta.fetch_seq_string(chr, usize::try_from(ref_pos + i <span class="kw">as </span>u32).unwrap(), usize::try_from(ref_pos + i <span class="kw">as </span>u32).unwrap()).unwrap();
-                            <span class="kw">let </span>ref_base = ref_str.as_bytes()[<span class="number">0</span>];
-
-                            <span class="kw">let </span>read_base = read.seq().as_bytes()[read_pos <span class="kw">as </span>usize + i];
-                            <span class="kw">let </span>q = read.qual()[read_pos <span class="kw">as </span>usize + i];
-
-                            <span class="comment">// skydive::elog!(" - {} {} {}", ref_pos + i as u32 + 1, String::from_utf8_lossy(&amp;[ref_base]), String::from_utf8_lossy(&amp;[read_base]));
-
-                            </span><span class="kw">if </span>ref_base != read_base {
-                                <span class="kw">let </span>seq = <span class="macro">vec!</span>[read_base];
-                                <span class="kw">let </span>allele_map = alleles_map.entry(ref_pos + i <span class="kw">as </span>u32 + <span class="number">1</span>).or_insert_with(BTreeMap::new);
-
-                                <span class="kw">if let </span><span class="prelude-val">Some</span>((existing_seq, <span class="kw">_</span>)) = allele_map.get(<span class="kw-2">&amp;</span>read_index) {
-                                    <span class="kw">if </span>seq.len() &gt; existing_seq.len() {
-                                        allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
-                                    }
-                                } <span class="kw">else </span>{
-                                    allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
-                                }
-
-                                read_ids.insert(String::from_utf8_lossy(<span class="kw-2">&amp;</span>read.qname()).to_string(), read_index);
-                            }
-                        }
-                    }
-
-                    read_pos += len;
-                    ref_pos += len;
-                }
-                Cigar::SoftClip(len) =&gt; {
                     read_pos += len;
                 }
                 Cigar::HardClip(<span class="kw">_</span>) =&gt; { }
@@ -844,39 +1217,78 @@
             <span class="kw">let </span>record = alignment.record();
             <span class="kw">let </span>qname = String::from_utf8(record.qname().to_vec()).unwrap();
 
-            <span class="kw">let </span>read_index = <span class="kw-2">*</span>read_ids.get(<span class="kw-2">&amp;</span>qname).unwrap();
+            <span class="kw">if </span>read_ids.contains_key(<span class="kw-2">&amp;</span>qname) {
+                <span class="kw">let </span>read_index = <span class="kw-2">*</span>read_ids.get(<span class="kw-2">&amp;</span>qname).unwrap();
 
-            <span class="kw">if </span>alleles_map.contains_key(<span class="kw-2">&amp;</span>pileup.pos()) &amp;&amp; !alleles_map.get(<span class="kw-2">&amp;</span>pileup.pos()).unwrap().contains_key(<span class="kw-2">&amp;</span>read_index) {
-                <span class="kw">if </span>alignment.qpos().is_none() {
-                    <span class="kw">continue</span>;
+                <span class="kw">if </span>alleles_map.contains_key(<span class="kw-2">&amp;</span>(pileup.pos())) &amp;&amp; !alleles_map.get(<span class="kw-2">&amp;</span>(pileup.pos())).unwrap().contains_key(<span class="kw-2">&amp;</span>read_index) {
+                    <span class="kw">if </span>alignment.qpos().is_none() || alignment.qpos().unwrap() &gt;= record.seq().len() {
+                        <span class="kw">continue</span>;
+                    }
+
+                    <span class="kw">let </span>base = record.seq()[alignment.qpos().unwrap()];
+                    <span class="kw">let </span>seq = <span class="macro">vec!</span>[base];
+                    <span class="comment">// let q = record.qual()[alignment.qpos().unwrap()];
+                    </span><span class="kw">let </span>q = <span class="number">10</span>;
+
+                    <span class="kw">let </span>allele_map = alleles_map.get_mut(<span class="kw-2">&amp;</span>pileup.pos()).expect(<span class="string">"Position not found in alleles_map"</span>);
+                    allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
                 }
-
-                <span class="kw">let </span>base = record.seq()[alignment.qpos().unwrap() - <span class="number">1</span>];
-                <span class="kw">let </span>seq = <span class="macro">vec!</span>[base];
-                <span class="kw">let </span>q = record.qual()[alignment.qpos().unwrap() - <span class="number">1</span>];
-
-                <span class="comment">// skydive::elog!("{} {} {}", pileup.pos(), read_index, String::from_utf8_lossy(&amp;seq));
-
-                </span><span class="kw">let </span>allele_map = alleles_map.entry(pileup.pos()).or_insert_with(BTreeMap::new);
-                allele_map.insert(read_index, (String::from_utf8_lossy(<span class="kw-2">&amp;</span>seq).to_string(), q));
             }
         }
     }
 
-    <span class="comment">// skydive::elog!("{:?}", alleles_map);
-
-    </span><span class="kw">let </span><span class="kw-2">mut </span>matrix = Vec::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>matrix = Vec::new();
     <span class="kw">let </span><span class="kw-2">mut </span>mloci = Vec::new();
 
-    <span class="kw">for </span>(pos, allele_map) <span class="kw">in </span>alleles_map {
-        matrix.push(allele_map);
-        mloci.push(pos - <span class="number">1</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>last_pos = <span class="number">0</span>;
+    <span class="kw">for </span>(pos, <span class="kw-2">mut </span>allele_map) <span class="kw">in </span>alleles_map {
+        <span class="comment">// skydive::elog!("before {} {:?}", pos, allele_map);
+
+        </span><span class="kw">for </span>id <span class="kw">in </span>read_map.keys() {
+            <span class="kw">let </span><span class="kw-2">mut </span>allele_set = HashMap::new();
+            <span class="kw">for </span>(<span class="kw">_</span>, (allele, <span class="kw">_</span>)) <span class="kw">in </span><span class="kw-2">&amp;</span>allele_map {
+                <span class="kw">if </span>!allele_set.contains_key(allele) {
+                    allele_set.insert(allele.clone(), <span class="number">0</span>);
+                }
+
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(x) = allele_set.get_mut(allele) {
+                    <span class="kw-2">*</span>x += <span class="number">1</span>;
+                }
+            }
+
+            <span class="kw">let </span><span class="kw-2">mut </span>most_frequent_allele = allele_set.keys().next().unwrap().clone();
+            <span class="kw">let </span><span class="kw-2">mut </span>most_frequent_count = <span class="number">0</span>;
+            <span class="kw">for </span>(allele, count) <span class="kw">in </span>allele_set {
+                <span class="kw">if </span>count &gt; most_frequent_count {
+                    most_frequent_count = count;
+                    most_frequent_allele = allele;
+                }
+            }
+
+            <span class="kw">if </span>!allele_map.contains_key(id) {
+                allele_map.insert(<span class="kw-2">*</span>id, (most_frequent_allele, <span class="number">0</span>));
+            }
+        }
+
+        <span class="comment">// skydive::elog!("after  {} {:?}", pos, allele_map);
+
+        // let score = allele_map.values().map(|(a, s)| *s as f32).sum::&lt;f32&gt;() / allele_map.len() as f32;
+
+        </span><span class="kw">let </span>allele_set = allele_map.values().map(|(a, <span class="kw">_</span>)| a.clone()).collect::&lt;HashSet&lt;String&gt;&gt;();
+
+        <span class="comment">// skydive::elog!("{:?}", allele_set);
+
+        // if allele_map.len() == read_map.len() {
+        // if score &gt; 5.0 {
+        </span><span class="kw">if </span>allele_set.len() == <span class="number">2 </span>&amp;&amp; allele_set.iter().map(|a| a.len() - <span class="number">1</span>).sum::&lt;usize&gt;() == <span class="number">0 </span>&amp;&amp; pos - last_pos &gt; <span class="number">20 </span>{
+            matrix.push(allele_map);
+            mloci.push(pos);
+        }
+
+        last_pos = pos;
     }
 
-    <span class="comment">// skydive::elog!("{:?}", matrix);
-    // skydive::elog!("{:?}", mloci);
-
-    </span>(matrix, mloci)
+    (matrix, mloci, read_map)
 }
 
 <span class="kw">fn </span>write_haplotypes(output_file: <span class="kw-2">&amp;mut </span>File, name: String, hap1: String, hap2: String) {
@@ -944,13 +1356,17 @@
 <span class="kw">fn </span>add_variant_records(mloci: Vec&lt;u32&gt;, h1: Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, h2: Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, fasta: <span class="kw-2">&amp;mut </span>rust_htslib::faidx::Reader, chr: String, start: u64, stop: u64, vcf: <span class="kw-2">&amp;mut </span>rust_htslib::bcf::Writer) {
     <span class="kw">let </span><span class="kw-2">mut </span>hap_alleles = HashMap::new();
     <span class="kw">for </span>((pos, a1), a2) <span class="kw">in </span>mloci.iter().zip(h1.iter()).zip(h2.iter()) {
+        <span class="kw">let </span>ref_base = fasta.fetch_seq_string(<span class="kw-2">&amp;</span>chr, usize::try_from(<span class="kw-2">*</span>pos).unwrap(), usize::try_from(<span class="kw-2">*</span>pos).unwrap()).unwrap();
+
         <span class="kw">if </span>a1.is_some() &amp;&amp; a2.is_some() {
             hap_alleles.insert(pos, (a1.clone().unwrap(), a2.clone().unwrap()));
         } <span class="kw">else if </span>a1.is_some() &amp;&amp; a2.is_none() {
             hap_alleles.insert(pos, (a1.clone().unwrap(), a1.clone().unwrap()));
         } <span class="kw">else if </span>a1.is_none() &amp;&amp; a2.is_some() {
             hap_alleles.insert(pos, (a2.clone().unwrap(), a2.clone().unwrap()));
-        }
+        } <span class="kw">else </span>{
+            <span class="comment">// skydive::elog!(" - no variant for {}", pos);
+        </span>}
     }
 
     <span class="kw">let </span><span class="kw-2">mut </span>ref_start: <span class="prelude-ty">Option</span>&lt;(String, u32)&gt; = <span class="prelude-val">None</span>;
@@ -959,28 +1375,30 @@
         <span class="kw">let </span>ref_base = fasta.fetch_seq_string(<span class="kw-2">&amp;</span>chr, usize::try_from(pos).unwrap(), usize::try_from(pos).unwrap()).unwrap();
 
         <span class="kw">if </span>hap_alleles.contains_key(<span class="kw-2">&amp;</span>pos) {
-            <span class="kw">if </span>ref_start.is_some() {
-                <span class="kw">let </span>(ref_str, ref_pos) = ref_start.unwrap();
+            <span class="comment">/*
+            if ref_start.is_some() {
+                let (ref_str, ref_pos) = ref_start.unwrap();
 
-                <span class="kw">let </span><span class="kw-2">mut </span>ref_record = vcf.empty_record();
-                <span class="kw">let </span>rid = vcf.header().name2rid(chr.as_bytes()).unwrap();
-                ref_record.set_rid(<span class="prelude-val">Some</span>(rid));
-                ref_record.set_pos(ref_pos <span class="kw">as </span>i64);
+                let mut ref_record = vcf.empty_record();
+                let rid = vcf.header().name2rid(chr.as_bytes()).unwrap();
+                ref_record.set_rid(Some(rid));
+                ref_record.set_pos(ref_pos as i64);
 
-                ref_record.push_info_integer(<span class="string">"END"</span>.as_bytes(), <span class="kw-2">&amp;</span>[pos <span class="kw">as </span>i32]).unwrap();
-                ref_record.push_format_integer(<span class="string">"GQ"</span>.as_bytes(), <span class="kw-2">&amp;</span>[<span class="number">40</span>]).unwrap();
+                ref_record.push_info_integer("END".as_bytes(), &amp;[pos as i32]).unwrap();
+                ref_record.push_format_integer("GQ".as_bytes(), &amp;[40]).unwrap();
 
-                ref_record.set_alleles(<span class="kw-2">&amp;</span>[ref_str.to_string().as_bytes(), <span class="string">"&lt;*&gt;"</span>.as_bytes()]).unwrap();
+                ref_record.set_alleles(&amp;[ref_str.to_string().as_bytes(), "&lt;*&gt;".as_bytes()]).unwrap();
 
-                <span class="kw">let </span>genotype = <span class="kw-2">&amp;</span>[GenotypeAllele::Unphased(<span class="number">0</span>), GenotypeAllele::Phased(<span class="number">0</span>)];
+                let genotype = &amp;[GenotypeAllele::Unphased(0), GenotypeAllele::Phased(0)];
                 ref_record.push_genotypes(genotype).unwrap();
 
-                vcf.write(<span class="kw-2">&amp;</span>ref_record).unwrap();
+                vcf.write(&amp;ref_record).unwrap();
 
-                ref_start = <span class="prelude-val">None</span>;
+                ref_start = None;
             }
+            */
 
-            <span class="kw">let </span><span class="kw-2">mut </span>record = vcf.empty_record();
+            </span><span class="kw">let </span><span class="kw-2">mut </span>record = vcf.empty_record();
 
             <span class="comment">// Set contig name and record position
             </span><span class="kw">let </span>rid = vcf.header().name2rid(chr.as_bytes()).unwrap();
@@ -1043,25 +1461,28 @@
                 }
             });
 
-            <span class="kw">let </span><span class="kw-2">mut </span>alleles: Vec&lt;<span class="kw-2">&amp;</span>[u8]&gt; = alleles_vec.iter().map(|v| v.as_slice()).collect();
-            alleles.push(<span class="string">"&lt;*&gt;"</span>.as_bytes());
-            record.set_alleles(<span class="kw-2">&amp;</span>alleles).unwrap();
+            <span class="kw">let </span>alleles: Vec&lt;<span class="kw-2">&amp;</span>[u8]&gt; = alleles_vec.iter().map(|v| v.as_slice()).collect();
 
-            record.push_format_integer(<span class="string">"GQ"</span>.as_bytes(), <span class="kw-2">&amp;</span>[<span class="number">40</span>]).unwrap();
+            <span class="kw">if </span>alleles.len() &gt; <span class="number">1 </span>{
+                <span class="comment">// alleles.push("&lt;*&gt;".as_bytes());
+                </span>record.set_alleles(<span class="kw-2">&amp;</span>alleles).unwrap();
 
-            <span class="comment">// Get allele indices
-            </span><span class="kw">let </span>i1 = record.alleles().iter().position(|<span class="kw-2">&amp;</span>a| a == a1.replace(<span class="string">"-"</span>, <span class="string">""</span>).as_bytes()).unwrap() <span class="kw">as </span>i32;
-            <span class="kw">let </span>i2 = record.alleles().iter().position(|<span class="kw-2">&amp;</span>a| a == a2.replace(<span class="string">"-"</span>, <span class="string">""</span>).as_bytes()).unwrap() <span class="kw">as </span>i32;
+                record.push_format_integer(<span class="string">"GQ"</span>.as_bytes(), <span class="kw-2">&amp;</span>[<span class="number">40</span>]).unwrap();
 
-            <span class="comment">// Set record genotype - note first allele is always unphased
-            </span><span class="kw">let </span>genotype = <span class="kw-2">&amp;</span>[GenotypeAllele::Unphased(i1), GenotypeAllele::Phased(i2)];
-            record.push_genotypes(genotype).unwrap();
+                <span class="comment">// Get allele indices
+                </span><span class="kw">let </span>i1 = record.alleles().iter().position(|<span class="kw-2">&amp;</span>a| a == a1.replace(<span class="string">"-"</span>, <span class="string">""</span>).as_bytes()).unwrap() <span class="kw">as </span>i32;
+                <span class="kw">let </span>i2 = record.alleles().iter().position(|<span class="kw-2">&amp;</span>a| a == a2.replace(<span class="string">"-"</span>, <span class="string">""</span>).as_bytes()).unwrap() <span class="kw">as </span>i32;
 
-            <span class="comment">// Trim unused alleles
-            // record.trim_alleles();
+                <span class="comment">// Set record genotype - note first allele is always unphased
+                </span><span class="kw">let </span>genotype = <span class="kw-2">&amp;</span>[GenotypeAllele::Unphased(i1), GenotypeAllele::Phased(i2)];
+                record.push_genotypes(genotype).unwrap();
 
-            // Write record
-            </span>vcf.write(<span class="kw-2">&amp;</span>record).unwrap()
+                <span class="comment">// Trim unused alleles
+                // record.trim_alleles();
+
+                // Write record
+                </span>vcf.write(<span class="kw-2">&amp;</span>record).unwrap()
+            }
         } <span class="kw">else </span>{
             <span class="kw">if </span>ref_start.is_none() {
                 ref_start = <span class="prelude-val">Some</span>((ref_base.clone(), pos));
@@ -1070,9 +1491,12 @@
     }
 }
 
-<span class="kw">fn </span>phase_variants(matrix: <span class="kw-2">&amp;</span>Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;) -&gt; (Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;) {
+<span class="kw">fn </span>phase_variants(matrix: <span class="kw-2">&amp;</span>Vec&lt;BTreeMap&lt;usize, (String, u8)&gt;&gt;) -&gt; (BTreeSet&lt;usize&gt;, BTreeSet&lt;usize&gt;, Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;, Vec&lt;<span class="prelude-ty">Option</span>&lt;String&gt;&gt;) {
     <span class="kw">let </span>num_snps = matrix.len();
     <span class="kw">let </span>num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(<span class="kw-2">&amp;</span><span class="number">0</span>) + <span class="number">1</span>).max().unwrap_or(<span class="number">0</span>);
+
+    <span class="macro">skydive::elog!</span>(<span class="string">"num_reads: {}"</span>, num_reads);
+    <span class="macro">skydive::elog!</span>(<span class="string">"num_snps: {}"</span>, num_snps);
 
     <span class="kw">let </span><span class="kw-2">mut </span>reads = <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="prelude-val">None</span>; num_snps]; num_reads];
     <span class="kw">let </span><span class="kw-2">mut </span>confidences = <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="prelude-val">None</span>; num_snps]; num_reads];
@@ -1114,11 +1538,18 @@
         all_alleles[snp_idx] = index_map;
     }
 
-    <span class="kw">let </span>wmec_matrix = WMECData::new(reads, confidences);
+    <span class="kw">let </span>wmec_matrix = WMECData::new(reads.clone(), confidences);
 
-    <span class="kw">let </span>(p1, p2) = skydive::wmec::phase_all(<span class="kw-2">&amp;</span>wmec_matrix, <span class="number">40</span>, <span class="number">20</span>);
+    <span class="kw">let </span>(p1, p2, r1, r2) = skydive::wmec::phase_all(<span class="kw-2">&amp;</span>wmec_matrix, <span class="number">60</span>, <span class="number">15</span>);
 
-    <span class="kw">let </span><span class="kw-2">mut </span>h1 = Vec::new();
+    <span class="comment">// skydive::elog!("aa: {:?}", all_alleles);
+    </span><span class="macro">skydive::elog!</span>(<span class="string">"p1: {:?}"</span>, p1);
+    <span class="macro">skydive::elog!</span>(<span class="string">"p2: {:?}"</span>, p2);
+    <span class="macro">skydive::elog!</span>(<span class="string">"r1: {:?}"</span>, r1);
+    <span class="macro">skydive::elog!</span>(<span class="string">"r2: {:?}"</span>, r2);
+
+    <span class="comment">// Convert phased variants to allele strings as before
+    </span><span class="kw">let </span><span class="kw-2">mut </span>h1 = Vec::new();
     <span class="kw">let </span><span class="kw-2">mut </span>h2 = Vec::new();
     <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..p1.len() {
         <span class="kw">let </span>a1 = all_alleles[i].get(<span class="kw-2">&amp;</span>p1[i]).cloned();
@@ -1128,5 +1559,6 @@
         h2.push(a2);
     }
 
-    (h1, h2)
+    <span class="comment">// Return both the read assignments and the phased variants
+    </span>(r1, r2, h1, h2)
 }</code></pre></div></section></main></body></html>

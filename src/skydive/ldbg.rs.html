@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/ldbg.rs`."><title>ldbg.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">skydive/</div>ldbg.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/skydive/src/ldbg.rs`."><title>ldbg.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="skydive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.1 (4eb161250 2025-03-15)" data-channel="1.85.1" data-search-js="search-75f5ac3e.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">skydive/</div>ldbg.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -4018,7 +4018,9 @@
 <a href="#4017" id="4017">4017</a>
 <a href="#4018" id="4018">4018</a>
 <a href="#4019" id="4019">4019</a>
-<a href="#4020" id="4020">4020</a></pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
+<a href="#4020" id="4020">4020</a>
+<a href="#4021" id="4021">4021</a>
+<a href="#4022" id="4022">4022</a></pre></div><pre class="rust"><code><span class="kw">use </span>anyhow::Result;
 <span class="kw">use </span>itertools::Itertools;
 <span class="kw">use </span>linked_hash_map::LinkedHashMap;
 
@@ -4994,31 +4996,33 @@
         <span class="kw">let </span><span class="kw-2">mut </span>b = seq.windows(<span class="self">self</span>.kmer_size).map(|kmer| kmer.to_vec()).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="kw">for </span>(read_path, replacement_path) <span class="kw">in </span>replacements {
-            <span class="kw">let </span>start_pos = b.iter().position(|kmer| kmer == <span class="kw-2">&amp;</span>read_path[<span class="number">0</span>]).unwrap();
-            <span class="kw">let </span>end_pos = b.iter().position(|kmer| kmer == <span class="kw-2">&amp;</span>read_path[read_path.len()-<span class="number">1</span>]).unwrap();
+            <span class="kw">let </span>start_pos = b.iter().position(|kmer| kmer == <span class="kw-2">&amp;</span>read_path[<span class="number">0</span>]);
+            <span class="kw">let </span>end_pos = b.iter().position(|kmer| kmer == <span class="kw-2">&amp;</span>read_path[read_path.len()-<span class="number">1</span>]);
 
-            <span class="kw">let </span><span class="kw-2">mut </span>q1 = String::new();
-            <span class="kw">for </span>kmer <span class="kw">in </span>read_path.iter() {
-                <span class="kw">if </span>q1.is_empty() {
-                    q1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(kmer));
-                } <span class="kw">else </span>{
-                    q1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(<span class="kw-2">&amp;</span>kmer[<span class="self">self</span>.kmer_size - <span class="number">1</span>..]));
+            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(start_pos), <span class="prelude-val">Some</span>(end_pos)) = (start_pos, end_pos) {
+                <span class="kw">let </span><span class="kw-2">mut </span>q1 = String::new();
+                <span class="kw">for </span>kmer <span class="kw">in </span>read_path.iter() {
+                    <span class="kw">if </span>q1.is_empty() {
+                        q1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(kmer));
+                    } <span class="kw">else </span>{
+                        q1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(<span class="kw-2">&amp;</span>kmer[<span class="self">self</span>.kmer_size - <span class="number">1</span>..]));
+                    }
                 }
-            }
 
-            <span class="kw">let </span><span class="kw-2">mut </span>r1 = String::new();
-            <span class="kw">for </span>kmer <span class="kw">in </span>replacement_path.iter() {
-                <span class="kw">if </span>r1.is_empty() {
-                    r1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(kmer));
-                } <span class="kw">else </span>{
-                    r1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(<span class="kw-2">&amp;</span>kmer[<span class="self">self</span>.kmer_size - <span class="number">1</span>..]));
+                <span class="kw">let </span><span class="kw-2">mut </span>r1 = String::new();
+                <span class="kw">for </span>kmer <span class="kw">in </span>replacement_path.iter() {
+                    <span class="kw">if </span>r1.is_empty() {
+                        r1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(kmer));
+                    } <span class="kw">else </span>{
+                        r1.push_str(<span class="kw-2">&amp;</span>String::from_utf8_lossy(<span class="kw-2">&amp;</span>kmer[<span class="self">self</span>.kmer_size - <span class="number">1</span>..]));
+                    }
                 }
-            }
 
-            <span class="comment">// crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
+                <span class="comment">// crate::elog!("Replacing {}-{} in read of length {}\n{}\n{}", start_pos, end_pos, b.len(), q1, r1);
 
-            </span><span class="kw">if </span>start_pos &lt;= end_pos {
-                b.splice(start_pos..=end_pos, replacement_path);
+                </span><span class="kw">if </span>start_pos &lt;= end_pos {
+                    b.splice(start_pos..=end_pos, replacement_path);
+                }
             }
         }
 
