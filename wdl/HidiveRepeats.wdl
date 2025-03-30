@@ -75,7 +75,6 @@ workflow HidiveRepeats {
     call Consensus as Consensus1 {
         input:
             loci = bed,
-            reference = reference,
             aligned_reads_bam = Phase.hap1_bam,
             aligned_reads_csi = Phase.hap1_bai,
             prefix = sample_name + ".hap1"
@@ -95,7 +94,6 @@ workflow HidiveRepeats {
     call Consensus as Consensus2 {
         input:
             loci = bed,
-            reference = reference,
             aligned_reads_bam = Phase.hap2_bam,
             aligned_reads_csi = Phase.hap2_bai,
             prefix = sample_name + ".hap2"
@@ -351,8 +349,6 @@ task Consensus {
     input {
         File loci
 
-        File reference
-
         File aligned_reads_bam
         File aligned_reads_csi
 
@@ -361,18 +357,16 @@ task Consensus {
         Int num_cpus = 8
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([reference, aligned_reads_bam, aligned_reads_csi], "GB"))
+    Int disk_size_gb = 1 + 2*ceil(size([aligned_reads_bam, aligned_reads_csi], "GB"))
     Int memory_gb = 2*num_cpus
 
     command <<<
         set -x
 
-        hidive consensus -l ~{loci} -r ~{reference} -o ~{prefix}.fa ~{aligned_reads_bam}
+        hidive consensus -l ~{loci} -o ~{prefix}.fa ~{aligned_reads_bam}
 
-        minimap2 -ayYL -x map-hifi ~{reference} ~{prefix}.fa | \
+        minimap2 -ayYL -x map-hifi ~{prefix}.fa | \
             samtools sort --write-index -O BAM -o ~{prefix}.bam
-
-        ls -lah *
     >>>
 
     output {
@@ -381,7 +375,7 @@ task Consensus {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_fix_consensus"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"

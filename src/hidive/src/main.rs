@@ -298,13 +298,13 @@ enum Commands {
         #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
 
-        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
-        #[clap(short, long, value_parser, required = true)]
-        ref_path: PathBuf,
+        // /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        // #[clap(short, long, value_parser, required = true)]
+        // ref_path: PathBuf,
 
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(required = true, value_parser)]
-        short_read_fasta_path: PathBuf,
+        // /// FASTA files with short-read sequences (may contain one or more samples).
+        // #[clap(required = true, value_parser)]
+        // short_read_fasta_path: PathBuf,
 
         /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
@@ -602,11 +602,11 @@ fn main() {
         Commands::Consensus {
             output,
             loci,
-            ref_path,
-            short_read_fasta_path,
+            // ref_path,
+            // short_read_fasta_path,
             bam_path,
         } => {
-            consensus::start(&output, &loci, &ref_path, &short_read_fasta_path, &bam_path);
+            consensus::start(&output, &loci, &bam_path);
         }
         Commands::Trim {
             output,

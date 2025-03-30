@@ -18,8 +18,8 @@ use spoa::AlignmentType;
 pub fn start(
     output: &PathBuf,
     loci_list: &Vec<String>,
-    reference_fasta_path: &PathBuf,
-    short_read_fasta_path: &PathBuf,
+    // reference_fasta_path: &PathBuf,
+    // short_read_fasta_path: &PathBuf,
     bam_path: &PathBuf,
 ) {
     // Get the system's temporary directory path
@@ -31,9 +31,9 @@ pub fn start(
     // let reference_seq_url = reference_seq_urls.iter().next().unwrap();
     // let fasta = skydive::stage::open_fasta(&reference_seq_url).unwrap();
 
-    skydive::elog!("Processing short-read sample {}...", short_read_fasta_path.display());
-    let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path.clone()]);
-    skydive::elog!(" - {} short reads loaded", all_sr_seqs.len());
+    // skydive::elog!("Processing short-read sample {}...", short_read_fasta_path.display());
+    // let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path.clone()]);
+    // skydive::elog!(" - {} short reads loaded", all_sr_seqs.len());
 
     // Parse BAM file path.
     let bam_urls = skydive::parse::parse_file_names(&[bam_path.clone()]);
