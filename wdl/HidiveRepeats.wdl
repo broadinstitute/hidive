@@ -292,8 +292,8 @@ task Correct {
     >>>
 
     output {
-        File corrected_bam = "~{prefix}.bam"
-        File corrected_csi = "~{prefix}.bam.csi"
+        File corrected_bam = "~{prefix}.corrected.bam"
+        File corrected_csi = "~{prefix}.corrected.bam.csi"
     }
 
     runtime {
