@@ -77,7 +77,7 @@ RUN wget -O abPOA-v1.5.3.tar.gz https://github.com/yangao07/abPOA/releases/downl
     tar -vxzf abPOA-v1.5.3.tar.gz && \
     cd abPOA-v1.5.3 && \
     make && \
-    cp abpoa /usr/local/bin/
+    cp bin/abpoa /usr/local/bin/
 
 # Final stage
 FROM python:3.9-slim
