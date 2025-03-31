@@ -74,7 +74,7 @@ RUN wget -O htslib-1.21.tar.bz2 https://github.com/samtools/htslib/releases/down
     rm -rf htslib-1.21 htslib-1.21.tar.bz2
 
 RUN wget -O abPOA-v1.5.3.tar.gz https://github.com/yangao07/abPOA/releases/download/v1.5.3/abPOA-v1.5.3.tar.gz && \
-    tar -vxjf abPOA-v1.5.3.tar.gz && \
+    tar -vxzf abPOA-v1.5.3.tar.gz && \
     cd abPOA-v1.5.3 && \
     make && \
     cp abpoa /usr/local/bin/
