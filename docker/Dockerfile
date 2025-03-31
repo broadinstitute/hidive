@@ -73,6 +73,11 @@ RUN wget -O htslib-1.21.tar.bz2 https://github.com/samtools/htslib/releases/down
     cd .. && \
     rm -rf htslib-1.21 htslib-1.21.tar.bz2
 
+RUN wget -O abPOA-v1.5.3.tar.gz https://github.com/yangao07/abPOA/releases/download/v1.5.3/abPOA-v1.5.3.tar.gz && \
+    tar -vxjf abPOA-v1.5.3.tar.gz && \
+    cd abPOA-v1.5.3 && \
+    cp abpoa /usr/local/bin/
+
 # Final stage
 FROM python:3.9-slim
 
@@ -88,6 +93,7 @@ COPY --from=builder /usr/local/bin/samtools /usr/local/bin/samtools
 COPY --from=builder /usr/local/bin/bcftools /usr/local/bin/bcftools
 COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
 COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
+COPY --from=builder /usr/local/bin/abpoa /usr/local/bin/abpoa
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Copy gcloud utilities from builder stage
