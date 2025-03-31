@@ -21,6 +21,9 @@ workflows:
 - name: HidiveMSA
   subclass: wdl
   primaryDescriptorPath: /wdl/HidiveMSA.wdl
+- name: HidiveSummarizeMSA
+  subclass: wdl
+  primaryDescriptorPath: /wdl/HidiveSummarizeMSA.wdl
 - name: AlignPacbioBam
   subclass: wdl
   primaryDescriptorPath: /wdl/AlignPacbioBam.wdl

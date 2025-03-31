@@ -450,7 +450,9 @@ pub fn stage_data(
     let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
 
     for record in all_data.iter() {
-        fasta_writer.write_record(record)?;
+        if record.seq().len() > 0 {
+            fasta_writer.write_record(record)?;
+        }
     }
 
     let _ = fasta_writer.flush();
