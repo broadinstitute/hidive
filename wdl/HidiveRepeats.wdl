@@ -78,7 +78,7 @@ workflow HidiveRepeats {
             reference = reference,
             aligned_reads_bam = Phase.hap1_bam,
             aligned_reads_csi = Phase.hap1_bai,
-            prefix = sample_name + ".hap1"
+            prefix = sample_name + ".hap1.consensus"
     }
 
     call Correct as Correct1 {
@@ -98,7 +98,7 @@ workflow HidiveRepeats {
             reference = reference,
             aligned_reads_bam = Phase.hap2_bam,
             aligned_reads_csi = Phase.hap2_bai,
-            prefix = sample_name + ".hap2.corrected"
+            prefix = sample_name + ".hap2.consensus"
     }
 
     call Correct as Correct2 {
@@ -109,7 +109,7 @@ workflow HidiveRepeats {
             reference = reference,
             long_reads_bam = Consensus2.consensus_bam,
             short_read_fasta = Rescue.fasta,
-            prefix = sample_name + ".hap2"
+            prefix = sample_name + ".hap2.corrected"
     }
 
     if (defined(mat_aln_bam)) {
