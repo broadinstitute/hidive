@@ -89,7 +89,7 @@ workflow HidiveRepeats {
             reference = reference,
             long_reads_bam = Consensus1.consensus_bam,
             short_read_fasta = Rescue.fasta,
-            prefix = sample_name + ".hap1"
+            prefix = sample_name + ".hap1.corrected"
     }
 
     call Consensus as Consensus2 {
@@ -98,7 +98,7 @@ workflow HidiveRepeats {
             reference = reference,
             aligned_reads_bam = Phase.hap2_bam,
             aligned_reads_csi = Phase.hap2_bai,
-            prefix = sample_name + ".hap2"
+            prefix = sample_name + ".hap2.corrected"
     }
 
     call Correct as Correct2 {
@@ -288,12 +288,12 @@ task Correct {
 
         hidive correct -l ~{loci} -k ~{k} -m ~{model} ~{long_reads_bam} ~{short_read_fasta} | \
             minimap2 -ayYL -x map-hifi ~{reference} - | \
-            samtools sort --write-index -O BAM -o ~{prefix}.corrected.bam
+            samtools sort --write-index -O BAM -o ~{prefix}.bam
     >>>
 
     output {
-        File corrected_bam = "~{prefix}.corrected.bam"
-        File corrected_csi = "~{prefix}.corrected.bam.csi"
+        File corrected_bam = "~{prefix}.bam"
+        File corrected_csi = "~{prefix}.bam.csi"
     }
 
     runtime {
