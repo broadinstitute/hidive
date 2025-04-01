@@ -47,7 +47,7 @@ workflow HidiveMSA {
 task Fetch {
     input {
         Array[String] bams
-        File? ont_bam
+        String? ont_bam
 
         String locus
         String sample_name
