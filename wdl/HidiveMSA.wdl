@@ -68,8 +68,8 @@ task Fetch {
 
         # If ONT BAM is provided, append its reads to the FASTA
         if [ -n "~{ont_bam}" ]; then
-            hidive fetch -l '~{locus}' --haplotype 1 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_1#' >> ~{prefix}.fa
-            hidive fetch -l '~{locus}' --haplotype 2 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_2#' >> ~{prefix}.fa
+            hidive fetch -l '~{locus}' --haplotype 1 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_1#/' >> ~{prefix}.fa
+            hidive fetch -l '~{locus}' --haplotype 2 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_2#/' >> ~{prefix}.fa
         fi
     >>>
 
