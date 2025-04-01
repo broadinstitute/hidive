@@ -8,8 +8,9 @@ workflow HidiveMSA {
         File? hprc_hap1_bam
         File? hprc_hap2_bam
 
-        File? ont_hap1_bam
-        File? ont_hap2_bam
+        File? ont_bam
+
+        String sample_name
     }
 
     String locus_htt = "chr4:3,074,832-3,074,978|HTT"
@@ -17,18 +18,22 @@ workflow HidiveMSA {
 
     call Fetch as FetchHTT {
         input:
-            bams = select_all([repeat_hap1_bam, repeat_hap2_bam, hprc_hap1_bam, hprc_hap2_bam, ont_hap1_bam, ont_hap2_bam]),
+            bams = select_all([repeat_hap1_bam, repeat_hap2_bam, hprc_hap1_bam, hprc_hap2_bam]),
+            ont_bam = ont_bam,
             locus = locus_htt,
-            prefix = "HTT"
+            prefix = "HTT",
+            sample_name = sample_name
     }
 
     call Abpoa as AbpoaHTT { input: fasta = FetchHTT.fasta }
 
     call Fetch as FetchFMR1 {
         input:
-            bams = select_all([repeat_hap1_bam, repeat_hap2_bam, hprc_hap1_bam, hprc_hap2_bam, ont_hap1_bam, ont_hap2_bam]),
+            bams = select_all([repeat_hap1_bam, repeat_hap2_bam, hprc_hap1_bam, hprc_hap2_bam]),
+            ont_bam = ont_bam,
             locus = locus_fmr1,
-            prefix = "FMR1"
+            prefix = "FMR1",
+            sample_name = sample_name
     }
 
     call Abpoa as AbpoaFMR1 { input: fasta = FetchFMR1.fasta }
@@ -42,7 +47,10 @@ workflow HidiveMSA {
 task Fetch {
     input {
         Array[String] bams
+        File? ont_bam
+
         String locus
+        String sample_name
 
         String prefix = "out"
 
@@ -56,7 +64,13 @@ task Fetch {
         # Write bams to a file
         echo '~{sep="," bams}' | tr ',' '\n' > bams.txt
 
-        hidive fetch -l '~{locus}' -o ~{prefix}.fa bams.txt
+        hidive fetch -l '~{locus}' bams.txt | sed 's/>/>~{sample_name}#' > ~{prefix}.fa 
+
+        # If ONT BAM is provided, append its reads to the FASTA
+        if [ -n "~{ont_bam}" ]; then
+            hidive fetch -l '~{locus}' --haplotype 1 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_1#' >> ~{prefix}.fa
+            hidive fetch -l '~{locus}' --haplotype 2 ~{ont_bam} | sed 's/>/>~{sample_name}_ont_2#' >> ~{prefix}.fa
+        fi
     >>>
 
     output {

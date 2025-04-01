@@ -10,7 +10,10 @@ use minimap2::Aligner;
 use needletail::Sequence;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::record::Cigar;
-use rust_htslib::{bam, bam::{FetchDefinition, Read}};
+use rust_htslib::{
+    bam,
+    bam::{FetchDefinition, Read},
+};
 
 use hdbscan::{DistanceMetric, Hdbscan, HdbscanHyperParams};
 use spoa::AlignmentType;
@@ -37,22 +40,56 @@ pub fn start(
     let bam_url = bam_urls.iter().next().unwrap();
 
     // Iterate over loc
-    let from_loci = skydive::parse::parse_loci(from_loci_list, 0).into_iter().collect::<Vec<_>>();
-    let to_loci = skydive::parse::parse_loci(to_loci_list, 0).into_iter().collect::<Vec<_>>();
+    let from_loci = skydive::parse::parse_loci(from_loci_list, 0)
+        .into_iter()
+        .collect::<Vec<_>>();
+    let to_loci = skydive::parse::parse_loci(to_loci_list, 0)
+        .into_iter()
+        .collect::<Vec<_>>();
 
     // Open FASTA file for writing.
     let mut buf_writer = BufWriter::new(File::create(output).unwrap());
     let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
 
-    for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
-        skydive::elog!("Found locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
+    for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in
+        from_loci.iter().zip(to_loci.iter())
+    {
+        skydive::elog!(
+            "Found locus {} ({}:{}-{}) -> {} ({}:{}-{})...",
+            from_name,
+            from_chr,
+            from_start,
+            from_stop,
+            to_name,
+            to_chr,
+            to_start,
+            to_stop
+        );
     }
 
-    for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in from_loci.iter().zip(to_loci.iter()) {
-        skydive::elog!("Processing locus {} ({}:{}-{}) -> {} ({}:{}-{})...", from_name, from_chr, from_start, from_stop, to_name, to_chr, to_start, to_stop);
+    for ((from_chr, from_start, from_stop, from_name), (to_chr, to_start, to_stop, to_name)) in
+        from_loci.iter().zip(to_loci.iter())
+    {
+        skydive::elog!(
+            "Processing locus {} ({}:{}-{}) -> {} ({}:{}-{})...",
+            from_name,
+            from_chr,
+            from_start,
+            from_stop,
+            to_name,
+            to_chr,
+            to_start,
+            to_stop
+        );
 
         // Extract the reference sequence for the current locus.
-        let reference_seq = fasta.fetch_seq_string(to_chr.clone(), usize::try_from(*to_start).unwrap(), usize::try_from(*to_stop).unwrap()).unwrap();
+        let reference_seq = fasta
+            .fetch_seq_string(
+                to_chr.clone(),
+                usize::try_from(*to_start).unwrap(),
+                usize::try_from(*to_stop).unwrap(),
+            )
+            .unwrap();
 
         // Initialize aligner
         let mut aligner = Aligner::builder()
@@ -69,10 +106,26 @@ pub fn start(
         let mut read_vectors = Vec::new();
         let mut reads = Vec::new();
 
-        let _ = bam.fetch(FetchDefinition::RegionString(from_chr.as_bytes(), *from_start as i64, *from_stop as i64));
-        for read in bam.records().filter(|r| r.is_ok()).flatten().filter(|r| !r.is_secondary() && !r.is_supplementary()) {
+        let _ = bam.fetch(FetchDefinition::RegionString(
+            from_chr.as_bytes(),
+            *from_start as i64,
+            *from_stop as i64,
+        ));
+        for read in bam
+            .records()
+            .filter(|r| r.is_ok())
+            .flatten()
+            .filter(|r| !r.is_secondary() && !r.is_supplementary())
+        {
             let mappings = aligner
-                .map(&read.seq().as_bytes(), false, false, None, None, Some(read.qname()))
+                .map(
+                    &read.seq().as_bytes(),
+                    false,
+                    false,
+                    None,
+                    None,
+                    Some(read.qname()),
+                )
                 .unwrap();
 
             for mapping in mappings {
@@ -89,22 +142,24 @@ pub fn start(
                 for (cap_idx, cap) in re.captures_iter(&cigar).enumerate() {
                     let cigar_len = cap[1].parse::<u32>().unwrap();
                     match &cap[2] {
-                        "M" | "=" => { ref_pos += cigar_len as i64; },
+                        "M" | "=" => {
+                            ref_pos += cigar_len as i64;
+                        }
                         "I" => {
                             if cigar_len > 5 {
                                 variants.insert(ref_pos, 1);
                             }
-                        },
+                        }
                         "D" => {
                             if cigar_len > 5 {
                                 variants.insert(ref_pos, 1);
                             }
                             ref_pos += cigar_len as i64;
-                        },
+                        }
                         "X" => {
                             variants.insert(ref_pos, 1);
                             ref_pos += cigar_len as i64;
-                        },
+                        }
                         "S" => {
                             if cap_idx == 0 {
                                 trim_left = cigar_len as usize;
@@ -116,7 +171,11 @@ pub fn start(
                     }
                 }
 
-                let seq = if mapping.strand == minimap2::Strand::Forward { read.seq().as_bytes() } else { read.seq().as_bytes().reverse_complement() };
+                let seq = if mapping.strand == minimap2::Strand::Forward {
+                    read.seq().as_bytes()
+                } else {
+                    read.seq().as_bytes().reverse_complement()
+                };
                 let subseq = seq[trim_left..seq.len() - trim_right].to_vec();
 
                 read_vectors.push(variants);
@@ -124,7 +183,8 @@ pub fn start(
             }
         }
 
-        let all_positions = read_vectors.iter()
+        let all_positions = read_vectors
+            .iter()
             .flat_map(|r| r.keys())
             .collect::<HashSet<_>>()
             .into_iter()
@@ -132,7 +192,8 @@ pub fn start(
             .cloned()
             .collect::<Vec<_>>();
 
-        let pos_to_idx = all_positions.iter()
+        let pos_to_idx = all_positions
+            .iter()
             .enumerate()
             .map(|(i, p)| (p, i))
             .collect::<BTreeMap<_, _>>();
@@ -181,7 +242,11 @@ pub fn start(
                     let consensus_cstr = sg.consensus();
                     let name = format!("{}.{}.{}", from_name, sample_name, unique_label);
 
-                    let record = fasta::Record::with_attrs(name.as_str(), None, consensus_cstr.to_str().unwrap().as_bytes());
+                    let record = fasta::Record::with_attrs(
+                        name.as_str(),
+                        None,
+                        consensus_cstr.to_str().unwrap().as_bytes(),
+                    );
                     fasta_writer.write_record(&record).unwrap();
                 }
             }

@@ -2,11 +2,11 @@
 //! of long-read data and a linked de Bruijn graph representation of short-read data.
 //!
 
+pub mod agg;
 pub mod edges;
 pub mod ldbg;
 pub mod link;
 pub mod record;
-pub mod agg;
 
 pub mod mldbg;
 

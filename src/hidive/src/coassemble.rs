@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::{fs::File, path::PathBuf, io::Write};
+use std::{fs::File, io::Write, path::PathBuf};
 
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use minimap2::Aligner;
 use needletail::Sequence;
 use petgraph::graph::NodeIndex;
 use rayon::prelude::*;
-use indicatif::ParallelProgressIterator;
 
 use skydive::ldbg::LdBG;
 use skydive::mldbg::MLdBG;
@@ -28,15 +28,33 @@ pub fn start(
     let reference_seq_urls = skydive::parse::parse_file_names(reference_fasta_paths);
 
     // Read all long reads.
-    skydive::elog!("Processing long-read samples {:?}...", long_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!(
+        "Processing long-read samples {:?}...",
+        long_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
     let all_lr_seqs = skydive::utils::read_fasta(&vec![long_read_fasta_path.clone()]);
 
     // Read all short reads.
-    skydive::elog!("Processing short-read samples {:?}...", short_read_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!(
+        "Processing short-read samples {:?}...",
+        short_read_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
     let all_sr_seqs = skydive::utils::read_fasta(&vec![short_read_fasta_path]);
 
     // Read all reference subsequences.
-    skydive::elog!("Processing reference {:?}...", reference_seq_urls.iter().map(|url| url.as_str()).collect::<Vec<&str>>());
+    skydive::elog!(
+        "Processing reference {:?}...",
+        reference_seq_urls
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<&str>>()
+    );
     let all_ref_seqs = skydive::utils::read_fasta(reference_fasta_paths);
 
     let l1 = LdBG::from_sequences("lr".to_string(), kmer_size, &all_lr_seqs);
@@ -69,7 +87,6 @@ pub fn start(
     writeln!(output, "{}", asm1).expect("Failed to write to output file");
     writeln!(output, ">hap2").expect("Failed to write to output file");
     writeln!(output, "{}", asm2).expect("Failed to write to output file");
-
 }
 
 fn refine_haplotype(asm: String, ref_path: PathBuf, ref_seq: &Vec<u8>) -> String {
@@ -81,7 +98,11 @@ fn refine_haplotype(asm: String, ref_path: PathBuf, ref_seq: &Vec<u8>) -> String
 
     let results = vec![asm]
         .iter()
-        .map(|hap| aligner.map(hap.as_bytes(), true, false, None, None, None).unwrap())
+        .map(|hap| {
+            aligner
+                .map(hap.as_bytes(), true, false, None, None, None)
+                .unwrap()
+        })
         .collect::<Vec<_>>();
 
     let mut alt_seq: Vec<u8> = Vec::new();
@@ -140,14 +161,17 @@ fn assemble_haplotype(ref_seqs: &Vec<Vec<u8>>, reads: &Vec<Vec<u8>>) -> String {
     let oriented_reads = orient_reads(ref_seqs, reads);
 
     let mut la = spoa::AlignmentEngine::new(AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
-    oriented_reads.iter().filter(|read| read.len() > 500).for_each(|lr_seq| {
-        let seq = lr_seq.clone();
-        let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
-        let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
+    oriented_reads
+        .iter()
+        .filter(|read| read.len() > 500)
+        .for_each(|lr_seq| {
+            let seq = lr_seq.clone();
+            let seq_cstr = std::ffi::CString::new(seq.clone()).unwrap();
+            let seq_qual = std::ffi::CString::new(vec![b'I'; seq.len()]).unwrap();
 
-        let a = la.align(seq_cstr.as_ref(), &sg);
-        sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
-    });
+            let a = la.align(seq_cstr.as_ref(), &sg);
+            sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+        });
 
     let consensus_cstr = sg.consensus();
 
@@ -178,8 +202,14 @@ fn orient_reads(ref_seqs: &Vec<Vec<u8>>, reads: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
             let this_read_fw = &sorted_reads[i];
             let this_read_rc = this_read_fw.reverse_complement();
 
-            let fw_overlaps = this_read_fw.windows(17).filter(|kmer| last_read_kmers.contains(kmer)).count();
-            let rc_overlaps = this_read_rc.windows(17).filter(|kmer| last_read_kmers.contains(kmer)).count();
+            let fw_overlaps = this_read_fw
+                .windows(17)
+                .filter(|kmer| last_read_kmers.contains(kmer))
+                .count();
+            let rc_overlaps = this_read_rc
+                .windows(17)
+                .filter(|kmer| last_read_kmers.contains(kmer))
+                .count();
 
             if fw_overlaps > rc_overlaps {
                 oriented_reads.push(this_read_fw.clone());
@@ -206,7 +236,10 @@ fn cluster_reads(l: &LdBG, all_seqs: &[Vec<u8>]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>)
     let mut reads_hap1 = Vec::new();
     let mut reads_hap2 = Vec::new();
     for (read_index, read) in all_mat.reads.iter().enumerate() {
-        let read_u8 = read.iter().map(|x| if x.is_some() { x.unwrap() } else { 2 }).collect::<Vec<u8>>();
+        let read_u8 = read
+            .iter()
+            .map(|x| if x.is_some() { x.unwrap() } else { 2 })
+            .collect::<Vec<u8>>();
 
         let mut h1_matches = 0;
         let mut h2_matches = 0;
@@ -224,8 +257,16 @@ fn cluster_reads(l: &LdBG, all_seqs: &[Vec<u8>]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>)
             }
         }
 
-        let h1_similarity = if total_valid > 0 { h1_matches as f64 / total_valid as f64 } else { 0.0 };
-        let h2_similarity = if total_valid > 0 { h2_matches as f64 / total_valid as f64 } else { 0.0 };
+        let h1_similarity = if total_valid > 0 {
+            h1_matches as f64 / total_valid as f64
+        } else {
+            0.0
+        };
+        let h2_similarity = if total_valid > 0 {
+            h2_matches as f64 / total_valid as f64
+        } else {
+            0.0
+        };
 
         if h1_similarity > 0.8 || h2_similarity > 0.8 {
             if h1_similarity > h2_similarity {
@@ -239,7 +280,12 @@ fn cluster_reads(l: &LdBG, all_seqs: &[Vec<u8>]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>)
     (reads_hap1, reads_hap2)
 }
 
-fn assign_reads_to_bubbles(bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>>, lr_seqs: &[Vec<u8>], l: &LdBG, g: &petgraph::Graph<String, f32>) -> WMECData {
+fn assign_reads_to_bubbles(
+    bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<NodeIndex>>,
+    lr_seqs: &[Vec<u8>],
+    l: &LdBG,
+    g: &petgraph::Graph<String, f32>,
+) -> WMECData {
     let mut reads = vec![vec![None; bubbles.len()]; lr_seqs.len()];
     let mut confidences = vec![vec![None; bubbles.len()]; lr_seqs.len()];
 
@@ -256,50 +302,70 @@ fn assign_reads_to_bubbles(bubbles: &LinkedHashMap<(NodeIndex, NodeIndex), Vec<N
         });
 
     for (bubble_index, ((in_node, out_node), interior)) in bubbles.iter().enumerate() {
-        let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *in_node, *out_node, 0, Some(interior.len()));
-        let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(&g, *out_node, *in_node, 0, Some(interior.len()));
+        let paths_fwd = petgraph::algo::all_simple_paths::<Vec<_>, _>(
+            &g,
+            *in_node,
+            *out_node,
+            0,
+            Some(interior.len()),
+        );
+        let paths_rev = petgraph::algo::all_simple_paths::<Vec<_>, _>(
+            &g,
+            *out_node,
+            *in_node,
+            0,
+            Some(interior.len()),
+        );
 
-        let mut path_info = paths_fwd.chain(paths_rev).map(|path| {
-            let path_kmers = path
-                .iter()
-                .map(|node| g.node_weight(*node).unwrap().as_bytes().to_vec())
-                .map(|kmer| skydive::utils::canonicalize_kmer(&kmer))
-                .collect::<Vec<Vec<u8>>>();
+        let mut path_info = paths_fwd
+            .chain(paths_rev)
+            .map(|path| {
+                let path_kmers = path
+                    .iter()
+                    .map(|node| g.node_weight(*node).unwrap().as_bytes().to_vec())
+                    .map(|kmer| skydive::utils::canonicalize_kmer(&kmer))
+                    .collect::<Vec<Vec<u8>>>();
 
-            let mut read_index_counts = HashMap::new();
+                let mut read_index_counts = HashMap::new();
 
-            let mut path_score = 1.0;
-            for kmer in &path_kmers {
-                if let Some(read_indices) = cn_kmers.get(kmer) {
-                    for &read_index in read_indices {
-                        *read_index_counts.entry(read_index).or_insert(0) += 1;
+                let mut path_score = 1.0;
+                for kmer in &path_kmers {
+                    if let Some(read_indices) = cn_kmers.get(kmer) {
+                        for &read_index in read_indices {
+                            *read_index_counts.entry(read_index).or_insert(0) += 1;
+                        }
                     }
+
+                    let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
+                    path_score *= l.scores.get(&cn_kmer).unwrap_or(&1.0);
                 }
 
-                let cn_kmer = skydive::utils::canonicalize_kmer(kmer);
-                path_score *= l.scores.get(&cn_kmer).unwrap_or(&1.0);
-            }
+                path_score = path_score.powf(1.0 / path_kmers.len() as f32);
+                if path_score.is_nan() {
+                    path_score = 0.0;
+                }
 
-            path_score = path_score.powf(1.0 / path_kmers.len() as f32);
-            if path_score.is_nan() {
-                path_score = 0.0;
-            }
+                let path_length = path_kmers.len();
+                let read_index_counts_filtered: BTreeMap<usize, i32> = read_index_counts
+                    .iter()
+                    .filter(|(_, &count)| count as f32 > 0.8 * path_length as f32)
+                    .map(|(&index, &count)| (index, count))
+                    .collect();
 
-            let path_length = path_kmers.len();
-            let read_index_counts_filtered: BTreeMap<usize, i32> = read_index_counts.iter()
-                .filter(|(_, &count)| count as f32 > 0.8 * path_length as f32)
-                .map(|(&index, &count)| (index, count))
-                .collect();
+                let read_indices = read_index_counts_filtered
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>();
 
-            let read_indices = read_index_counts_filtered.keys().cloned().collect::<Vec<_>>();
-
-            (path_kmers, read_indices, path_score)
-        })
-        .collect::<Vec<_>>();
+                (path_kmers, read_indices, path_score)
+            })
+            .collect::<Vec<_>>();
 
         path_info.sort_by(|(_, _, score_a), (_, _, score_b)| score_b.partial_cmp(score_a).unwrap());
 
-        for (path_index, (path_kmers, read_indices, path_score)) in path_info.iter().take(2).enumerate() {
+        for (path_index, (path_kmers, read_indices, path_score)) in
+            path_info.iter().take(2).enumerate()
+        {
             let mut allele = String::new();
             for path_kmer in path_kmers {
                 let kmer = std::str::from_utf8(path_kmer).unwrap();
@@ -334,7 +400,7 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
     let mut hap2 = String::new();
 
     while index1 < lr_msas[0].len() {
-        let combined_base_counts = allele_counts(lr_msas, index1, index1+1);
+        let combined_base_counts = allele_counts(lr_msas, index1, index1 + 1);
         // let bases = allele_indices(lr_msas, index1, index1+1);
 
         if combined_base_counts.is_empty() {
@@ -347,11 +413,11 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
             index1 += 1;
         } else {
             let mut index2 = index1;
-            let mut allele_base_counts = allele_counts(lr_msas, index2, index2+1);
+            let mut allele_base_counts = allele_counts(lr_msas, index2, index2 + 1);
 
             while index2 < lr_msas[0].len() && allele_base_counts.len() > 1 {
                 index2 += 1;
-                allele_base_counts = allele_counts(lr_msas, index2, index2+1);
+                allele_base_counts = allele_counts(lr_msas, index2, index2 + 1);
             }
 
             let allele_counts = allele_counts(lr_msas, index1, index2)
@@ -393,7 +459,11 @@ fn create_fully_phased_haplotypes(lr_msas: &Vec<String>, h1: &Vec<u8>) -> (Strin
 
 fn create_wmec_matrix(matrix: &Vec<BTreeMap<usize, String>>) -> WMECData {
     let num_snps = matrix.len();
-    let num_reads = matrix.iter().map(|m| m.keys().max().unwrap_or(&0) + 1).max().unwrap_or(0);
+    let num_reads = matrix
+        .iter()
+        .map(|m| m.keys().max().unwrap_or(&0) + 1)
+        .max()
+        .unwrap_or(0);
 
     let mut reads = vec![vec![None; num_snps]; num_reads];
     let mut confidences = vec![vec![None; num_snps]; num_reads];
@@ -413,15 +483,15 @@ fn create_read_allele_matrix(lr_msas: &Vec<String>) -> Vec<BTreeMap<usize, Strin
 
     let mut index1 = 0;
     while index1 < lr_msas[0].len() {
-        let combined_base_counts = allele_counts(lr_msas, index1, index1+1);
+        let combined_base_counts = allele_counts(lr_msas, index1, index1 + 1);
 
         if combined_base_counts.len() > 1 {
             let mut index2 = index1;
-            let mut allele_base_counts = allele_counts(lr_msas, index2, index2+1);
+            let mut allele_base_counts = allele_counts(lr_msas, index2, index2 + 1);
 
             while index2 < lr_msas[0].len() && allele_base_counts.len() > 1 {
                 index2 += 1;
-                allele_base_counts = allele_counts(lr_msas, index2, index2+1);
+                allele_base_counts = allele_counts(lr_msas, index2, index2 + 1);
             }
 
             let allele_counts = allele_counts(lr_msas, index1, index2)
@@ -462,14 +532,16 @@ fn create_read_allele_matrix(lr_msas: &Vec<String>) -> Vec<BTreeMap<usize, Strin
 }
 
 fn allele_indices(lr_msas: &Vec<String>, index1: usize, index2: usize) -> Vec<String> {
-    let alleles = lr_msas.iter()
+    let alleles = lr_msas
+        .iter()
         .map(|msa| msa[index1..index2].to_string().replace(" ", ""))
         .collect::<Vec<String>>();
     alleles
 }
 
 fn allele_counts(lr_msas: &Vec<String>, index1: usize, index2: usize) -> BTreeMap<String, i32> {
-    let combined_allele_counts = lr_msas.iter()
+    let combined_allele_counts = lr_msas
+        .iter()
         .map(|msa| msa[index1..index2].to_string().replace(" ", ""))
         .filter(|allele| !allele.is_empty())
         .fold(BTreeMap::new(), |mut counts, base| {

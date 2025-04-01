@@ -218,12 +218,8 @@ pub fn mapping_info(
     let mut position_dict: HashMap<String, Vec<usize>> = HashMap::new();
     for anchor_seq in seqlist.into_iter() {
         let anchor_rev = reverse_complement(&anchor_seq);
-        position_dict
-            .entry(anchor_seq.clone())
-            .or_default();
-        position_dict
-            .entry(anchor_rev.clone())
-            .or_default();
+        position_dict.entry(anchor_seq.clone()).or_default();
+        position_dict.entry(anchor_rev.clone()).or_default();
     }
 
     for i in 0..contig.len() - k + 1 {
@@ -649,7 +645,7 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
         if item.starts_with('A') {
             if let Some(anchor) = graph.anchor.get(item) {
                 seq += anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
-                                                                    // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
+                                                                   // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             }
         } else if item.starts_with("E") {
             if let Some(edge) = graph.edges.get(item) {

@@ -2,8 +2,8 @@ use std::{collections::HashSet, io::BufRead, path::PathBuf};
 
 use anyhow::Result;
 use linked_hash_set::LinkedHashSet;
-use url::Url;
 use regex::Regex;
+use url::Url;
 
 use path_absolutize::Absolutize;
 
@@ -29,7 +29,10 @@ use path_absolutize::Absolutize;
 /// It will also panic if it cannot read a given file path.
 ///
 #[must_use]
-pub fn parse_loci(loci_list: &Vec<String>, padding: u64) -> LinkedHashSet<(String, u64, u64, String)> {
+pub fn parse_loci(
+    loci_list: &Vec<String>,
+    padding: u64,
+) -> LinkedHashSet<(String, u64, u64, String)> {
     // Initialize a HashSet to store unique loci after parsing
     let mut loci = LinkedHashSet::new();
 
@@ -122,7 +125,7 @@ pub fn parse_locus(locus: &str, padding: u64) -> Result<(String, u64, u64, Strin
         let stop = captures.get(3).unwrap().as_str().parse::<u64>()? + padding;
         let name = captures.get(4).map_or_else(
             || format!("{chr}:{start}-{stop}"),
-            |m| m.as_str().to_string()
+            |m| m.as_str().to_string(),
         );
 
         if start > stop {
@@ -217,24 +220,64 @@ mod tests {
     fn test_parse_locus() {
         // Valid locus without padding
         let result = parse_locus("chr1:1000-2000", 0);
-        assert_eq!(result.ok(), Some(("chr1".to_string(), 1000 as u64, 2000 as u64, "chr1:1000-2000".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr1".to_string(),
+                1000 as u64,
+                2000 as u64,
+                "chr1:1000-2000".to_string()
+            ))
+        );
 
         // Valid locus with padding
         let result = parse_locus("chr2:5000-6000", 100);
         assert!(result.is_ok());
-        assert_eq!(result.ok(), Some(("chr2".to_string(), 4900 as u64, 6100 as u64, "chr2:4900-6100".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr2".to_string(),
+                4900 as u64,
+                6100 as u64,
+                "chr2:4900-6100".to_string()
+            ))
+        );
 
         // Valid locus with name
         let result = parse_locus("chr3:10000-20000|gene1", 0);
-        assert_eq!(result.ok(), Some(("chr3".to_string(), 10000 as u64, 20000 as u64, "gene1".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr3".to_string(),
+                10000 as u64,
+                20000 as u64,
+                "gene1".to_string()
+            ))
+        );
 
         // Valid locus with commas
         let result = parse_locus("chr3:10,000-20,000|gene1", 0);
-        assert_eq!(result.ok(), Some(("chr3".to_string(), 10000 as u64, 20000 as u64, "gene1".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr3".to_string(),
+                10000 as u64,
+                20000 as u64,
+                "gene1".to_string()
+            ))
+        );
 
         // Combination of space and colon separators
         let result = parse_locus("chr4 30000-40000", 0);
-        assert_eq!(result.ok(), Some(("chr4".to_string(), 30000 as u64, 40000 as u64, "chr4:30000-40000".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr4".to_string(),
+                30000 as u64,
+                40000 as u64,
+                "chr4:30000-40000".to_string()
+            ))
+        );
 
         // Invalid format (non-numeric start position)
         let result = parse_locus("chr5:start-50000", 0);
@@ -246,23 +289,62 @@ mod tests {
 
         // Valid locus with tab-separated fields
         let result = parse_locus("chr7\t70000\t80000", 0);
-        assert_eq!(result.ok(), Some(("chr7".to_string(), 70000 as u64, 80000 as u64, "chr7:70000-80000".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr7".to_string(),
+                70000 as u64,
+                80000 as u64,
+                "chr7:70000-80000".to_string()
+            ))
+        );
 
         // Valid locus with tab-separated fields and name
         let result = parse_locus("chr8\t90000\t100000\tgene2", 0);
-        assert_eq!(result.ok(), Some(("chr8".to_string(), 90000 as u64, 100000 as u64, "gene2".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr8".to_string(),
+                90000 as u64,
+                100000 as u64,
+                "gene2".to_string()
+            ))
+        );
 
         // Valid locus with mixed tab and colon separators
         let result = parse_locus("chr9:110000\t120000", 0);
-        assert_eq!(result.ok(), Some(("chr9".to_string(), 110000 as u64, 120000 as u64, "chr9:110000-120000".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr9".to_string(),
+                110000 as u64,
+                120000 as u64,
+                "chr9:110000-120000".to_string()
+            ))
+        );
 
         // Contig name with dash in it
         let result = parse_locus("chr10-A:130000-140000|chr10-A", 0);
-        assert_eq!(result.ok(), Some(("chr10-A".to_string(), 130000 as u64, 140000 as u64, "chr10-A".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr10-A".to_string(),
+                130000 as u64,
+                140000 as u64,
+                "chr10-A".to_string()
+            ))
+        );
 
         // Locus with multiple colons and dashes
         let result = parse_locus("chr22:42121531-42135680:1-14150", 0);
-        assert_eq!(result.ok(), Some(("chr22:42121531-42135680".to_string(), 1 as u64, 14150 as u64, "chr22:42121531-42135680:1-14150".to_string())));
+        assert_eq!(
+            result.ok(),
+            Some((
+                "chr22:42121531-42135680".to_string(),
+                1 as u64,
+                14150 as u64,
+                "chr22:42121531-42135680:1-14150".to_string()
+            ))
+        );
     }
 }
-

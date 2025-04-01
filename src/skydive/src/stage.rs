@@ -169,6 +169,7 @@ pub fn extract_aligned_bam_reads(
     start: &u64,
     stop: &u64,
     name: &str,
+    haplotype: Option<u8>,
 ) -> Result<Vec<fasta::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
@@ -180,7 +181,17 @@ pub fn extract_aligned_bam_reads(
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
             // for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
-            for (i, alignment) in pileup.alignments().enumerate() {
+            for (i, alignment) in pileup.alignments().enumerate().filter(|(_, a)| {
+                haplotype.is_none()
+                    || a.record()
+                        .aux(b"HP")
+                        .ok()
+                        .map(|aux| match aux {
+                            Aux::U8(v) => v == haplotype.unwrap(),
+                            _ => false,
+                        })
+                        .unwrap_or(false)
+            }) {
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
@@ -264,8 +275,7 @@ fn extract_fasta_seqs(
     name: &String,
 ) -> Result<Vec<fasta::Record>> {
     let id = format!("{chr}:{start}-{stop}|{name}|{basename}");
-    let seq = fasta
-        .fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
+    let seq = fasta.fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
     if seq.len() > 0 {
         let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
@@ -281,6 +291,7 @@ fn stage_data_from_one_file(
     seqs_url: &Url,
     loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
+    haplotype: Option<u8>,
 ) -> Result<Vec<fasta::Record>> {
     let mut all_seqs = Vec::new();
 
@@ -304,7 +315,8 @@ fn stage_data_from_one_file(
         // Extract seqs for the current locus.
         for (chr, start, stop, name) in loci.iter() {
             let aligned_seqs =
-                extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop, name).unwrap();
+                extract_aligned_bam_reads(&basename, &mut bam, chr, start, stop, name, haplotype)
+                    .unwrap();
             all_seqs.extend(aligned_seqs);
         }
 
@@ -348,6 +360,7 @@ fn stage_data_from_all_files(
     seq_urls: &HashSet<Url>,
     loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
+    haplotype: Option<u8>,
 ) -> Result<Vec<fasta::Record>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
     let all_data: Vec<_> = seq_urls
@@ -355,7 +368,7 @@ fn stage_data_from_all_files(
         .map(|seqs_url| {
             // Define an operation to stage data from one file.
             let op = || {
-                let seqs = stage_data_from_one_file(seqs_url, loci, unmapped)?;
+                let seqs = stage_data_from_one_file(seqs_url, loci, unmapped, haplotype)?;
                 Ok(seqs)
             };
 
@@ -395,7 +408,11 @@ fn stage_data_from_all_files(
 /// # Panics
 ///
 /// This function does not panic.
-pub fn read_spans_locus(start: i64, end: i64, loci: &HashSet<(String, i64, i64)>) -> Result<bool, String> {
+pub fn read_spans_locus(
+    start: i64,
+    end: i64,
+    loci: &HashSet<(String, i64, i64)>,
+) -> Result<bool, String> {
     if start < 0 || end < 0 {
         return Err("Error: Negative genomic positions are not allowed.".to_string());
     }
@@ -430,13 +447,14 @@ pub fn stage_data(
     loci: &LinkedHashSet<(String, u64, u64, String)>,
     seq_urls: &HashSet<Url>,
     unmapped: bool,
+    haplotype: Option<u8>,
     cache_path: &PathBuf,
 ) -> Result<usize> {
     let current_dir = env::current_dir()?;
     env::set_current_dir(cache_path).unwrap();
 
     // Stage data from all BAM files.
-    let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped) {
+    let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped, haplotype) {
         Ok(all_data) => all_data,
         Err(e) => {
             panic!("Error: {e}");
@@ -470,7 +488,7 @@ pub fn stage_data_in_memory(
     env::set_current_dir(cache_path).unwrap();
 
     // Stage data from all BAM files.
-    let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped) {
+    let all_data = match stage_data_from_all_files(seq_urls, loci, unmapped, None) {
         Ok(all_data) => all_data,
         Err(e) => {
             panic!("Error: {e}");
@@ -510,7 +528,7 @@ mod tests {
         // let loci = LinkedHashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
         loci.insert(("chr15".to_string(), 23960193, 23963918, "test".to_string()));
 
-        let result = stage_data_from_one_file(&seqs_url, &loci, false);
+        let result = stage_data_from_one_file(&seqs_url, &loci, false, None);
 
         assert!(result.is_ok(), "Failed to stage data from one file");
     }
@@ -528,7 +546,7 @@ mod tests {
         ).unwrap();
         let seq_urls = HashSet::from([seqs_url]);
 
-        let result = stage_data(&output_path, &loci, &seq_urls, false, &cache_path);
+        let result = stage_data(&output_path, &loci, &seq_urls, false, None, &cache_path);
 
         assert!(result.is_ok(), "Failed to stage data from file");
 
@@ -551,7 +569,7 @@ mod tests {
 
         let seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
-        let result = stage_data(&output_path, &loci, &seq_urls, false, &cache_path);
+        let result = stage_data(&output_path, &loci, &seq_urls, false, None, &cache_path);
 
         println!("{:?}", result);
 

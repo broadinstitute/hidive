@@ -130,12 +130,8 @@ pub fn start(
 
     for (i, record) in all_records.iter().enumerate() {
         writeln!(writer, ">read_{}", i).expect("Could not write to file");
-        writeln!(
-            writer,
-            "{}",
-            String::from_utf8_lossy(record.seq())
-        )
-        .expect("Could not write to file");
+        writeln!(writer, "{}", String::from_utf8_lossy(record.seq()))
+            .expect("Could not write to file");
     }
 
     skydive::elog!(

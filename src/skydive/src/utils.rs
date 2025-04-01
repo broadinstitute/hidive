@@ -186,15 +186,21 @@ pub fn shannon_entropy(seq: &[u8]) -> f32 {
         *freq.entry(base).or_insert(0) += 1;
     }
 
-    -freq.values().map(|&count| {
-        let p = count as f32 / len;
-        p * p.log2()
-    }).sum::<f32>()
+    -freq
+        .values()
+        .map(|&count| {
+            let p = count as f32 / len;
+            p * p.log2()
+        })
+        .sum::<f32>()
 }
 
 #[must_use]
 pub fn gc_content(seq: &[u8]) -> f32 {
-    let gc_count = seq.iter().filter(|&&base| base == b'G' || base == b'C').count();
+    let gc_count = seq
+        .iter()
+        .filter(|&&base| base == b'G' || base == b'C')
+        .count();
     gc_count as f32 / seq.len() as f32
 }
 
@@ -218,7 +224,10 @@ pub fn gc_content(seq: &[u8]) -> f32 {
 /// This function will panic if:
 /// 1. The file cannot be opened.
 /// 2. Any line in the file cannot be read.
-pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>) -> std::io::Result<()> {
+pub fn write_gfa<W: std::io::Write>(
+    writer: &mut W,
+    graph: &DiGraph<String, f32>,
+) -> std::io::Result<()> {
     // Write header
     writeln!(writer, "H\tVN:Z:1.0")?;
 
@@ -231,7 +240,13 @@ pub fn write_gfa<W: std::io::Write>(writer: &mut W, graph: &DiGraph<String, f32>
     for edge in graph.edge_references() {
         let (from, to) = (edge.source().index(), edge.target().index());
         let weight = edge.weight();
-        writeln!(writer, "L\t{}\t+\t{}\t+\t0M\tRC:f:{}", from, to, (100.0*weight).round() as u8)?;
+        writeln!(
+            writer,
+            "L\t{}\t+\t{}\t+\t0M\tRC:f:{}",
+            from,
+            to,
+            (100.0 * weight).round() as u8
+        )?;
     }
 
     Ok(())
@@ -265,14 +280,14 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
     for line in reader.lines() {
         let line = line?;
         let fields: Vec<&str> = line.split('\t').collect();
-        
+
         match fields[0] {
             "S" => {
                 let id = fields[1];
                 let sequence = fields[2].to_string();
                 let node_index = graph.add_node(sequence);
                 node_map.insert(id.to_string(), node_index);
-            },
+            }
             "L" => {
                 if fields.len() < 6 {
                     continue; // Skip malformed lines
@@ -282,7 +297,8 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                 let to_id = fields[3];
                 // let to_orient = fields[4];
 
-                let weight = fields.get(5)
+                let weight = fields
+                    .get(5)
                     .and_then(|s| s.split(':').last())
                     .and_then(|s| s.parse::<f32>().ok())
                     .unwrap_or(1.0);
@@ -290,7 +306,7 @@ pub fn read_gfa<P: AsRef<Path>>(path: P) -> std::io::Result<DiGraph<String, f32>
                 if let (Some(&from), Some(&to)) = (node_map.get(from_id), node_map.get(to_id)) {
                     graph.add_edge(from, to, weight);
                 }
-            },
+            }
             _ => {} // Ignore other lines
         }
     }
@@ -344,7 +360,7 @@ mod tests {
             19193..19207,
             19221..19228,
             19746..19763,
-            20037..20063
+            20037..20063,
         ];
         assert_eq!(ranges, expected_ranges);
     }
