@@ -31,7 +31,7 @@ task CombineFastas {
     command <<<
         set -euxo pipefail
 
-        gsutil cat -I | sed 's/-//g' > ~{prefix}.fa < ~{write_lines(all_msa)}
+        cat ~{write_lines(all_msa)} | gsutil -m cp -I - | sed 's/-//g' > ~{prefix}.fa
     >>>
 
     output {
