@@ -31,11 +31,7 @@ task CombineFastas {
     command <<<
         set -euxo pipefail
 
-        echo '~{sep="\n" all_msa}' > file_list.txt
-
-        while read -r file; do
-            gsutil cat "$file" | sed 's/-//g' >> ~{prefix}.fa
-        done < file_list.txt
+        gsutil cat -I | sed 's/-//g' > ~{prefix}.fa < ~{write_lines(all_msa)}
     >>>
 
     output {
