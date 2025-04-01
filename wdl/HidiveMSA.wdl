@@ -64,7 +64,7 @@ task Fetch {
         # Write bams to a file
         echo '~{sep="," bams}' | tr ',' '\n' > bams.txt
 
-        hidive fetch -l '~{locus}' bams.txt | sed 's/>/>~{sample_name}#' > ~{prefix}.fa 
+        hidive fetch -l '~{locus}' bams.txt | sed 's/>/>~{sample_name}#/' > ~{prefix}.fa 
 
         # If ONT BAM is provided, append its reads to the FASTA
         if [ -n "~{ont_bam}" ]; then
