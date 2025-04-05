@@ -27,19 +27,22 @@ def main():
                 num_alignments += 1
     print(f"Found {num_alignments} alignments")
 
-    # Check if SAM file is empty
+    align_n = defaultdict(int)
     if num_alignments > 0:
         align_f = pysam.AlignmentFile(sam, 'rb') if (
             sam.suffix == '.bam'
         ) else pysam.AlignmentFile(sam, check_sq=False)
         for i, r in enumerate(align_f):
+            if int(r.get_tag('AS')) < args.min_as:
+                continue
+            k = (r.query_name, r.reference_name)
+            align_n[k] += 1
             if i % 10000 == 0:
-                print(i)
+                print(f"{i}/{num_alignments}")
             process_alignment(
                 r, sites_per_star_allele, matched_sites, args.exclude_haps,
-                args.indel_buffer
+                args.indel_buffer, align_n[k]
             )
-
         write_output(matched_sites, args.out)
     else:
         with open(args.out, 'w') as out_f:
@@ -77,6 +80,11 @@ def parse_args():
         'and haplotype to count as a site match for indels (20).',
         default=20
     )
+    p.add_argument(
+        '--min_as', type=int,
+        help='Minimum value for AS tag (DP alignment score) to retain '
+        'alignment (9000)', default=9000
+    )
     if len(sys.argv) < 4:
         p.print_help()
         sys.exit(0)
@@ -104,7 +112,7 @@ def load_star_allele_definitions(vcf_dir, seq_start_pos):
 
 
 def process_alignment(
-    r, sites_per_star_allele, matched_sites, exclude_haps, indel_buffer
+    r, sites_per_star_allele, matched_sites, exclude_haps, indel_buffer, align_n
 ):
     '''Process a single alignment record.'''
     star_allele = r.query_name.replace('*', '_')
@@ -132,8 +140,9 @@ def process_alignment(
         match_found = check_site_match(
             site, star_seq, hap_pos, hap_seq, indel_buffer, hap, star_allele
         )
+        hap_with_n = f"{hap}_{align_n}" if (align_n > 1) else hap
         if match_found:
-            matched_sites[hap][star_allele].add(site)
+            matched_sites[hap_with_n][star_allele].add(site)
 
 
 def check_site_match(
@@ -169,4 +178,5 @@ def write_output(matched_sites, out_file):
 
 if __name__ == '__main__':
     main()
+
 
