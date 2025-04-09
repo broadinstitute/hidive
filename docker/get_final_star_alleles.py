@@ -91,7 +91,7 @@ def parse_args():
     p.add_argument(
         '--min_as', type=int,
         help='Minimum value for AS tag (DP alignment score) to retain '
-        'alignment (9000)', default=9000
+        'alignment (6000)', default=6000
     )
     if len(sys.argv) < 5:
         p.print_help()
@@ -100,7 +100,7 @@ def parse_args():
 
 
 def find_best_genomic_matches(
-    sam, exclude_haps=[], ignore_alleles=[], min_as=9000
+    sam, exclude_haps=[], ignore_alleles=[], min_as=6000
 ):
     '''Find best-matching star allele(s) for each haplotype by scoring CIGAR 
     string over the genomic locus

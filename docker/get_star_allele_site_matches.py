@@ -85,7 +85,7 @@ def parse_args():
     p.add_argument(
         '--min_as', type=int,
         help='Minimum value for AS tag (DP alignment score) to retain '
-        'alignment (9000)', default=9000
+        'alignment (6000)', default=6000
     )
     if len(sys.argv) < 4:
         p.print_help()
