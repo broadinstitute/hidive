@@ -14,7 +14,9 @@ StarMatch = namedtuple('StarMatch', ['star_allele', 'match', 'total'])
 
 def main():
     args = parse_args()
-    assert args.pharmvar_dir.is_dir()
+    assert args.pharmvar_dir.is_dir() and len(
+        list(args.pharmvar_dir.glob('*vcf'))
+    ) > 0
     best_genomic_matches = find_best_genomic_matches(
         args.sam, args.exclude_haps, args.ignore_alleles, args.min_as
     )

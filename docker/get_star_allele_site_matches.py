@@ -11,7 +11,9 @@ VcfRec = namedtuple('VcfRec', ['pos', 'ref', 'alt'])
 
 def main():
     args = parse_args()
-    assert args.pharmvar_dir.is_dir()
+    assert args.pharmvar_dir.is_dir() and len(
+        list(args.pharmvar_dir.glob('*vcf'))
+    ) > 0
     sites_per_star_allele = load_star_allele_definitions(
         args.pharmvar_dir, args.seq_start_pos
     )
