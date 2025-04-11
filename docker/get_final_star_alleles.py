@@ -14,9 +14,11 @@ StarMatch = namedtuple('StarMatch', ['star_allele', 'match', 'total'])
 
 def main():
     args = parse_args()
-    assert args.pharmvar_dir.is_dir()
+    assert args.pharmvar_dir.is_dir() and len(
+        list(args.pharmvar_dir.glob('*vcf'))
+    ) > 0
     best_genomic_matches = find_best_genomic_matches(
-        args.sam, args.exclude_haps, args.ignore_alleles
+        args.sam, args.exclude_haps, args.ignore_alleles, args.min_as
     )
     sites_per_star_allele = load_star_allele_definitions(
         args.pharmvar_dir, args.seq_start_pos
@@ -38,6 +40,7 @@ def main():
                 w, hap, all_matched_sites[hap], sites_per_star_allele,
                 [z[0] for z in best_genomic_matches[hap]]
             )
+    print(f'Wrote final star alleles to {args.out}')
 
 
 def parse_args():
@@ -85,13 +88,20 @@ def parse_args():
         help='List of haplotypes to exclude, e.g. SV haplotypes (none)',
         default=[]
     )
+    p.add_argument(
+        '--min_as', type=int,
+        help='Minimum value for AS tag (DP alignment score) to retain '
+        'alignment (6000)', default=6000
+    )
     if len(sys.argv) < 5:
         p.print_help()
         sys.exit(0)
     return p.parse_args()
 
 
-def find_best_genomic_matches(sam, exclude_haps=[], ignore_alleles=[]):
+def find_best_genomic_matches(
+    sam, exclude_haps=[], ignore_alleles=[], min_as=6000
+):
     '''Find best-matching star allele(s) for each haplotype by scoring CIGAR 
     string over the genomic locus
     '''
@@ -101,18 +111,25 @@ def find_best_genomic_matches(sam, exclude_haps=[], ignore_alleles=[]):
         for line in f:
             if not line.startswith('@'):
                 num_alignments += 1
-    print(f"Found {num_alignments} alignments")
+    #print(f"Found {num_alignments} alignments")
 
+    align_n = defaultdict(int)
     best_genomic_matches = defaultdict(list)
     if num_alignments > 0:
         align_f = AlignmentFile(sam, 'rb') if (
             sam.suffix == '.bam'
         ) else AlignmentFile(sam, check_sq=False)
         for r in align_f:
+            if int(r.get_tag('AS')) < min_as:
+                continue
             hap = r.reference_name
             star_allele = r.query_name.replace('CYP2D6', '')
             if hap in exclude_haps or star_allele in ignore_alleles:
                 continue
+            align_n[(hap, star_allele)] += 1
+            n = align_n[(hap, star_allele)]
+            if n > 1:
+                hap += f"_{n}"
             # genomic match score = num bases match - (mismatch + del + indel)
             score = 0
             for op, op_len in r.cigartuples:
@@ -285,3 +302,4 @@ def match_frac_str(site_list):
 
 if __name__ == '__main__':
     main()
+
