@@ -1610,7 +1610,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hidive"
-version = "0.1.108"
+version = "0.1.109"
 dependencies = [
  "bio",
  "chrono",
@@ -3762,7 +3762,7 @@ checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "skydive"
-version = "0.1.108"
+version = "0.1.109"
 dependencies = [
  "anyhow",
  "backoff",
