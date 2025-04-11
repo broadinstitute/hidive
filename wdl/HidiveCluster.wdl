@@ -490,7 +490,7 @@ task Cluster {
     command <<<
         set -euxo pipefail
 
-        hidive cluster -s "~{sample_name}" -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix} ~{hap_bam} > ~{prefix}.fa
+        hidive cluster -s "~{sample_name}" -f ~{from_loci} -t ~{to_loci} -r ~{reference} -o ~{prefix}.fa ~{hap_bam}
     >>>
 
     output {
@@ -498,7 +498,7 @@ task Cluster {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_call_star_alleles"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.109"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
