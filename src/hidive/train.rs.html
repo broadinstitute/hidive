@@ -2,11 +2,11 @@
 <a href=#2 id=2 data-nosnippet>2</a><span class="comment">// use rand::SeedableRng;
 <a href=#3 id=3 data-nosnippet>3</a>// use skydive::mldbg::MLdBG;
 <a href=#4 id=4 data-nosnippet>4</a></span><span class="kw">use </span>skydive::utils::canonicalize_kmer;
-<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>std::collections::HashMap;
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::collections::HashSet;
-<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>std::path::PathBuf;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>std::collections::hash_map::Keys;
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::collections::HashMap;
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>std::collections::HashSet;
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>std::iter::Chain;
-<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>std::collections::hash_map::Keys;
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>std::path::PathBuf;
 <a href=#10 id=10 data-nosnippet>10</a>
 <a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>gbdt::config::{loss2string, Config, Loss};
 <a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>gbdt::decision_tree::{Data, DataVec};
@@ -78,330 +78,373 @@
 <a href=#78 id=78 data-nosnippet>78</a>    <span class="kw">let </span>test_sr_contigs = test_s1.assemble_all();
 <a href=#79 id=79 data-nosnippet>79</a>    <span class="kw">let </span>test_sr_distances = distance_to_a_contig_end(<span class="kw-2">&amp;</span>test_sr_contigs, kmer_size);
 <a href=#80 id=80 data-nosnippet>80</a>
-<a href=#81 id=81 data-nosnippet>81</a>
-<a href=#82 id=82 data-nosnippet>82</a>    <span class="comment">// Configure GBDT.
-<a href=#83 id=83 data-nosnippet>83</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>cfg = Config::new();
-<a href=#84 id=84 data-nosnippet>84</a>    cfg.set_feature_size(<span class="number">6</span>);
-<a href=#85 id=85 data-nosnippet>85</a>    cfg.set_max_depth(<span class="number">4</span>);
-<a href=#86 id=86 data-nosnippet>86</a>    cfg.set_min_leaf_size(<span class="number">5</span>);
-<a href=#87 id=87 data-nosnippet>87</a>    cfg.set_loss(<span class="kw-2">&amp;</span>loss2string(<span class="kw-2">&amp;</span>Loss::BinaryLogitraw));
-<a href=#88 id=88 data-nosnippet>88</a>    cfg.set_shrinkage(<span class="number">0.05</span>);
-<a href=#89 id=89 data-nosnippet>89</a>    cfg.set_iterations(iterations);
-<a href=#90 id=90 data-nosnippet>90</a>    cfg.set_debug(debug);
-<a href=#91 id=91 data-nosnippet>91</a>
-<a href=#92 id=92 data-nosnippet>92</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Training GBDT model with:"</span>);
-<a href=#93 id=93 data-nosnippet>93</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - feature_size={}"</span>, cfg.feature_size);
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - max_depth={}"</span>, cfg.max_depth);
-<a href=#95 id=95 data-nosnippet>95</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - min_leaf_size={}"</span>, cfg.min_leaf_size);
-<a href=#96 id=96 data-nosnippet>96</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - loss={}"</span>, loss2string(<span class="kw-2">&amp;</span>cfg.loss));
-<a href=#97 id=97 data-nosnippet>97</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - shrinkage={}"</span>, cfg.shrinkage);
-<a href=#98 id=98 data-nosnippet>98</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - iterations={}"</span>, cfg.iterations);
-<a href=#99 id=99 data-nosnippet>99</a>    <span class="comment">// skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
-<a href=#100 id=100 data-nosnippet>100</a>
-<a href=#101 id=101 data-nosnippet>101</a>    // Initialize GBDT algorithm.
-<a href=#102 id=102 data-nosnippet>102</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>gbdt = GBDT::new(<span class="kw-2">&amp;</span>cfg);
-<a href=#103 id=103 data-nosnippet>103</a>
-<a href=#104 id=104 data-nosnippet>104</a>    <span class="comment">// let mut training_data: DataVec = Vec::new();
-<a href=#105 id=105 data-nosnippet>105</a>    // let mut test_data: DataVec = Vec::new();
-<a href=#106 id=106 data-nosnippet>106</a>
-<a href=#107 id=107 data-nosnippet>107</a>    // let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-<a href=#108 id=108 data-nosnippet>108</a>
-<a href=#109 id=109 data-nosnippet>109</a>    </span><span class="kw">let </span>kmers = l1
-<a href=#110 id=110 data-nosnippet>110</a>        .kmers
-<a href=#111 id=111 data-nosnippet>111</a>        .keys()
-<a href=#112 id=112 data-nosnippet>112</a>        .chain(s1.kmers.keys())
-<a href=#113 id=113 data-nosnippet>113</a>        .chain(t1.kmers.keys());
-<a href=#114 id=114 data-nosnippet>114</a>
-<a href=#115 id=115 data-nosnippet>115</a>    <span class="kw">let </span><span class="kw-2">mut </span>training_data: DataVec = create_dataset_for_model(
-<a href=#116 id=116 data-nosnippet>116</a>        kmers,
-<a href=#117 id=117 data-nosnippet>117</a>        <span class="kw-2">&amp;</span>lr_distances,
-<a href=#118 id=118 data-nosnippet>118</a>        <span class="kw-2">&amp;</span>sr_distances,
-<a href=#119 id=119 data-nosnippet>119</a>        <span class="kw-2">&amp;</span>l1,
-<a href=#120 id=120 data-nosnippet>120</a>        <span class="kw-2">&amp;</span>s1,
-<a href=#121 id=121 data-nosnippet>121</a>        <span class="kw-2">&amp;</span>t1,
-<a href=#122 id=122 data-nosnippet>122</a>    );
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="comment">// Configure GBDT.
+<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>cfg = Config::new();
+<a href=#83 id=83 data-nosnippet>83</a>    cfg.set_feature_size(<span class="number">6</span>);
+<a href=#84 id=84 data-nosnippet>84</a>    cfg.set_max_depth(<span class="number">4</span>);
+<a href=#85 id=85 data-nosnippet>85</a>    cfg.set_min_leaf_size(<span class="number">5</span>);
+<a href=#86 id=86 data-nosnippet>86</a>    cfg.set_loss(<span class="kw-2">&amp;</span>loss2string(<span class="kw-2">&amp;</span>Loss::BinaryLogitraw));
+<a href=#87 id=87 data-nosnippet>87</a>    cfg.set_shrinkage(<span class="number">0.05</span>);
+<a href=#88 id=88 data-nosnippet>88</a>    cfg.set_iterations(iterations);
+<a href=#89 id=89 data-nosnippet>89</a>    cfg.set_debug(debug);
+<a href=#90 id=90 data-nosnippet>90</a>
+<a href=#91 id=91 data-nosnippet>91</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Training GBDT model with:"</span>);
+<a href=#92 id=92 data-nosnippet>92</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - feature_size={}"</span>, cfg.feature_size);
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - max_depth={}"</span>, cfg.max_depth);
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - min_leaf_size={}"</span>, cfg.min_leaf_size);
+<a href=#95 id=95 data-nosnippet>95</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - loss={}"</span>, loss2string(<span class="kw-2">&amp;</span>cfg.loss));
+<a href=#96 id=96 data-nosnippet>96</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - shrinkage={}"</span>, cfg.shrinkage);
+<a href=#97 id=97 data-nosnippet>97</a>    <span class="macro">skydive::elog!</span>(<span class="string">" - iterations={}"</span>, cfg.iterations);
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="comment">// skydive::elog!(" - train/test={}/{}", 1.0 - test_split, test_split); //**** Commented out
+<a href=#99 id=99 data-nosnippet>99</a>
+<a href=#100 id=100 data-nosnippet>100</a>    // Initialize GBDT algorithm.
+<a href=#101 id=101 data-nosnippet>101</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>gbdt = GBDT::new(<span class="kw-2">&amp;</span>cfg);
+<a href=#102 id=102 data-nosnippet>102</a>
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="comment">// let mut training_data: DataVec = Vec::new();
+<a href=#104 id=104 data-nosnippet>104</a>    // let mut test_data: DataVec = Vec::new();
+<a href=#105 id=105 data-nosnippet>105</a>
+<a href=#106 id=106 data-nosnippet>106</a>    // let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+<a href=#107 id=107 data-nosnippet>107</a>
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">let </span>kmers = l1
+<a href=#109 id=109 data-nosnippet>109</a>        .kmers
+<a href=#110 id=110 data-nosnippet>110</a>        .keys()
+<a href=#111 id=111 data-nosnippet>111</a>        .chain(s1.kmers.keys())
+<a href=#112 id=112 data-nosnippet>112</a>        .chain(t1.kmers.keys());
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">let </span><span class="kw-2">mut </span>training_data: DataVec =
+<a href=#115 id=115 data-nosnippet>115</a>        create_dataset_for_model(kmers, <span class="kw-2">&amp;</span>lr_distances, <span class="kw-2">&amp;</span>sr_distances, <span class="kw-2">&amp;</span>l1, <span class="kw-2">&amp;</span>s1, <span class="kw-2">&amp;</span>t1);
+<a href=#116 id=116 data-nosnippet>116</a>
+<a href=#117 id=117 data-nosnippet>117</a>    <span class="comment">// Train the decision trees.
+<a href=#118 id=118 data-nosnippet>118</a>    </span><span class="macro">skydive::elog!</span>(
+<a href=#119 id=119 data-nosnippet>119</a>        <span class="string">"Training GBDT model with {} training points..."</span>,
+<a href=#120 id=120 data-nosnippet>120</a>        training_data.len().to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)
+<a href=#121 id=121 data-nosnippet>121</a>    );
+<a href=#122 id=122 data-nosnippet>122</a>    gbdt.fit(<span class="kw-2">&amp;mut </span>training_data);
 <a href=#123 id=123 data-nosnippet>123</a>
-<a href=#124 id=124 data-nosnippet>124</a>    <span class="comment">// Train the decision trees.
-<a href=#125 id=125 data-nosnippet>125</a>    </span><span class="macro">skydive::elog!</span>(
-<a href=#126 id=126 data-nosnippet>126</a>        <span class="string">"Training GBDT model with {} training points..."</span>,
-<a href=#127 id=127 data-nosnippet>127</a>        training_data.len().to_formatted_string(<span class="kw-2">&amp;</span>Locale::en)
-<a href=#128 id=128 data-nosnippet>128</a>    );
-<a href=#129 id=129 data-nosnippet>129</a>    gbdt.fit(<span class="kw-2">&amp;mut </span>training_data);
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="comment">// Prepare test data.
+<a href=#125 id=125 data-nosnippet>125</a>    </span><span class="kw">let </span>test_kmers = test_l1
+<a href=#126 id=126 data-nosnippet>126</a>        .kmers
+<a href=#127 id=127 data-nosnippet>127</a>        .keys()
+<a href=#128 id=128 data-nosnippet>128</a>        .chain(test_s1.kmers.keys())
+<a href=#129 id=129 data-nosnippet>129</a>        .chain(test_t1.kmers.keys());
 <a href=#130 id=130 data-nosnippet>130</a>
-<a href=#131 id=131 data-nosnippet>131</a>    <span class="comment">// Prepare test data.
-<a href=#132 id=132 data-nosnippet>132</a>    </span><span class="kw">let </span>test_kmers = test_l1
-<a href=#133 id=133 data-nosnippet>133</a>        .kmers
-<a href=#134 id=134 data-nosnippet>134</a>        .keys()
-<a href=#135 id=135 data-nosnippet>135</a>        .chain(test_s1.kmers.keys())
-<a href=#136 id=136 data-nosnippet>136</a>        .chain(test_t1.kmers.keys());
-<a href=#137 id=137 data-nosnippet>137</a>
-<a href=#138 id=138 data-nosnippet>138</a>    <span class="kw">let </span>test_data: DataVec = create_dataset_for_model(
-<a href=#139 id=139 data-nosnippet>139</a>        test_kmers,
-<a href=#140 id=140 data-nosnippet>140</a>        <span class="kw-2">&amp;</span>test_lr_distances,
-<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw-2">&amp;</span>test_sr_distances,
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw-2">&amp;</span>test_l1,
-<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw-2">&amp;</span>test_s1,
-<a href=#144 id=144 data-nosnippet>144</a>        <span class="kw-2">&amp;</span>test_t1,
-<a href=#145 id=145 data-nosnippet>145</a>    );
-<a href=#146 id=146 data-nosnippet>146</a>
-<a href=#147 id=147 data-nosnippet>147</a>    <span class="comment">// Predict the test data.
-<a href=#148 id=148 data-nosnippet>148</a>    </span><span class="macro">skydive::elog!</span>(<span class="string">"Computing accuracy on test data..."</span>);
-<a href=#149 id=149 data-nosnippet>149</a>    <span class="kw">let </span>prediction = gbdt.predict(<span class="kw-2">&amp;</span>test_data);
-<a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">let </span>pred_threshold: f32 = <span class="number">0.5</span>;
-<a href=#151 id=151 data-nosnippet>151</a>
-<a href=#152 id=152 data-nosnippet>152</a>    <span class="comment">// Evaluate accuracy of the model on the test data.
-<a href=#153 id=153 data-nosnippet>153</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>num_correct = <span class="number">0u32</span>;
-<a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">let </span><span class="kw-2">mut </span>num_total = <span class="number">0u32</span>;
-<a href=#155 id=155 data-nosnippet>155</a>    <span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(prediction.iter()) {
-<a href=#156 id=156 data-nosnippet>156</a>        <span class="kw">let </span>truth = data.label;
-<a href=#157 id=157 data-nosnippet>157</a>        <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
-<a href=#158 id=158 data-nosnippet>158</a>        <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
-<a href=#159 id=159 data-nosnippet>159</a>            num_correct += <span class="number">1</span>;
-<a href=#160 id=160 data-nosnippet>160</a>        }
-<a href=#161 id=161 data-nosnippet>161</a>        num_total += <span class="number">1</span>;
-<a href=#162 id=162 data-nosnippet>162</a>    }
-<a href=#163 id=163 data-nosnippet>163</a>
-<a href=#164 id=164 data-nosnippet>164</a>    <span class="comment">// Precision, Recall, and F1 score calculations.
-<a href=#165 id=165 data-nosnippet>165</a>    </span><span class="kw">let </span>(precision, recall, f1_score) = compute_precision_recall_f1(<span class="kw-2">&amp;</span>test_data, <span class="kw-2">&amp;</span>prediction, pred_threshold);
-<a href=#166 id=166 data-nosnippet>166</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Prediction threshold: {:.2}"</span>, pred_threshold);
-<a href=#167 id=167 data-nosnippet>167</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Precision: {:.2}%"</span>, <span class="number">100.0 </span>* precision);
-<a href=#168 id=168 data-nosnippet>168</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Recall: {:.2}%"</span>, <span class="number">100.0 </span>* recall);
-<a href=#169 id=169 data-nosnippet>169</a>    <span class="macro">skydive::elog!</span>(<span class="string">"F1 score: {:.2}%"</span>, <span class="number">100.0 </span>* f1_score);
-<a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>    <span class="comment">// TPR and FPR calculations at various thresholds.
-<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="macro">skydive::elog!</span>(<span class="string">"Computing TPR and FPR at various thresholds..."</span>);
-<a href=#173 id=173 data-nosnippet>173</a>    <span class="kw">let </span>fpr_tpr: Vec&lt;(f32, f32)&gt; = compute_fpr_tpr(<span class="kw-2">&amp;</span>test_data, <span class="kw-2">&amp;</span>prediction);
-<a href=#174 id=174 data-nosnippet>174</a>
-<a href=#175 id=175 data-nosnippet>175</a>    <span class="comment">// Save TPR and FPR at various thresholds to a file.
-<a href=#176 id=176 data-nosnippet>176</a>    </span><span class="kw">let </span>csv_output = output.with_extension(<span class="string">"csv"</span>);
-<a href=#177 id=177 data-nosnippet>177</a>    <span class="kw">let </span><span class="kw-2">mut </span>writer = std::fs::File::create(csv_output).expect(<span class="string">"Unable to create file"</span>);
-<a href=#178 id=178 data-nosnippet>178</a>    <span class="kw">for </span>(tpr, fpr) <span class="kw">in </span><span class="kw-2">&amp;</span>fpr_tpr {
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="macro">writeln!</span>(writer, <span class="string">"{},{}"</span>, tpr, fpr).expect(<span class="string">"Unable to write data"</span>);
-<a href=#180 id=180 data-nosnippet>180</a>    }
-<a href=#181 id=181 data-nosnippet>181</a>    <span class="macro">skydive::elog!</span>(<span class="string">"TPR and FPR at various thresholds saved to {}"</span>, output.to_str().unwrap());
-<a href=#182 id=182 data-nosnippet>182</a>
-<a href=#183 id=183 data-nosnippet>183</a>    <span class="comment">// Create a ROC curve.
-<a href=#184 id=184 data-nosnippet>184</a>    </span><span class="kw">let </span>png_output = output.with_extension(<span class="string">"png"</span>);
-<a href=#185 id=185 data-nosnippet>185</a>    plot_roc_curve(<span class="kw-2">&amp;</span>png_output, <span class="kw-2">&amp;</span>fpr_tpr).expect(<span class="string">"Unable to plot ROC curve"</span>);
-<a href=#186 id=186 data-nosnippet>186</a>    <span class="macro">skydive::elog!</span>(<span class="string">"ROC curve saved to {}"</span>, png_output.to_str().unwrap());
-<a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a>    <span class="macro">skydive::elog!</span>(
-<a href=#189 id=189 data-nosnippet>189</a>        <span class="string">"Predicted accuracy: {}/{} ({:.2}%)"</span>,
-<a href=#190 id=190 data-nosnippet>190</a>        num_correct.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
-<a href=#191 id=191 data-nosnippet>191</a>        num_total.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
-<a href=#192 id=192 data-nosnippet>192</a>        <span class="number">100.0 </span>* num_correct <span class="kw">as </span>f32 / num_total <span class="kw">as </span>f32
-<a href=#193 id=193 data-nosnippet>193</a>    );
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">let </span>test_data: DataVec = create_dataset_for_model(
+<a href=#132 id=132 data-nosnippet>132</a>        test_kmers,
+<a href=#133 id=133 data-nosnippet>133</a>        <span class="kw-2">&amp;</span>test_lr_distances,
+<a href=#134 id=134 data-nosnippet>134</a>        <span class="kw-2">&amp;</span>test_sr_distances,
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw-2">&amp;</span>test_l1,
+<a href=#136 id=136 data-nosnippet>136</a>        <span class="kw-2">&amp;</span>test_s1,
+<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw-2">&amp;</span>test_t1,
+<a href=#138 id=138 data-nosnippet>138</a>    );
+<a href=#139 id=139 data-nosnippet>139</a>
+<a href=#140 id=140 data-nosnippet>140</a>    <span class="comment">// Predict the test data.
+<a href=#141 id=141 data-nosnippet>141</a>    </span><span class="macro">skydive::elog!</span>(<span class="string">"Computing accuracy on test data..."</span>);
+<a href=#142 id=142 data-nosnippet>142</a>    <span class="kw">let </span>prediction = gbdt.predict(<span class="kw-2">&amp;</span>test_data);
+<a href=#143 id=143 data-nosnippet>143</a>    <span class="kw">let </span>pred_threshold: f32 = <span class="number">0.5</span>;
+<a href=#144 id=144 data-nosnippet>144</a>
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="comment">// Evaluate accuracy of the model on the test data.
+<a href=#146 id=146 data-nosnippet>146</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>num_correct = <span class="number">0u32</span>;
+<a href=#147 id=147 data-nosnippet>147</a>    <span class="kw">let </span><span class="kw-2">mut </span>num_total = <span class="number">0u32</span>;
+<a href=#148 id=148 data-nosnippet>148</a>    <span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(prediction.iter()) {
+<a href=#149 id=149 data-nosnippet>149</a>        <span class="kw">let </span>truth = data.label;
+<a href=#150 id=150 data-nosnippet>150</a>        <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
+<a href=#151 id=151 data-nosnippet>151</a>        <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
+<a href=#152 id=152 data-nosnippet>152</a>            num_correct += <span class="number">1</span>;
+<a href=#153 id=153 data-nosnippet>153</a>        }
+<a href=#154 id=154 data-nosnippet>154</a>        num_total += <span class="number">1</span>;
+<a href=#155 id=155 data-nosnippet>155</a>    }
+<a href=#156 id=156 data-nosnippet>156</a>
+<a href=#157 id=157 data-nosnippet>157</a>    <span class="comment">// Precision, Recall, and F1 score calculations.
+<a href=#158 id=158 data-nosnippet>158</a>    </span><span class="kw">let </span>(precision, recall, f1_score) =
+<a href=#159 id=159 data-nosnippet>159</a>        compute_precision_recall_f1(<span class="kw-2">&amp;</span>test_data, <span class="kw-2">&amp;</span>prediction, pred_threshold);
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Prediction threshold: {:.2}"</span>, pred_threshold);
+<a href=#161 id=161 data-nosnippet>161</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Precision: {:.2}%"</span>, <span class="number">100.0 </span>* precision);
+<a href=#162 id=162 data-nosnippet>162</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Recall: {:.2}%"</span>, <span class="number">100.0 </span>* recall);
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="macro">skydive::elog!</span>(<span class="string">"F1 score: {:.2}%"</span>, <span class="number">100.0 </span>* f1_score);
+<a href=#164 id=164 data-nosnippet>164</a>
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="comment">// TPR and FPR calculations at various thresholds.
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="macro">skydive::elog!</span>(<span class="string">"Computing TPR and FPR at various thresholds..."</span>);
+<a href=#167 id=167 data-nosnippet>167</a>    <span class="kw">let </span>fpr_tpr: Vec&lt;(f32, f32)&gt; = compute_fpr_tpr(<span class="kw-2">&amp;</span>test_data, <span class="kw-2">&amp;</span>prediction);
+<a href=#168 id=168 data-nosnippet>168</a>
+<a href=#169 id=169 data-nosnippet>169</a>    <span class="comment">// Save TPR and FPR at various thresholds to a file.
+<a href=#170 id=170 data-nosnippet>170</a>    </span><span class="kw">let </span>csv_output = output.with_extension(<span class="string">"csv"</span>);
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="kw">let </span><span class="kw-2">mut </span>writer = std::fs::File::create(csv_output).expect(<span class="string">"Unable to create file"</span>);
+<a href=#172 id=172 data-nosnippet>172</a>    <span class="kw">for </span>(tpr, fpr) <span class="kw">in </span><span class="kw-2">&amp;</span>fpr_tpr {
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="macro">writeln!</span>(writer, <span class="string">"{},{}"</span>, tpr, fpr).expect(<span class="string">"Unable to write data"</span>);
+<a href=#174 id=174 data-nosnippet>174</a>    }
+<a href=#175 id=175 data-nosnippet>175</a>    <span class="macro">skydive::elog!</span>(
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="string">"TPR and FPR at various thresholds saved to {}"</span>,
+<a href=#177 id=177 data-nosnippet>177</a>        output.to_str().unwrap()
+<a href=#178 id=178 data-nosnippet>178</a>    );
+<a href=#179 id=179 data-nosnippet>179</a>
+<a href=#180 id=180 data-nosnippet>180</a>    <span class="comment">// Create a ROC curve.
+<a href=#181 id=181 data-nosnippet>181</a>    </span><span class="kw">let </span>png_output = output.with_extension(<span class="string">"png"</span>);
+<a href=#182 id=182 data-nosnippet>182</a>    plot_roc_curve(<span class="kw-2">&amp;</span>png_output, <span class="kw-2">&amp;</span>fpr_tpr).expect(<span class="string">"Unable to plot ROC curve"</span>);
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="macro">skydive::elog!</span>(<span class="string">"ROC curve saved to {}"</span>, png_output.to_str().unwrap());
+<a href=#184 id=184 data-nosnippet>184</a>
+<a href=#185 id=185 data-nosnippet>185</a>    <span class="macro">skydive::elog!</span>(
+<a href=#186 id=186 data-nosnippet>186</a>        <span class="string">"Predicted accuracy: {}/{} ({:.2}%)"</span>,
+<a href=#187 id=187 data-nosnippet>187</a>        num_correct.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
+<a href=#188 id=188 data-nosnippet>188</a>        num_total.to_formatted_string(<span class="kw-2">&amp;</span>Locale::en),
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="number">100.0 </span>* num_correct <span class="kw">as </span>f32 / num_total <span class="kw">as </span>f32
+<a href=#190 id=190 data-nosnippet>190</a>    );
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a>    gbdt.save_model(output.to_str().unwrap())
+<a href=#193 id=193 data-nosnippet>193</a>        .expect(<span class="string">"Unable to save model"</span>);
 <a href=#194 id=194 data-nosnippet>194</a>
-<a href=#195 id=195 data-nosnippet>195</a>    gbdt.save_model(output.to_str().unwrap())
-<a href=#196 id=196 data-nosnippet>196</a>        .expect(<span class="string">"Unable to save model"</span>);
+<a href=#195 id=195 data-nosnippet>195</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Model saved to {}"</span>, output.to_str().unwrap());
+<a href=#196 id=196 data-nosnippet>196</a>}
 <a href=#197 id=197 data-nosnippet>197</a>
-<a href=#198 id=198 data-nosnippet>198</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Model saved to {}"</span>, output.to_str().unwrap());
-<a href=#199 id=199 data-nosnippet>199</a>}
-<a href=#200 id=200 data-nosnippet>200</a>
-<a href=#201 id=201 data-nosnippet>201</a><span class="kw">pub fn </span>distance_to_a_contig_end(contigs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;, kmer_size: usize) -&gt; HashMap&lt;Vec&lt;u8&gt;, usize&gt; {
+<a href=#198 id=198 data-nosnippet>198</a><span class="kw">pub fn </span>distance_to_a_contig_end(
+<a href=#199 id=199 data-nosnippet>199</a>    contigs: <span class="kw-2">&amp;</span>Vec&lt;Vec&lt;u8&gt;&gt;,
+<a href=#200 id=200 data-nosnippet>200</a>    kmer_size: usize,
+<a href=#201 id=201 data-nosnippet>201</a>) -&gt; HashMap&lt;Vec&lt;u8&gt;, usize&gt; {
 <a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">let </span><span class="kw-2">mut </span>distances = HashMap::new();
 <a href=#203 id=203 data-nosnippet>203</a>
 <a href=#204 id=204 data-nosnippet>204</a>    <span class="kw">for </span>contig <span class="kw">in </span>contigs {
-<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">for </span>(distance_from_start, cn_kmer) <span class="kw">in </span>contig.windows(kmer_size).map(canonicalize_kmer).enumerate() {
-<a href=#206 id=206 data-nosnippet>206</a>            <span class="kw">let </span>distance_from_end = contig.len() - distance_from_start - kmer_size;
-<a href=#207 id=207 data-nosnippet>207</a>
-<a href=#208 id=208 data-nosnippet>208</a>            distances.insert(cn_kmer, <span class="kw">if </span>distance_from_start &lt; distance_from_end { distance_from_start } <span class="kw">else </span>{ distance_from_end });
-<a href=#209 id=209 data-nosnippet>209</a>        }
-<a href=#210 id=210 data-nosnippet>210</a>    }
-<a href=#211 id=211 data-nosnippet>211</a>
-<a href=#212 id=212 data-nosnippet>212</a>    distances
-<a href=#213 id=213 data-nosnippet>213</a>}
-<a href=#214 id=214 data-nosnippet>214</a>
-<a href=#215 id=215 data-nosnippet>215</a><span class="kw">pub fn </span>process_reads(read_seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;, read_type: <span class="kw-2">&amp;</span>str)  -&gt; Vec&lt;Vec&lt;u8&gt;&gt;{
-<a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
-<a href=#217 id=217 data-nosnippet>217</a>    <span class="kw">for </span>read_seq_url <span class="kw">in </span>read_seq_urls {
-<a href=#218 id=218 data-nosnippet>218</a>        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
-<a href=#219 id=219 data-nosnippet>219</a>            read_seq_url,
-<a href=#220 id=220 data-nosnippet>220</a>            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
-<a href=#221 id=221 data-nosnippet>221</a>        );
-<a href=#222 id=222 data-nosnippet>222</a>        <span class="kw">let </span>fasta_path = read_seq_url.to_file_path().unwrap();
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">for </span>(distance_from_start, cn_kmer) <span class="kw">in
+<a href=#206 id=206 data-nosnippet>206</a>            </span>contig.windows(kmer_size).map(canonicalize_kmer).enumerate()
+<a href=#207 id=207 data-nosnippet>207</a>        {
+<a href=#208 id=208 data-nosnippet>208</a>            <span class="kw">let </span>distance_from_end = contig.len() - distance_from_start - kmer_size;
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a>            distances.insert(
+<a href=#211 id=211 data-nosnippet>211</a>                cn_kmer,
+<a href=#212 id=212 data-nosnippet>212</a>                <span class="kw">if </span>distance_from_start &lt; distance_from_end {
+<a href=#213 id=213 data-nosnippet>213</a>                    distance_from_start
+<a href=#214 id=214 data-nosnippet>214</a>                } <span class="kw">else </span>{
+<a href=#215 id=215 data-nosnippet>215</a>                    distance_from_end
+<a href=#216 id=216 data-nosnippet>216</a>                },
+<a href=#217 id=217 data-nosnippet>217</a>            );
+<a href=#218 id=218 data-nosnippet>218</a>        }
+<a href=#219 id=219 data-nosnippet>219</a>    }
+<a href=#220 id=220 data-nosnippet>220</a>
+<a href=#221 id=221 data-nosnippet>221</a>    distances
+<a href=#222 id=222 data-nosnippet>222</a>}
 <a href=#223 id=223 data-nosnippet>223</a>
-<a href=#224 id=224 data-nosnippet>224</a>        <span class="macro">skydive::elog!</span>(<span class="string">"Processing {}-read sample {}..."</span>, read_type, basename);
-<a href=#225 id=225 data-nosnippet>225</a>
-<a href=#226 id=226 data-nosnippet>226</a>        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
-<a href=#227 id=227 data-nosnippet>227</a>        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
-<a href=#228 id=228 data-nosnippet>228</a>
-<a href=#229 id=229 data-nosnippet>229</a>        all_seqs.extend(
-<a href=#230 id=230 data-nosnippet>230</a>            all_reads
-<a href=#231 id=231 data-nosnippet>231</a>                .iter()
-<a href=#232 id=232 data-nosnippet>232</a>                .map(|r| r.seq().to_vec())
-<a href=#233 id=233 data-nosnippet>233</a>                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
-<a href=#234 id=234 data-nosnippet>234</a>        );
-<a href=#235 id=235 data-nosnippet>235</a>    }
-<a href=#236 id=236 data-nosnippet>236</a>
-<a href=#237 id=237 data-nosnippet>237</a>    all_seqs
-<a href=#238 id=238 data-nosnippet>238</a>}
-<a href=#239 id=239 data-nosnippet>239</a>
-<a href=#240 id=240 data-nosnippet>240</a><span class="kw">pub fn </span>plot_roc_curve(output: <span class="kw-2">&amp;</span>PathBuf, roc_points: <span class="kw-2">&amp;</span>[(f32, f32)]) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
-<a href=#241 id=241 data-nosnippet>241</a>    <span class="kw">let </span>root = BitMapBackend::new(output, (<span class="number">640</span>, <span class="number">480</span>)).into_drawing_area();
-<a href=#242 id=242 data-nosnippet>242</a>    root.fill(<span class="kw-2">&amp;</span>WHITE)<span class="question-mark">?</span>;
-<a href=#243 id=243 data-nosnippet>243</a>
-<a href=#244 id=244 data-nosnippet>244</a>    <span class="kw">let </span><span class="kw-2">mut </span>chart = ChartBuilder::on(<span class="kw-2">&amp;</span>root)
-<a href=#245 id=245 data-nosnippet>245</a>        .caption(<span class="string">"ROC Curve"</span>, (<span class="string">"sans-serif"</span>, <span class="number">50</span>).into_font())
-<a href=#246 id=246 data-nosnippet>246</a>        .margin(<span class="number">10</span>)
-<a href=#247 id=247 data-nosnippet>247</a>        .x_label_area_size(<span class="number">30</span>)
-<a href=#248 id=248 data-nosnippet>248</a>        .y_label_area_size(<span class="number">50</span>)
-<a href=#249 id=249 data-nosnippet>249</a>        .build_cartesian_2d(<span class="number">0.0</span>..<span class="number">1.0</span>, <span class="number">0.0</span>..<span class="number">1.0</span>)<span class="question-mark">?</span>;
-<a href=#250 id=250 data-nosnippet>250</a>
-<a href=#251 id=251 data-nosnippet>251</a>    chart
-<a href=#252 id=252 data-nosnippet>252</a>        .configure_mesh()
-<a href=#253 id=253 data-nosnippet>253</a>        .x_desc(<span class="string">"False Positive Rate"</span>)
-<a href=#254 id=254 data-nosnippet>254</a>        .y_desc(<span class="string">"True Positive Rate"</span>)
-<a href=#255 id=255 data-nosnippet>255</a>        .draw()<span class="question-mark">?</span>;
-<a href=#256 id=256 data-nosnippet>256</a>
-<a href=#257 id=257 data-nosnippet>257</a>    chart.draw_series(LineSeries::new(
-<a href=#258 id=258 data-nosnippet>258</a>        roc_points.iter().map(|(fpr, tpr)| (<span class="kw-2">*</span>fpr <span class="kw">as </span>f64, <span class="kw-2">*</span>tpr <span class="kw">as </span>f64)),
-<a href=#259 id=259 data-nosnippet>259</a>        <span class="kw-2">&amp;</span>RED,
-<a href=#260 id=260 data-nosnippet>260</a>    ))<span class="question-mark">?
-<a href=#261 id=261 data-nosnippet>261</a>        </span>.label(<span class="string">"ROC Curve"</span>)
-<a href=#262 id=262 data-nosnippet>262</a>        .legend(|(x, y)| PathElement::new([(x, y), (x + <span class="number">20</span>, y)], RED));
-<a href=#263 id=263 data-nosnippet>263</a>
-<a href=#264 id=264 data-nosnippet>264</a>    <span class="comment">// Draw a diagonal dotted line for reference.
-<a href=#265 id=265 data-nosnippet>265</a>    </span>chart.draw_series(LineSeries::new(
-<a href=#266 id=266 data-nosnippet>266</a>        [(<span class="number">0.0</span>, <span class="number">0.0</span>), (<span class="number">1.0</span>, <span class="number">1.0</span>)].iter().cloned(),
-<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw-2">&amp;</span>BLACK,
-<a href=#268 id=268 data-nosnippet>268</a>    ))<span class="question-mark">?
-<a href=#269 id=269 data-nosnippet>269</a>        </span>.label(<span class="string">"Random"</span>)
-<a href=#270 id=270 data-nosnippet>270</a>        .legend(|(x, y)| PathElement::new(<span class="macro">vec!</span>[(x, y), (x + <span class="number">20</span>, y)], BLACK));
-<a href=#271 id=271 data-nosnippet>271</a>
-<a href=#272 id=272 data-nosnippet>272</a>    chart.configure_series_labels().background_style(WHITE).draw()<span class="question-mark">?</span>;
-<a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a>    <span class="prelude-val">Ok</span>(())
-<a href=#275 id=275 data-nosnippet>275</a>}
-<a href=#276 id=276 data-nosnippet>276</a>
-<a href=#277 id=277 data-nosnippet>277</a>
-<a href=#278 id=278 data-nosnippet>278</a><span class="doccomment">/// Computes FPR and TPR at various thresholds.
-<a href=#279 id=279 data-nosnippet>279</a></span><span class="kw">pub fn </span>compute_fpr_tpr(test_data: <span class="kw-2">&amp;</span>DataVec, p: <span class="kw-2">&amp;</span>Vec&lt;f32&gt;) -&gt; Vec&lt;(f32, f32)&gt; {
-<a href=#280 id=280 data-nosnippet>280</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Computing FPR and TPR at various thresholds..."</span>);
-<a href=#281 id=281 data-nosnippet>281</a>    <span class="kw">let </span><span class="kw-2">mut </span>fpr_tpr: Vec&lt;(f32, f32)&gt; = Vec::new();
-<a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>    <span class="comment">// Iterate over different thresholds
-<a href=#284 id=284 data-nosnippet>284</a>    </span><span class="kw">for </span>threshold <span class="kw">in </span><span class="number">0</span>..<span class="number">100 </span>{
-<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">let </span>pred_threshold = threshold <span class="kw">as </span>f32 / <span class="number">100.0</span>;
-<a href=#286 id=286 data-nosnippet>286</a>        <span class="kw">let </span>(<span class="kw-2">mut </span>num_true_positives, <span class="kw-2">mut </span>num_false_positives, <span class="kw-2">mut </span>num_false_negatives, <span class="kw-2">mut </span>num_true_negatives) = (<span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>);
+<a href=#224 id=224 data-nosnippet>224</a><span class="kw">pub fn </span>process_reads(read_seq_urls: <span class="kw-2">&amp;</span>HashSet&lt;Url&gt;, read_type: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;Vec&lt;u8&gt;&gt; {
+<a href=#225 id=225 data-nosnippet>225</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_seqs: Vec&lt;Vec&lt;u8&gt;&gt; = Vec::new();
+<a href=#226 id=226 data-nosnippet>226</a>    <span class="kw">for </span>read_seq_url <span class="kw">in </span>read_seq_urls {
+<a href=#227 id=227 data-nosnippet>227</a>        <span class="kw">let </span>basename = skydive::utils::basename_without_extension(
+<a href=#228 id=228 data-nosnippet>228</a>            read_seq_url,
+<a href=#229 id=229 data-nosnippet>229</a>            <span class="kw-2">&amp;</span>[<span class="string">".fasta.gz"</span>, <span class="string">".fa.gz"</span>, <span class="string">".fasta"</span>, <span class="string">".fa"</span>],
+<a href=#230 id=230 data-nosnippet>230</a>        );
+<a href=#231 id=231 data-nosnippet>231</a>        <span class="kw">let </span>fasta_path = read_seq_url.to_file_path().unwrap();
+<a href=#232 id=232 data-nosnippet>232</a>
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="macro">skydive::elog!</span>(<span class="string">"Processing {}-read sample {}..."</span>, read_type, basename);
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="kw">let </span>reader = bio::io::fasta::Reader::from_file(<span class="kw-2">&amp;</span>fasta_path).unwrap();
+<a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">let </span>all_reads: Vec&lt;bio::io::fasta::Record&gt; = reader.records().map(|r| r.unwrap()).collect();
+<a href=#237 id=237 data-nosnippet>237</a>
+<a href=#238 id=238 data-nosnippet>238</a>        all_seqs.extend(
+<a href=#239 id=239 data-nosnippet>239</a>            all_reads
+<a href=#240 id=240 data-nosnippet>240</a>                .iter()
+<a href=#241 id=241 data-nosnippet>241</a>                .map(|r| r.seq().to_vec())
+<a href=#242 id=242 data-nosnippet>242</a>                .collect::&lt;Vec&lt;Vec&lt;u8&gt;&gt;&gt;(),
+<a href=#243 id=243 data-nosnippet>243</a>        );
+<a href=#244 id=244 data-nosnippet>244</a>    }
+<a href=#245 id=245 data-nosnippet>245</a>
+<a href=#246 id=246 data-nosnippet>246</a>    all_seqs
+<a href=#247 id=247 data-nosnippet>247</a>}
+<a href=#248 id=248 data-nosnippet>248</a>
+<a href=#249 id=249 data-nosnippet>249</a><span class="kw">pub fn </span>plot_roc_curve(
+<a href=#250 id=250 data-nosnippet>250</a>    output: <span class="kw-2">&amp;</span>PathBuf,
+<a href=#251 id=251 data-nosnippet>251</a>    roc_points: <span class="kw-2">&amp;</span>[(f32, f32)],
+<a href=#252 id=252 data-nosnippet>252</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+<a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">let </span>root = BitMapBackend::new(output, (<span class="number">640</span>, <span class="number">480</span>)).into_drawing_area();
+<a href=#254 id=254 data-nosnippet>254</a>    root.fill(<span class="kw-2">&amp;</span>WHITE)<span class="question-mark">?</span>;
+<a href=#255 id=255 data-nosnippet>255</a>
+<a href=#256 id=256 data-nosnippet>256</a>    <span class="kw">let </span><span class="kw-2">mut </span>chart = ChartBuilder::on(<span class="kw-2">&amp;</span>root)
+<a href=#257 id=257 data-nosnippet>257</a>        .caption(<span class="string">"ROC Curve"</span>, (<span class="string">"sans-serif"</span>, <span class="number">50</span>).into_font())
+<a href=#258 id=258 data-nosnippet>258</a>        .margin(<span class="number">10</span>)
+<a href=#259 id=259 data-nosnippet>259</a>        .x_label_area_size(<span class="number">30</span>)
+<a href=#260 id=260 data-nosnippet>260</a>        .y_label_area_size(<span class="number">50</span>)
+<a href=#261 id=261 data-nosnippet>261</a>        .build_cartesian_2d(<span class="number">0.0</span>..<span class="number">1.0</span>, <span class="number">0.0</span>..<span class="number">1.0</span>)<span class="question-mark">?</span>;
+<a href=#262 id=262 data-nosnippet>262</a>
+<a href=#263 id=263 data-nosnippet>263</a>    chart
+<a href=#264 id=264 data-nosnippet>264</a>        .configure_mesh()
+<a href=#265 id=265 data-nosnippet>265</a>        .x_desc(<span class="string">"False Positive Rate"</span>)
+<a href=#266 id=266 data-nosnippet>266</a>        .y_desc(<span class="string">"True Positive Rate"</span>)
+<a href=#267 id=267 data-nosnippet>267</a>        .draw()<span class="question-mark">?</span>;
+<a href=#268 id=268 data-nosnippet>268</a>
+<a href=#269 id=269 data-nosnippet>269</a>    chart
+<a href=#270 id=270 data-nosnippet>270</a>        .draw_series(LineSeries::new(
+<a href=#271 id=271 data-nosnippet>271</a>            roc_points
+<a href=#272 id=272 data-nosnippet>272</a>                .iter()
+<a href=#273 id=273 data-nosnippet>273</a>                .map(|(fpr, tpr)| (<span class="kw-2">*</span>fpr <span class="kw">as </span>f64, <span class="kw-2">*</span>tpr <span class="kw">as </span>f64)),
+<a href=#274 id=274 data-nosnippet>274</a>            <span class="kw-2">&amp;</span>RED,
+<a href=#275 id=275 data-nosnippet>275</a>        ))<span class="question-mark">?
+<a href=#276 id=276 data-nosnippet>276</a>        </span>.label(<span class="string">"ROC Curve"</span>)
+<a href=#277 id=277 data-nosnippet>277</a>        .legend(|(x, y)| PathElement::new([(x, y), (x + <span class="number">20</span>, y)], RED));
+<a href=#278 id=278 data-nosnippet>278</a>
+<a href=#279 id=279 data-nosnippet>279</a>    <span class="comment">// Draw a diagonal dotted line for reference.
+<a href=#280 id=280 data-nosnippet>280</a>    </span>chart
+<a href=#281 id=281 data-nosnippet>281</a>        .draw_series(LineSeries::new(
+<a href=#282 id=282 data-nosnippet>282</a>            [(<span class="number">0.0</span>, <span class="number">0.0</span>), (<span class="number">1.0</span>, <span class="number">1.0</span>)].iter().cloned(),
+<a href=#283 id=283 data-nosnippet>283</a>            <span class="kw-2">&amp;</span>BLACK,
+<a href=#284 id=284 data-nosnippet>284</a>        ))<span class="question-mark">?
+<a href=#285 id=285 data-nosnippet>285</a>        </span>.label(<span class="string">"Random"</span>)
+<a href=#286 id=286 data-nosnippet>286</a>        .legend(|(x, y)| PathElement::new(<span class="macro">vec!</span>[(x, y), (x + <span class="number">20</span>, y)], BLACK));
 <a href=#287 id=287 data-nosnippet>287</a>
-<a href=#288 id=288 data-nosnippet>288</a>        <span class="comment">// Iterate over test data and predictions
-<a href=#289 id=289 data-nosnippet>289</a>        </span><span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(p.iter()) {
-<a href=#290 id=290 data-nosnippet>290</a>            <span class="kw">let </span>truth = data.label;
-<a href=#291 id=291 data-nosnippet>291</a>            <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
+<a href=#288 id=288 data-nosnippet>288</a>    chart
+<a href=#289 id=289 data-nosnippet>289</a>        .configure_series_labels()
+<a href=#290 id=290 data-nosnippet>290</a>        .background_style(WHITE)
+<a href=#291 id=291 data-nosnippet>291</a>        .draw()<span class="question-mark">?</span>;
 <a href=#292 id=292 data-nosnippet>292</a>
-<a href=#293 id=293 data-nosnippet>293</a>            <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
-<a href=#294 id=294 data-nosnippet>294</a>                <span class="comment">// Correct classification
-<a href=#295 id=295 data-nosnippet>295</a>                </span><span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{ num_true_positives += <span class="number">1</span>; }  <span class="comment">// True Positive
-<a href=#296 id=296 data-nosnippet>296</a>                </span><span class="kw">else </span>{ num_true_negatives += <span class="number">1</span>; }  <span class="comment">// True Negative
-<a href=#297 id=297 data-nosnippet>297</a>            </span>} <span class="kw">else </span>{
-<a href=#298 id=298 data-nosnippet>298</a>                <span class="comment">// Incorrect classification
-<a href=#299 id=299 data-nosnippet>299</a>                </span><span class="kw">if </span>truth &lt; <span class="number">0.5 </span>{ num_false_positives += <span class="number">1</span>; }  <span class="comment">// False Positive
-<a href=#300 id=300 data-nosnippet>300</a>                </span><span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{ num_false_negatives += <span class="number">1</span>; }  <span class="comment">// False Negative
-<a href=#301 id=301 data-nosnippet>301</a>            </span>}
-<a href=#302 id=302 data-nosnippet>302</a>        }
-<a href=#303 id=303 data-nosnippet>303</a>
-<a href=#304 id=304 data-nosnippet>304</a>        <span class="comment">// Calculate FPR (False Positive Rate)
-<a href=#305 id=305 data-nosnippet>305</a>        </span><span class="kw">let </span>fpr = <span class="kw">if </span>num_false_positives + num_true_negatives &gt; <span class="number">0 </span>{
-<a href=#306 id=306 data-nosnippet>306</a>            num_false_positives <span class="kw">as </span>f32 / (num_false_positives + num_true_negatives) <span class="kw">as </span>f32
-<a href=#307 id=307 data-nosnippet>307</a>        } <span class="kw">else </span>{
-<a href=#308 id=308 data-nosnippet>308</a>            <span class="number">0.0
-<a href=#309 id=309 data-nosnippet>309</a>        </span>};
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="prelude-val">Ok</span>(())
+<a href=#294 id=294 data-nosnippet>294</a>}
+<a href=#295 id=295 data-nosnippet>295</a>
+<a href=#296 id=296 data-nosnippet>296</a><span class="doccomment">/// Computes FPR and TPR at various thresholds.
+<a href=#297 id=297 data-nosnippet>297</a></span><span class="kw">pub fn </span>compute_fpr_tpr(test_data: <span class="kw-2">&amp;</span>DataVec, p: <span class="kw-2">&amp;</span>Vec&lt;f32&gt;) -&gt; Vec&lt;(f32, f32)&gt; {
+<a href=#298 id=298 data-nosnippet>298</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Computing FPR and TPR at various thresholds..."</span>);
+<a href=#299 id=299 data-nosnippet>299</a>    <span class="kw">let </span><span class="kw-2">mut </span>fpr_tpr: Vec&lt;(f32, f32)&gt; = Vec::new();
+<a href=#300 id=300 data-nosnippet>300</a>
+<a href=#301 id=301 data-nosnippet>301</a>    <span class="comment">// Iterate over different thresholds
+<a href=#302 id=302 data-nosnippet>302</a>    </span><span class="kw">for </span>threshold <span class="kw">in </span><span class="number">0</span>..<span class="number">100 </span>{
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>pred_threshold = threshold <span class="kw">as </span>f32 / <span class="number">100.0</span>;
+<a href=#304 id=304 data-nosnippet>304</a>        <span class="kw">let </span>(
+<a href=#305 id=305 data-nosnippet>305</a>            <span class="kw-2">mut </span>num_true_positives,
+<a href=#306 id=306 data-nosnippet>306</a>            <span class="kw-2">mut </span>num_false_positives,
+<a href=#307 id=307 data-nosnippet>307</a>            <span class="kw-2">mut </span>num_false_negatives,
+<a href=#308 id=308 data-nosnippet>308</a>            <span class="kw-2">mut </span>num_true_negatives,
+<a href=#309 id=309 data-nosnippet>309</a>        ) = (<span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>);
 <a href=#310 id=310 data-nosnippet>310</a>
-<a href=#311 id=311 data-nosnippet>311</a>        <span class="comment">// Calculate TPR (True Positive Rate)
-<a href=#312 id=312 data-nosnippet>312</a>        </span><span class="kw">let </span>tpr = <span class="kw">if </span>num_true_positives + num_false_negatives &gt; <span class="number">0 </span>{
-<a href=#313 id=313 data-nosnippet>313</a>            num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_negatives) <span class="kw">as </span>f32
-<a href=#314 id=314 data-nosnippet>314</a>        } <span class="kw">else </span>{
-<a href=#315 id=315 data-nosnippet>315</a>            <span class="number">0.0
-<a href=#316 id=316 data-nosnippet>316</a>        </span>};
-<a href=#317 id=317 data-nosnippet>317</a>
-<a href=#318 id=318 data-nosnippet>318</a>        fpr_tpr.push((fpr, tpr));
-<a href=#319 id=319 data-nosnippet>319</a>    }
-<a href=#320 id=320 data-nosnippet>320</a>
-<a href=#321 id=321 data-nosnippet>321</a>    fpr_tpr
-<a href=#322 id=322 data-nosnippet>322</a>}
-<a href=#323 id=323 data-nosnippet>323</a>
-<a href=#324 id=324 data-nosnippet>324</a><span class="doccomment">/// Computes precision, recall, and F1 score on test data.
-<a href=#325 id=325 data-nosnippet>325</a></span><span class="kw">pub fn </span>compute_precision_recall_f1(test_data: <span class="kw-2">&amp;</span>DataVec, p: <span class="kw-2">&amp;</span>Vec&lt;f32&gt;, pred_threshold: f32) -&gt; (f32, f32, f32) {
-<a href=#326 id=326 data-nosnippet>326</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Computing precision, recall, and F1 score on test data..."</span>);
-<a href=#327 id=327 data-nosnippet>327</a>    <span class="kw">let </span>(<span class="kw-2">mut </span>num_true_positives, <span class="kw-2">mut </span>num_false_positives, <span class="kw-2">mut </span>num_false_negatives) = (<span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>);
-<a href=#328 id=328 data-nosnippet>328</a>
-<a href=#329 id=329 data-nosnippet>329</a>    <span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(p.iter()) {
-<a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">let </span>truth = data.label;
-<a href=#331 id=331 data-nosnippet>331</a>        <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
-<a href=#332 id=332 data-nosnippet>332</a>        <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
-<a href=#333 id=333 data-nosnippet>333</a>            <span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{ num_true_positives += <span class="number">1</span>; }
-<a href=#334 id=334 data-nosnippet>334</a>        } <span class="kw">else </span>{
-<a href=#335 id=335 data-nosnippet>335</a>            <span class="kw">if </span>truth &lt; <span class="number">0.5 </span>{ num_false_positives += <span class="number">1</span>; }
-<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{ num_false_negatives += <span class="number">1</span>; }
-<a href=#337 id=337 data-nosnippet>337</a>        }
-<a href=#338 id=338 data-nosnippet>338</a>    }
-<a href=#339 id=339 data-nosnippet>339</a>
-<a href=#340 id=340 data-nosnippet>340</a>    <span class="kw">let </span>precision = num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_positives) <span class="kw">as </span>f32;
-<a href=#341 id=341 data-nosnippet>341</a>    <span class="kw">let </span>recall = num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_negatives) <span class="kw">as </span>f32;
-<a href=#342 id=342 data-nosnippet>342</a>    <span class="kw">let </span>f1_score = <span class="number">2.0 </span>* precision * recall / (precision + recall);
-<a href=#343 id=343 data-nosnippet>343</a>
-<a href=#344 id=344 data-nosnippet>344</a>    (precision, recall, f1_score)
-<a href=#345 id=345 data-nosnippet>345</a>}
-<a href=#346 id=346 data-nosnippet>346</a>
-<a href=#347 id=347 data-nosnippet>347</a><span class="doccomment">/// Creates a dataset for the ML model.
-<a href=#348 id=348 data-nosnippet>348</a></span><span class="kw">pub fn </span>create_dataset_for_model(
-<a href=#349 id=349 data-nosnippet>349</a>    kmers: Chain&lt;Chain&lt;Keys&lt;Vec&lt;u8&gt;, Record&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;,
-<a href=#350 id=350 data-nosnippet>350</a>    lr_distances: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, usize&gt;,
-<a href=#351 id=351 data-nosnippet>351</a>    sr_distances: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, usize&gt;,
-<a href=#352 id=352 data-nosnippet>352</a>    l1: <span class="kw-2">&amp;</span>LdBG,
-<a href=#353 id=353 data-nosnippet>353</a>    s1: <span class="kw-2">&amp;</span>LdBG,
-<a href=#354 id=354 data-nosnippet>354</a>    t1: <span class="kw-2">&amp;</span>LdBG,
-<a href=#355 id=355 data-nosnippet>355</a>) -&gt; Vec&lt;Data&gt; {
-<a href=#356 id=356 data-nosnippet>356</a>    <span class="kw">let </span><span class="kw-2">mut </span>dataset = Vec::new();
-<a href=#357 id=357 data-nosnippet>357</a>
-<a href=#358 id=358 data-nosnippet>358</a>    <span class="kw">for </span>kmer <span class="kw">in </span>kmers {
-<a href=#359 id=359 data-nosnippet>359</a>        <span class="kw">let </span>compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
-<a href=#360 id=360 data-nosnippet>360</a>        <span class="kw">let </span>compressed_len_diff = (kmer.len() - compressed_len) <span class="kw">as </span>f32;
-<a href=#361 id=361 data-nosnippet>361</a>        <span class="kw">let </span>entropy = skydive::utils::shannon_entropy(kmer);
-<a href=#362 id=362 data-nosnippet>362</a>        <span class="kw">let </span>gc_content = skydive::utils::gc_content(kmer);
-<a href=#363 id=363 data-nosnippet>363</a>        <span class="comment">// let lr_distance = *lr_distances.get(kmer).unwrap_or(&amp;0) as f32;
-<a href=#364 id=364 data-nosnippet>364</a>        // let sr_distance = *sr_distances.get(kmer).unwrap_or(&amp;0) as f32;
+<a href=#311 id=311 data-nosnippet>311</a>        <span class="comment">// Iterate over test data and predictions
+<a href=#312 id=312 data-nosnippet>312</a>        </span><span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(p.iter()) {
+<a href=#313 id=313 data-nosnippet>313</a>            <span class="kw">let </span>truth = data.label;
+<a href=#314 id=314 data-nosnippet>314</a>            <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
+<a href=#315 id=315 data-nosnippet>315</a>
+<a href=#316 id=316 data-nosnippet>316</a>            <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
+<a href=#317 id=317 data-nosnippet>317</a>                <span class="comment">// Correct classification
+<a href=#318 id=318 data-nosnippet>318</a>                </span><span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{
+<a href=#319 id=319 data-nosnippet>319</a>                    num_true_positives += <span class="number">1</span>;
+<a href=#320 id=320 data-nosnippet>320</a>                }
+<a href=#321 id=321 data-nosnippet>321</a>                <span class="comment">// True Positive
+<a href=#322 id=322 data-nosnippet>322</a>                </span><span class="kw">else </span>{
+<a href=#323 id=323 data-nosnippet>323</a>                    num_true_negatives += <span class="number">1</span>;
+<a href=#324 id=324 data-nosnippet>324</a>                } <span class="comment">// True Negative
+<a href=#325 id=325 data-nosnippet>325</a>            </span>} <span class="kw">else </span>{
+<a href=#326 id=326 data-nosnippet>326</a>                <span class="comment">// Incorrect classification
+<a href=#327 id=327 data-nosnippet>327</a>                </span><span class="kw">if </span>truth &lt; <span class="number">0.5 </span>{
+<a href=#328 id=328 data-nosnippet>328</a>                    num_false_positives += <span class="number">1</span>;
+<a href=#329 id=329 data-nosnippet>329</a>                } <span class="comment">// False Positive
+<a href=#330 id=330 data-nosnippet>330</a>                </span><span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{
+<a href=#331 id=331 data-nosnippet>331</a>                    num_false_negatives += <span class="number">1</span>;
+<a href=#332 id=332 data-nosnippet>332</a>                } <span class="comment">// False Negative
+<a href=#333 id=333 data-nosnippet>333</a>            </span>}
+<a href=#334 id=334 data-nosnippet>334</a>        }
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a>        <span class="comment">// Calculate FPR (False Positive Rate)
+<a href=#337 id=337 data-nosnippet>337</a>        </span><span class="kw">let </span>fpr = <span class="kw">if </span>num_false_positives + num_true_negatives &gt; <span class="number">0 </span>{
+<a href=#338 id=338 data-nosnippet>338</a>            num_false_positives <span class="kw">as </span>f32 / (num_false_positives + num_true_negatives) <span class="kw">as </span>f32
+<a href=#339 id=339 data-nosnippet>339</a>        } <span class="kw">else </span>{
+<a href=#340 id=340 data-nosnippet>340</a>            <span class="number">0.0
+<a href=#341 id=341 data-nosnippet>341</a>        </span>};
+<a href=#342 id=342 data-nosnippet>342</a>
+<a href=#343 id=343 data-nosnippet>343</a>        <span class="comment">// Calculate TPR (True Positive Rate)
+<a href=#344 id=344 data-nosnippet>344</a>        </span><span class="kw">let </span>tpr = <span class="kw">if </span>num_true_positives + num_false_negatives &gt; <span class="number">0 </span>{
+<a href=#345 id=345 data-nosnippet>345</a>            num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_negatives) <span class="kw">as </span>f32
+<a href=#346 id=346 data-nosnippet>346</a>        } <span class="kw">else </span>{
+<a href=#347 id=347 data-nosnippet>347</a>            <span class="number">0.0
+<a href=#348 id=348 data-nosnippet>348</a>        </span>};
+<a href=#349 id=349 data-nosnippet>349</a>
+<a href=#350 id=350 data-nosnippet>350</a>        fpr_tpr.push((fpr, tpr));
+<a href=#351 id=351 data-nosnippet>351</a>    }
+<a href=#352 id=352 data-nosnippet>352</a>
+<a href=#353 id=353 data-nosnippet>353</a>    fpr_tpr
+<a href=#354 id=354 data-nosnippet>354</a>}
+<a href=#355 id=355 data-nosnippet>355</a>
+<a href=#356 id=356 data-nosnippet>356</a><span class="doccomment">/// Computes precision, recall, and F1 score on test data.
+<a href=#357 id=357 data-nosnippet>357</a></span><span class="kw">pub fn </span>compute_precision_recall_f1(
+<a href=#358 id=358 data-nosnippet>358</a>    test_data: <span class="kw-2">&amp;</span>DataVec,
+<a href=#359 id=359 data-nosnippet>359</a>    p: <span class="kw-2">&amp;</span>Vec&lt;f32&gt;,
+<a href=#360 id=360 data-nosnippet>360</a>    pred_threshold: f32,
+<a href=#361 id=361 data-nosnippet>361</a>) -&gt; (f32, f32, f32) {
+<a href=#362 id=362 data-nosnippet>362</a>    <span class="macro">skydive::elog!</span>(<span class="string">"Computing precision, recall, and F1 score on test data..."</span>);
+<a href=#363 id=363 data-nosnippet>363</a>    <span class="kw">let </span>(<span class="kw-2">mut </span>num_true_positives, <span class="kw-2">mut </span>num_false_positives, <span class="kw-2">mut </span>num_false_negatives) =
+<a href=#364 id=364 data-nosnippet>364</a>        (<span class="number">0u32</span>, <span class="number">0u32</span>, <span class="number">0u32</span>);
 <a href=#365 id=365 data-nosnippet>365</a>
-<a href=#366 id=366 data-nosnippet>366</a>        </span><span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |lr| lr.coverage());
-<a href=#367 id=367 data-nosnippet>367</a>
-<a href=#368 id=368 data-nosnippet>368</a>        <span class="kw">let </span>scov_fw = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.fw_coverage());
-<a href=#369 id=369 data-nosnippet>369</a>        <span class="kw">let </span>scov_rc = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.rc_coverage());
-<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">let </span>scov_total = scov_fw + scov_rc;
-<a href=#371 id=371 data-nosnippet>371</a>        <span class="kw">let </span>strand_ratio = <span class="kw">if </span>scov_total &gt; <span class="number">0 </span>{
-<a href=#372 id=372 data-nosnippet>372</a>            (scov_fw <span class="kw">as </span>f32).max(scov_rc <span class="kw">as </span>f32) / scov_total <span class="kw">as </span>f32
+<a href=#366 id=366 data-nosnippet>366</a>    <span class="kw">for </span>(data, pred) <span class="kw">in </span>test_data.iter().zip(p.iter()) {
+<a href=#367 id=367 data-nosnippet>367</a>        <span class="kw">let </span>truth = data.label;
+<a href=#368 id=368 data-nosnippet>368</a>        <span class="kw">let </span>call = <span class="kw">if </span><span class="kw-2">*</span>pred &gt; pred_threshold { <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>};
+<a href=#369 id=369 data-nosnippet>369</a>        <span class="kw">if </span>(call - truth).abs() &lt; f32::EPSILON {
+<a href=#370 id=370 data-nosnippet>370</a>            <span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{
+<a href=#371 id=371 data-nosnippet>371</a>                num_true_positives += <span class="number">1</span>;
+<a href=#372 id=372 data-nosnippet>372</a>            }
 <a href=#373 id=373 data-nosnippet>373</a>        } <span class="kw">else </span>{
-<a href=#374 id=374 data-nosnippet>374</a>            <span class="number">0.5
-<a href=#375 id=375 data-nosnippet>375</a>        </span>};
-<a href=#376 id=376 data-nosnippet>376</a>
-<a href=#377 id=377 data-nosnippet>377</a>        <span class="comment">// let expected = (scov_fw + scov_rc) as f32 / 2.0;
-<a href=#378 id=378 data-nosnippet>378</a>        // let chi_square = if expected &gt; 0.0 {
-<a href=#379 id=379 data-nosnippet>379</a>        //     ((scov_fw as f32 - expected).powi(2) + 
-<a href=#380 id=380 data-nosnippet>380</a>        //     (scov_rc as f32 - expected).powi(2)) / expected
-<a href=#381 id=381 data-nosnippet>381</a>        // } else {
-<a href=#382 id=382 data-nosnippet>382</a>        //     0.0
-<a href=#383 id=383 data-nosnippet>383</a>        // };
-<a href=#384 id=384 data-nosnippet>384</a>
-<a href=#385 id=385 data-nosnippet>385</a>        </span><span class="kw">let </span>tcov = t1.kmers.get(kmer).map_or(<span class="number">0</span>, |tr| tr.coverage());
+<a href=#374 id=374 data-nosnippet>374</a>            <span class="kw">if </span>truth &lt; <span class="number">0.5 </span>{
+<a href=#375 id=375 data-nosnippet>375</a>                num_false_positives += <span class="number">1</span>;
+<a href=#376 id=376 data-nosnippet>376</a>            }
+<a href=#377 id=377 data-nosnippet>377</a>            <span class="kw">if </span>truth &gt; <span class="number">0.5 </span>{
+<a href=#378 id=378 data-nosnippet>378</a>                num_false_negatives += <span class="number">1</span>;
+<a href=#379 id=379 data-nosnippet>379</a>            }
+<a href=#380 id=380 data-nosnippet>380</a>        }
+<a href=#381 id=381 data-nosnippet>381</a>    }
+<a href=#382 id=382 data-nosnippet>382</a>
+<a href=#383 id=383 data-nosnippet>383</a>    <span class="kw">let </span>precision = num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_positives) <span class="kw">as </span>f32;
+<a href=#384 id=384 data-nosnippet>384</a>    <span class="kw">let </span>recall = num_true_positives <span class="kw">as </span>f32 / (num_true_positives + num_false_negatives) <span class="kw">as </span>f32;
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="kw">let </span>f1_score = <span class="number">2.0 </span>* precision * recall / (precision + recall);
 <a href=#386 id=386 data-nosnippet>386</a>
-<a href=#387 id=387 data-nosnippet>387</a>        <span class="kw">let </span>data = Data::new_training_data(
-<a href=#388 id=388 data-nosnippet>388</a>            <span class="macro">vec!</span>[
-<a href=#389 id=389 data-nosnippet>389</a>                <span class="kw">if </span>lcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>},    <span class="comment">// present in long reads
-<a href=#390 id=390 data-nosnippet>390</a>                </span>scov_total <span class="kw">as </span>f32,                   <span class="comment">// coverage in short reads
-<a href=#391 id=391 data-nosnippet>391</a>                </span>strand_ratio <span class="kw">as </span>f32,                 <span class="comment">// measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
-<a href=#392 id=392 data-nosnippet>392</a>                </span>compressed_len_diff,                 <span class="comment">// homopolymer compression length difference
-<a href=#393 id=393 data-nosnippet>393</a>                </span>entropy,                             <span class="comment">// shannon entropy
-<a href=#394 id=394 data-nosnippet>394</a>                </span>gc_content,                          <span class="comment">// gc content
-<a href=#395 id=395 data-nosnippet>395</a>                // lr_distance,                         // distance to nearest long read contig end
-<a href=#396 id=396 data-nosnippet>396</a>                // sr_distance,                         // distance to nearest short read contig end
-<a href=#397 id=397 data-nosnippet>397</a>            </span>],
-<a href=#398 id=398 data-nosnippet>398</a>            <span class="number">1.0</span>,
-<a href=#399 id=399 data-nosnippet>399</a>            <span class="kw">if </span>tcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>}, <span class="comment">// present in truth
-<a href=#400 id=400 data-nosnippet>400</a>            </span><span class="prelude-val">None</span>,
-<a href=#401 id=401 data-nosnippet>401</a>        );
-<a href=#402 id=402 data-nosnippet>402</a>
-<a href=#403 id=403 data-nosnippet>403</a>        dataset.push(data);
-<a href=#404 id=404 data-nosnippet>404</a>    }
-<a href=#405 id=405 data-nosnippet>405</a>
-<a href=#406 id=406 data-nosnippet>406</a>    dataset
-<a href=#407 id=407 data-nosnippet>407</a>}</code></pre></div></section></main></body></html>
+<a href=#387 id=387 data-nosnippet>387</a>    (precision, recall, f1_score)
+<a href=#388 id=388 data-nosnippet>388</a>}
+<a href=#389 id=389 data-nosnippet>389</a>
+<a href=#390 id=390 data-nosnippet>390</a><span class="doccomment">/// Creates a dataset for the ML model.
+<a href=#391 id=391 data-nosnippet>391</a></span><span class="kw">pub fn </span>create_dataset_for_model(
+<a href=#392 id=392 data-nosnippet>392</a>    kmers: Chain&lt;Chain&lt;Keys&lt;Vec&lt;u8&gt;, Record&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;, Keys&lt;Vec&lt;u8&gt;, Record&gt;&gt;,
+<a href=#393 id=393 data-nosnippet>393</a>    lr_distances: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, usize&gt;,
+<a href=#394 id=394 data-nosnippet>394</a>    sr_distances: <span class="kw-2">&amp;</span>HashMap&lt;Vec&lt;u8&gt;, usize&gt;,
+<a href=#395 id=395 data-nosnippet>395</a>    l1: <span class="kw-2">&amp;</span>LdBG,
+<a href=#396 id=396 data-nosnippet>396</a>    s1: <span class="kw-2">&amp;</span>LdBG,
+<a href=#397 id=397 data-nosnippet>397</a>    t1: <span class="kw-2">&amp;</span>LdBG,
+<a href=#398 id=398 data-nosnippet>398</a>) -&gt; Vec&lt;Data&gt; {
+<a href=#399 id=399 data-nosnippet>399</a>    <span class="kw">let </span><span class="kw-2">mut </span>dataset = Vec::new();
+<a href=#400 id=400 data-nosnippet>400</a>
+<a href=#401 id=401 data-nosnippet>401</a>    <span class="kw">for </span>kmer <span class="kw">in </span>kmers {
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="kw">let </span>compressed_len = skydive::utils::homopolymer_compressed(kmer).len();
+<a href=#403 id=403 data-nosnippet>403</a>        <span class="kw">let </span>compressed_len_diff = (kmer.len() - compressed_len) <span class="kw">as </span>f32;
+<a href=#404 id=404 data-nosnippet>404</a>        <span class="kw">let </span>entropy = skydive::utils::shannon_entropy(kmer);
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">let </span>gc_content = skydive::utils::gc_content(kmer);
+<a href=#406 id=406 data-nosnippet>406</a>        <span class="comment">// let lr_distance = *lr_distances.get(kmer).unwrap_or(&amp;0) as f32;
+<a href=#407 id=407 data-nosnippet>407</a>        // let sr_distance = *sr_distances.get(kmer).unwrap_or(&amp;0) as f32;
+<a href=#408 id=408 data-nosnippet>408</a>
+<a href=#409 id=409 data-nosnippet>409</a>        </span><span class="kw">let </span>lcov = l1.kmers.get(kmer).map_or(<span class="number">0</span>, |lr| lr.coverage());
+<a href=#410 id=410 data-nosnippet>410</a>
+<a href=#411 id=411 data-nosnippet>411</a>        <span class="kw">let </span>scov_fw = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.fw_coverage());
+<a href=#412 id=412 data-nosnippet>412</a>        <span class="kw">let </span>scov_rc = s1.kmers.get(kmer).map_or(<span class="number">0</span>, |sr| sr.rc_coverage());
+<a href=#413 id=413 data-nosnippet>413</a>        <span class="kw">let </span>scov_total = scov_fw + scov_rc;
+<a href=#414 id=414 data-nosnippet>414</a>        <span class="kw">let </span>strand_ratio = <span class="kw">if </span>scov_total &gt; <span class="number">0 </span>{
+<a href=#415 id=415 data-nosnippet>415</a>            (scov_fw <span class="kw">as </span>f32).max(scov_rc <span class="kw">as </span>f32) / scov_total <span class="kw">as </span>f32
+<a href=#416 id=416 data-nosnippet>416</a>        } <span class="kw">else </span>{
+<a href=#417 id=417 data-nosnippet>417</a>            <span class="number">0.5
+<a href=#418 id=418 data-nosnippet>418</a>        </span>};
+<a href=#419 id=419 data-nosnippet>419</a>
+<a href=#420 id=420 data-nosnippet>420</a>        <span class="comment">// let expected = (scov_fw + scov_rc) as f32 / 2.0;
+<a href=#421 id=421 data-nosnippet>421</a>        // let chi_square = if expected &gt; 0.0 {
+<a href=#422 id=422 data-nosnippet>422</a>        //     ((scov_fw as f32 - expected).powi(2) +
+<a href=#423 id=423 data-nosnippet>423</a>        //     (scov_rc as f32 - expected).powi(2)) / expected
+<a href=#424 id=424 data-nosnippet>424</a>        // } else {
+<a href=#425 id=425 data-nosnippet>425</a>        //     0.0
+<a href=#426 id=426 data-nosnippet>426</a>        // };
+<a href=#427 id=427 data-nosnippet>427</a>
+<a href=#428 id=428 data-nosnippet>428</a>        </span><span class="kw">let </span>tcov = t1.kmers.get(kmer).map_or(<span class="number">0</span>, |tr| tr.coverage());
+<a href=#429 id=429 data-nosnippet>429</a>
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">let </span>data = Data::new_training_data(
+<a href=#431 id=431 data-nosnippet>431</a>            <span class="macro">vec!</span>[
+<a href=#432 id=432 data-nosnippet>432</a>                <span class="kw">if </span>lcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>}, <span class="comment">// present in long reads
+<a href=#433 id=433 data-nosnippet>433</a>                </span>scov_total <span class="kw">as </span>f32,                <span class="comment">// coverage in short reads
+<a href=#434 id=434 data-nosnippet>434</a>                </span>strand_ratio <span class="kw">as </span>f32, <span class="comment">// measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+<a href=#435 id=435 data-nosnippet>435</a>                </span>compressed_len_diff, <span class="comment">// homopolymer compression length difference
+<a href=#436 id=436 data-nosnippet>436</a>                </span>entropy,             <span class="comment">// shannon entropy
+<a href=#437 id=437 data-nosnippet>437</a>                </span>gc_content,          <span class="comment">// gc content
+<a href=#438 id=438 data-nosnippet>438</a>                                     // lr_distance,                         // distance to nearest long read contig end
+<a href=#439 id=439 data-nosnippet>439</a>                                     // sr_distance,                         // distance to nearest short read contig end
+<a href=#440 id=440 data-nosnippet>440</a>            </span>],
+<a href=#441 id=441 data-nosnippet>441</a>            <span class="number">1.0</span>,
+<a href=#442 id=442 data-nosnippet>442</a>            <span class="kw">if </span>tcov &gt; <span class="number">0 </span>{ <span class="number">1.0 </span>} <span class="kw">else </span>{ <span class="number">0.0 </span>}, <span class="comment">// present in truth
+<a href=#443 id=443 data-nosnippet>443</a>            </span><span class="prelude-val">None</span>,
+<a href=#444 id=444 data-nosnippet>444</a>        );
+<a href=#445 id=445 data-nosnippet>445</a>
+<a href=#446 id=446 data-nosnippet>446</a>        dataset.push(data);
+<a href=#447 id=447 data-nosnippet>447</a>    }
+<a href=#448 id=448 data-nosnippet>448</a>
+<a href=#449 id=449 data-nosnippet>449</a>    dataset
+<a href=#450 id=450 data-nosnippet>450</a>}</code></pre></div></section></main></body></html>
