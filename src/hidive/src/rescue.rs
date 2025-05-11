@@ -1,20 +1,19 @@
+use bio::data_structures::interval_tree::IntervalTree;
+use bio::io::fasta::Reader;
+use bio::utils::Interval;
+use clap::ValueEnum;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use minimap2::{Aligner, Built, Mapping};
+use needletail::Sequence;
+use num_format::{Locale, ToFormattedString};
+use std::cmp::PartialEq;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
-use std::cmp::PartialEq;
-use clap::{ValueEnum};
-use bio::data_structures::interval_tree::IntervalTree;
-use bio::io::fasta::Reader;
-use bio::utils::Interval;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use minimap2::{Aligner, Built, Mapping};
-use needletail::Sequence;
-use num_format::{Locale, ToFormattedString};
-
 
 use indicatif::ProgressBar;
 use rayon::iter::ParallelBridge;
@@ -77,24 +76,24 @@ pub fn start(
         }
 
         // Set fetches with the input loci or the detected relevant loci.
-        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval
+        {
             match populate_fetches(&search_option, &loci, &ref_path, &reads, &mut fetches) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     skydive::elog!("Error: {}", e);
                     std::process::exit(1);
                 }
             }
             print_fetches_info(&fetches);
-
-            } else {
-                assert!(
-                    (search_option == SearchOption::All || search_option == SearchOption::Unmapped) && loci.is_none(),
-                    "Assertion failed: search_option is 'All' or 'Unmapped' and loci is NOT None"
-                );
-            }
+        } else {
+            assert!(
+                (search_option == SearchOption::All || search_option == SearchOption::Unmapped)
+                    && loci.is_none(),
+                "Assertion failed: search_option is 'All' or 'Unmapped' and loci is NOT None"
+            );
+        }
     }
-
 
     // Read the CRAM files and search for the k-mers in each read.
 
@@ -121,7 +120,8 @@ pub fn start(
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect::<HashMap<_, _>>();
 
-        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval
+        {
             // Use the fetches to retrieve the records.
             retrieve_records(
                 &mut reader,
@@ -164,13 +164,25 @@ pub fn start(
             let fw_seq = record.seq().as_bytes();
             let rc_seq = fw_seq.reverse_complement();
 
-            writeln!(writer, ">read_{}_{}_{}_{}", String::from_utf8_lossy(&record.qname()), tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()), record.reference_start(), record.reference_end()).expect("Could not write to file");
+            writeln!(
+                writer,
+                ">read_{}_{}_{}_{}",
+                String::from_utf8_lossy(&record.qname()),
+                tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()),
+                record.reference_start(),
+                record.reference_end()
+            )
+            .expect("Could not write to file");
             writeln!(
                 writer,
                 "{}",
-                if record.is_reverse() { String::from_utf8_lossy(&rc_seq) } else { String::from_utf8_lossy(&fw_seq) }
+                if record.is_reverse() {
+                    String::from_utf8_lossy(&rc_seq)
+                } else {
+                    String::from_utf8_lossy(&fw_seq)
+                }
             )
-                .expect("Could not write to file");
+            .expect("Could not write to file");
         }
 
         if !all_records.is_empty() {
@@ -185,7 +197,6 @@ pub fn start(
         }
     }
 }
-
 
 ////////////////////////////////////////////////////////////////
 //// print_fetches_info and its helper functions
@@ -210,8 +221,11 @@ fn populate_fetches(
     ref_path: &Option<PathBuf>,
     reads: &Vec<Vec<u8>>,
     fetches: &mut Vec<(String, Interval<i32>)>,
-) -> Result<(), String>{
-    if !matches!(search_option, SearchOption::Contig | SearchOption::ContigAndInterval) {
+) -> Result<(), String> {
+    if !matches!(
+        search_option,
+        SearchOption::Contig | SearchOption::ContigAndInterval
+    ) {
         return Err("Function should only be called if the search option is 'Contig' or 'ContigAndInterval'".to_string());
     }
 
@@ -222,8 +236,18 @@ fn populate_fetches(
             match Interval::new(start as i32..stop as i32) {
                 Ok(interval) => fetches.push((contig, interval)),
                 Err(e) => {
-                    skydive::elog!("Invalid interval for contig {}: {:?}, start: {}, stop: {}. Error: {}", contig, start..stop, start, stop, e);
-                    return Err(format!("Error creating interval for contig {}: {:?}", contig, e));
+                    skydive::elog!(
+                        "Invalid interval for contig {}: {:?}, start: {}, stop: {}. Error: {}",
+                        contig,
+                        start..stop,
+                        start,
+                        stop,
+                        e
+                    );
+                    return Err(format!(
+                        "Error creating interval for contig {}: {:?}",
+                        contig, e
+                    ));
                 }
             }
         }
@@ -247,7 +271,10 @@ fn populate_fetches(
 ///
 /// If the total length of the fetches cannot be calculated.
 fn print_fetches_info(fetches: &[(String, Interval<i32>)]) {
-    let total_length = fetches.iter().map(|(_, interval)| interval.end - interval.start).sum::<i32>();
+    let total_length = fetches
+        .iter()
+        .map(|(_, interval)| interval.end - interval.start)
+        .sum::<i32>();
     skydive::elog!(
         " -- will search unaligned reads and {} bases in {} contigs.",
         total_length.to_formatted_string(&Locale::en),
@@ -264,7 +291,6 @@ fn print_fetches_info(fetches: &[(String, Interval<i32>)]) {
 ////
 //////////////////////////////////////////////////////////////////
 
-
 /// This function detects the relevant loci in the reference genome.
 ///
 /// # Arguments
@@ -276,13 +302,22 @@ fn print_fetches_info(fetches: &[(String, Interval<i32>)]) {
 /// # Panics
 ///
 /// If no mappings are found for the provided sequences.
-fn detect_relevant_loci(ref_path: &PathBuf, reads: &Vec<Vec<u8>>, fetches: &mut Vec<(String, Interval<i32>)>) {
+fn detect_relevant_loci(
+    ref_path: &PathBuf,
+    reads: &Vec<Vec<u8>>,
+    fetches: &mut Vec<(String, Interval<i32>)>,
+) {
     let lr_aligner = initialize_aligner(ref_path, false);
 
     let lr_mappings = map_sequences(&lr_aligner, &reads, false);
 
     for lr_mapping in &lr_mappings {
-        skydive::elog!("lr mapping {:?}:{}-{}", lr_mapping.target_name, lr_mapping.target_start, lr_mapping.target_end);
+        skydive::elog!(
+            "lr mapping {:?}:{}-{}",
+            lr_mapping.target_name,
+            lr_mapping.target_start,
+            lr_mapping.target_end
+        );
     }
 
     let sr_aligner = initialize_aligner(ref_path, true);
@@ -299,7 +334,8 @@ fn detect_relevant_loci(ref_path: &PathBuf, reads: &Vec<Vec<u8>>, fetches: &mut 
     // Second pass
     merge_overlapping_intervals(&mut trees, &loci, &contig_lengths);
 
-    let sub_fetches: HashSet<_> = trees.iter()
+    let sub_fetches: HashSet<_> = trees
+        .iter()
         .flat_map(|(contig_name, tree)| {
             tree.find(Interval::new(0..i32::MAX).unwrap())
                 .map(move |entry| (contig_name.clone(), entry.interval().clone()))
@@ -355,13 +391,24 @@ fn initialize_aligner(ref_path: &PathBuf, is_sr: bool) -> Aligner<Built> {
 ///
 /// If no mappings are found for the provided sequences.
 fn map_sequences(aligner: &Aligner<Built>, reads: &[Vec<u8>], is_sr: bool) -> Vec<Mapping> {
-    let mappings: Vec<Mapping> = reads.par_iter().flat_map(|seq| {
-        if is_sr {
-            seq.windows(150).flat_map(|window| aligner.map(window, false, false, None, None, None).unwrap_or_else(|_| vec![])).collect::<Vec<_>>()
-        } else {
-            aligner.map(seq, false, false, None, None, None).unwrap_or_else(|_| vec![])
-        }
-    }).collect();
+    let mappings: Vec<Mapping> = reads
+        .par_iter()
+        .flat_map(|seq| {
+            if is_sr {
+                seq.windows(150)
+                    .flat_map(|window| {
+                        aligner
+                            .map(window, false, false, None, None, None)
+                            .unwrap_or_else(|_| vec![])
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                aligner
+                    .map(seq, false, false, None, None, None)
+                    .unwrap_or_else(|_| vec![])
+            }
+        })
+        .collect();
 
     if mappings.is_empty() {
         panic!("No mappings found for the provided sequences.");
@@ -389,14 +436,22 @@ fn collect_loci(
     sr_mappings: &[Mapping],
     contig_lengths: &mut HashMap<String, i32>,
 ) -> HashSet<(Vec<u8>, i32, i32)> {
-    lr_mappings.iter().chain(sr_mappings.iter()).filter_map(|m| {
-        if let Some(target_name) = &m.target_name {
-            contig_lengths.insert(target_name.to_string(), m.target_len);
-            Some((target_name.to_string().as_bytes().to_vec(), m.target_start, m.target_end))
-        } else {
-            None
-        }
-    }).collect::<HashSet<_>>()
+    lr_mappings
+        .iter()
+        .chain(sr_mappings.iter())
+        .filter_map(|m| {
+            if let Some(target_name) = &m.target_name {
+                contig_lengths.insert(target_name.to_string(), m.target_len);
+                Some((
+                    target_name.to_string().as_bytes().to_vec(),
+                    m.target_start,
+                    m.target_end,
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>()
 }
 
 /// This function populates the interval trees with the loci.
@@ -413,7 +468,7 @@ fn collect_loci(
 fn populate_interval_trees(
     trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
     loci: &HashSet<(Vec<u8>, i32, i32)>,
-    contig_lengths: &HashMap<String, i32>
+    contig_lengths: &HashMap<String, i32>,
 ) {
     for (seq, start, end) in loci {
         let contig_name = String::from_utf8_lossy(&seq).to_string();
@@ -423,7 +478,10 @@ fn populate_interval_trees(
             trees.insert(contig_name.clone(), IntervalTree::new());
         }
 
-        let interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
+        let interval = Interval::new(
+            start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length),
+        )
+        .unwrap();
         trees.get_mut(&contig_name).unwrap().insert(interval, ());
     }
 }
@@ -442,21 +500,34 @@ fn populate_interval_trees(
 fn merge_overlapping_intervals(
     trees: &mut BTreeMap<String, IntervalTree<i32, ()>>,
     loci: &HashSet<(Vec<u8>, i32, i32)>,
-    contig_lengths: &HashMap<String, i32>
+    contig_lengths: &HashMap<String, i32>,
 ) {
     for (seq, start, end) in loci {
         let contig_name = String::from_utf8_lossy(&seq).to_string();
         let contig_length = contig_lengths.get(&contig_name).unwrap();
         let tree = trees.get_mut(&contig_name).unwrap();
 
-        let current_interval = Interval::new(start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length)).unwrap();
+        let current_interval = Interval::new(
+            start.saturating_sub(50000).max(0)..end.saturating_add(50000).min(*contig_length),
+        )
+        .unwrap();
         let overlaps = tree.find(current_interval.clone()).collect::<Vec<_>>();
 
         let mut merged_intervals = IntervalTree::new();
 
         if !overlaps.is_empty() {
-            let min_start = overlaps.iter().map(|o| o.interval().start).min().unwrap().min(*start);
-            let max_end = overlaps.iter().map(|o| o.interval().end).max().unwrap().max(*end);
+            let min_start = overlaps
+                .iter()
+                .map(|o| o.interval().start)
+                .min()
+                .unwrap()
+                .min(*start);
+            let max_end = overlaps
+                .iter()
+                .map(|o| o.interval().end)
+                .max()
+                .unwrap()
+                .max(*end);
             merged_intervals.insert(Interval::new(min_start..max_end).unwrap(), ());
         } else {
             merged_intervals.insert(current_interval, ());
@@ -505,8 +576,11 @@ fn retrieve_records(
         let fetches_updated = prepare_fetches(fetches, search_option);
 
         for (contig, interval) in fetches_updated {
-            let fetch_definition = create_fetch_definition(search_option, Some(&contig), Some(interval));
-            reader.fetch(fetch_definition).expect("Failed to fetch reads");
+            let fetch_definition =
+                create_fetch_definition(search_option, Some(&contig), Some(interval));
+            reader
+                .fetch(fetch_definition)
+                .expect("Failed to fetch reads");
 
             let records = filter_and_collect_records(
                 reader,
@@ -523,7 +597,9 @@ fn retrieve_records(
         }
     } else {
         let fetch_definition = create_fetch_definition(search_option, None, None);
-        reader.fetch(fetch_definition).expect("Failed to fetch reads");
+        reader
+            .fetch(fetch_definition)
+            .expect("Failed to fetch reads");
 
         let records = filter_and_collect_records(
             reader,
@@ -575,10 +651,22 @@ fn filter_and_collect_records(
         .par_bridge()
         .flat_map(|record| record.ok())
         .filter_map(|read| {
-            update_processed_progress(processed_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+            update_processed_progress(
+                processed_items,
+                UPDATE_FREQUENCY,
+                tid_to_chrom,
+                &read,
+                &progress_bar,
+            );
 
             if is_valid_read(&read, kmer_size, min_kmers_pct, kmer_set) {
-                update_found_progress(found_items, UPDATE_FREQUENCY, tid_to_chrom, &read, &progress_bar);
+                update_found_progress(
+                    found_items,
+                    UPDATE_FREQUENCY,
+                    tid_to_chrom,
+                    &read,
+                    &progress_bar,
+                );
                 Some(read)
             } else {
                 None
@@ -602,13 +690,18 @@ fn filter_and_collect_records(
 /// # Panics
 /// If the contig is not valid.
 fn prepare_fetches(
-    fetches: &[(String, Interval<i32>)], search_option: &SearchOption
+    fetches: &[(String, Interval<i32>)],
+    search_option: &SearchOption,
 ) -> Vec<(String, Interval<i32>)> {
     if *search_option == SearchOption::Contig {
         let uniq_contigs: HashSet<_> = fetches.iter().map(|(contig, _)| contig.clone()).collect();
-        uniq_contigs.into_iter().map(|contig| (contig, Interval::new(0..1).unwrap())).collect()
+        uniq_contigs
+            .into_iter()
+            .map(|contig| (contig, Interval::new(0..1).unwrap()))
+            .collect()
     } else if *search_option == SearchOption::ContigAndInterval {
-        fetches.iter()
+        fetches
+            .iter()
             .map(|(contig, interval)| (contig.clone(), interval.clone()))
             .collect()
     } else {
@@ -635,11 +728,15 @@ fn create_fetch_definition<'a>(
         (None, SearchOption::Unmapped) => FetchDefinition::Unmapped,
         (Some(contig), SearchOption::Contig) if contig != "*" => {
             FetchDefinition::String(contig.as_bytes())
-        },
+        }
         (Some(contig), SearchOption::ContigAndInterval) if contig != "*" => {
             let interval = interval.unwrap_or_else(|| Interval::new(0..1).unwrap());
-            FetchDefinition::RegionString(contig.as_bytes(), interval.start as i64, interval.end as i64)
-        },
+            FetchDefinition::RegionString(
+                contig.as_bytes(),
+                interval.start as i64,
+                interval.end as i64,
+            )
+        }
         (Some(contig), _) if contig == "*" => FetchDefinition::Unmapped,
         _ => panic!(
             "Invalid fetch definition settings. \
@@ -650,7 +747,9 @@ fn create_fetch_definition<'a>(
              search option: '{:?}' , contig: '{:?}', interval: '{:?}'",
             search_option,
             contig.as_deref().unwrap_or(&"None".to_string()),
-            interval.map(|i| format!("{:?}", i)).unwrap_or_else(|| "None".to_string())
+            interval
+                .map(|i| format!("{:?}", i))
+                .unwrap_or_else(|| "None".to_string())
         ),
     }
 }
@@ -666,7 +765,13 @@ fn create_fetch_definition<'a>(
 ///
 /// # Panics
 /// If the chromosome name is not found in the mapping.
-fn update_processed_progress(processed_items: &Arc<AtomicUsize>, update_freq: usize, tid_to_chrom: &HashMap<i32, String>, read: &BamRecord, progress_bar: &Arc<ProgressBar>) {
+fn update_processed_progress(
+    processed_items: &Arc<AtomicUsize>,
+    update_freq: usize,
+    tid_to_chrom: &HashMap<i32, String>,
+    read: &BamRecord,
+    progress_bar: &Arc<ProgressBar>,
+) {
     let current_processed = processed_items.fetch_add(1, Ordering::Relaxed);
     if current_processed % update_freq == 0 {
         let unknown_chrom = "Unknown".to_string();
@@ -692,7 +797,13 @@ fn update_processed_progress(processed_items: &Arc<AtomicUsize>, update_freq: us
 ///
 /// # Panics
 /// If the chromosome name is not found in the mapping.
-fn update_found_progress(found_items: &Arc<AtomicUsize>, update_freq: usize, tid_to_chrom: &HashMap<i32, String>, read: &BamRecord, progress_bar: &Arc<ProgressBar>) {
+fn update_found_progress(
+    found_items: &Arc<AtomicUsize>,
+    update_freq: usize,
+    tid_to_chrom: &HashMap<i32, String>,
+    read: &BamRecord,
+    progress_bar: &Arc<ProgressBar>,
+) {
     let current_found = found_items.fetch_add(1, Ordering::Relaxed);
     if current_found % update_freq == 0 {
         let unknown_chrom = "Unknown".to_string();
@@ -716,10 +827,16 @@ fn update_found_progress(found_items: &Arc<AtomicUsize>, update_freq: usize, tid
 ///
 /// # Returns
 /// Whether the read is valid or not.
-fn is_valid_read(read: &BamRecord, kmer_size: usize, min_kmers_pct: usize, kmer_set: &HashSet<Vec<u8>>) -> bool {
+fn is_valid_read(
+    read: &BamRecord,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    kmer_set: &HashSet<Vec<u8>>,
+) -> bool {
     let read_seq = read.seq().as_bytes();
     let rl_seq = skydive::utils::homopolymer_compressed(&read_seq);
-    let num_kmers = rl_seq.par_windows(kmer_size)
+    let num_kmers = rl_seq
+        .par_windows(kmer_size)
         .filter(|kmer| kmer_set.contains(&skydive::utils::canonicalize_kmer(kmer)))
         .count();
     (num_kmers as f32 / rl_seq.len() as f32) > (min_kmers_pct as f32 / 100.0)
@@ -731,7 +848,11 @@ fn is_valid_read(read: &BamRecord, kmer_size: usize, min_kmers_pct: usize, kmer_
 /// - `progress_bar` - The progress bar to finalize.
 /// - `found_items` - The number of found items.
 /// - `processed_items` - The number of processed items.
-fn finalize_progress(progress_bar: &Arc<ProgressBar>, found_items: &Arc<AtomicUsize>, processed_items: &Arc<AtomicUsize>) {
+fn finalize_progress(
+    progress_bar: &Arc<ProgressBar>,
+    found_items: &Arc<AtomicUsize>,
+    processed_items: &Arc<AtomicUsize>,
+) {
     let final_found = found_items.load(Ordering::Relaxed);
     let final_processed = processed_items.load(Ordering::Relaxed);
     progress_bar.set_message(format!(

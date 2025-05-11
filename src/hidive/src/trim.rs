@@ -10,9 +10,7 @@ use std::{collections::HashMap, path::PathBuf};
 // Import the skydive module, which contains the necessary functions for staging data
 
 // Import types from rust_htslib for working with BAM files.
-use rust_htslib::bam::{
-    self, IndexedReader, Read,
-};
+use rust_htslib::bam::{self, IndexedReader, Read};
 
 pub fn start(output: &PathBuf, loci_list: &Vec<String>, bam_path: &PathBuf) {
     // Initialize a HashSet to store unique loci after parsing

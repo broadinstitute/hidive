@@ -17,7 +17,13 @@ use path_absolutize::Absolutize;
 /// # Panics
 ///
 /// Panics if any locus in `loci_list` cannot be parsed.
-pub fn start(output: &PathBuf, loci_list: &Vec<String>, padding: u64, seq_paths: &Vec<PathBuf>) {
+pub fn start(
+    output: &PathBuf,
+    loci_list: &Vec<String>,
+    padding: u64,
+    haplotype: Option<u8>,
+    seq_paths: &Vec<PathBuf>,
+) {
     let loci = skydive::parse::parse_loci(loci_list, padding);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
@@ -27,7 +33,7 @@ pub fn start(output: &PathBuf, loci_list: &Vec<String>, padding: u64, seq_paths:
 
     // Call the stage_data function from the skydive module to process and stage the data
     skydive::elog!("Fetching data...");
-    let r = skydive::stage::stage_data(output, &loci, &seq_urls, false, &cache_path);
+    let r = skydive::stage::stage_data(output, &loci, &seq_urls, false, haplotype, &cache_path);
 
     match r {
         Ok(n) => {

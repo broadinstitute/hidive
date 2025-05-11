@@ -16,9 +16,9 @@ use rayon::prelude::*;
 
 #[derive(Debug)]
 pub struct WMECData {
-    pub reads: Vec<Vec<Option<u8>>>,        // Reads matrix where None represents missing data
+    pub reads: Vec<Vec<Option<u8>>>, // Reads matrix where None represents missing data
     pub confidences: Vec<Vec<Option<u32>>>, // Confidence degrees matrix
-    pub num_snps: usize,                    // Number of SNP positions
+    pub num_snps: usize,             // Number of SNP positions
 }
 
 impl WMECData {
@@ -26,9 +26,13 @@ impl WMECData {
     #[must_use]
     pub fn new(reads: Vec<Vec<Option<u8>>>, confidences: Vec<Vec<Option<u32>>>) -> Self {
         let num_snps = reads[0].len();
-        WMECData { reads, confidences, num_snps }
+        WMECData {
+            reads,
+            confidences,
+            num_snps,
+        }
     }
-    
+
     // Function to compute W^0(j, R) and W^1(j, R)
     // Cost to set all fragments in set R to 0 or 1 at SNP j
     #[must_use]
@@ -50,7 +54,7 @@ impl WMECData {
 
         (w0, w1)
     }
-    
+
     // Calculate minimum correction cost Delta C(j, (R, S))
     #[must_use]
     pub fn delta_c(&self, snp: usize, r: &BTreeSet<usize>, s: &BTreeSet<usize>) -> u32 {
@@ -80,8 +84,12 @@ impl WMECData {
             write!(file, "Read_{}", i)?;
             for (allele, qual) in read.iter().zip(conf.iter()) {
                 if let Some(allele) = allele {
-                    if *allele == 0 { write!(file, "\t0,{}", qual.unwrap())? };
-                    if *allele == 1 { write!(file, "\t1,{}", qual.unwrap())? };
+                    if *allele == 0 {
+                        write!(file, "\t0,{}", qual.unwrap())?
+                    };
+                    if *allele == 1 {
+                        write!(file, "\t1,{}", qual.unwrap())?
+                    };
                 } else {
                     write!(file, "\t-,1")?;
                 }
@@ -118,11 +126,22 @@ fn generate_bipartitions(set: &BTreeSet<usize>) -> Vec<(BTreeSet<usize>, BTreeSe
 }
 
 // Function to initialize the DP table for SNP 0
-fn initialize_dp(data: &WMECData) -> (HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>) {
+fn initialize_dp(
+    data: &WMECData,
+) -> (
+    HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>,
+    HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>,
+) {
     let mut dp: HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32> = HashMap::new();
-    let mut backtrack: HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>> = HashMap::new();
+    let mut backtrack: HashMap<
+        (usize, BTreeSet<usize>, BTreeSet<usize>),
+        Option<(BTreeSet<usize>, BTreeSet<usize>)>,
+    > = HashMap::new();
 
-    let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+    let active_fragments: BTreeSet<usize> = data
+        .reads
+        .iter()
+        .enumerate()
         .filter(|(_, read)| read[0].is_some()) // Only consider fragments covering SNP 0
         .map(|(index, _)| index)
         .collect();
@@ -138,8 +157,19 @@ fn initialize_dp(data: &WMECData) -> (HashMap<(usize, BTreeSet<usize>, BTreeSet<
 }
 
 // Function to update the DP table for each SNP position
-fn update_dp_old(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
-    let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+fn update_dp_old(
+    data: &WMECData,
+    dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>,
+    backtrack: &mut HashMap<
+        (usize, BTreeSet<usize>, BTreeSet<usize>),
+        Option<(BTreeSet<usize>, BTreeSet<usize>)>,
+    >,
+    snp: usize,
+) {
+    let active_fragments: BTreeSet<usize> = data
+        .reads
+        .iter()
+        .enumerate()
         .filter(|(_, read)| read[snp].is_some()) // Only consider fragments covering SNP
         .map(|(index, _)| index)
         .collect();
@@ -150,14 +180,21 @@ fn update_dp_old(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTre
         let mut min_cost = u32::MAX;
         let mut best_bipartition = None;
 
-        let prev_active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+        let prev_active_fragments: BTreeSet<usize> = data
+            .reads
+            .iter()
+            .enumerate()
             .filter(|(_, read)| read[snp - 1].is_some()) // Fragments covering the previous SNP
             .map(|(index, _)| index)
             .collect();
-        
+
         for (prev_r, prev_s) in generate_bipartitions(&prev_active_fragments) {
-            let r_compatible = r.intersection(&prev_active_fragments).all(|&x| prev_r.contains(&x));
-            let s_compatible = s.intersection(&prev_active_fragments).all(|&x| prev_s.contains(&x));
+            let r_compatible = r
+                .intersection(&prev_active_fragments)
+                .all(|&x| prev_r.contains(&x));
+            let s_compatible = s
+                .intersection(&prev_active_fragments)
+                .all(|&x| prev_s.contains(&x));
 
             if r_compatible && s_compatible {
                 if let Some(&prev_cost) = dp.get(&(snp - 1, prev_r.clone(), prev_s.clone())) {
@@ -176,29 +213,48 @@ fn update_dp_old(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTre
     }
 }
 
-fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>, snp: usize) {
-    let active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+fn update_dp(
+    data: &WMECData,
+    dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>,
+    backtrack: &mut HashMap<
+        (usize, BTreeSet<usize>, BTreeSet<usize>),
+        Option<(BTreeSet<usize>, BTreeSet<usize>)>,
+    >,
+    snp: usize,
+) {
+    let active_fragments: BTreeSet<usize> = data
+        .reads
+        .iter()
+        .enumerate()
         .filter(|(_, read)| read[snp].is_some())
         .map(|(index, _)| index)
         .collect();
     let partitions = generate_bipartitions(&active_fragments);
-    
+
     // Pre-compute prev_active_fragments since it's used by all iterations
-    let prev_active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+    let prev_active_fragments: BTreeSet<usize> = data
+        .reads
+        .iter()
+        .enumerate()
         .filter(|(_, read)| read[snp - 1].is_some())
         .map(|(index, _)| index)
         .collect();
 
     // Collect results in parallel
-    let results: Vec<_> = partitions.par_iter()
+    let results: Vec<_> = partitions
+        .par_iter()
         .map(|(r, s)| {
             let delta_cost = data.delta_c(snp, r, s);
             let mut min_cost = u32::MAX;
             let mut best_bipartition = None;
-            
+
             for (prev_r, prev_s) in generate_bipartitions(&prev_active_fragments) {
-                let r_compatible = r.intersection(&prev_active_fragments).all(|&x| prev_r.contains(&x));
-                let s_compatible = s.intersection(&prev_active_fragments).all(|&x| prev_s.contains(&x));
+                let r_compatible = r
+                    .intersection(&prev_active_fragments)
+                    .all(|&x| prev_r.contains(&x));
+                let s_compatible = s
+                    .intersection(&prev_active_fragments)
+                    .all(|&x| prev_s.contains(&x));
 
                 if r_compatible && s_compatible {
                     if let Some(&prev_cost) = dp.get(&(snp - 1, prev_r.clone(), prev_s.clone())) {
@@ -223,12 +279,22 @@ fn update_dp(data: &WMECData, dp: &mut HashMap<(usize, BTreeSet<usize>, BTreeSet
     }
 }
 
-fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>, backtrack: &HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), Option<(BTreeSet<usize>, BTreeSet<usize>)>>) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<usize>) {
+fn backtrack_haplotypes(
+    data: &WMECData,
+    dp: &HashMap<(usize, BTreeSet<usize>, BTreeSet<usize>), u32>,
+    backtrack: &HashMap<
+        (usize, BTreeSet<usize>, BTreeSet<usize>),
+        Option<(BTreeSet<usize>, BTreeSet<usize>)>,
+    >,
+) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<usize>) {
     let mut best_cost = u32::MAX;
     let mut best_bipartition = None;
 
     // Restrict processing to reads that span variants within the window.
-    let final_active_fragments: BTreeSet<usize> = data.reads.iter().enumerate()
+    let final_active_fragments: BTreeSet<usize> = data
+        .reads
+        .iter()
+        .enumerate()
         .filter(|(_, read)| read[data.num_snps - 1].is_some())
         .map(|(index, _)| index)
         .collect();
@@ -260,7 +326,10 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
         }
 
         if snp > 0 {
-            if let Some(prev_bipartition) = backtrack.get(&(snp, r.clone(), s.clone())).and_then(|x| x.as_ref()) {
+            if let Some(prev_bipartition) = backtrack
+                .get(&(snp, r.clone(), s.clone()))
+                .and_then(|x| x.as_ref())
+            {
                 current_bipartition = prev_bipartition.clone();
             } else {
                 // This should not happen if the DP table is correctly filled
@@ -271,7 +340,12 @@ fn backtrack_haplotypes(data: &WMECData, dp: &HashMap<(usize, BTreeSet<usize>, B
 
     crate::elog!("wmec score: {}", best_cost);
 
-    (haplotype1, haplotype2, current_bipartition.0, current_bipartition.1)
+    (
+        haplotype1,
+        haplotype2,
+        current_bipartition.0,
+        current_bipartition.1,
+    )
 }
 
 // Main function to perform WMEC using dynamic programming
@@ -287,7 +361,11 @@ pub fn phase(data: &WMECData) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<us
 }
 
 #[must_use]
-pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<usize>) {
+pub fn phase_all(
+    data: &WMECData,
+    window: usize,
+    stride: usize,
+) -> (Vec<u8>, Vec<u8>, BTreeSet<usize>, BTreeSet<usize>) {
     data.write_reads_matrix("mat.tsv");
 
     // First, collect all window ranges
@@ -315,15 +393,27 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
         .par_iter()
         .progress_with(pb)
         .map(|&(start, end)| {
-            let (window_indices, window_reads): (Vec<usize>, Vec<Vec<Option<u8>>>) = data.reads.iter().zip(data.confidences.iter()).enumerate()
+            let (window_indices, window_reads): (Vec<usize>, Vec<Vec<Option<u8>>>) = data
+                .reads
+                .iter()
+                .zip(data.confidences.iter())
+                .enumerate()
                 .map(|(read_idx, (read, confidence))| {
                     let window_read = read[start..end].to_vec();
                     let window_confidence = confidence[start..end].to_vec();
 
                     let none_count = window_read.iter().filter(|x| x.is_none()).count();
-                    let lowqual_count = window_confidence.iter().filter(|&&x| x.is_some() && x.unwrap() == 0).count();
+                    let lowqual_count = window_confidence
+                        .iter()
+                        .filter(|&&x| x.is_some() && x.unwrap() == 0)
+                        .count();
 
-                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
+                    (
+                        none_count + lowqual_count,
+                        read_idx,
+                        window_read,
+                        window_confidence,
+                    )
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -332,15 +422,27 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
                 .map(|(_, read_idx, window_read, _)| (read_idx, window_read))
                 .unzip();
 
-            let (_, window_confidences): (Vec<usize>, Vec<Vec<Option<u32>>>) = data.reads.iter().zip(data.confidences.iter()).enumerate()
+            let (_, window_confidences): (Vec<usize>, Vec<Vec<Option<u32>>>) = data
+                .reads
+                .iter()
+                .zip(data.confidences.iter())
+                .enumerate()
                 .map(|(read_idx, (read, confidence))| {
                     let window_read = read[start..end].to_vec();
                     let window_confidence = confidence[start..end].to_vec();
 
                     let none_count = window_read.iter().filter(|x| x.is_none()).count();
-                    let lowqual_count = window_confidence.iter().filter(|&&x| x.is_some() && x.unwrap() == 0).count();
+                    let lowqual_count = window_confidence
+                        .iter()
+                        .filter(|&&x| x.is_some() && x.unwrap() == 0)
+                        .count();
 
-                    (none_count + lowqual_count, read_idx, window_read, window_confidence)
+                    (
+                        none_count + lowqual_count,
+                        read_idx,
+                        window_read,
+                        window_confidence,
+                    )
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -353,7 +455,7 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
             crate::elog!("window_indices: {} {} {:?}", start, end, window_indices);
 
             let window_data = WMECData::new(window_reads, window_confidences);
-            
+
             let (mut dp, mut backtrack) = initialize_dp(&window_data);
             for snp in 1..window_data.num_snps {
                 update_dp(&window_data, &mut dp, &mut backtrack, snp);
@@ -390,11 +492,17 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
 
         if haplotype1.len() == 0 {
             for read_num in reads1.clone() {
-                all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+                all_read_assignments
+                    .entry(read_num)
+                    .or_insert(vec![])
+                    .push(1);
             }
 
             for read_num in reads2.clone() {
-                all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+                all_read_assignments
+                    .entry(read_num)
+                    .or_insert(vec![])
+                    .push(2);
             }
 
             haplotype1 = hap1;
@@ -403,19 +511,28 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
             part2 = reads2;
         } else {
             // Compare overlap regions to determine orientation
-            crate::elog!("haplotypes: {} {} {}", haplotype1.len(), haplotype2.len(), overlap);
+            crate::elog!(
+                "haplotypes: {} {} {}",
+                haplotype1.len(),
+                haplotype2.len(),
+                overlap
+            );
 
             let new_overlap_len = std::cmp::min(overlap, hap1.len());
-            let h1_overlap = &haplotype1[haplotype1.len()-new_overlap_len..];
-            let h2_overlap = &haplotype2[haplotype2.len()-new_overlap_len..];
+            let h1_overlap = &haplotype1[haplotype1.len() - new_overlap_len..];
+            let h2_overlap = &haplotype2[haplotype2.len() - new_overlap_len..];
             let new_overlap = &hap1[..new_overlap_len];
 
             // Count matches between overlapping regions
-            let h1_matches = h1_overlap.iter().zip(new_overlap.iter())
-                .filter(|(a,b)| a == b)
+            let h1_matches = h1_overlap
+                .iter()
+                .zip(new_overlap.iter())
+                .filter(|(a, b)| a == b)
                 .count();
-            let h2_matches = h2_overlap.iter().zip(new_overlap.iter())
-                .filter(|(a,b)| a == b)
+            let h2_matches = h2_overlap
+                .iter()
+                .zip(new_overlap.iter())
+                .filter(|(a, b)| a == b)
                 .count();
 
             // Append new haplotypes in correct orientation based on best overlap match
@@ -424,22 +541,34 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
                 haplotype2.extend_from_slice(&hap2[std::cmp::min(overlap, hap2.len())..]);
 
                 for read_num in reads1.clone() {
-                    all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+                    all_read_assignments
+                        .entry(read_num)
+                        .or_insert(vec![])
+                        .push(1);
                 }
 
                 for read_num in reads2.clone() {
-                    all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+                    all_read_assignments
+                        .entry(read_num)
+                        .or_insert(vec![])
+                        .push(2);
                 }
             } else {
                 haplotype1.extend_from_slice(&hap2[std::cmp::min(overlap, hap2.len())..]);
                 haplotype2.extend_from_slice(&hap1[std::cmp::min(overlap, hap1.len())..]);
 
                 for read_num in reads1.clone() {
-                    all_read_assignments.entry(read_num).or_insert(vec![]).push(2);
+                    all_read_assignments
+                        .entry(read_num)
+                        .or_insert(vec![])
+                        .push(2);
                 }
 
                 for read_num in reads2.clone() {
-                    all_read_assignments.entry(read_num).or_insert(vec![]).push(1);
+                    all_read_assignments
+                        .entry(read_num)
+                        .or_insert(vec![])
+                        .push(1);
                 }
             }
         }
@@ -452,7 +581,8 @@ pub fn phase_all(data: &WMECData, window: usize, stride: usize) -> (Vec<u8>, Vec
 
     for (read_num, assignments) in all_read_assignments {
         // Count frequency of assignments (1 or 2) for this read
-        let most_common = assignments.iter()
+        let most_common = assignments
+            .iter()
             .fold(HashMap::new(), |mut counts, &value| {
                 *counts.entry(value).or_insert(0) += 1;
                 counts
@@ -483,7 +613,7 @@ mod tests {
             vec![Some(0), None],    // f0
             vec![Some(1), Some(0)], // f1
             vec![Some(1), Some(1)], // f2
-            vec![None,    Some(0)], // f3
+            vec![None, Some(0)],    // f3
         ];
 
         // Define the confidence degrees
@@ -491,7 +621,7 @@ mod tests {
             vec![Some(5), None],    // f0
             vec![Some(3), Some(2)], // f1
             vec![Some(6), Some(1)], // f2
-            vec![None,    Some(2)], // f3
+            vec![None, Some(2)],    // f3
         ];
 
         // Initialize the dataset
@@ -510,7 +640,11 @@ mod tests {
             let r_set: BTreeSet<usize> = r.into_iter().collect();
             let s_set: BTreeSet<usize> = s.into_iter().collect();
             let cost = data.delta_c(0, &r_set, &s_set);
-            assert_eq!(cost, expected_cost, "Cost for partition ({:?}, {:?}) does not match expected", r_set, s_set);
+            assert_eq!(
+                cost, expected_cost,
+                "Cost for partition ({:?}, {:?}) does not match expected",
+                r_set, s_set
+            );
         }
     }
 
@@ -521,7 +655,7 @@ mod tests {
             vec![Some(0), None],    // f0
             vec![Some(1), Some(0)], // f1
             vec![Some(1), Some(1)], // f2
-            vec![None,    Some(0)], // f3
+            vec![None, Some(0)],    // f3
         ];
 
         // Define the confidence degrees
@@ -529,7 +663,7 @@ mod tests {
             vec![Some(5), None],    // f0
             vec![Some(3), Some(2)], // f1
             vec![Some(6), Some(1)], // f2
-            vec![None,    Some(2)], // f3
+            vec![None, Some(2)],    // f3
         ];
 
         // Initialize the dataset
@@ -553,8 +687,14 @@ mod tests {
         for (r, s, expected_cost) in expected_values {
             let r_set: BTreeSet<usize> = r.into_iter().collect();
             let s_set: BTreeSet<usize> = s.into_iter().collect();
-            let actual_cost = dp.get(&(1, r_set.clone(), s_set.clone())).unwrap_or(&u32::MAX);
-            assert_eq!(*actual_cost, expected_cost, "Cost for partition ({:?}, {:?}) does not match expected", r_set, s_set);
+            let actual_cost = dp
+                .get(&(1, r_set.clone(), s_set.clone()))
+                .unwrap_or(&u32::MAX);
+            assert_eq!(
+                *actual_cost, expected_cost,
+                "Cost for partition ({:?}, {:?}) does not match expected",
+                r_set, s_set
+            );
         }
     }
 
@@ -569,22 +709,22 @@ mod tests {
     fn test_whatshap_manuscript_figure_1() {
         // Define the dataset as a matrix of reads
         let reads = vec![
-            vec![Some(0), None,    None,    Some(0), Some(1)], // f0
-            vec![Some(1), Some(0), Some(0), None,    None   ], // f1
-            vec![Some(1), Some(1), Some(0), None,    None   ], // f2
-            vec![None,    Some(0), Some(0), Some(1), None   ], // f3
-            vec![None,    None,    Some(1), Some(0), Some(1)], // f4
-            vec![None,    None,    None,    Some(0), Some(1)], // f5
+            vec![Some(0), None, None, Some(0), Some(1)], // f0
+            vec![Some(1), Some(0), Some(0), None, None], // f1
+            vec![Some(1), Some(1), Some(0), None, None], // f2
+            vec![None, Some(0), Some(0), Some(1), None], // f3
+            vec![None, None, Some(1), Some(0), Some(1)], // f4
+            vec![None, None, None, Some(0), Some(1)],    // f5
         ];
 
         // Define the confidence degrees
         let confidences = vec![
-            vec![Some(32), None,     None,     Some(34), Some(17)], // f0
-            vec![Some(15), Some(25), Some(13), None,     None    ], // f1
-            vec![Some(7),  Some(3),  Some(15), None,     None    ], // f2
-            vec![None,     Some(12), Some(23), Some(29), Some(31)], // f3
-            vec![None,     None,     Some(25), Some(17), Some(19)], // f4
-            vec![None,     None,     None,     Some(20), Some(10)], // f5
+            vec![Some(32), None, None, Some(34), Some(17)], // f0
+            vec![Some(15), Some(25), Some(13), None, None], // f1
+            vec![Some(7), Some(3), Some(15), None, None],   // f2
+            vec![None, Some(12), Some(23), Some(29), Some(31)], // f3
+            vec![None, None, Some(25), Some(17), Some(19)], // f4
+            vec![None, None, None, Some(20), Some(10)],     // f5
         ];
 
         // Initialize the dataset
@@ -596,7 +736,13 @@ mod tests {
         let expected_haplotype1 = vec![0, 1, 1, 0, 1];
         let expected_haplotype2 = vec![1, 0, 0, 1, 0];
 
-        assert_eq!(haplotype1, expected_haplotype1, "Haplotype 1 does not match expected");
-        assert_eq!(haplotype2, expected_haplotype2, "Haplotype 2 does not match expected");
+        assert_eq!(
+            haplotype1, expected_haplotype1,
+            "Haplotype 1 does not match expected"
+        );
+        assert_eq!(
+            haplotype2, expected_haplotype2,
+            "Haplotype 2 does not match expected"
+        );
     }
 }

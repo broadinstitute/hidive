@@ -1,8 +1,9 @@
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
 
-
-use crate::train::{create_dataset_for_model, distance_to_a_contig_end, plot_roc_curve, process_reads};
+use crate::train::{
+    create_dataset_for_model, distance_to_a_contig_end, plot_roc_curve, process_reads,
+};
 use gbdt::decision_tree::DataVec;
 use gbdt::gradient_boost::GBDT;
 use skydive::ldbg::LdBG;
@@ -19,7 +20,6 @@ pub fn start(
     let long_read_seq_urls = skydive::parse::parse_file_names(long_read_seq_paths);
     let short_read_seq_urls = skydive::parse::parse_file_names(short_read_seq_paths);
     let truth_seq_urls = skydive::parse::parse_file_names(truth_seq_paths);
-
 
     // Read all long reads.
     let all_lr_seqs: Vec<Vec<u8>> = process_reads(&long_read_seq_urls, "long");
@@ -39,9 +39,11 @@ pub fn start(
     let sr_contigs = s1.assemble_all();
     let sr_distances = distance_to_a_contig_end(&sr_contigs, kmer_size);
 
-
     // load model
-    skydive::elog!("Loading GBDT model from {}...", model_path.to_str().unwrap());
+    skydive::elog!(
+        "Loading GBDT model from {}...",
+        model_path.to_str().unwrap()
+    );
     let gbdt = GBDT::load_model(model_path.to_str().unwrap()).expect("Unable to load model");
 
     // Prepare test data.
@@ -50,14 +52,8 @@ pub fn start(
         .keys()
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
-    let test_data: DataVec = create_dataset_for_model(
-        test_kmers,
-        &lr_distances,
-        &sr_distances,
-        &l1,
-        &s1,
-        &t1,
-    );
+    let test_data: DataVec =
+        create_dataset_for_model(test_kmers, &lr_distances, &sr_distances, &l1, &s1, &t1);
 
     // Predict the test data.
     skydive::elog!("Computing accuracy on test data...");
@@ -77,7 +73,8 @@ pub fn start(
     }
 
     // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = crate::train::compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
+    let (precision, recall, f1_score) =
+        crate::train::compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
     skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
     skydive::elog!("Precision: {:.2}%", 100.0 * precision);
     skydive::elog!("Recall: {:.2}%", 100.0 * recall);
@@ -92,7 +89,10 @@ pub fn start(
     for (tpr, fpr) in &fpr_tpr {
         writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
     }
-    skydive::elog!("TPR and FPR at various thresholds saved to {}", csv_output.to_str().unwrap());
+    skydive::elog!(
+        "TPR and FPR at various thresholds saved to {}",
+        csv_output.to_str().unwrap()
+    );
 
     // Create a ROC curve.
     let png_output = output.with_extension("png");
@@ -111,5 +111,3 @@ pub fn start(
 
     skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }
-
-

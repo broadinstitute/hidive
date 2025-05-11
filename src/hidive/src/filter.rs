@@ -69,7 +69,9 @@ pub fn start(output: &PathBuf, gfa_path: &PathBuf, short_read_fasta_paths: &Vec<
         let fasta_reader = bio::io::fasta::Reader::new(reader);
         let all_reads = fasta_reader.records().flatten().collect::<Vec<_>>();
 
-        let progress_bar = skydive::utils::default_unbounded_progress_bar("Filtering short reads (0 retained)".to_string());
+        let progress_bar = skydive::utils::default_unbounded_progress_bar(
+            "Filtering short reads (0 retained)".to_string(),
+        );
 
         // Create some thread-safe counters.
         let found_items = Arc::new(AtomicUsize::new(0));

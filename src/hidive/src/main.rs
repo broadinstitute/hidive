@@ -53,22 +53,22 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+mod assemble;
 mod build;
 mod cluster;
-mod consensus;
 mod coassemble;
-mod assemble;
+mod consensus;
 mod correct;
+mod eval_model;
 mod fetch;
 mod filter;
+mod genotype;
 mod impute;
-mod rescue;
+mod phase;
 mod recruit;
+mod rescue;
 mod train;
 mod trim;
-mod eval_model;
-mod phase;
-mod genotype;
 
 #[derive(Debug, Parser)]
 #[clap(name = "hidive")]
@@ -98,7 +98,6 @@ enum Commands {
         // /// Test split.
         // #[clap(short, long, value_parser, default_value_t = 0.2)]
         // test_split: f32,
-
         /// Number of training iterations.
         #[clap(short, long, value_parser, default_value_t = 200)]
         iterations: usize,
@@ -177,6 +176,10 @@ enum Commands {
         /// Include unmapped reads.
         #[clap(short, long, value_parser, default_value_t = 0)]
         padding: u64,
+
+        /// Include reads from only one haplotagged haplotype.
+        #[clap(long, value_parser)]
+        haplotype: Option<u8>,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
         #[clap(required = true, value_parser)]
@@ -298,14 +301,13 @@ enum Commands {
         #[clap(short, long, value_parser, required = true)]
         loci: Vec<String>,
 
-        /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
-        #[clap(short, long, value_parser, required = true)]
-        ref_path: PathBuf,
+        // /// Reference FASTA (for guessing where reads mapped based on input FASTA filter files).
+        // #[clap(short, long, value_parser, required = true)]
+        // ref_path: PathBuf,
 
-        /// FASTA files with short-read sequences (may contain one or more samples).
-        #[clap(required = true, value_parser)]
-        short_read_fasta_path: PathBuf,
-
+        // /// FASTA files with short-read sequences (may contain one or more samples).
+        // #[clap(required = true, value_parser)]
+        // short_read_fasta_path: PathBuf,
         /// BAM file with integrated long- and short-read data.
         #[clap(required = true, value_parser)]
         bam_path: PathBuf,
@@ -557,9 +559,10 @@ fn main() {
             output,
             loci,
             padding,
+            haplotype,
             seq_paths,
         } => {
-            fetch::start(&output, &loci, padding, &seq_paths);
+            fetch::start(&output, &loci, padding, haplotype, &seq_paths);
         }
         Commands::Rescue {
             output,
@@ -571,7 +574,16 @@ fn main() {
             fasta_paths,
             seq_paths,
         } => {
-            rescue::start(&output, kmer_size, min_kmers_pct, search_option, ref_path, loci, &fasta_paths, &seq_paths);
+            rescue::start(
+                &output,
+                kmer_size,
+                min_kmers_pct,
+                search_option,
+                ref_path,
+                loci,
+                &fasta_paths,
+                &seq_paths,
+            );
         }
         Commands::Recruit {
             output,
@@ -597,16 +609,23 @@ fn main() {
             ref_path,
             bam_path,
         } => {
-            cluster::start(&output, &sample_name, &from_loci, &to_loci, &ref_path, &bam_path);
+            cluster::start(
+                &output,
+                &sample_name,
+                &from_loci,
+                &to_loci,
+                &ref_path,
+                &bam_path,
+            );
         }
         Commands::Consensus {
             output,
             loci,
-            ref_path,
-            short_read_fasta_path,
+            // ref_path,
+            // short_read_fasta_path,
             bam_path,
         } => {
-            consensus::start(&output, &loci, &ref_path, &short_read_fasta_path, &bam_path);
+            consensus::start(&output, &loci, &bam_path);
         }
         Commands::Trim {
             output,
@@ -634,7 +653,14 @@ fn main() {
             long_read_fasta_path,
             short_read_fasta_path,
         } => {
-            assemble::start(&output, gfa_output, kmer_size, &model_path, &long_read_fasta_path, &short_read_fasta_path);
+            assemble::start(
+                &output,
+                gfa_output,
+                kmer_size,
+                &model_path,
+                &long_read_fasta_path,
+                &short_read_fasta_path,
+            );
         }
         Commands::Correct {
             output,
@@ -652,7 +678,7 @@ fn main() {
                 window_size,
                 &model_path,
                 &long_read_fasta_path,
-                &short_read_fasta_path
+                &short_read_fasta_path,
             );
         }
         Commands::Coassemble {
@@ -669,7 +695,7 @@ fn main() {
                 &model_path,
                 &reference_fasta_paths,
                 long_read_fasta_path,
-                short_read_fasta_path
+                short_read_fasta_path,
             );
         }
         Commands::Phase {
@@ -684,9 +710,9 @@ fn main() {
                 &sample_name,
                 &loci,
                 &reference_fasta_path,
-                &bam_path
+                &bam_path,
             );
-        },
+        }
         Commands::Genotype {
             output,
             sample_name,
@@ -701,10 +727,9 @@ fn main() {
                 &loci,
                 &reference_fasta_path,
                 &vcf_path,
-                &bam_path
+                &bam_path,
             );
         }
-
     }
 
     skydive::elog!("Complete. Elapsed time: {}.", elapsed_time(start_time));

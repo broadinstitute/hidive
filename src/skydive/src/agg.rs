@@ -7,7 +7,6 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
-
 #[derive(Debug)]
 pub struct GraphicalGenome {
     pub anchor: HashMap<String, Value>,
@@ -150,19 +149,18 @@ impl GraphicalGenome {
     /// If the edge do not have outgoing anchor
     pub fn extract_single_sample_graph(
         &self,
-        df_single_sample: &Array2<f64>, 
+        df_single_sample: &Array2<f64>,
         anchorlist: &Vec<String>,
-        readset:&Vec<String>,
+        readset: &Vec<String>,
         sample: &str,
     ) -> io::Result<GraphicalGenome> {
-
         let mut new_edges: HashMap<String, serde_json::Value> = HashMap::new();
         let mut new_incoming = HashMap::new();
         let mut new_outgoing = HashMap::new();
 
-        // be careful about the anchor and read index, 
+        // be careful about the anchor and read index,
         // make sure it matches with the imputed data matrix
-        for (anchorindex, anchor) in anchorlist.iter().enumerate(){
+        for (anchorindex, anchor) in anchorlist.iter().enumerate() {
             let mut d: HashMap<usize, String> = HashMap::new();
             if let Some(outgoinglist) = self.outgoing.get(anchor) {
                 // Update the existing `d` variable instead of declaring a new one
@@ -173,70 +171,89 @@ impl GraphicalGenome {
                     .collect();
             }
 
-            for (read_index, read) in readset.iter().enumerate(){
+            for (read_index, read) in readset.iter().enumerate() {
                 let edgeindex = df_single_sample[[read_index, anchorindex]].round() - 1.0;
-                #[allow(clippy::cast_possible_truncation)]#[allow(clippy::cast_sign_loss)]
+                #[allow(clippy::cast_possible_truncation)]
+                #[allow(clippy::cast_sign_loss)]
                 let usize_index = edgeindex as usize;
                 let edgename = d.get(&usize_index);
                 // println!("usize_index: {}, d: {:?}, edgename: {:?}", usize_index, &d, edgename); // Assuming new_edges is a HashMap<String, SomeType>
-                new_edges.entry(edgename.unwrap().to_string()).or_insert_with(|| serde_json::json!({}));
-                if let Some(edge_value) = self.edges.get(&(*edgename.as_ref().unwrap()).to_string()) {
+                new_edges
+                    .entry(edgename.unwrap().to_string())
+                    .or_insert_with(|| serde_json::json!({}));
+                if let Some(edge_value) = self.edges.get(&(*edgename.as_ref().unwrap()).to_string())
+                {
                     if let Some(seq_value) = edge_value.get("seq") {
-                        let new_edge_value = new_edges.entry((*edgename.as_ref().unwrap()).to_string()).or_insert_with(|| serde_json::json!({}));
+                        let new_edge_value = new_edges
+                            .entry((*edgename.as_ref().unwrap()).to_string())
+                            .or_insert_with(|| serde_json::json!({}));
                         new_edge_value["seq"] = seq_value.clone();
                     }
                 }
 
                 let edgename_str = (*edgename.as_ref().unwrap()).to_string();
-                let new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
+                let new_edge_value = new_edges
+                    .entry(edgename_str.clone())
+                    .or_insert_with(|| serde_json::json!({}));
                 if !new_edge_value.get("reads").is_some() {
                     new_edge_value["reads"] = serde_json::Value::Array(vec![]);
                 }
-                let reads_vec = new_edge_value.get_mut("reads").unwrap().as_array_mut().unwrap();
+                let reads_vec = new_edge_value
+                    .get_mut("reads")
+                    .unwrap()
+                    .as_array_mut()
+                    .unwrap();
                 reads_vec.push(serde_json::Value::String(read.to_string()));
-
 
                 // let mut new_edge_value = new_edges.entry(edgename_str.clone()).or_insert_with(|| serde_json::json!({}));
                 if !new_edge_value.get("strain").is_some() {
                     new_edge_value["strain"] = serde_json::Value::Array(vec![]);
                 }
-                let strain_vec = new_edge_value.get_mut("strain").unwrap().as_array_mut().unwrap();
-                                if !strain_vec.iter().any(|x| x == &serde_json::Value::String(sample.to_string())) {
+                let strain_vec = new_edge_value
+                    .get_mut("strain")
+                    .unwrap()
+                    .as_array_mut()
+                    .unwrap();
+                if !strain_vec
+                    .iter()
+                    .any(|x| x == &serde_json::Value::String(sample.to_string()))
+                {
                     strain_vec.push(serde_json::Value::String(sample.to_string()));
                 }
 
-
-                if let Some(outgoing_list) = self.outgoing.get(&(*edgename.as_ref().unwrap()).to_string()) {
-                    if let Some(dst) = outgoing_list.get(0){
-                        let incoming_list = new_incoming.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
+                if let Some(outgoing_list) = self
+                    .outgoing
+                    .get(&(*edgename.as_ref().unwrap()).to_string())
+                {
+                    if let Some(dst) = outgoing_list.get(0) {
+                        let incoming_list = new_incoming
+                            .entry((*edgename.as_ref().unwrap()).to_string())
+                            .or_default();
                         add_unique(incoming_list, anchor.to_string());
 
                         let incoming_dst_list = new_incoming.entry(dst.to_string()).or_default();
                         add_unique(incoming_dst_list, (*edgename.as_ref().unwrap()).to_string());
                         let outgoing_list = new_outgoing.entry(anchor.to_string()).or_default();
                         add_unique(outgoing_list, (*edgename.as_ref().unwrap()).to_string());
-                        let outgoing_edgename_list = new_outgoing.entry((*edgename.as_ref().unwrap()).to_string()).or_default();
+                        let outgoing_edgename_list = new_outgoing
+                            .entry((*edgename.as_ref().unwrap()).to_string())
+                            .or_default();
                         add_unique(outgoing_edgename_list, dst.to_string());
-                    }
-                    else{
+                    } else {
                         panic!("edge do not have outgoing anchor")
-                            
-                        }
-
+                    }
                 }
             }
-
         }
-    let new_graph = GraphicalGenome {
-            anchor: self.anchor.clone(), 
+        let new_graph = GraphicalGenome {
+            anchor: self.anchor.clone(),
             edges: new_edges,
             outgoing: new_outgoing,
             incoming: new_incoming,
-            };
-    Ok(new_graph) 
+        };
+        Ok(new_graph)
     }
 }
-
 
 pub struct FindAllPathBetweenAnchors {
     pub subpath: Vec<(Vec<String>, HashSet<String>)>,
@@ -244,7 +261,12 @@ pub struct FindAllPathBetweenAnchors {
 
 impl FindAllPathBetweenAnchors {
     #[must_use]
-    pub fn new(graph: &GraphicalGenome, start: &str, end: &str, read_sets: HashSet<String>) -> Self {
+    pub fn new(
+        graph: &GraphicalGenome,
+        start: &str,
+        end: &str,
+        read_sets: HashSet<String>,
+    ) -> Self {
         let mut finder = FindAllPathBetweenAnchors {
             subpath: Vec::new(),
         };
@@ -252,7 +274,15 @@ impl FindAllPathBetweenAnchors {
         finder
     }
 
-    pub fn find_path(&mut self, g: &GraphicalGenome, start: &str, end: &str, sofar: &Vec<String>, depth: usize, readset: HashSet<String>) {
+    pub fn find_path(
+        &mut self,
+        g: &GraphicalGenome,
+        start: &str,
+        end: &str,
+        sofar: &Vec<String>,
+        depth: usize,
+        readset: HashSet<String>,
+    ) {
         if start == end {
             let mut sofar1 = sofar.clone();
             sofar1.push(end.to_string());
@@ -273,7 +303,6 @@ impl FindAllPathBetweenAnchors {
         let depth1 = depth + 1;
 
         if let Some(outgoing) = g.outgoing.get(start) {
-            
             for dst in outgoing {
                 let mut readset1 = readset.clone();
                 if dst.starts_with("E") {
@@ -283,10 +312,13 @@ impl FindAllPathBetweenAnchors {
                     //                                         .unwrap_or_default();
 
                     // let readset1: HashSet<String> = readset.intersection(&edge_reads).cloned().collect();
-                    if let Some(edge_reads) = g.edges.get(dst).and_then(|e| e.get("reads").and_then(|r| r.as_array())) {
+                    if let Some(edge_reads) = g
+                        .edges
+                        .get(dst)
+                        .and_then(|e| e.get("reads").and_then(|r| r.as_array()))
+                    {
                         readset1.retain(|read| edge_reads.iter().any(|r| r.as_str() == Some(read)));
                     }
-                    
                 }
                 let mut sofar1 = sofar.clone();
                 sofar1.push(start.to_string());
@@ -304,7 +336,7 @@ pub fn reconstruct_path_seq(graph: &GraphicalGenome, path: &[String]) -> String 
         if item.starts_with('A') {
             if let Some(anchor) = graph.anchor.get(item) {
                 seq += &anchor["seq"].as_str().unwrap_or_default(); // Assuming `anchor` is a HashMap and "seq" is a key
-                // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
+                                                                    // println!("{:?}", anchor["seq"].as_str().unwrap_or_default());
             }
         } else if item.starts_with("E") {
             if let Some(edge) = graph.edges.get(item) {

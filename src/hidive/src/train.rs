@@ -2,11 +2,11 @@ use num_format::{Locale, ToFormattedString};
 // use rand::SeedableRng;
 // use skydive::mldbg::MLdBG;
 use skydive::utils::canonicalize_kmer;
+use std::collections::hash_map::Keys;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::iter::Chain;
-use std::collections::hash_map::Keys;
+use std::path::PathBuf;
 
 use gbdt::config::{loss2string, Config, Loss};
 use gbdt::decision_tree::{Data, DataVec};
@@ -78,7 +78,6 @@ pub fn start(
     let test_sr_contigs = test_s1.assemble_all();
     let test_sr_distances = distance_to_a_contig_end(&test_sr_contigs, kmer_size);
 
-
     // Configure GBDT.
     let mut cfg = Config::new();
     cfg.set_feature_size(6);
@@ -112,14 +111,8 @@ pub fn start(
         .chain(s1.kmers.keys())
         .chain(t1.kmers.keys());
 
-    let mut training_data: DataVec = create_dataset_for_model(
-        kmers,
-        &lr_distances,
-        &sr_distances,
-        &l1,
-        &s1,
-        &t1,
-    );
+    let mut training_data: DataVec =
+        create_dataset_for_model(kmers, &lr_distances, &sr_distances, &l1, &s1, &t1);
 
     // Train the decision trees.
     skydive::elog!(
@@ -162,7 +155,8 @@ pub fn start(
     }
 
     // Precision, Recall, and F1 score calculations.
-    let (precision, recall, f1_score) = compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
+    let (precision, recall, f1_score) =
+        compute_precision_recall_f1(&test_data, &prediction, pred_threshold);
     skydive::elog!("Prediction threshold: {:.2}", pred_threshold);
     skydive::elog!("Precision: {:.2}%", 100.0 * precision);
     skydive::elog!("Recall: {:.2}%", 100.0 * recall);
@@ -178,7 +172,10 @@ pub fn start(
     for (tpr, fpr) in &fpr_tpr {
         writeln!(writer, "{},{}", tpr, fpr).expect("Unable to write data");
     }
-    skydive::elog!("TPR and FPR at various thresholds saved to {}", output.to_str().unwrap());
+    skydive::elog!(
+        "TPR and FPR at various thresholds saved to {}",
+        output.to_str().unwrap()
+    );
 
     // Create a ROC curve.
     let png_output = output.with_extension("png");
@@ -198,21 +195,33 @@ pub fn start(
     skydive::elog!("Model saved to {}", output.to_str().unwrap());
 }
 
-pub fn distance_to_a_contig_end(contigs: &Vec<Vec<u8>>, kmer_size: usize) -> HashMap<Vec<u8>, usize> {
+pub fn distance_to_a_contig_end(
+    contigs: &Vec<Vec<u8>>,
+    kmer_size: usize,
+) -> HashMap<Vec<u8>, usize> {
     let mut distances = HashMap::new();
 
     for contig in contigs {
-        for (distance_from_start, cn_kmer) in contig.windows(kmer_size).map(canonicalize_kmer).enumerate() {
+        for (distance_from_start, cn_kmer) in
+            contig.windows(kmer_size).map(canonicalize_kmer).enumerate()
+        {
             let distance_from_end = contig.len() - distance_from_start - kmer_size;
 
-            distances.insert(cn_kmer, if distance_from_start < distance_from_end { distance_from_start } else { distance_from_end });
+            distances.insert(
+                cn_kmer,
+                if distance_from_start < distance_from_end {
+                    distance_from_start
+                } else {
+                    distance_from_end
+                },
+            );
         }
     }
 
     distances
 }
 
-pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<u8>>{
+pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str) -> Vec<Vec<u8>> {
     let mut all_seqs: Vec<Vec<u8>> = Vec::new();
     for read_seq_url in read_seq_urls {
         let basename = skydive::utils::basename_without_extension(
@@ -237,7 +246,10 @@ pub fn process_reads(read_seq_urls: &HashSet<Url>, read_type: &str)  -> Vec<Vec<
     all_seqs
 }
 
-pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(), Box<dyn std::error::Error>> {
+pub fn plot_roc_curve(
+    output: &PathBuf,
+    roc_points: &[(f32, f32)],
+) -> Result<(), Box<dyn std::error::Error>> {
     let root = BitMapBackend::new(output, (640, 480)).into_drawing_area();
     root.fill(&WHITE)?;
 
@@ -254,26 +266,32 @@ pub fn plot_roc_curve(output: &PathBuf, roc_points: &[(f32, f32)]) -> Result<(),
         .y_desc("True Positive Rate")
         .draw()?;
 
-    chart.draw_series(LineSeries::new(
-        roc_points.iter().map(|(fpr, tpr)| (*fpr as f64, *tpr as f64)),
-        &RED,
-    ))?
+    chart
+        .draw_series(LineSeries::new(
+            roc_points
+                .iter()
+                .map(|(fpr, tpr)| (*fpr as f64, *tpr as f64)),
+            &RED,
+        ))?
         .label("ROC Curve")
         .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], RED));
 
     // Draw a diagonal dotted line for reference.
-    chart.draw_series(LineSeries::new(
-        [(0.0, 0.0), (1.0, 1.0)].iter().cloned(),
-        &BLACK,
-    ))?
+    chart
+        .draw_series(LineSeries::new(
+            [(0.0, 0.0), (1.0, 1.0)].iter().cloned(),
+            &BLACK,
+        ))?
         .label("Random")
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK));
 
-    chart.configure_series_labels().background_style(WHITE).draw()?;
+    chart
+        .configure_series_labels()
+        .background_style(WHITE)
+        .draw()?;
 
     Ok(())
 }
-
 
 /// Computes FPR and TPR at various thresholds.
 pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
@@ -283,7 +301,12 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
     // Iterate over different thresholds
     for threshold in 0..100 {
         let pred_threshold = threshold as f32 / 100.0;
-        let (mut num_true_positives, mut num_false_positives, mut num_false_negatives, mut num_true_negatives) = (0u32, 0u32, 0u32, 0u32);
+        let (
+            mut num_true_positives,
+            mut num_false_positives,
+            mut num_false_negatives,
+            mut num_true_negatives,
+        ) = (0u32, 0u32, 0u32, 0u32);
 
         // Iterate over test data and predictions
         for (data, pred) in test_data.iter().zip(p.iter()) {
@@ -292,12 +315,21 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
 
             if (call - truth).abs() < f32::EPSILON {
                 // Correct classification
-                if truth > 0.5 { num_true_positives += 1; }  // True Positive
-                else { num_true_negatives += 1; }  // True Negative
+                if truth > 0.5 {
+                    num_true_positives += 1;
+                }
+                // True Positive
+                else {
+                    num_true_negatives += 1;
+                } // True Negative
             } else {
                 // Incorrect classification
-                if truth < 0.5 { num_false_positives += 1; }  // False Positive
-                if truth > 0.5 { num_false_negatives += 1; }  // False Negative
+                if truth < 0.5 {
+                    num_false_positives += 1;
+                } // False Positive
+                if truth > 0.5 {
+                    num_false_negatives += 1;
+                } // False Negative
             }
         }
 
@@ -322,18 +354,29 @@ pub fn compute_fpr_tpr(test_data: &DataVec, p: &Vec<f32>) -> Vec<(f32, f32)> {
 }
 
 /// Computes precision, recall, and F1 score on test data.
-pub fn compute_precision_recall_f1(test_data: &DataVec, p: &Vec<f32>, pred_threshold: f32) -> (f32, f32, f32) {
+pub fn compute_precision_recall_f1(
+    test_data: &DataVec,
+    p: &Vec<f32>,
+    pred_threshold: f32,
+) -> (f32, f32, f32) {
     skydive::elog!("Computing precision, recall, and F1 score on test data...");
-    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) = (0u32, 0u32, 0u32);
+    let (mut num_true_positives, mut num_false_positives, mut num_false_negatives) =
+        (0u32, 0u32, 0u32);
 
     for (data, pred) in test_data.iter().zip(p.iter()) {
         let truth = data.label;
         let call = if *pred > pred_threshold { 1.0 } else { 0.0 };
         if (call - truth).abs() < f32::EPSILON {
-            if truth > 0.5 { num_true_positives += 1; }
+            if truth > 0.5 {
+                num_true_positives += 1;
+            }
         } else {
-            if truth < 0.5 { num_false_positives += 1; }
-            if truth > 0.5 { num_false_negatives += 1; }
+            if truth < 0.5 {
+                num_false_positives += 1;
+            }
+            if truth > 0.5 {
+                num_false_negatives += 1;
+            }
         }
     }
 
@@ -376,7 +419,7 @@ pub fn create_dataset_for_model(
 
         // let expected = (scov_fw + scov_rc) as f32 / 2.0;
         // let chi_square = if expected > 0.0 {
-        //     ((scov_fw as f32 - expected).powi(2) + 
+        //     ((scov_fw as f32 - expected).powi(2) +
         //     (scov_rc as f32 - expected).powi(2)) / expected
         // } else {
         //     0.0
@@ -386,14 +429,14 @@ pub fn create_dataset_for_model(
 
         let data = Data::new_training_data(
             vec![
-                if lcov > 0 { 1.0 } else { 0.0 },    // present in long reads
-                scov_total as f32,                   // coverage in short reads
-                strand_ratio as f32,                 // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
-                compressed_len_diff,                 // homopolymer compression length difference
-                entropy,                             // shannon entropy
-                gc_content,                          // gc content
-                // lr_distance,                         // distance to nearest long read contig end
-                // sr_distance,                         // distance to nearest short read contig end
+                if lcov > 0 { 1.0 } else { 0.0 }, // present in long reads
+                scov_total as f32,                // coverage in short reads
+                strand_ratio as f32, // measure of strand bias (0.5 = balanced, 1.0 = all on one strand)
+                compressed_len_diff, // homopolymer compression length difference
+                entropy,             // shannon entropy
+                gc_content,          // gc content
+                                     // lr_distance,                         // distance to nearest long read contig end
+                                     // sr_distance,                         // distance to nearest short read contig end
             ],
             1.0,
             if tcov > 0 { 1.0 } else { 0.0 }, // present in truth
