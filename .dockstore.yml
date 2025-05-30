@@ -30,3 +30,6 @@ workflows:
 - name: SubsetAndAlignBam
   subclass: wdl
   primaryDescriptorPath: /wdl/SubsetAndAlignBam.wdl
+- name: HidiveRescue
+  subclass: wdl
+  primaryDescriptorPath: /wdl/HidiveRescue.wdl
