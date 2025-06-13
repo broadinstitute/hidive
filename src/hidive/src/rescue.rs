@@ -1,5 +1,5 @@
 use bio::data_structures::interval_tree::IntervalTree;
-use bio::io::fasta::Reader;
+use bio::io::fastq::{self, Reader};
 use bio::utils::Interval;
 use clap::ValueEnum;
 use flate2::write::GzEncoder;
@@ -10,7 +10,7 @@ use num_format::{Locale, ToFormattedString};
 use std::cmp::PartialEq;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
@@ -42,10 +42,10 @@ pub fn start(
     search_option: SearchOption,
     ref_path: Option<PathBuf>,
     loci: Option<Vec<String>>,
-    fasta_paths: &Vec<PathBuf>,
+    fastq_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
 ) {
-    let fasta_urls = skydive::parse::parse_file_names(fasta_paths);
+    let fastq_urls = skydive::parse::parse_file_names(fastq_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
     // Get the system's temporary directory path
@@ -57,8 +57,8 @@ pub fn start(
 
     // Read the FASTA files and prepare a hashmap of k-mers to search for in the other files.
     let mut kmer_set = HashSet::new();
-    for fasta_url in fasta_urls {
-        let reader = Reader::from_file(fasta_url.to_file_path().unwrap()).unwrap();
+    for fastq_url in fastq_urls {
+        let reader = Reader::from_file(fastq_url.to_file_path().unwrap()).unwrap();
 
         let mut reads = Vec::new();
         for record in reader.records().flatten() {
@@ -153,17 +153,35 @@ pub fn start(
             );
         }
 
+        /*
         let file = File::create(output).expect("Could not open file for writing.");
         let mut writer: Box<dyn Write> = if output.to_str().unwrap().ends_with(".gz") {
             Box::new(GzEncoder::new(file, Compression::default()))
         } else {
             Box::new(file)
         };
+        */
+
+        let mut buf_writer = BufWriter::new(File::create(output).unwrap());
+        let mut fastq_writer = fastq::Writer::new(&mut buf_writer);
 
         for record in all_records.iter() {
-            let fw_seq = record.seq().as_bytes();
-            let rc_seq = fw_seq.reverse_complement();
+            if record.is_reverse() {
+                let rv_seq = record.seq().as_bytes().reverse_complement();
+                let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                rv_qual.reverse();
+                let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
 
+                fastq_writer.write_record(&rv_record).unwrap();
+            } else {
+                let fw_seq = record.seq().as_bytes();
+                let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
+
+                fastq_writer.write_record(&fw_record).unwrap();
+            }
+
+            /*
             writeln!(
                 writer,
                 ">read_{}_{}_{}_{}",
@@ -183,6 +201,7 @@ pub fn start(
                 }
             )
             .expect("Could not write to file");
+            */
         }
 
         if !all_records.is_empty() {

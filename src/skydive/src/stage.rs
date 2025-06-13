@@ -18,11 +18,10 @@ use url::Url;
 use backoff::ExponentialBackoff;
 
 // Import rayon's parallel iterator traits.
-// use rayon::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 // Import types from rust_htslib for working with BAM files.
-use bio::io::fasta;
+use bio::io::fastq;
 use rust_htslib::bam::{self, FetchDefinition, IndexedReader, Read};
 use rust_htslib::faidx::Reader;
 
@@ -170,7 +169,7 @@ pub fn extract_aligned_bam_reads(
     stop: &u64,
     name: &str,
     haplotype: Option<u8>,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let mut bmap = HashMap::new();
@@ -180,7 +179,6 @@ pub fn extract_aligned_bam_reads(
         let pileup = p.unwrap();
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
-            // for alignment in pileup.alignments().filter(|a| !a.record().is_secondary()) {
             for (i, alignment) in pileup.alignments().enumerate().filter(|(_, a)| {
                 haplotype.is_none()
                     || a.record()
@@ -202,16 +200,16 @@ pub fn extract_aligned_bam_reads(
                 let is_supplementary = alignment.record().is_supplementary();
                 let seq_name = format!("{qname}|{name}|{sm}|{i}|{is_secondary}|{is_supplementary}");
 
-                // crate::elog!("{}", seq_name);
-
                 if !bmap.contains_key(&seq_name) {
-                    bmap.insert(seq_name.clone(), String::new());
+                    bmap.insert(seq_name.clone(), (String::new(), Vec::new()));
                 }
 
                 if !alignment.is_del() && !alignment.is_refskip() {
                     let a = alignment.record().seq()[alignment.qpos().unwrap()];
+                    let q = alignment.record().qual()[alignment.qpos().unwrap()];
 
-                    bmap.get_mut(&seq_name).unwrap().push(a as char);
+                    bmap.get_mut(&seq_name).unwrap().0.push(a as char);
+                    bmap.get_mut(&seq_name).unwrap().1.push(q + 33 as u8);
                 }
 
                 if let bam::pileup::Indel::Ins(len) = alignment.indel() {
@@ -219,8 +217,10 @@ pub fn extract_aligned_bam_reads(
                         let pos2 = pos1 + (len as usize);
                         for pos in pos1..pos2 {
                             let a = alignment.record().seq()[pos];
+                            let q = alignment.record().qual()[pos];
 
-                            bmap.get_mut(&seq_name).unwrap().push(a as char);
+                            bmap.get_mut(&seq_name).unwrap().0.push(a as char);
+                            bmap.get_mut(&seq_name).unwrap().1.push(q + 33 as u8);
                         }
                     }
                 }
@@ -230,7 +230,7 @@ pub fn extract_aligned_bam_reads(
 
     let records = bmap
         .iter()
-        .map(|kv| fasta::Record::with_attrs(kv.0.as_str(), None, kv.1.as_bytes()))
+        .map(|kv| fastq::Record::with_attrs(kv.0.as_str(), None, kv.1.0.as_bytes(), kv.1.1.as_bytes()))
         .collect();
 
     Ok(records)
@@ -240,7 +240,7 @@ pub fn extract_aligned_bam_reads(
 fn extract_unaligned_bam_reads(
     _basename: &str,
     bam: &mut IndexedReader,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let _ = bam.fetch(FetchDefinition::Unmapped);
@@ -255,8 +255,9 @@ fn extract_unaligned_bam_reads(
 
             let vseq = read.seq().as_bytes();
             let bseq = vseq.as_bytes();
+            let qseq = read.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
 
-            let seq = fasta::Record::with_attrs(seq_name.as_str(), Some(""), bseq);
+            let seq = fastq::Record::with_attrs(seq_name.as_str(), Some(""), bseq, &qseq);
 
             seq
         })
@@ -273,12 +274,12 @@ fn extract_fasta_seqs(
     start: &u64,
     stop: &u64,
     name: &String,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     let id = format!("{chr}:{start}-{stop}|{name}|{basename}");
     let seq = fasta.fetch_seq_string(chr, usize::try_from(*start)?, usize::try_from(*stop - 1)?)?;
 
     if seq.len() > 0 {
-        let records = vec![fasta::Record::with_attrs(id.as_str(), None, seq.as_bytes())];
+        let records = vec![fastq::Record::with_attrs(id.as_str(), None, seq.as_bytes(), vec![30; seq.len()].as_slice())];
 
         return Ok(records);
     }
@@ -292,7 +293,7 @@ fn stage_data_from_one_file(
     loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
     haplotype: Option<u8>,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     let mut all_seqs = Vec::new();
 
     let basename = seqs_url
@@ -361,7 +362,7 @@ fn stage_data_from_all_files(
     loci: &LinkedHashSet<(String, u64, u64, String)>,
     unmapped: bool,
     haplotype: Option<u8>,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     // Use a parallel iterator to process multiple BAM files concurrently.
     let all_data: Vec<_> = seq_urls
         .par_iter()
@@ -463,17 +464,17 @@ pub fn stage_data(
 
     env::set_current_dir(current_dir).unwrap();
 
-    // Write to a FASTA file.
+    // Write to a FASTQ file.
     let mut buf_writer = BufWriter::new(File::create(output_path)?);
-    let mut fasta_writer = fasta::Writer::new(&mut buf_writer);
+    let mut fastq_writer = fastq::Writer::new(&mut buf_writer);
 
     for record in all_data.iter() {
         if record.seq().len() > 0 {
-            fasta_writer.write_record(record)?;
+            fastq_writer.write_record(record)?;
         }
     }
 
-    let _ = fasta_writer.flush();
+    let _ = fastq_writer.flush();
 
     Ok(all_data.len())
 }
@@ -483,7 +484,7 @@ pub fn stage_data_in_memory(
     seq_urls: &HashSet<Url>,
     unmapped: bool,
     cache_path: &PathBuf,
-) -> Result<Vec<fasta::Record>> {
+) -> Result<Vec<fastq::Record>> {
     let current_dir = env::current_dir()?;
     env::set_current_dir(cache_path).unwrap();
 
@@ -508,7 +509,7 @@ mod tests {
 
     // This test may pass, but still print a message to stderr regarding its failure to access data. This is because
     // open_bam() tries a couple of authorization methods before accessing data, and the initial failures print a
-    // message to stderr. Elsewhere in the code, we suppress such messages (i.e. in stage_data()), but here we don't.
+    // message to stderr.
     #[test]
     fn test_open_bam() {
         let seqs_url = Url::parse(
@@ -525,7 +526,6 @@ mod tests {
             "gs://fc-8c3900db-633f-477f-96b3-fb31ae265c44/results/PBFlowcell/m84060_230907_210011_s2/reads/ccs/aligned/m84060_230907_210011_s2.bam"
         ).unwrap();
         let mut loci = LinkedHashSet::new();
-        // let loci = LinkedHashSet::from([("chr15".to_string(), 23960193, 23963918, "test".to_string())]);
         loci.insert(("chr15".to_string(), 23960193, 23963918, "test".to_string()));
 
         let result = stage_data_from_one_file(&seqs_url, &loci, false, None);
@@ -549,8 +549,6 @@ mod tests {
         let result = stage_data(&output_path, &loci, &seq_urls, false, None, &cache_path);
 
         assert!(result.is_ok(), "Failed to stage data from file");
-
-        println!("{:?}", result.unwrap());
     }
 
     #[test]
@@ -570,8 +568,6 @@ mod tests {
         let seq_urls = HashSet::from([seqs_url_1, seqs_url_2]);
 
         let result = stage_data(&output_path, &loci, &seq_urls, false, None, &cache_path);
-
-        println!("{:?}", result);
 
         assert!(result.is_ok(), "Failed to stage data from all files");
     }
