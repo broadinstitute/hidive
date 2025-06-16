@@ -98,7 +98,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.107"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.113"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -147,6 +147,6 @@ task Rescue {
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
-        maxRetries: 2
+        maxRetries: 0
     }
 }
