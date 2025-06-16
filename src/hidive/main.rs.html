@@ -165,7 +165,7 @@
 <a href=#165 id=165 data-nosnippet>165</a>    <span class="doccomment">/// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
 <a href=#166 id=166 data-nosnippet>166</a>    </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
 <a href=#167 id=167 data-nosnippet>167</a>    </span>Fetch {
-<a href=#168 id=168 data-nosnippet>168</a>        <span class="doccomment">/// Output path for FASTA file with reads spanning locus of interest.
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="doccomment">/// Output path for FASTQ file with reads spanning locus of interest.
 <a href=#169 id=169 data-nosnippet>169</a>        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
 <a href=#170 id=170 data-nosnippet>170</a>        </span>output: PathBuf,
 <a href=#171 id=171 data-nosnippet>171</a>
@@ -189,7 +189,7 @@
 <a href=#189 id=189 data-nosnippet>189</a>    <span class="doccomment">/// Find more sequences (both aligned and unaligned) overlapping previously fetched reads.
 <a href=#190 id=190 data-nosnippet>190</a>    </span><span class="attr">#[clap(arg_required_else_help = <span class="bool-val">true</span>)]
 <a href=#191 id=191 data-nosnippet>191</a>    </span>Rescue {
-<a href=#192 id=192 data-nosnippet>192</a>        <span class="doccomment">/// Output path for FASTA file with reads spanning locus of interest.
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="doccomment">/// Output path for FASTQ file with reads spanning locus of interest.
 <a href=#193 id=193 data-nosnippet>193</a>        </span><span class="attr">#[clap(short, long, value_parser, default_value = <span class="string">"/dev/stdout"</span>)]
 <a href=#194 id=194 data-nosnippet>194</a>        </span>output: PathBuf,
 <a href=#195 id=195 data-nosnippet>195</a>
@@ -217,7 +217,7 @@
 <a href=#217 id=217 data-nosnippet>217</a>        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
 <a href=#218 id=218 data-nosnippet>218</a>        </span>fasta_paths: Vec&lt;PathBuf&gt;,
 <a href=#219 id=219 data-nosnippet>219</a>
-<a href=#220 id=220 data-nosnippet>220</a>        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to find relevant sequences.
 <a href=#221 id=221 data-nosnippet>221</a>        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
 <a href=#222 id=222 data-nosnippet>222</a>        </span>seq_paths: Vec&lt;PathBuf&gt;,
 <a href=#223 id=223 data-nosnippet>223</a>    },
