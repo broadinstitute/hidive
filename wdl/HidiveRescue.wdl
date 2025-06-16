@@ -33,7 +33,7 @@ workflow HidiveRescue {
 
     call Rescue {
         input:
-            long_reads_fasta = Fetch.fasta,
+            long_reads_fastq = Fetch.fastq,
             short_reads_cram = short_reads_cram,
             short_reads_crai = short_reads_crai,
             ref_fa_with_alt = ref_fa_with_alt,
@@ -43,7 +43,7 @@ workflow HidiveRescue {
     }
 
     output {
-        File rescued_fasta_gz = Rescue.fasta_gz
+        File rescued_fastq_gz = Rescue.fastq_gz
     }
 }
 
@@ -67,7 +67,7 @@ task PrepareLocus {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.113"
         memory: "1 GB"
         cpu: 1
         disks: "local-disk 1 SSD"
@@ -90,11 +90,11 @@ task Fetch {
     command <<<
         set -euxo pipefail
 
-        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fa
+        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fq
     >>>
 
     output {
-        File fasta = "~{prefix}.fa"
+        File fastq = "~{prefix}.fq"
     }
 
     runtime {
@@ -107,7 +107,7 @@ task Fetch {
 
 task Rescue {
     input {
-        File long_reads_fasta
+        File long_reads_fastq
         File short_reads_cram
         File short_reads_crai
 
@@ -120,7 +120,7 @@ task Rescue {
         Int num_cpus = 16
     }
 
-    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fasta, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
+    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastq, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
     Int memory_gb = 2*num_cpus
 
     command <<<
@@ -135,15 +135,15 @@ task Rescue {
         export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
-        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fasta} ~{short_reads_cram} | gzip > ~{prefix}.fa.gz
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastq} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
     >>>
 
     output {
-        File fasta_gz = "~{prefix}.fa.gz"
+        File fastq_gz = "~{prefix}.fq.gz"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.101"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.113"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
