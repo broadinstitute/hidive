@@ -4,6 +4,10 @@ on:
     branches-ignore:
     - main
 
+env:
+  DOCKER_REGISTRY: us.gcr.io
+  DOCKER_IMAGE: broad-dsp-lrma/lr-hidive
+
 jobs:
   build_docker:
     runs-on: ubuntu-22.04
@@ -62,14 +66,14 @@ jobs:
           ${{ runner.os }}-buildx-
 
     - name: Configure Docker to use gcloud credentials
-      run: gcloud auth configure-docker us.gcr.io -q
+      run: gcloud auth configure-docker ${{ env.DOCKER_REGISTRY }} -q
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: ./docker
         push: true
-        tags: us.gcr.io/broad-dsp-lrma/lr-hidive:${{ github.ref_name }}
+        tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ github.ref_name }}
         build-args: |
           branch=v${{ github.ref_name }}
         cache-from: |
