@@ -29,28 +29,19 @@ jobs:
       with:
         toolchain: stable
 
-    - name: Try to run sccache-cache
-      id: sccache
-      continue-on-error: true
+    - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.6
 
     - name: Build Rust binary
       env:
-        SCCACHE_GHA_ENABLED: ${{ steps.sccache.outcome == 'success' && 'true' || 'false' }}
-        RUSTC_WRAPPER: ${{ steps.sccache.outcome == 'success' && 'sccache' || '' }}
+        SCCACHE_GHA_ENABLED: "true"
+        RUSTC_WRAPPER: "sccache"
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config libfreetype6-dev libfontconfig1-dev
-        if [ "$SCCACHE_GHA_ENABLED" = "true" ]; then
-          export RUSTC_WRAPPER=sccache
-        else
-          unset RUSTC_WRAPPER
-        fi
         cargo build --release
         strip target/release/hidive
-        if [ "$SCCACHE_GHA_ENABLED" = "true" ]; then
-          sccache --show-stats
-        fi
+        sccache --show-stats
 
     - name: Authenticate to Google Cloud
       id: 'auth'
