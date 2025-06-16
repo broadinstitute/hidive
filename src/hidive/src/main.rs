@@ -165,7 +165,7 @@ enum Commands {
     /// Stream loci from CRAM/BAM/FASTA files stored locally or in Google Cloud Storage.
     #[clap(arg_required_else_help = true)]
     Fetch {
-        /// Output path for FASTA file with reads spanning locus of interest.
+        /// Output path for FASTQ file with reads spanning locus of interest.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
@@ -189,7 +189,7 @@ enum Commands {
     /// Find more sequences (both aligned and unaligned) overlapping previously fetched reads.
     #[clap(arg_required_else_help = true)]
     Rescue {
-        /// Output path for FASTA file with reads spanning locus of interest.
+        /// Output path for FASTQ file with reads spanning locus of interest.
         #[clap(short, long, value_parser, default_value = "/dev/stdout")]
         output: PathBuf,
 
@@ -217,7 +217,7 @@ enum Commands {
         #[clap(short, long, value_parser, required = true)]
         fasta_paths: Vec<PathBuf>,
 
-        /// Indexed WGS BAM, CRAM, or FASTA files from which to extract relevant sequences.
+        /// Indexed WGS BAM, CRAM, or FASTA files from which to find relevant sequences.
         #[clap(required = true, value_parser)]
         seq_paths: Vec<PathBuf>,
     },
