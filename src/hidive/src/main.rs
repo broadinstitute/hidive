@@ -361,6 +361,26 @@ enum Commands {
         graph: PathBuf,
     },
 
+    /// Create overlap graph for long and short read datasets.
+    #[clap(arg_required_else_help = true)]
+    Overlap {
+        /// Output path for overlap graph.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// FASTA files with long-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        long_read_fasta_path: PathBuf,
+
+        /// FASTA files with short-read sequences (may contain one or more samples).
+        #[clap(required = true, value_parser)]
+        short_read_fasta_path: PathBuf,
+    },
+
     /// Error-correct long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Assemble {
