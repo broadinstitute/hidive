@@ -77,6 +77,8 @@ pub fn start(
             reads.push(fw_seq.to_vec());
         }
 
+        skydive::elog!("Read {} reads from {}.", reads.len(), file_path.to_str().unwrap());
+
         // Set fetches with the input loci or the detected relevant loci.
         if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
             match populate_fetches(&search_option, &loci, &ref_path, &reads, &mut fetches) {
@@ -95,6 +97,8 @@ pub fn start(
             );
         }
     }
+
+    skydive::elog!("Fetches: {:?}", fetches);
 
     // Read the CRAM files and search for the k-mers in each read.
     let mut all_records = Vec::new();
