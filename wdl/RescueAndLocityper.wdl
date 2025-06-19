@@ -149,7 +149,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.113"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
