@@ -33,3 +33,6 @@ workflows:
 - name: HidiveRescue
   subclass: wdl
   primaryDescriptorPath: /wdl/HidiveRescue.wdl
+- name: RescueAndLocityper
+  subclass: wdl
+  primaryDescriptorPath: /wdl/RescueAndLocityper.wdl
