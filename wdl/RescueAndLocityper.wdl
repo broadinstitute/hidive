@@ -107,11 +107,12 @@ task GenerateDB {
             -r ~{reference} \
             -j ~{counts_jf} \
             -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
+
+        find ~{locus_name}.db -type f -exec ls -lah {} \;
         
         echo "compressing DB"
         tar -czf ~{output_tar} ~{locus_name}.db
         echo "done compressing DB"
-
     >>>
 
     runtime {
