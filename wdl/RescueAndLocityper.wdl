@@ -86,6 +86,35 @@ workflow RescueAndLocityper {
     }
 }
 
+task SubsetVCF {
+    input {
+        File vcf
+        File bed
+    }
+
+    Int disk_size = 1 + ceil(size([vcf, bed], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        bcftools view -R ~{bed} ~{vcf} | bgzip > subset.vcf.gz
+        tabix -p vcf subset.vcf.gz
+    >>>
+
+    output {
+        File subset_vcf_gz = "subset.vcf.gz"
+        File subset_vcf_gz_tbi = "subset.vcf.gz.tbi"
+    }
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
 task GenerateDB {
     input {
         File reference
@@ -103,8 +132,11 @@ task GenerateDB {
     command <<<
         set -euxo pipefail
 
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
         locityper add -d ~{locus_name}.db \
-            -r ~{reference} \
+            -r reference.fa \
             -j ~{counts_jf} \
             -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
 
