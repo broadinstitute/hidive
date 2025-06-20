@@ -121,11 +121,12 @@ task GenerateDBFromVCF {
         File reference_index
         File counts_jf
         File vcf
+        File bed
         String docker
     }
 
     Int disk_size = 10
-    String output_tar = "db.tar.gz"
+    String output_tar = "vcf_db.tar.gz"
 
     command <<<
         set -euxo pipefail
@@ -133,15 +134,14 @@ task GenerateDBFromVCF {
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
-        locityper add -d db \
+        locityper add -d vcf_db \
+            -v ~{vcf} \
             -r reference.fa \
             -j ~{counts_jf} \
-            -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
+            -L ~{bed}
 
-        find ~{locus_name}.db -type f -exec ls -lah {} \;
-        
         echo "compressing DB"
-        tar -czf ~{output_tar} ~{locus_name}.db
+        tar -czf ~{output_tar} vcf_db
         echo "done compressing DB"
     >>>
 
@@ -242,7 +242,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_more_locityper"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_interlaced"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
