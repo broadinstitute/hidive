@@ -4,7 +4,7 @@ workflow RescueAndLocityper {
     input {
         String sample_id
 
-        # File long_reads_bam
+        File long_reads_bam
 
         File cram
         File crai
@@ -14,48 +14,47 @@ workflow RescueAndLocityper {
         File ref_cache_tar_gz
         File counts_jf
 
-        # File vcf
-        # File vcf_tbi
-        # File bed
+        File vcf
+        File vcf_tbi
+        File bed
 
         # String locus_name
-        String locus_coordinates
-
-        File alleles_fa
+        # String locus_coordinates
+        # File alleles_fa
     }
 
-    call GenerateDB {
-        input:
-            reference = ref_fa_with_alt,
-            reference_index = ref_fai_with_alt,
-            counts_jf = counts_jf,
-            locus_name = "test",
-            locus_coordinates = locus_coordinates,
-            alleles_fa = alleles_fa,
-    }
-
-    # call GenerateDBFromVCF {
+    # call GenerateDB {
     #     input:
     #         reference = ref_fa_with_alt,
     #         reference_index = ref_fai_with_alt,
     #         counts_jf = counts_jf,
-    #         vcf = vcf,
-    #         vcf_tbi = vcf_tbi,
-    #         bed = bed,
+    #         locus_name = "test",
+    #         locus_coordinates = locus_coordinates,
+    #         alleles_fa = alleles_fa,
     # }
 
-    # call Fetch {
-    #     input:
-    #         bam = long_reads_bam,
-    #         loci = bed,
-    #         padding = 10000,
-    #         prefix = sample_id
-    # }
+    call GenerateDBFromVCF {
+        input:
+            reference = ref_fa_with_alt,
+            reference_index = ref_fai_with_alt,
+            counts_jf = counts_jf,
+            vcf = vcf,
+            vcf_tbi = vcf_tbi,
+            bed = bed,
+    }
+
+    call Fetch {
+        input:
+            bam = long_reads_bam,
+            loci = bed,
+            padding = 10000,
+            prefix = sample_id
+    }
 
     call Rescue {
         input:
-            # long_reads_fastx = Fetch.fastq,
-            long_reads_fastx = alleles_fa,
+            # long_reads_fastx = alleles_fa,
+            long_reads_fastx = Fetch.fastq,
             short_reads_cram = cram,
             short_reads_crai = crai,
             ref_fa_with_alt = ref_fa_with_alt,
@@ -68,8 +67,8 @@ workflow RescueAndLocityper {
         input:
             sample_id = sample_id,
             input_fq1 = Rescue.fastq_gz,
-            # db_targz = GenerateDBFromVCF.db_tar,
-            db_targz = GenerateDB.db_tar,
+            db_targz = GenerateDBFromVCF.db_tar,
+            # db_targz = GenerateDB.db_tar,
             counts_file = counts_jf,
             reference = ref_fa_with_alt,
             # locus_name = locus_name,
