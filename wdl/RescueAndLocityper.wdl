@@ -115,6 +115,49 @@ task SubsetVCF {
     }
 }
 
+task GenerateDBFromVCF {
+    input {
+        File reference
+        File reference_index
+        File counts_jf
+        File vcf
+        File bed
+        String docker
+    }
+
+    Int disk_size = 10
+    String output_tar = "vcf_db.tar.gz"
+
+    command <<<
+        set -euxo pipefail
+
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
+        locityper add -d vcf_db \
+            -v ~{vcf} \
+            -r reference.fa \
+            -j ~{counts_jf} \
+            -L ~{bed}
+
+        echo "compressing DB"
+        tar -czf ~{output_tar} vcf_db
+        echo "done compressing DB"
+    >>>
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: docker
+    }
+
+    output {
+        File db_tar = output_tar
+    }
+}
+
 task GenerateDB {
     input {
         File reference
@@ -199,7 +242,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_more_locityper"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_interlaced"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -238,6 +281,7 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p locityper_prepoc
         locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
+            --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
