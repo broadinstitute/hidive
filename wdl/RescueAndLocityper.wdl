@@ -46,6 +46,22 @@ workflow RescueAndLocityper {
             prefix = sample_id
     }
 
+    call LocityperPreprocessAndGenotype {
+        input:
+            sample_id = sample_id,
+            input_fq1 = Rescue.fastq_gz,
+            # input_fq2 = fastq_r2[scatter_index],
+            db_targz = GenerateDB.db_tar,
+            counts_file = counts_jf,
+            reference = ref_fa_with_alt,
+            # weights_file = weights_file,
+            locus_name = locus_name,
+            reference_index = ref_fai_with_alt,
+            docker = locityper_docker,
+            locityper_n_cpu = 4,
+            locityper_mem_gb = 32
+    }
+
     # scatter (scatter_index in range(length(sample_ids))) {
     #     call locityper_preprocess_and_genotype {
     #         input:
@@ -65,9 +81,9 @@ workflow RescueAndLocityper {
     #     }
     # }
 
-    # output {
-    #     Array[File] results = locityper_preprocess_and_genotype.genotype_tar
-    # }
+    output {
+        File results = LocityperPreprocessAndGenotype.genotype_tar
+    }
 }
 
 task GenerateDB {
@@ -160,28 +176,31 @@ task Rescue {
 task LocityperPreprocessAndGenotype {
     input {
         File input_fq1
-        File input_fq2
+        File? input_fq2
         File counts_file
         File reference
         File reference_index
-        File weights_file
+        # File weights_file
         String docker
-        String locityper_n_cpu
-        String locityper_mem_gb
         File db_targz
         String sample_id
         String locus_name
+
+        Int locityper_n_cpu
+        Int locityper_mem_gb
     }
 
-    Int disk_size = ceil(size(input_fq1, "GiB") + size(input_fq2, "GiB")) + 80
+    Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2]), "GiB"))
     String output_tar = sample_id + "." + locus_name + ".tar.gz"
 
     command <<<
         set -euxo pipefail
+
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
+
         mkdir -p locityper_prepoc
-        locityper preproc -i ~{input_fq1} ~{input_fq2} \
+        locityper preproc -i select_all([~{input_fq1}, ~{input_fq2}]) \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
@@ -192,23 +211,20 @@ task LocityperPreprocessAndGenotype {
         tar --strip-components 1 -C db -xvzf ~{db_targz}
         mkdir -p out_dir
 
-        echo -e ~{locus_name}"\t"~{weights_file} > weights.tsv
-
-        locityper genotype -i ~{input_fq1} ~{input_fq2} \
+        locityper genotype -i select_all([~{input_fq1}, ~{input_fq2}]) \
             -d db \
             -p locityper_prepoc \
-            -@ ${nthreads} \
-            --reg-weights weights.tsv \
+            -@ ${nthreads} \ # --reg-weights weights.tsv \
             --debug 2 \
             -o out_dir
-        tar -czf ~{output_tar} out_dir
 
+        tar -czf ~{output_tar} out_dir
     >>>
 
     runtime {
-        memory: locityper_mem_gb + " GB"
+        memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
-        disks: "local-disk " + disk_size + " HDD"
+        disks: "local-disk ~{disk_size} HDD"
         preemptible: 3
         docker: docker
     }
