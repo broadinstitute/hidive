@@ -115,6 +115,49 @@ task SubsetVCF {
     }
 }
 
+task GenerateDBFromVCF {
+    input {
+        File reference
+        File reference_index
+        File counts_jf
+        File vcf
+        String docker
+    }
+
+    Int disk_size = 10
+    String output_tar = "db.tar.gz"
+
+    command <<<
+        set -euxo pipefail
+
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
+        locityper add -d db \
+            -r reference.fa \
+            -j ~{counts_jf} \
+            -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
+
+        find ~{locus_name}.db -type f -exec ls -lah {} \;
+        
+        echo "compressing DB"
+        tar -czf ~{output_tar} ~{locus_name}.db
+        echo "done compressing DB"
+    >>>
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: docker
+    }
+
+    output {
+        File db_tar = output_tar
+    }
+}
+
 task GenerateDB {
     input {
         File reference
