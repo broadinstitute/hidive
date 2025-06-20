@@ -213,9 +213,9 @@
 <a href=#213 id=213 data-nosnippet>213</a>        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">false</span>)]
 <a href=#214 id=214 data-nosnippet>214</a>        </span>loci: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
 <a href=#215 id=215 data-nosnippet>215</a>
-<a href=#216 id=216 data-nosnippet>216</a>        <span class="doccomment">/// FASTA files with reads to use as a filter for finding more reads.
+<a href=#216 id=216 data-nosnippet>216</a>        <span class="doccomment">/// FASTA/FASTQ files with reads to use as a filter for finding more reads.
 <a href=#217 id=217 data-nosnippet>217</a>        </span><span class="attr">#[clap(short, long, value_parser, required = <span class="bool-val">true</span>)]
-<a href=#218 id=218 data-nosnippet>218</a>        </span>fasta_paths: Vec&lt;PathBuf&gt;,
+<a href=#218 id=218 data-nosnippet>218</a>        </span>fastx_paths: Vec&lt;PathBuf&gt;,
 <a href=#219 id=219 data-nosnippet>219</a>
 <a href=#220 id=220 data-nosnippet>220</a>        <span class="doccomment">/// Indexed WGS BAM, CRAM, or FASTA files from which to find relevant sequences.
 <a href=#221 id=221 data-nosnippet>221</a>        </span><span class="attr">#[clap(required = <span class="bool-val">true</span>, value_parser)]
@@ -571,7 +571,7 @@
 <a href=#571 id=571 data-nosnippet>571</a>            search_option,
 <a href=#572 id=572 data-nosnippet>572</a>            ref_path,
 <a href=#573 id=573 data-nosnippet>573</a>            loci,
-<a href=#574 id=574 data-nosnippet>574</a>            fasta_paths,
+<a href=#574 id=574 data-nosnippet>574</a>            fastx_paths,
 <a href=#575 id=575 data-nosnippet>575</a>            seq_paths,
 <a href=#576 id=576 data-nosnippet>576</a>        } =&gt; {
 <a href=#577 id=577 data-nosnippet>577</a>            rescue::start(
@@ -581,7 +581,7 @@
 <a href=#581 id=581 data-nosnippet>581</a>                search_option,
 <a href=#582 id=582 data-nosnippet>582</a>                ref_path,
 <a href=#583 id=583 data-nosnippet>583</a>                loci,
-<a href=#584 id=584 data-nosnippet>584</a>                <span class="kw-2">&amp;</span>fasta_paths,
+<a href=#584 id=584 data-nosnippet>584</a>                <span class="kw-2">&amp;</span>fastx_paths,
 <a href=#585 id=585 data-nosnippet>585</a>                <span class="kw-2">&amp;</span>seq_paths,
 <a href=#586 id=586 data-nosnippet>586</a>            );
 <a href=#587 id=587 data-nosnippet>587</a>        }
