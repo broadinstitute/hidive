@@ -849,21 +849,21 @@
 <a href=#849 id=849 data-nosnippet>849</a>
 <a href=#850 id=850 data-nosnippet>850</a>    <span class="kw">for </span>(qname, records) <span class="kw">in </span>grouped_records {
 <a href=#851 id=851 data-nosnippet>851</a>        <span class="kw">if </span>records.len() == <span class="number">1 </span>{
-<a href=#852 id=852 data-nosnippet>852</a>            <span class="comment">// Handle singleton reads
-<a href=#853 id=853 data-nosnippet>853</a>            </span><span class="kw">let </span>record = records[<span class="number">0</span>];
-<a href=#854 id=854 data-nosnippet>854</a>            <span class="kw">if </span>record.is_reverse() {
-<a href=#855 id=855 data-nosnippet>855</a>                <span class="kw">let </span>rv_seq = record.seq().as_bytes().reverse_complement();
-<a href=#856 id=856 data-nosnippet>856</a>                <span class="kw">let </span><span class="kw-2">mut </span>rv_qual = record.qual().iter().map(|<span class="kw-2">&amp;</span>q| q + <span class="number">33</span>).collect::&lt;Vec&lt;u8&gt;&gt;();
-<a href=#857 id=857 data-nosnippet>857</a>                rv_qual.reverse();
-<a href=#858 id=858 data-nosnippet>858</a>                <span class="kw">let </span>rv_record = fastq::Record::with_attrs(<span class="kw-2">&amp;</span>String::from_utf8_lossy(record.qname()), <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>rv_seq, <span class="kw-2">&amp;</span>rv_qual);
-<a href=#859 id=859 data-nosnippet>859</a>                fastq_writer.write_record(<span class="kw-2">&amp;</span>rv_record).unwrap();
-<a href=#860 id=860 data-nosnippet>860</a>            } <span class="kw">else </span>{
-<a href=#861 id=861 data-nosnippet>861</a>                <span class="kw">let </span>fw_seq = record.seq().as_bytes();
-<a href=#862 id=862 data-nosnippet>862</a>                <span class="kw">let </span>fw_qual = record.qual().iter().map(|<span class="kw-2">&amp;</span>q| q + <span class="number">33</span>).collect::&lt;Vec&lt;u8&gt;&gt;();
-<a href=#863 id=863 data-nosnippet>863</a>                <span class="kw">let </span>fw_record = fastq::Record::with_attrs(<span class="kw-2">&amp;</span>String::from_utf8_lossy(record.qname()), <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>fw_seq, <span class="kw-2">&amp;</span>fw_qual);
-<a href=#864 id=864 data-nosnippet>864</a>                fastq_writer.write_record(<span class="kw-2">&amp;</span>fw_record).unwrap();
-<a href=#865 id=865 data-nosnippet>865</a>            }
-<a href=#866 id=866 data-nosnippet>866</a>        } <span class="kw">else </span>{
+<a href=#852 id=852 data-nosnippet>852</a>            <span class="comment">// // Handle singleton reads
+<a href=#853 id=853 data-nosnippet>853</a>            // let record = records[0];
+<a href=#854 id=854 data-nosnippet>854</a>            // if record.is_reverse() {
+<a href=#855 id=855 data-nosnippet>855</a>            //     let rv_seq = record.seq().as_bytes().reverse_complement();
+<a href=#856 id=856 data-nosnippet>856</a>            //     let mut rv_qual = record.qual().iter().map(|&amp;q| q + 33).collect::&lt;Vec&lt;u8&gt;&gt;();
+<a href=#857 id=857 data-nosnippet>857</a>            //     rv_qual.reverse();
+<a href=#858 id=858 data-nosnippet>858</a>            //     let rv_record = fastq::Record::with_attrs(&amp;String::from_utf8_lossy(record.qname()), None, &amp;rv_seq, &amp;rv_qual);
+<a href=#859 id=859 data-nosnippet>859</a>            //     fastq_writer.write_record(&amp;rv_record).unwrap();
+<a href=#860 id=860 data-nosnippet>860</a>            // } else {
+<a href=#861 id=861 data-nosnippet>861</a>            //     let fw_seq = record.seq().as_bytes();
+<a href=#862 id=862 data-nosnippet>862</a>            //     let fw_qual = record.qual().iter().map(|&amp;q| q + 33).collect::&lt;Vec&lt;u8&gt;&gt;();
+<a href=#863 id=863 data-nosnippet>863</a>            //     let fw_record = fastq::Record::with_attrs(&amp;String::from_utf8_lossy(record.qname()), None, &amp;fw_seq, &amp;fw_qual);
+<a href=#864 id=864 data-nosnippet>864</a>            //     fastq_writer.write_record(&amp;fw_record).unwrap();
+<a href=#865 id=865 data-nosnippet>865</a>            // }
+<a href=#866 id=866 data-nosnippet>866</a>        </span>} <span class="kw">else </span>{
 <a href=#867 id=867 data-nosnippet>867</a>            <span class="comment">// Handle paired reads
 <a href=#868 id=868 data-nosnippet>868</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>paired_records = Vec::new();
 <a href=#869 id=869 data-nosnippet>869</a>            <span class="kw">for </span>record <span class="kw">in </span>records {
