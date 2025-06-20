@@ -123,7 +123,7 @@ task GenerateDBFromVCF {
         # String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    Int disk_size = 1 + ceil(size([reference, vcf, counts_jf, bed], "GiB"))
+    Int disk_size = 1 + 4*ceil(size([reference, vcf, counts_jf, bed], "GiB"))
     String output_tar = "vcf_db.tar.gz"
 
     command <<<
