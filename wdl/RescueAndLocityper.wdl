@@ -224,7 +224,7 @@ task Fetch {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_interlaced"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.118"
         memory: "2 GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -272,7 +272,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_interlaced"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.118"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
