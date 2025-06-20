@@ -196,18 +196,22 @@ task LocityperPreprocessAndGenotype {
     command <<<
         set -euxo pipefail
 
+        gunzip -c ~{reference} > reference.fa
+
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
+
         mkdir -p locityper_prepoc
         locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
-            -r ~{reference} \
+            -r reference.fa \
             -o locityper_prepoc
 
         mkdir -p db
         tar --strip-components 1 -C db -xvzf ~{db_targz}
+
         mkdir -p out_dir
         locityper genotype -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -d db \
