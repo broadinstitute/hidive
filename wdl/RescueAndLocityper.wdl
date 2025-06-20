@@ -50,36 +50,15 @@ workflow RescueAndLocityper {
         input:
             sample_id = sample_id,
             input_fq1 = Rescue.fastq_gz,
-            # input_fq2 = fastq_r2[scatter_index],
             db_targz = GenerateDB.db_tar,
             counts_file = counts_jf,
             reference = ref_fa_with_alt,
-            # weights_file = weights_file,
             locus_name = locus_name,
             reference_index = ref_fai_with_alt,
             docker = locityper_docker,
             locityper_n_cpu = 4,
             locityper_mem_gb = 32
     }
-
-    # scatter (scatter_index in range(length(sample_ids))) {
-    #     call locityper_preprocess_and_genotype {
-    #         input:
-    #             sample_id = sample_ids[scatter_index],
-    #             input_fq1 = fastq_r1[scatter_index],
-    #             input_fq2 = fastq_r2[scatter_index],
-    #             db_targz = generate_db.db_tar,
-    #             counts_file = counts_jf,
-    #             reference = reference,
-    #             weights_file = weights_file,
-    #             locus_name = locus_name,
-    #             reference_index = reference_index,
-    #             docker = locityper_docker,
-    #             locityper_n_cpu = locityper_n_cpu,
-    #             locityper_mem_gb = locityper_mem_gb
-
-    #     }
-    # }
 
     output {
         File results = LocityperPreprocessAndGenotype.genotype_tar
@@ -234,7 +213,9 @@ task Rescue {
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
         hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastx} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
-        hidive fetch -l "chr17:72062001-76562000" -p 10000 ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
+
+        hidive fetch -l "chr17:72062001-76562000" -p 10000 Homo_sapiens_assembly38.fasta > chr17.fa
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f chr17.fa ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
     >>>
 
     output {
