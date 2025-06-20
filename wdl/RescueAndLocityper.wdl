@@ -197,6 +197,7 @@ task LocityperPreprocessAndGenotype {
         set -euxo pipefail
 
         gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
 
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
