@@ -3,6 +3,9 @@ version 1.0
 workflow RescueAndLocityper {
     input {
         String sample_id
+
+        # File long_reads_bam
+
         File cram
         File crai
 
@@ -11,17 +14,14 @@ workflow RescueAndLocityper {
         File ref_cache_tar_gz
         File counts_jf
 
-        # File reference
-        # File reference_index
-        # File db_path
+        # File vcf
+        # File vcf_tbi
+        # File bed
 
-        String locus_name
+        # String locus_name
         String locus_coordinates
 
         File alleles_fa
-        # File weights_file
-
-        String locityper_docker = "eichlerlab/locityper:0.19.1"
     }
 
     call GenerateDB {
@@ -29,14 +29,32 @@ workflow RescueAndLocityper {
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            locus_name = locus_name,
+            locus_name = "test",
             locus_coordinates = locus_coordinates,
             alleles_fa = alleles_fa,
-            docker = locityper_docker
     }
+
+    # call GenerateDBFromVCF {
+    #     input:
+    #         reference = ref_fa_with_alt,
+    #         reference_index = ref_fai_with_alt,
+    #         counts_jf = counts_jf,
+    #         vcf = vcf,
+    #         vcf_tbi = vcf_tbi,
+    #         bed = bed,
+    # }
+
+    # call Fetch {
+    #     input:
+    #         bam = long_reads_bam,
+    #         loci = bed,
+    #         padding = 10000,
+    #         prefix = sample_id
+    # }
 
     call Rescue {
         input:
+            # long_reads_fastx = Fetch.fastq,
             long_reads_fastx = alleles_fa,
             short_reads_cram = cram,
             short_reads_crai = crai,
@@ -50,12 +68,13 @@ workflow RescueAndLocityper {
         input:
             sample_id = sample_id,
             input_fq1 = Rescue.fastq_gz,
+            # db_targz = GenerateDBFromVCF.db_tar,
             db_targz = GenerateDB.db_tar,
             counts_file = counts_jf,
             reference = ref_fa_with_alt,
-            locus_name = locus_name,
+            # locus_name = locus_name,
+            locus_name = "test",
             reference_index = ref_fai_with_alt,
-            docker = locityper_docker,
             locityper_n_cpu = 4,
             locityper_mem_gb = 32
     }
@@ -100,8 +119,9 @@ task GenerateDBFromVCF {
         File reference_index
         File counts_jf
         File vcf
+        File vcf_tbi
         File bed
-        String docker
+        # String docker = "eichlerlab/locityper:0.19.1"
     }
 
     Int disk_size = 10
@@ -124,16 +144,16 @@ task GenerateDBFromVCF {
         echo "done compressing DB"
     >>>
 
+    output {
+        File db_tar = output_tar
+    }
+
     runtime {
         memory: "8 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
-        docker: docker
-    }
-
-    output {
-        File db_tar = output_tar
+        docker: "eichlerlab/locityper:0.19.1"
     }
 }
 
@@ -145,7 +165,6 @@ task GenerateDB {
         String locus_name
         String locus_coordinates
         File alleles_fa
-        String docker
     }
 
     Int disk_size = 10
@@ -169,16 +188,47 @@ task GenerateDB {
         echo "done compressing DB"
     >>>
 
+    output {
+        File db_tar = output_tar
+    }
+
     runtime {
         memory: "8 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
-        docker: docker
+        docker: "eichlerlab/locityper:0.19.1"
+    }
+}
+
+task Fetch {
+    input {
+        String bam
+        String? locus
+        File? loci
+        Int padding
+
+        String prefix = "out"
+
+        Int disk_size_gb = 2
+        Int num_cpus = 4
     }
 
+    command <<<
+        set -euxo pipefail
+
+        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fq
+    >>>
+
     output {
-        File db_tar = output_tar
+        File fastq = "~{prefix}.fq"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_interlaced"
+        memory: "2 GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
 
@@ -238,14 +288,14 @@ task LocityperPreprocessAndGenotype {
         File counts_file
         File reference
         File reference_index
-        # File weights_file
-        String docker
         File db_targz
         String sample_id
         String locus_name
 
         Int locityper_n_cpu
         Int locityper_mem_gb
+
+        String docker = "eichlerlab/locityper:0.19.1"
     }
 
     Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2]), "GiB"))
@@ -274,6 +324,7 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p out_dir
         locityper genotype -i ~{sep=" " select_all([input_fq1, input_fq2])} \
+            --interleaved \
             -d db \
             -p locityper_prepoc \
             -@ ${nthreads} \
