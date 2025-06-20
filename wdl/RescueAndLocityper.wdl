@@ -238,6 +238,7 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p locityper_prepoc
         locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
+            --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
