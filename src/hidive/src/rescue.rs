@@ -1,16 +1,15 @@
 use bio::data_structures::interval_tree::IntervalTree;
-use bio::io::fastq::{self, Reader};
+use bio::io::fastq;
 use bio::utils::Interval;
 use clap::ValueEnum;
-use flate2::write::GzEncoder;
-use flate2::Compression;
 use minimap2::{Aligner, Built, Mapping};
 use needletail::Sequence;
+use needletail::parse_fastx_file;
 use num_format::{Locale, ToFormattedString};
 use std::cmp::PartialEq;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
@@ -42,10 +41,10 @@ pub fn start(
     search_option: SearchOption,
     ref_path: Option<PathBuf>,
     loci: Option<Vec<String>>,
-    fastq_paths: &Vec<PathBuf>,
+    fastx_paths: &Vec<PathBuf>,
     seq_paths: &Vec<PathBuf>,
 ) {
-    let fastq_urls = skydive::parse::parse_file_names(fastq_paths);
+    let fastx_urls = skydive::parse::parse_file_names(fastx_paths);
     let seq_urls = skydive::parse::parse_file_names(seq_paths);
 
     // Get the system's temporary directory path
@@ -55,15 +54,19 @@ pub fn start(
     // Define the fetch definitions for the aligner.
     let mut fetches = Vec::new();
 
-    // Read the FASTA files and prepare a hashmap of k-mers to search for in the other files.
+    // Read the FASTA/FASTQ files and prepare a hashmap of k-mers to search for in the other files.
     let mut kmer_set = HashSet::new();
-    for fastq_url in fastq_urls {
-        let reader = Reader::from_file(fastq_url.to_file_path().unwrap()).unwrap();
-
+    for fastx_url in fastx_urls {
+        let file_path = fastx_url.to_file_path().unwrap();
         let mut reads = Vec::new();
-        for record in reader.records().flatten() {
+        
+        // Use needletail's parse_fastx_file which automatically detects FASTA/FASTQ format
+        let mut reader = parse_fastx_file(&file_path).expect("Failed to open sequence file");
+        
+        while let Some(record) = reader.next() {
+            let record = record.expect("Failed to parse sequence record");
             let fw_seq = record.seq();
-            let rl_seq = skydive::utils::homopolymer_compressed(fw_seq);
+            let rl_seq = skydive::utils::homopolymer_compressed(&fw_seq);
 
             let kmers = rl_seq
                 .windows(kmer_size)
@@ -71,13 +74,13 @@ pub fn start(
                 .collect::<HashSet<Vec<u8>>>();
 
             kmer_set.extend(kmers);
-
             reads.push(fw_seq.to_vec());
         }
 
+        skydive::elog!("Read {} reads from {}.", reads.len(), file_path.to_str().unwrap());
+
         // Set fetches with the input loci or the detected relevant loci.
-        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval
-        {
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
             match populate_fetches(&search_option, &loci, &ref_path, &reads, &mut fetches) {
                 Ok(_) => {}
                 Err(e) => {
@@ -95,8 +98,9 @@ pub fn start(
         }
     }
 
-    // Read the CRAM files and search for the k-mers in each read.
+    skydive::elog!("Fetches: {:?}", fetches);
 
+    // Read the CRAM files and search for the k-mers in each read.
     let mut all_records = Vec::new();
     for seq_url in seq_urls {
         let mut reader = skydive::stage::open_bam(&seq_url).unwrap();
@@ -109,7 +113,7 @@ pub fn start(
         let processed_items = Arc::new(AtomicUsize::new(0));
         let progress_bar = Arc::new(progress_bar);
 
-        const UPDATE_FREQUENCY: usize = 1_000_000;
+        // const UPDATE_FREQUENCY: usize = 1_000_000;
 
         // Create an immutable map of tid to chromosome name
         let tid_to_chrom: HashMap<i32, String> = reader
@@ -153,15 +157,6 @@ pub fn start(
             );
         }
 
-        /*
-        let file = File::create(output).expect("Could not open file for writing.");
-        let mut writer: Box<dyn Write> = if output.to_str().unwrap().ends_with(".gz") {
-            Box::new(GzEncoder::new(file, Compression::default()))
-        } else {
-            Box::new(file)
-        };
-        */
-
         let mut buf_writer = BufWriter::new(File::create(output).unwrap());
         let mut fastq_writer = fastq::Writer::new(&mut buf_writer);
 
@@ -180,28 +175,6 @@ pub fn start(
 
                 fastq_writer.write_record(&fw_record).unwrap();
             }
-
-            /*
-            writeln!(
-                writer,
-                ">read_{}_{}_{}_{}",
-                String::from_utf8_lossy(&record.qname()),
-                tid_to_chrom.get(&record.tid()).unwrap_or(&"*".to_string()),
-                record.reference_start(),
-                record.reference_end()
-            )
-            .expect("Could not write to file");
-            writeln!(
-                writer,
-                "{}",
-                if record.is_reverse() {
-                    String::from_utf8_lossy(&rc_seq)
-                } else {
-                    String::from_utf8_lossy(&fw_seq)
-                }
-            )
-            .expect("Could not write to file");
-            */
         }
 
         if !all_records.is_empty() {
@@ -589,7 +562,7 @@ fn retrieve_records(
     processed_items: &Arc<AtomicUsize>,
     all_records: &mut Vec<BamRecord>,
 ) {
-    const UPDATE_FREQUENCY: usize = 1_000_000;
+    // const UPDATE_FREQUENCY: usize = 1_000_000;
 
     if let Some(fetches) = fetches {
         let fetches_updated = prepare_fetches(fetches, search_option);

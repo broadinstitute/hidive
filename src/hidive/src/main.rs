@@ -213,9 +213,9 @@ enum Commands {
         #[clap(short, long, value_parser, required = false)]
         loci: Option<Vec<String>>,
 
-        /// FASTA files with reads to use as a filter for finding more reads.
+        /// FASTA/FASTQ files with reads to use as a filter for finding more reads.
         #[clap(short, long, value_parser, required = true)]
-        fasta_paths: Vec<PathBuf>,
+        fastx_paths: Vec<PathBuf>,
 
         /// Indexed WGS BAM, CRAM, or FASTA files from which to find relevant sequences.
         #[clap(required = true, value_parser)]
@@ -571,7 +571,7 @@ fn main() {
             search_option,
             ref_path,
             loci,
-            fasta_paths,
+            fastx_paths,
             seq_paths,
         } => {
             rescue::start(
@@ -581,7 +581,7 @@ fn main() {
                 search_option,
                 ref_path,
                 loci,
-                &fasta_paths,
+                &fastx_paths,
                 &seq_paths,
             );
         }
