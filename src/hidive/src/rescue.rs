@@ -157,25 +157,10 @@ pub fn start(
             );
         }
 
-        let mut buf_writer = BufWriter::new(File::create(output).unwrap());
-        let mut fastq_writer = fastq::Writer::new(&mut buf_writer);
+        let buf_writer = BufWriter::new(File::create(output).unwrap());
+        let mut fastq_writer = fastq::Writer::new(buf_writer);
 
-        for record in all_records.iter() {
-            if record.is_reverse() {
-                let rv_seq = record.seq().as_bytes().reverse_complement();
-                let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-                rv_qual.reverse();
-                let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
-
-                fastq_writer.write_record(&rv_record).unwrap();
-            } else {
-                let fw_seq = record.seq().as_bytes();
-                let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-                let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
-
-                fastq_writer.write_record(&fw_record).unwrap();
-            }
-        }
+        write_paired_fastq_records(&all_records, &mut fastq_writer);
 
         if !all_records.is_empty() {
             skydive::elog!(
@@ -853,4 +838,50 @@ fn finalize_progress(
         final_processed.to_formatted_string(&Locale::en)
     ));
     progress_bar.finish();
+}
+
+fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::Writer<BufWriter<File>>) {
+    let mut grouped_records = HashMap::new();
+    for record in records {
+        let qname = String::from_utf8_lossy(record.qname()).into_owned();
+        grouped_records.entry(qname).or_insert_with(Vec::new).push(record);
+    }
+
+    for (qname, records) in grouped_records {
+        if records.len() == 1 {
+            // Handle singleton reads
+            let record = records[0];
+            if record.is_reverse() {
+                let rv_seq = record.seq().as_bytes().reverse_complement();
+                let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                rv_qual.reverse();
+                let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
+                fastq_writer.write_record(&rv_record).unwrap();
+            } else {
+                let fw_seq = record.seq().as_bytes();
+                let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
+                fastq_writer.write_record(&fw_record).unwrap();
+            }
+        } else {
+            // Handle paired reads
+            let mut paired_records = Vec::new();
+            for record in records {
+                if record.is_reverse() {
+                    let rv_seq = record.seq().as_bytes().reverse_complement();
+                    let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                    rv_qual.reverse();
+                    let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
+                    paired_records.push(rv_record);
+                } else {
+                    let fw_seq = record.seq().as_bytes();
+                    let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+                    let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
+                    paired_records.push(fw_record);
+                }
+            }
+            fastq_writer.write_record(&paired_records[0]).unwrap();
+            fastq_writer.write_record(&paired_records[1]).unwrap();
+        }
+    }
 }
