@@ -158,6 +158,7 @@ task Rescue {
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
         hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastx} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
+        hidive fetch -l "chr17:72062001-76562000" -p 10000 ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
     >>>
 
     output {
