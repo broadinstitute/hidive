@@ -86,6 +86,35 @@ workflow RescueAndLocityper {
     }
 }
 
+task SubsetVCF {
+    input {
+        File vcf
+        File bed
+    }
+
+    Int disk_size = 1 + ceil(size([vcf, bed], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        bcftools view -R ~{bed} ~{vcf} | bgzip > subset.vcf.gz
+        tabix -p vcf subset.vcf.gz
+    >>>
+
+    output {
+        File subset_vcf_gz = "subset.vcf.gz"
+        File subset_vcf_gz_tbi = "subset.vcf.gz.tbi"
+    }
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
 task GenerateDB {
     input {
         File reference
@@ -103,15 +132,19 @@ task GenerateDB {
     command <<<
         set -euxo pipefail
 
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
         locityper add -d ~{locus_name}.db \
-            -r ~{reference} \
+            -r reference.fa \
             -j ~{counts_jf} \
             -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
+
+        find ~{locus_name}.db -type f -exec ls -lah {} \;
         
         echo "compressing DB"
         tar -czf ~{output_tar} ~{locus_name}.db
         echo "done compressing DB"
-
     >>>
 
     runtime {
@@ -158,6 +191,7 @@ task Rescue {
         export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
 
         hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastx} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
+        hidive fetch -l "chr17:72062001-76562000" -p 10000 ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
     >>>
 
     output {
@@ -165,7 +199,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_more_locityper"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"
@@ -196,22 +230,25 @@ task LocityperPreprocessAndGenotype {
     command <<<
         set -euxo pipefail
 
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
 
         mkdir -p locityper_prepoc
-        locityper preproc -i ~{select_all([input_fq1, input_fq2])} \
+        locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
-            -r ~{reference} \
+            -r reference.fa \
             -o locityper_prepoc
 
         mkdir -p db
         tar --strip-components 1 -C db -xvzf ~{db_targz}
-        mkdir -p out_dir
 
-        locityper genotype -i ~{select_all([input_fq1, input_fq2])} \
+        mkdir -p out_dir
+        locityper genotype -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -d db \
             -p locityper_prepoc \
             -@ ${nthreads} \
