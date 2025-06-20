@@ -198,9 +198,8 @@ task LocityperPreprocessAndGenotype {
 
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
-
         mkdir -p locityper_prepoc
-        locityper preproc -i ~{select_all([input_fq1, input_fq2])} \
+        locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
@@ -210,8 +209,7 @@ task LocityperPreprocessAndGenotype {
         mkdir -p db
         tar --strip-components 1 -C db -xvzf ~{db_targz}
         mkdir -p out_dir
-
-        locityper genotype -i ~{select_all([input_fq1, input_fq2])} \
+        locityper genotype -i ~{sep=" " select_all([input_fq1, input_fq2])} \
             -d db \
             -p locityper_prepoc \
             -@ ${nthreads} \
