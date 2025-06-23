@@ -63,10 +63,16 @@ workflow RescueAndLocityper {
             prefix = sample_id
     }
 
+    call DeduplicateFastq {
+        input:
+            fastq = Rescue.fastq_gz,
+            prefix = sample_id
+    }
+
     call LocityperPreprocessAndGenotype {
         input:
             sample_id = sample_id,
-            input_fq1 = Rescue.fastq_gz,
+            input_fq1 = DeduplicateFastq.fastq_gz,
             db_targz = GenerateDBFromVCF.db_tar,
             # db_targz = GenerateDB.db_tar,
             counts_file = counts_jf,
@@ -275,6 +281,65 @@ task Rescue {
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_genotype_vcf"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 0
+    }
+}
+
+task DeduplicateFastq {
+    input {
+        File fastq
+        String prefix = "out"
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([fastq], "GB"))
+    Int memory_gb = 2
+
+    command <<<
+        set -x
+
+        python3 <<EOF
+import gzip
+from collections import defaultdict
+
+seen_reads = defaultdict(int)
+written_reads = set()
+
+with gzip.open("~{fastq}", "rt") as f_in, gzip.open("~{prefix}.fq.gz", "wt") as f_out:
+    while True:
+        # Try to read the 4 lines that make up a FASTQ record
+        name = f_in.readline().strip()
+        if not name:  # EOF
+            break
+            
+        seq = f_in.readline()
+        plus = f_in.readline()
+        qual = f_in.readline()
+        
+        # Get just the read name without /1 or /2
+        read_name = name.split()[0]
+        
+        # Count this occurrence
+        seen_reads[read_name] += 1
+        
+        # Only write if we haven't written this read name yet
+        # and we've seen it exactly twice (paired)
+        if seen_reads[read_name] <= 2 and read_name not in written_reads:
+            f_out.write(f"{name}\n{seq}{plus}{qual}")
+            if seen_reads[read_name] == 2:
+                written_reads.add(read_name)
+
+EOF
+    >>>
+
+    output {
+        File fastq_gz = "~{prefix}.fq.gz"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_genotype_vcf"
+        memory: "~{memory_gb} GB"
+        cpu: 2
         disks: "local-disk ~{disk_size_gb} SSD"
         maxRetries: 0
     }
