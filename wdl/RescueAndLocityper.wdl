@@ -393,7 +393,7 @@ task LocityperPreprocessAndGenotype {
             -p locityper_prepoc \
             -@ ${nthreads} \
             --debug 2 \
-            --subset-loci DEL_13418 INS_14956 \
+            --subset-loci DEL_336185 \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
