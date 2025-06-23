@@ -847,7 +847,7 @@ fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::W
         grouped_records.entry(qname).or_insert_with(Vec::new).push(record);
     }
 
-    for (qname, records) in grouped_records {
+    for (_, records) in grouped_records {
         // Handle proper paired reads (exactly 2 records)
         if records.len() == 2 {
             let mut paired_records = Vec::new();
