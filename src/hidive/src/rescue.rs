@@ -848,23 +848,8 @@ fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::W
     }
 
     for (qname, records) in grouped_records {
-        if records.len() == 1 {
-            // // Handle singleton reads
-            // let record = records[0];
-            // if record.is_reverse() {
-            //     let rv_seq = record.seq().as_bytes().reverse_complement();
-            //     let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-            //     rv_qual.reverse();
-            //     let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
-            //     fastq_writer.write_record(&rv_record).unwrap();
-            // } else {
-            //     let fw_seq = record.seq().as_bytes();
-            //     let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-            //     let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
-            //     fastq_writer.write_record(&fw_record).unwrap();
-            // }
-        } else {
-            // Handle paired reads
+        // Handle proper paired reads (exactly 2 records)
+        if records.len() == 2 {
             let mut paired_records = Vec::new();
             for record in records {
                 if record.is_reverse() {
@@ -885,3 +870,4 @@ fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::W
         }
     }
 }
+
