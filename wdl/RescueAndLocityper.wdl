@@ -393,6 +393,7 @@ task LocityperPreprocessAndGenotype {
             -p locityper_prepoc \
             -@ ${nthreads} \
             --debug 2 \
+            --subset-loci DEL_13418 INS_14956 \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
@@ -402,7 +403,7 @@ task LocityperPreprocessAndGenotype {
         memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
-        preemptible: 3
+        preemptible: 0
         docker: docker
     }
 
