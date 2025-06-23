@@ -842,12 +842,19 @@ fn finalize_progress(
 
 fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::Writer<BufWriter<File>>) {
     let mut grouped_records = HashMap::new();
+    let mut emitted_names = HashSet::new();
+    
     for record in records {
         let qname = String::from_utf8_lossy(record.qname()).into_owned();
         grouped_records.entry(qname).or_insert_with(Vec::new).push(record);
     }
 
-    for (_, records) in grouped_records {
+    for (qname, records) in grouped_records {
+        // Skip if we've already emitted this read name
+        if emitted_names.contains(&qname) {
+            continue;
+        }
+        
         // Handle proper paired reads (exactly 2 records)
         if records.len() == 2 {
             let mut paired_records = Vec::new();
@@ -867,6 +874,9 @@ fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::W
             }
             fastq_writer.write_record(&paired_records[0]).unwrap();
             fastq_writer.write_record(&paired_records[1]).unwrap();
+            
+            // Mark this read name as emitted
+            emitted_names.insert(qname);
         }
     }
 }
