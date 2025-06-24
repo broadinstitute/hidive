@@ -17,21 +17,10 @@ workflow RescueAndLocityper {
         File vcf
         File vcf_tbi
         File bed
+        File filtered_bed
 
-        # String locus_name
-        # String locus_coordinates
-        # File alleles_fa
+        Int N = 20
     }
-
-    # call GenerateDB {
-    #     input:
-    #         reference = ref_fa_with_alt,
-    #         reference_index = ref_fai_with_alt,
-    #         counts_jf = counts_jf,
-    #         locus_name = "test",
-    #         locus_coordinates = locus_coordinates,
-    #         alleles_fa = alleles_fa,
-    # }
 
     call GenerateDBFromVCF {
         input:
@@ -53,7 +42,6 @@ workflow RescueAndLocityper {
 
     call Rescue {
         input:
-            # long_reads_fastx = alleles_fa,
             long_reads_fastx = Fetch.fastq,
             short_reads_cram = cram,
             short_reads_crai = crai,
@@ -63,23 +51,31 @@ workflow RescueAndLocityper {
             prefix = sample_id
     }
 
-    call LocityperPreprocessAndGenotype {
+    call DeduplicateFastq {
         input:
-            sample_id = sample_id,
-            input_fq1 = Rescue.fastq_gz,
-            db_targz = GenerateDBFromVCF.db_tar,
-            # db_targz = GenerateDB.db_tar,
-            counts_file = counts_jf,
-            reference = ref_fa_with_alt,
-            # locus_name = locus_name,
-            locus_name = "test",
-            reference_index = ref_fai_with_alt,
-            locityper_n_cpu = 4,
-            locityper_mem_gb = 32
+            fastq = Rescue.fastq_gz,
+            prefix = sample_id
+    }
+
+    call SplitBedNames { input: bed = filtered_bed, N = N }
+
+    scatter (names_file in SplitBedNames.name_parts) {
+        call LocityperPreprocessAndGenotype {
+            input:
+                sample_id = sample_id,
+                input_fq1 = DeduplicateFastq.fastq_gz,
+                db_targz = GenerateDBFromVCF.db_tar,
+                counts_file = counts_jf,
+                reference = ref_fa_with_alt,
+                locus_names = read_lines(names_file),
+                reference_index = ref_fai_with_alt,
+                locityper_n_cpu = 4,
+                locityper_mem_gb = 32
+        }
     }
 
     output {
-        File results = LocityperPreprocessAndGenotype.genotype_tar
+        Array[File] results = LocityperPreprocessAndGenotype.genotype_tar
     }
 }
 
@@ -280,6 +276,65 @@ task Rescue {
     }
 }
 
+task DeduplicateFastq {
+    input {
+        File fastq
+        String prefix = "out"
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([fastq], "GB"))
+    Int memory_gb = 2
+
+    command <<<
+        set -x
+
+        python3 <<EOF
+import gzip
+from collections import defaultdict
+
+seen_reads = defaultdict(int)
+written_reads = set()
+
+with gzip.open("~{fastq}", "rt") as f_in, gzip.open("~{prefix}.fq.gz", "wt") as f_out:
+    while True:
+        # Try to read the 4 lines that make up a FASTQ record
+        name = f_in.readline().strip()
+        if not name:  # EOF
+            break
+            
+        seq = f_in.readline()
+        plus = f_in.readline()
+        qual = f_in.readline()
+        
+        # Get just the read name without /1 or /2
+        read_name = name.split()[0]
+        
+        # Count this occurrence
+        seen_reads[read_name] += 1
+        
+        # Only write if we haven't written this read name yet
+        # and we've seen it exactly twice (paired)
+        if seen_reads[read_name] <= 2 and read_name not in written_reads:
+            f_out.write(f"{name}\n{seq}{plus}{qual}")
+            if seen_reads[read_name] == 2:
+                written_reads.add(read_name)
+
+EOF
+    >>>
+
+    output {
+        File fastq_gz = "~{prefix}.fq.gz"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_genotype_vcf"
+        memory: "~{memory_gb} GB"
+        cpu: 2
+        disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 0
+    }
+}
+
 task LocityperPreprocessAndGenotype {
     input {
         File input_fq1
@@ -289,7 +344,7 @@ task LocityperPreprocessAndGenotype {
         File reference_index
         File db_targz
         String sample_id
-        String locus_name
+        Array[String] locus_names
 
         Int locityper_n_cpu
         Int locityper_mem_gb
@@ -298,7 +353,7 @@ task LocityperPreprocessAndGenotype {
     }
 
     Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2]), "GiB"))
-    String output_tar = sample_id + "." + locus_name + ".tar.gz"
+    String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
         set -euxo pipefail
@@ -328,6 +383,7 @@ task LocityperPreprocessAndGenotype {
             -p locityper_prepoc \
             -@ ${nthreads} \
             --debug 2 \
+            --subset-loci ~{sep=" " locus_names} \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
@@ -337,11 +393,38 @@ task LocityperPreprocessAndGenotype {
         memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
-        preemptible: 3
+        preemptible: 0
         docker: docker
     }
 
     output {
         File genotype_tar = output_tar
+    }
+}
+
+task SplitBedNames {
+    input {
+        File bed
+        Int N = 20
+    }
+
+    Int disk_size = 1 + ceil(size(bed, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        cut -f4 ~{bed} | split -l ~{N} - split_part_ && wc -l split_part_*
+    >>>
+
+    output {
+        Array[File] name_parts = glob("split_part_*")
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
     }
 }
