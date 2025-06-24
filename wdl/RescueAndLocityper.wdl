@@ -17,6 +17,8 @@ workflow RescueAndLocityper {
         File vcf
         File vcf_tbi
         File bed
+
+        Int N = 20
     }
 
     call GenerateDBFromVCF {
@@ -54,7 +56,7 @@ workflow RescueAndLocityper {
             prefix = sample_id
     }
 
-    call SplitBedNames { input: bed = bed }
+    call SplitBedNames { input: bed = bed, N = N }
 
     scatter (names_file in SplitBedNames.name_parts) {
         call LocityperPreprocessAndGenotype {
@@ -402,6 +404,7 @@ task LocityperPreprocessAndGenotype {
 task SplitBedNames {
     input {
         File bed
+        Int N = 20
     }
 
     Int disk_size = 1 + ceil(size(bed, "GiB"))
@@ -409,7 +412,7 @@ task SplitBedNames {
     command <<<
         set -euxo pipefail
 
-        cut -f4 ~{bed} | split -l 20 - split_part_ && wc -l split_part_*
+        cut -f4 ~{bed} | split -l ~{N} - split_part_ && wc -l split_part_*
     >>>
 
     output {
