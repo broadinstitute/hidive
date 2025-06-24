@@ -443,7 +443,7 @@ task Summarize {
 
         tar -xzvf ~{genotype_tar}
 
-        python3 /locityper/extra/into_csv.py -i ./* -o gts.csv
+        python3 /locityper/extra/into_csv.py -i out_dir/./* -o gts.csv
     >>>
 
     output {
