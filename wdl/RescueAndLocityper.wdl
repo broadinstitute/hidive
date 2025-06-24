@@ -74,8 +74,10 @@ workflow RescueAndLocityper {
         }
     }
 
+    call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar[0] }
+
     output {
-        Array[File] results = LocityperPreprocessAndGenotype.genotype_tar
+        File results = Summarize.summary_csv
     }
 }
 
@@ -352,7 +354,7 @@ task LocityperPreprocessAndGenotype {
         String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2]), "GiB"))
+    Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
@@ -426,5 +428,35 @@ task SplitBedNames {
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
         docker: "staphb/bcftools:1.22"
+    }
+}
+
+task Summarize {
+    input {
+        String sample_id
+        File genotype_tar
+    }
+
+    Int disk_size = 1 + 10*ceil(size(genotype_tar, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        tar -xzvf ~{genotype_tar}
+
+        mv out_dir ~{sample_id}
+        python3 /locityper/extra/into_csv.py -i ./~{sample_id} -o gts.csv
+    >>>
+
+    output {
+        File summary_csv = "gts.csv"
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 0
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper_csv"
     }
 }
