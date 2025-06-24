@@ -74,7 +74,7 @@ workflow RescueAndLocityper {
         }
     }
 
-    call Summarize { input: genotype_tar = LocityperPreprocessAndGenotype.genotype_tar[0] }
+    call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar[0] }
 
     output {
         File results = Summarize.summary_csv
@@ -433,6 +433,7 @@ task SplitBedNames {
 
 task Summarize {
     input {
+        String sample_id
         File genotype_tar
     }
 
@@ -443,7 +444,8 @@ task Summarize {
 
         tar -xzvf ~{genotype_tar}
 
-        python3 /locityper/extra/into_csv.py -i out_dir/./* -o gts.csv
+        mv out_dir ~{sample_id}
+        python3 /locityper/extra/into_csv.py -i ./~{sample_id} -o gts.csv
     >>>
 
     output {
