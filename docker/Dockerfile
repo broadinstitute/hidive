@@ -79,6 +79,9 @@ RUN wget -O abPOA-v1.5.3.tar.gz https://github.com/yangao07/abPOA/releases/downl
     make && \
     cp bin/abpoa /usr/local/bin/
 
+# We don't need to install locityper here, we just need to get the post-processing scripts
+RUN git clone https://github.com/tprodanov/locityper.git
+
 # Final stage
 FROM python:3.9-slim
 
@@ -96,6 +99,7 @@ COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
 COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
 COPY --from=builder /usr/local/bin/abpoa /usr/local/bin/abpoa
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
+COPY --from=builder /locityper/extra /locityper/extra/
 
 # Copy gcloud utilities from builder stage
 COPY --from=builder /google-cloud-sdk /google-cloud-sdk

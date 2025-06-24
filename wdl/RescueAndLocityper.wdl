@@ -428,3 +428,30 @@ task SplitBedNames {
         docker: "staphb/bcftools:1.22"
     }
 }
+
+task Summarize {
+    input {
+        File bed
+        Int N = 20
+    }
+
+    Int disk_size = 1 + ceil(size(bed, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        cut -f4 ~{bed} | split -l ~{N} - split_part_ && wc -l split_part_*
+    >>>
+
+    output {
+        Array[File] name_parts = glob("split_part_*")
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
