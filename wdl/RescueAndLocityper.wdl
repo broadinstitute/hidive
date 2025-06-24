@@ -17,6 +17,7 @@ workflow RescueAndLocityper {
         File vcf
         File vcf_tbi
         File bed
+        File filtered_bed
 
         Int N = 20
     }
@@ -56,7 +57,7 @@ workflow RescueAndLocityper {
             prefix = sample_id
     }
 
-    call SplitBedNames { input: bed = bed, N = N }
+    call SplitBedNames { input: bed = filtered_bed, N = N }
 
     scatter (names_file in SplitBedNames.name_parts) {
         call LocityperPreprocessAndGenotype {
