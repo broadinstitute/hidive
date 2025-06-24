@@ -436,7 +436,7 @@ task Summarize {
         File genotype_tar
     }
 
-    Int disk_size = 1 + ceil(size(genotype_tar, "GiB"))
+    Int disk_size = 1 + 10*ceil(size(genotype_tar, "GiB"))
 
     command <<<
         set -euxo pipefail
