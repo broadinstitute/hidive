@@ -245,7 +245,7 @@ task Rescue {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastx, short_reads_cram, short_reads_crai, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
-    Int memory_gb = 5*num_cpus
+    Int memory_gb = 6*num_cpus
 
     command <<<
         set -euxo pipefail
@@ -354,11 +354,13 @@ task LocityperPreprocessAndGenotype {
         String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    Int disk_size = 80 + ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
+    Int disk_size = 120 + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
         set -euxo pipefail
+        
+        df -h
 
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
