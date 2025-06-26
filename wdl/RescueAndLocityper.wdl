@@ -354,7 +354,7 @@ task LocityperPreprocessAndGenotype {
         String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    Int disk_size = 120 + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
+    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
