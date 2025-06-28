@@ -68,14 +68,14 @@ fn write_gfa_format(graph: &DiGraph<SequenceRecord, OverlapInfo>, output: &PathB
     for node_idx in graph.node_indices() {
         let seq_record = &graph[node_idx];
         // Only write forward sequences to avoid duplicates
-        if seq_record.is_forward {
+        // if seq_record.is_forward {
             writeln!(
                 writer,
                 "S\t{}\t{}\t*",
                 seq_record.id,
                 String::from_utf8_lossy(&seq_record.sequence)
             ).expect("Failed to write sequence line");
-        }
+        // }
     }
 
     // Write overlaps (edges)
@@ -86,7 +86,7 @@ fn write_gfa_format(graph: &DiGraph<SequenceRecord, OverlapInfo>, output: &PathB
         let overlap = &graph[edge_idx];
 
         // Only write edges between forward sequences
-        if from_seq.is_forward && to_seq.is_forward {
+        if from_seq.is_forward == to_seq.is_forward {
             let orientation = match overlap.overlap_type {
                 OverlapType::SuffixPrefix => ('+', '+'),
                 OverlapType::PrefixSuffix => ('+', '-'),
@@ -136,7 +136,7 @@ fn load_fastx_file(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, fastx_path:
                 };
 
                 let fw_record = SequenceRecord {
-                    id: String::from_utf8_lossy(record.id()).to_string(),
+                    id: format!("{}-fw", String::from_utf8_lossy(record.id())),
                     is_forward: true,
                     sequence: fw_seq,
                     quality: fw_qual,
@@ -144,7 +144,7 @@ fn load_fastx_file(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, fastx_path:
                 };
                 
                 let rc_record = SequenceRecord {
-                    id: String::from_utf8_lossy(record.id()).to_string(),
+                    id: format!("{}-rc", String::from_utf8_lossy(record.id())),
                     is_forward: false,
                     sequence: rc_seq,
                     quality: rc_qual,
