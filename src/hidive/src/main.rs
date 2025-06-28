@@ -406,11 +406,11 @@ enum Commands {
         pacbio_fastx_path: PathBuf,
 
         /// FASTA files with Illumina sequences.
-        #[clap(required = false, value_parser)]
+        #[clap(short, long, value_parser, required = false)]
         illumina_fastx_path: Option<PathBuf>,
 
         /// FASTA files with Nanopore sequences.
-        #[clap(required = false, value_parser)]
+        #[clap(short, long, value_parser, required = false)]
         nanopore_fastx_path: Option<PathBuf>,
     },
 
