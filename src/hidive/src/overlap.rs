@@ -8,6 +8,8 @@ use needletail::parse_fastx_file;
 use petgraph::graph::DiGraph;
 use url::Url;
 
+use bio::alignment::sparse::{find_kmer_matches, lcskpp, SparseAlignmentResult};
+
 /// Represents the source technology for a sequence read
 #[derive(Debug, Clone, PartialEq)]
 pub enum SequenceSource {
@@ -63,7 +65,7 @@ pub fn start(
         let seq_record = &graph[node_idx];
         
         // Only process PacBio reads (and only forward orientation to avoid duplicates)
-        if seq_record.source == SequenceSource::PacBio && seq_record.is_forward {
+        if seq_record.source == SequenceSource::PacBio {
             // Collect unique neighbors to avoid duplicates
             let mut neighbors: Vec<_> = graph.neighbors(node_idx).collect();
             neighbors.sort(); // Sort to ensure consistent ordering
@@ -75,11 +77,15 @@ pub fn start(
                 let mut la_ov = spoa::AlignmentEngine::new(spoa::AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
                 let mut la_sw = spoa::AlignmentEngine::new(spoa::AlignmentType::kSW, 5, -4, -8, -6, -8, -4);
 
+                // Track sequence names in order they're added to the graph
+                let mut sequence_names = Vec::new();
+
                 // Add PacBio read first
                 let pb_seq_cstr = std::ffi::CString::new(&seq_record.sequence[..]).unwrap();
                 let pb_qual_cstr = std::ffi::CString::new(vec![b'I'; seq_record.sequence.len()]).unwrap();
                 let a = la_ov.align(pb_seq_cstr.as_ref(), &sg);
                 sg.add_alignment(&a, pb_seq_cstr.as_ref(), pb_qual_cstr.as_ref());
+                sequence_names.push(seq_record.id.clone());
 
                 // Process all neighbors in a single pass, using appropriate alignment method
                 for neighbor in neighbors {
@@ -104,14 +110,21 @@ pub fn start(
                     };
                     
                     sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                    sequence_names.push(neighbor_seq.id.clone());
                 }
 
                 // Get MSA
                 let msa = sg.multiple_sequence_alignment(true);
-                for seq in msa {
+                for (i, seq) in msa.iter().enumerate() {
+                    let read_name = if i < sequence_names.len() {
+                        &sequence_names[i]
+                    } else {
+                        "consensus"
+                    };
                     skydive::elog!(
-                        "\tMSA sequence: {}", 
-                        seq.to_str().unwrap()
+                        "\tMSA sequence: {} ({})", 
+                        seq.to_str().unwrap(),
+                        read_name,
                     );
                 }
                 skydive::elog!("");
@@ -266,169 +279,17 @@ fn extract_kmers(sequence: &[u8], k: usize) -> Vec<Vec<u8>> {
     kmers
 }
 
-/// Find overlap between two sequences
+/// Find overlap between two sequences using sparse alignment
 fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, min_overlap: usize) -> Option<OverlapInfo> {
-    let seq1_len = seq1.sequence.len();
-    let seq2_len = seq2.sequence.len();
-    
-    // Check for contained reads first
-    if seq1_len <= seq2_len {
-        // Check if seq1 is contained within seq2
-        for start_pos in 0..=seq2_len - seq1_len {
-            if seq2.sequence[start_pos..start_pos + seq1_len] == seq1.sequence {
-                return Some(OverlapInfo {
-                    overlap_length: seq1_len,
-                    overlap_type: OverlapType::Contained,
-                });
-            }
-        }
-    } else {
-        // Check if seq2 is contained within seq1
-        for start_pos in 0..=seq1_len - seq2_len {
-            if seq1.sequence[start_pos..start_pos + seq2_len] == seq2.sequence {
-                return Some(OverlapInfo {
-                    overlap_length: seq2_len,
-                    overlap_type: OverlapType::Container,
-                });
-            }
-        }
+    let matches = find_kmer_matches(&seq1.sequence, &seq2.sequence, min_overlap);
+    let sparse_al = lcskpp(&matches, min_overlap);
+
+    if sparse_al.score >= min_overlap as u32 {
+        return Some(OverlapInfo {
+            overlap_length: 1,
+            overlap_type: OverlapType::SuffixPrefix, // Default assumption
+        });
     }
-    
-    // Try different overlap lengths for suffix-prefix and prefix-suffix overlaps
-    for overlap_len in min_overlap..=std::cmp::min(seq1_len, seq2_len) {
-        // Check suffix of seq1 against prefix of seq2
-        if seq1.sequence[seq1_len - overlap_len..] == seq2.sequence[..overlap_len] {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::SuffixPrefix,
-            });
-        }
-        
-        // Check prefix of seq1 against suffix of seq2
-        if seq1.sequence[..overlap_len] == seq2.sequence[seq2_len - overlap_len..] {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::PrefixSuffix,
-            });
-        }
-    }
-    
+
     None
-}
-
-/// Alternative: Compute overlaps using suffix array approach (more sensitive)
-fn compute_overlaps_suffix_array(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, min_overlap: usize) {
-    let nodes: Vec<_> = graph.node_indices().collect();
-    
-    for i in 0..nodes.len() {
-        for j in i + 1..nodes.len() {
-            let node1 = nodes[i];
-            let node2 = nodes[j];
-            
-            if let Some(overlap_info) = find_overlap_suffix_array(&graph[node1], &graph[node2], min_overlap) {
-                graph.add_edge(node1, node2, overlap_info);
-            }
-        }
-    }
-}
-
-/// Find overlap using suffix array approach
-fn find_overlap_suffix_array(seq1: &SequenceRecord, seq2: &SequenceRecord, min_overlap: usize) -> Option<OverlapInfo> {
-    // This is a simplified version - in practice you'd use a proper suffix array library
-    // For now, we'll use the same approach as before but with more sophisticated matching
-    
-    let seq1_len = seq1.sequence.len();
-    let seq2_len = seq2.sequence.len();
-    
-    // Try different overlap lengths with more sophisticated matching
-    for overlap_len in min_overlap..=std::cmp::min(seq1_len, seq2_len) {
-        // Check suffix of seq1 against prefix of seq2
-        if seq1.sequence[seq1_len - overlap_len..] == seq2.sequence[..overlap_len] {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::SuffixPrefix,
-            });
-        }
-        
-        // Check prefix of seq1 against suffix of seq2
-        if seq1.sequence[..overlap_len] == seq2.sequence[seq2_len - overlap_len..] {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::PrefixSuffix,
-            });
-        }
-    }
-    
-    None
-}
-
-/// Find overlap with quality score consideration
-fn find_overlap_with_quality(seq1: &SequenceRecord, seq2: &SequenceRecord, min_overlap: usize, min_quality: u8) -> Option<OverlapInfo> {
-    let seq1_len = seq1.sequence.len();
-    let seq2_len = seq2.sequence.len();
-    
-    for overlap_len in min_overlap..=std::cmp::min(seq1_len, seq2_len) {
-        // Check suffix of seq1 against prefix of seq2
-        if let Some(quality_score) = check_overlap_quality(
-            &seq1.sequence[seq1_len - overlap_len..],
-            &seq2.sequence[..overlap_len],
-            &seq1.quality.as_ref().map(|q| &q[seq1_len - overlap_len..]),
-            &seq2.quality.as_ref().map(|q| &q[..overlap_len]),
-            min_quality
-        ) {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::SuffixPrefix,
-            });
-        }
-        
-        // Check prefix of seq1 against suffix of seq2
-        if let Some(quality_score) = check_overlap_quality(
-            &seq1.sequence[..overlap_len],
-            &seq2.sequence[seq2_len - overlap_len..],
-            &seq1.quality.as_ref().map(|q| &q[..overlap_len]),
-            &seq2.quality.as_ref().map(|q| &q[seq2_len - overlap_len..]),
-            min_quality
-        ) {
-            return Some(OverlapInfo {
-                overlap_length: overlap_len,
-                overlap_type: OverlapType::PrefixSuffix,
-            });
-        }
-    }
-    
-    None
-}
-
-/// Check if overlap has sufficient quality
-fn check_overlap_quality(
-    seq1: &[u8],
-    seq2: &[u8],
-    qual1: &Option<&[u8]>,
-    qual2: &Option<&[u8]>,
-    min_quality: u8
-) -> Option<f64> {
-    if seq1 != seq2 {
-        return None;
-    }
-    
-    // If we have quality scores, check them
-    if let (Some(q1), Some(q2)) = (qual1, qual2) {
-        let mut total_quality = 0.0;
-        let mut count = 0;
-        
-        for i in 0..seq1.len() {
-            if q1[i] >= min_quality && q2[i] >= min_quality {
-                total_quality += (q1[i] as f64 + q2[i] as f64) / 2.0;
-                count += 1;
-            }
-        }
-        
-        if count > 0 {
-            return Some(total_quality / count as f64);
-        }
-    }
-    
-    // If no quality scores, just check sequence match
-    Some(0.0)
 }
