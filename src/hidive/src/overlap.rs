@@ -57,6 +57,38 @@ pub fn start(
     compute_overlaps(&mut graph, kmer_size);
 
     write_gfa_format(&graph, output);
+
+    // Print overlapping sequence IDs and sequences for each PacBio read
+    for node_idx in graph.node_indices() {
+        let seq_record = &graph[node_idx];
+        
+        // Only process PacBio reads
+        if seq_record.source == SequenceSource::PacBio {
+            let mut overlapping_reads = HashSet::new();
+            
+            // Get all neighbors (both incoming and outgoing edges)
+            for neighbor in graph.neighbors(node_idx) {
+                let neighbor_seq = &graph[neighbor];
+                overlapping_reads.insert((&neighbor_seq.id, &neighbor_seq.sequence));
+            }
+
+            if !overlapping_reads.is_empty() {
+                skydive::elog!(
+                    "PacBio read {} (seq: {}) overlaps with:", 
+                    seq_record.id,
+                    String::from_utf8_lossy(&seq_record.sequence)
+                );
+                
+                for (id, seq) in overlapping_reads {
+                    skydive::elog!(
+                        "\t{}: {}", 
+                        id,
+                        String::from_utf8_lossy(seq)
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Write the overlap graph to GFA (Graphical Fragment Assembly) format
@@ -69,15 +101,12 @@ fn write_gfa_format(graph: &DiGraph<SequenceRecord, OverlapInfo>, output: &PathB
     // Write sequences (nodes)
     for node_idx in graph.node_indices() {
         let seq_record = &graph[node_idx];
-        // Only write forward sequences to avoid duplicates
-        // if seq_record.is_forward {
-            writeln!(
-                writer,
-                "S\t{}\t{}\t*",
-                seq_record.id,
-                String::from_utf8_lossy(&seq_record.sequence)
-            ).expect("Failed to write sequence line");
-        // }
+        writeln!(
+            writer,
+            "S\t{}\t{}\t*",
+            seq_record.id,
+            String::from_utf8_lossy(&seq_record.sequence)
+        ).expect("Failed to write sequence line");
     }
 
     // Write overlaps (edges)
