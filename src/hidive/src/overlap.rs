@@ -62,30 +62,59 @@ pub fn start(
     for node_idx in graph.node_indices() {
         let seq_record = &graph[node_idx];
         
-        // Only process PacBio reads
-        if seq_record.source == SequenceSource::PacBio {
-            let mut overlapping_reads = HashSet::new();
+        // Only process PacBio reads (and only forward orientation to avoid duplicates)
+        if seq_record.source == SequenceSource::PacBio && seq_record.is_forward {
+            // Collect unique neighbors to avoid duplicates
+            let mut neighbors: Vec<_> = graph.neighbors(node_idx).collect();
+            neighbors.sort(); // Sort to ensure consistent ordering
+            neighbors.dedup(); // Remove any duplicates
             
-            // Get all neighbors (both incoming and outgoing edges)
-            for neighbor in graph.neighbors(node_idx) {
-                let neighbor_seq = &graph[neighbor];
-                overlapping_reads.insert((&neighbor_seq.id, &neighbor_seq.sequence));
-            }
+            if !neighbors.is_empty() {
+                // Create a POA graph of overlapping reads
+                let mut sg = spoa::Graph::new();
+                let mut la_ov = spoa::AlignmentEngine::new(spoa::AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
+                let mut la_sw = spoa::AlignmentEngine::new(spoa::AlignmentType::kSW, 5, -4, -8, -6, -8, -4);
 
-            if !overlapping_reads.is_empty() {
-                skydive::elog!(
-                    "PacBio read {} (seq: {}) overlaps with:", 
-                    seq_record.id,
-                    String::from_utf8_lossy(&seq_record.sequence)
-                );
-                
-                for (id, seq) in overlapping_reads {
+                // Add PacBio read first
+                let pb_seq_cstr = std::ffi::CString::new(&seq_record.sequence[..]).unwrap();
+                let pb_qual_cstr = std::ffi::CString::new(vec![b'I'; seq_record.sequence.len()]).unwrap();
+                let a = la_ov.align(pb_seq_cstr.as_ref(), &sg);
+                sg.add_alignment(&a, pb_seq_cstr.as_ref(), pb_qual_cstr.as_ref());
+
+                // Process all neighbors in a single pass, using appropriate alignment method
+                for neighbor in neighbors {
+                    let neighbor_seq = &graph[neighbor];
+                    
+                    // Skip if this is the same sequence (shouldn't happen, but safety check)
+                    if neighbor == node_idx {
+                        continue;
+                    }
+                    
+                    let seq_cstr = std::ffi::CString::new(&neighbor_seq.sequence[..]).unwrap();
+                    let seq_qual = std::ffi::CString::new(vec![b'I'; neighbor_seq.sequence.len()]).unwrap();
+                    
+                    // Use overlap alignment for long reads, Smith-Waterman for short reads
+                    let a = match neighbor_seq.source {
+                        SequenceSource::PacBio | SequenceSource::Nanopore => {
+                            la_ov.align(seq_cstr.as_ref(), &sg)
+                        }
+                        SequenceSource::Illumina => {
+                            la_sw.align(seq_cstr.as_ref(), &sg)
+                        }
+                    };
+                    
+                    sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
+                }
+
+                // Get MSA
+                let msa = sg.multiple_sequence_alignment(true);
+                for seq in msa {
                     skydive::elog!(
-                        "\t{}: {}", 
-                        id,
-                        String::from_utf8_lossy(seq)
+                        "\tMSA sequence: {}", 
+                        seq.to_str().unwrap()
                     );
                 }
+                skydive::elog!("");
             }
         }
     }
