@@ -27,6 +27,8 @@ struct OverlapInfo {
 enum OverlapType {
     SuffixPrefix, // seq1 suffix matches seq2 prefix
     PrefixSuffix, // seq1 prefix matches seq2 suffix
+    Contained,    // seq1 is contained within seq2
+    Container,    // seq1 contains seq2
 }
 
 /// Represents a sequence record with metadata
@@ -90,6 +92,8 @@ fn write_gfa_format(graph: &DiGraph<SequenceRecord, OverlapInfo>, output: &PathB
             let orientation = match overlap.overlap_type {
                 OverlapType::SuffixPrefix => ('+', '+'),
                 OverlapType::PrefixSuffix => ('+', '-'),
+                OverlapType::Contained => ('+', '+'), // Contained reads have same orientation
+                OverlapType::Container => ('+', '+'), // Container reads have same orientation
             };
             
             writeln!(
@@ -209,7 +213,30 @@ fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, min_overlap: usize
     let seq1_len = seq1.sequence.len();
     let seq2_len = seq2.sequence.len();
     
-    // Try different overlap lengths
+    // Check for contained reads first
+    if seq1_len <= seq2_len {
+        // Check if seq1 is contained within seq2
+        for start_pos in 0..=seq2_len - seq1_len {
+            if seq2.sequence[start_pos..start_pos + seq1_len] == seq1.sequence {
+                return Some(OverlapInfo {
+                    overlap_length: seq1_len,
+                    overlap_type: OverlapType::Contained,
+                });
+            }
+        }
+    } else {
+        // Check if seq2 is contained within seq1
+        for start_pos in 0..=seq1_len - seq2_len {
+            if seq1.sequence[start_pos..start_pos + seq2_len] == seq2.sequence {
+                return Some(OverlapInfo {
+                    overlap_length: seq2_len,
+                    overlap_type: OverlapType::Container,
+                });
+            }
+        }
+    }
+    
+    // Try different overlap lengths for suffix-prefix and prefix-suffix overlaps
     for overlap_len in min_overlap..=std::cmp::min(seq1_len, seq2_len) {
         // Check suffix of seq1 against prefix of seq2
         if seq1.sequence[seq1_len - overlap_len..] == seq2.sequence[..overlap_len] {
