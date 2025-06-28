@@ -54,6 +54,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod assemble;
+mod overlap;
 mod build;
 mod cluster;
 mod coassemble;
@@ -389,6 +390,30 @@ enum Commands {
         short_read_fasta_path: PathBuf,
     },
 
+    /// Construct a graph describing the overlap between long- and short-read sequences.
+    #[clap(arg_required_else_help = true)]
+    Overlap {
+        /// Output path for corrected reads.
+        #[clap(short, long, value_parser, default_value = "/dev/stdout")]
+        output: PathBuf,
+
+        /// Kmer-size
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// FASTA files with PacBio sequences.
+        #[clap(required = true, value_parser)]
+        pacbio_fastx_path: PathBuf,
+
+        /// FASTA files with Illumina sequences.
+        #[clap(required = false, value_parser)]
+        illumina_fastx_path: Option<PathBuf>,
+
+        /// FASTA files with Nanopore sequences.
+        #[clap(required = false, value_parser)]
+        nanopore_fastx_path: Option<PathBuf>,
+    },
+
     /// Error-clean long reads using a linked de Bruijn graph.
     #[clap(arg_required_else_help = true)]
     Correct {
@@ -660,6 +685,21 @@ fn main() {
                 &model_path,
                 &long_read_fasta_path,
                 &short_read_fasta_path,
+            );
+        }
+        Commands::Overlap {
+            output,
+            kmer_size,
+            pacbio_fastx_path,
+            illumina_fastx_path,
+            nanopore_fastx_path,
+        } => {
+            overlap::start(
+                &output,
+                kmer_size,
+                &pacbio_fastx_path,
+                &illumina_fastx_path,
+                &nanopore_fastx_path,
             );
         }
         Commands::Correct {
