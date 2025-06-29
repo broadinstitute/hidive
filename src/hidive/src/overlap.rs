@@ -1,14 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::{fs::File, io::{Write, BufWriter}, path::PathBuf};
 
-use needletail::parser::SequenceRecord as NeedletailRecord;
 use needletail::Sequence;
 use needletail::parse_fastx_file;
 
 use petgraph::graph::DiGraph;
-use url::Url;
+use petgraph::visit::EdgeRef;
 
-use bio::alignment::sparse::{find_kmer_matches, lcskpp, SparseAlignmentResult};
+use bio::alignment::sparse::{find_kmer_matches, lcskpp};
 
 /// Represents the source technology for a sequence read
 #[derive(Debug, Clone, PartialEq)]
@@ -56,7 +55,8 @@ pub fn start(
     load_fastx_file(&mut graph, illumina_fastx_path, SequenceSource::Illumina);
     load_fastx_file(&mut graph, nanopore_fastx_path, SequenceSource::Nanopore);
 
-    compute_overlaps(&mut graph, kmer_size / 2);
+    compute_overlaps(&mut graph, kmer_size, 2*kmer_size);
+    filter_overlaps(&mut graph);
 
     write_gfa_format(&graph, output);
 
@@ -164,7 +164,7 @@ fn load_fastx_file(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, fastx_path:
 }
 
 /// Compute overlaps between sequences using k-mer based detection
-fn compute_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, kmer_size: usize) {
+fn compute_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, kmer_size: usize, min_overlap: usize) {
     let mut kmer_to_nodes: HashMap<Vec<u8>, Vec<petgraph::graph::NodeIndex>> = HashMap::new();
     
     // Build k-mer index
@@ -178,7 +178,7 @@ fn compute_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, kmer_size:
     }
     
     // Find overlaps based on shared k-mers
-    for (kmer, nodes) in kmer_to_nodes {
+    for (_kmer, nodes) in kmer_to_nodes {
         if nodes.len() > 1 {
             // Check all pairs of nodes that share this k-mer
             for i in 0..nodes.len() {
@@ -186,7 +186,7 @@ fn compute_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>, kmer_size:
                     let node1 = nodes[i];
                     let node2 = nodes[j];
                     
-                    if let Some(overlap_info) = find_overlap(&graph[node1], &graph[node2], kmer_size) {
+                    if let Some(overlap_info) = find_overlap(&graph[node1], &graph[node2], kmer_size, min_overlap) {
                         // Add edge representing the overlap
                         graph.add_edge(node1, node2, overlap_info);
                     }
@@ -210,15 +210,13 @@ fn extract_kmers(sequence: &[u8], k: usize) -> Vec<Vec<u8>> {
 }
 
 /// Find overlap between two sequences using sparse alignment
-fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, min_overlap: usize) -> Option<OverlapInfo> {
-    let matches = find_kmer_matches(&seq1.sequence, &seq2.sequence, min_overlap);
-    let sparse_al = lcskpp(&matches, min_overlap);
-
-    skydive::elog!("{} {} sparse_al: {:?}", seq1.id, seq2.id, sparse_al.score);
+fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, kmer_size: usize, min_overlap: usize) -> Option<OverlapInfo> {
+    let matches = find_kmer_matches(&seq1.sequence, &seq2.sequence, kmer_size);
+    let sparse_al = lcskpp(&matches, kmer_size);
 
     if sparse_al.score >= min_overlap as u32 {
         return Some(OverlapInfo {
-            overlap_length: 1,
+            overlap_length: sparse_al.score as usize,
             overlap_type: OverlapType::SuffixPrefix, // Default assumption
         });
     }
@@ -297,6 +295,74 @@ fn process_pacbio_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) {
                 }
                 skydive::elog!("");
             }
+        }
+    }
+}
+
+/// Filter forward and reverse overlaps
+fn filter_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>) {
+    let mut edges_to_remove: Vec<(petgraph::graph::NodeIndex, petgraph::graph::NodeIndex)> = Vec::new();
+
+    for node_idx in graph.node_indices() {
+        let seq_record = &graph[node_idx];
+        
+        // Only process PacBio reads (and only forward orientation to avoid duplicates)
+        if seq_record.source == SequenceSource::PacBio && seq_record.is_forward {
+            // Get all neighbors and their edge weights
+            let mut neighbor_edges: Vec<(petgraph::graph::NodeIndex, petgraph::graph::EdgeIndex, usize)> = Vec::new();
+            
+            for edge_idx in graph.edges(node_idx) {
+                let neighbor = edge_idx.target();
+                let overlap_info = &graph[edge_idx.id()];
+                neighbor_edges.push((neighbor, edge_idx.id(), overlap_info.overlap_length));
+            }
+            
+            // Group neighbors by their base read ID (removing -fw/-rc suffix)
+            let mut read_groups: HashMap<String, Vec<(petgraph::graph::NodeIndex, petgraph::graph::EdgeIndex, usize)>> = HashMap::new();
+            
+            for (neighbor, edge_idx, weight) in neighbor_edges {
+                let neighbor_seq = &graph[neighbor];
+                // Extract base read ID by removing -fw or -rc suffix
+                let base_id = if neighbor_seq.id.ends_with("-fw") {
+                    neighbor_seq.id[..neighbor_seq.id.len()-3].to_string()
+                } else if neighbor_seq.id.ends_with("-rc") {
+                    neighbor_seq.id[..neighbor_seq.id.len()-3].to_string()
+                } else {
+                    neighbor_seq.id.clone() // Fallback if no suffix
+                };
+                
+                read_groups.entry(base_id).or_insert_with(Vec::new).push((neighbor, edge_idx, weight));
+            }
+            
+            // For each read that has both orientations as neighbors, keep only the better edge
+            for (_base_id, edges) in read_groups {
+                if edges.len() > 1 {
+                    // Find the edge with the highest weight
+                    let best_edge = edges.iter().max_by_key(|(_, _, weight)| weight).unwrap();
+                    let best_weight = best_edge.2;
+                    
+                    // Mark all other edges to this read for removal
+                    for (neighbor, _edge_idx, weight) in edges {
+                        if weight < best_weight {
+                            // skydive::elog!(
+                            //     "Removing weaker overlap: {} -> {} (weight: {} < {})", 
+                            //     seq_record.id, 
+                            //     graph[neighbor].id, 
+                            //     weight, 
+                            //     best_weight
+                            // );
+                            edges_to_remove.push((node_idx, neighbor));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove marked edges
+    for (from, to) in edges_to_remove {
+        if let Some(edge_idx) = graph.find_edge(from, to) {
+            graph.remove_edge(edge_idx);
         }
     }
 }
