@@ -9,6 +9,10 @@ use petgraph::visit::EdgeRef;
 
 use bio::alignment::sparse::{find_kmer_matches, lcskpp};
 
+use serde_json;
+use serde_json::Value;
+use std::ffi::CString;
+
 /// Represents the source technology for a sequence read
 #[derive(Debug, Clone, PartialEq)]
 pub enum SequenceSource {
@@ -52,15 +56,22 @@ pub fn start(
     let mut graph = DiGraph::<SequenceRecord, OverlapInfo>::new();
 
     load_fastx_file(&mut graph, &Some(pacbio_fastx_path.clone()), SequenceSource::PacBio);
-    load_fastx_file(&mut graph, illumina_fastx_path, SequenceSource::Illumina);
     load_fastx_file(&mut graph, nanopore_fastx_path, SequenceSource::Nanopore);
+    load_fastx_file(&mut graph, illumina_fastx_path, SequenceSource::Illumina);
 
     compute_overlaps(&mut graph, kmer_size, 2*kmer_size);
     filter_overlaps(&mut graph);
 
-    write_gfa_format(&graph, output);
+    // write_gfa_format(&graph, output);
 
-    process_pacbio_overlaps(&graph);
+    let all_read_tokens = process_overlaps(&graph);
+
+    for (i, read_tokens) in all_read_tokens.iter().enumerate() {
+        skydive::elog!("Read {} tokens:", i);
+        for token in read_tokens {
+            skydive::elog!("{}", serde_json::to_string_pretty(&token).unwrap());
+        }
+    }
 }
 
 /// Write the overlap graph to GFA (Graphical Fragment Assembly) format
@@ -225,7 +236,9 @@ fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, kmer_size: usize, 
 }
 
 /// Process PacBio reads and their overlapping neighbors to create POA graphs and MSAs
-fn process_pacbio_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) {
+fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Value>> {
+    let mut all_tokens = Vec::new();
+
     // Print overlapping sequence IDs and sequences for each PacBio read
     for node_idx in graph.node_indices() {
         let seq_record = &graph[node_idx];
@@ -281,6 +294,52 @@ fn process_pacbio_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) {
 
                 // Get MSA
                 let msa = sg.multiple_sequence_alignment(true);
+
+                // Process MSA strings to replace leading/trailing gaps with spaces
+                let msa: Vec<CString> = msa.into_iter().map(|seq| {
+                    let bytes = seq.to_bytes();
+                    let mut processed = bytes.to_vec();
+                    
+                    // Replace leading gaps
+                    let mut i = 0;
+                    while i < processed.len() && processed[i] == b'-' {
+                        processed[i] = b' ';
+                        i += 1;
+                    }
+                    
+                    // Replace trailing gaps
+                    let mut i = processed.len() - 1;
+                    while i > 0 && processed[i] == b'-' {
+                        processed[i] = b' ';
+                        i -= 1;
+                    }
+                    
+                    CString::new(processed).unwrap()
+                }).collect();
+                
+                // Convert MSA to JSON tokens
+                let msa_length = msa[0].to_bytes().len();
+                let mut tokens = Vec::new();
+                
+                for pos in 0..msa_length {
+                    let column: Vec<u8> = msa.iter()
+                        .map(|seq| seq.to_bytes()[pos])
+                        .collect();
+                    
+                    let token = msa_column_to_token(&column, &sequence_names, pos);
+                    tokens.push(token);
+                }
+
+                all_tokens.push(tokens);
+                
+                /*
+                skydive::elog!("MSA JSON tokens:");
+                for token in tokens {
+                    skydive::elog!("{}", serde_json::to_string_pretty(&token).unwrap());
+                }
+                skydive::elog!("");
+                */
+
                 for (i, seq) in msa.iter().enumerate() {
                     let read_name = if i < sequence_names.len() {
                         &sequence_names[i]
@@ -297,6 +356,8 @@ fn process_pacbio_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) {
             }
         }
     }
+
+    all_tokens
 }
 
 /// Filter forward and reverse overlaps
@@ -365,4 +426,78 @@ fn filter_overlaps(graph: &mut DiGraph<SequenceRecord, OverlapInfo>) {
             graph.remove_edge(edge_idx);
         }
     }
+}
+
+/// Calculate entropy of base distribution
+fn calculate_entropy(counts: &HashMap<u8, usize>) -> f64 {
+    let total: usize = counts.values().sum();
+    if total == 0 {
+        return 0.0;
+    }
+    
+    let mut entropy = 0.0;
+    for &count in counts.values() {
+        if count > 0 {
+            let p = count as f64 / total as f64;
+            entropy -= p * p.log2();
+        }
+    }
+    entropy
+}
+
+/// Convert an MSA column to a JSON token
+fn msa_column_to_token(
+    column: &[u8], 
+    sequence_names: &[String], 
+    pos: usize
+) -> Value {
+    let mut counts_by_source: HashMap<String, HashMap<u8, usize>> = HashMap::new();
+    
+    // Initialize counts for each source
+    counts_by_source.insert("pb".to_string(), HashMap::new());
+    counts_by_source.insert("ont".to_string(), HashMap::new());
+    counts_by_source.insert("ill".to_string(), HashMap::new());
+    
+    // Count bases by source
+    for (i, &base) in column.iter().enumerate() {
+        if i < sequence_names.len() {
+            let source = if sequence_names[i].contains("pacbio") || sequence_names[i].contains("pb") {
+                "pb"
+            } else if sequence_names[i].contains("nanopore") || sequence_names[i].contains("ont") {
+                "ont"
+            } else {
+                "ill"
+            };
+            
+            *counts_by_source.get_mut(source).unwrap().entry(base).or_insert(0) += 1;
+        }
+    }
+    
+    // Build JSON token
+    let mut token = serde_json::Map::new();
+    
+    // Add counts for each base and source
+    for (source, counts) in &counts_by_source {
+        for base in b"ACGT-" {
+            let key = format!("{}_{}", *base as char, source);
+            let count = counts.get(base).unwrap_or(&0);
+            token.insert(key, Value::Number(serde_json::Number::from(*count)));
+        }
+    }
+    
+    // Add position
+    token.insert("pos".to_string(), Value::Number(serde_json::Number::from(pos)));
+
+    // Calculate and add entropy
+    let all_counts: HashMap<u8, usize> = counts_by_source
+        .values()
+        .flat_map(|counts| counts.iter())
+        .fold(HashMap::new(), |mut acc, (&base, &count)| {
+            *acc.entry(base).or_insert(0) += count;
+            acc
+        });
+    let entropy = calculate_entropy(&all_counts);
+    token.insert("entropy".to_string(), Value::Number(serde_json::Number::from_f64(entropy).unwrap()));
+    
+    Value::Object(token)
 }
