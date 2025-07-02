@@ -256,8 +256,9 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                 let mut la_ov = spoa::AlignmentEngine::new(spoa::AlignmentType::kOV, 5, -4, -8, -6, -8, -4);
                 let mut la_sw = spoa::AlignmentEngine::new(spoa::AlignmentType::kSW, 5, -4, -8, -6, -8, -4);
 
-                // Track sequence names in order they're added to the graph
+                // Track sequence names and sources in order they're added to the graph
                 let mut sequence_names = Vec::new();
+                let mut sequence_sources = Vec::new();
 
                 // Add PacBio read first
                 let pb_seq_cstr = std::ffi::CString::new(&seq_record.sequence[..]).unwrap();
@@ -265,6 +266,7 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                 let a = la_ov.align(pb_seq_cstr.as_ref(), &sg);
                 sg.add_alignment(&a, pb_seq_cstr.as_ref(), pb_qual_cstr.as_ref());
                 sequence_names.push(seq_record.id.clone());
+                sequence_sources.push(seq_record.source.clone());
 
                 // Process all neighbors in a single pass, using appropriate alignment method
                 for neighbor in neighbors {
@@ -290,10 +292,11 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                     
                     sg.add_alignment(&a, seq_cstr.as_ref(), seq_qual.as_ref());
                     sequence_names.push(neighbor_seq.id.clone());
+                    sequence_sources.push(neighbor_seq.source.clone());
                 }
 
                 // Get MSA
-                let msa = sg.multiple_sequence_alignment(true);
+                let msa = sg.multiple_sequence_alignment(false);
 
                 // Process MSA strings to replace leading/trailing gaps with spaces
                 let msa: Vec<CString> = msa.into_iter().map(|seq| {
@@ -326,7 +329,7 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                         .map(|seq| seq.to_bytes()[pos])
                         .collect();
                     
-                    let token = msa_column_to_token(&column, &sequence_names, pos);
+                    let token = msa_column_to_token(&column, &sequence_names, &sequence_sources, pos);
                     tokens.push(token);
                 }
 
@@ -448,7 +451,8 @@ fn calculate_entropy(counts: &HashMap<u8, usize>) -> f64 {
 /// Convert an MSA column to a JSON token
 fn msa_column_to_token(
     column: &[u8], 
-    sequence_names: &[String], 
+    _sequence_names: &[String], 
+    sequence_sources: &[SequenceSource],
     pos: usize
 ) -> Value {
     let mut counts_by_source: HashMap<String, HashMap<u8, usize>> = HashMap::new();
@@ -460,13 +464,11 @@ fn msa_column_to_token(
     
     // Count bases by source
     for (i, &base) in column.iter().enumerate() {
-        if i < sequence_names.len() {
-            let source = if sequence_names[i].contains("pacbio") || sequence_names[i].contains("pb") {
-                "pb"
-            } else if sequence_names[i].contains("nanopore") || sequence_names[i].contains("ont") {
-                "ont"
-            } else {
-                "ill"
+        if i < sequence_sources.len() {
+            let source = match &sequence_sources[i] {
+                SequenceSource::PacBio => "pb",
+                SequenceSource::Nanopore => "ont",
+                SequenceSource::Illumina => "ill",
             };
             
             *counts_by_source.get_mut(source).unwrap().entry(base).or_insert(0) += 1;
