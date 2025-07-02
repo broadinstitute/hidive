@@ -296,10 +296,14 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                 }
 
                 // Get MSA
-                let msa = sg.multiple_sequence_alignment(false);
+                let msa = sg.multiple_sequence_alignment(true);
+
+                // Get consensus sequence (last line of MSA)
+                let consensus = msa.last().unwrap().to_bytes().to_vec();
+                let msa_without_consensus = msa[..msa.len()-1].to_vec();
 
                 // Process MSA strings to replace leading/trailing gaps with spaces
-                let msa: Vec<CString> = msa.into_iter().map(|seq| {
+                let msa: Vec<CString> = msa_without_consensus.into_iter().map(|seq| {
                     let bytes = seq.to_bytes();
                     let mut processed = bytes.to_vec();
                     
@@ -328,8 +332,10 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                     let column: Vec<u8> = msa.iter()
                         .map(|seq| seq.to_bytes()[pos])
                         .collect();
+
+                    let label = consensus[pos];
                     
-                    let token = msa_column_to_token(&column, &sequence_names, &sequence_sources, pos);
+                    let token = msa_column_to_token(&column, &sequence_names, &sequence_sources, pos, Some(label));
                     tokens.push(token);
                 }
 
@@ -453,7 +459,8 @@ fn msa_column_to_token(
     column: &[u8], 
     _sequence_names: &[String], 
     sequence_sources: &[SequenceSource],
-    pos: usize
+    pos: usize,
+    label: Option<u8>
 ) -> Value {
     let mut counts_by_source: HashMap<String, HashMap<u8, usize>> = HashMap::new();
     
@@ -480,11 +487,16 @@ fn msa_column_to_token(
     
     // Add counts for each base and source
     for (source, counts) in &counts_by_source {
+        let mut cov = 0;
         for base in b"ACGT-" {
             let key = format!("{}_{}", *base as char, source);
             let count = counts.get(base).unwrap_or(&0);
             token.insert(key, Value::Number(serde_json::Number::from(*count)));
+
+            cov += count;
         }
+
+        token.insert(format!("cov_{}", source), Value::Number(serde_json::Number::from(cov)));
     }
     
     // Add position
@@ -500,6 +512,17 @@ fn msa_column_to_token(
         });
     let entropy = calculate_entropy(&all_counts);
     token.insert("entropy".to_string(), Value::Number(serde_json::Number::from_f64(entropy).unwrap()));
+
+    if let Some(label) = label {
+        let label_str = match label {
+            b'A' => "A",
+            b'C' => "C",
+            b'G' => "G",
+            b'T' => "T",
+            _ => "N",
+        };
+        token.insert("label".to_string(), Value::String(label_str.to_string()));
+    }
     
     Value::Object(token)
 }
