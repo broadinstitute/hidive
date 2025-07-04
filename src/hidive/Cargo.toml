@@ -22,6 +22,7 @@ minimap2 = "=0.1.23+minimap2.2.28"
 needletail = "=0.5.1"
 ndarray = { version = "=0.16.1", features = ["rayon"] }
 ndarray-stats = "=0.6.0"
+ndarray-npy = "=0.9.1"
 num-format = "=0.4.4"
 path-absolutize = "=3.1.1"
 petgraph = "=0.6.5"
@@ -31,11 +32,13 @@ regex = "=1.10.5"
 # reqwest = { workspace = true }
 reqwest = { version = "=0.11.27", features = ["blocking"]}
 rust-htslib = { version = "=0.47.0", features = ["gcs", "serde_feature"] }
+safetensors = "0.6.0"
 sdust = "=0.1.0"
 serde = "=1.0.204"
 serde_json = "=1.0.120"
 spoa = { git = "https://github.com/nlhepler/spoa-rs.git", rev = "d546870f172e8dace40cbcc41a7fe32a97afe138" }
 skydive = { path = "../skydive" }
+tch = "=0.20.0"
 tempfile = "=3.17.1"
 url = "=2.5.2"
 plotters = "=0.3.7"

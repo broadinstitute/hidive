@@ -13,6 +13,9 @@ use serde_json;
 use serde_json::Value;
 use std::ffi::CString;
 
+use ndarray_npy::NpzWriter;
+use ndarray::{Array3, Array2};
+
 /// Represents the source technology for a sequence read
 #[derive(Debug, Clone, PartialEq)]
 pub enum SequenceSource {
@@ -64,14 +67,69 @@ pub fn start(
 
     // write_gfa_format(&graph, output);
 
-    let all_read_tokens = process_overlaps(&graph);
+    let (all_features, all_labels) = process_overlaps(&graph);
 
-    for (i, read_tokens) in all_read_tokens.iter().enumerate() {
-        skydive::elog!("Read {} tokens:", i);
-        for token in read_tokens {
-            skydive::elog!("{}", serde_json::to_string_pretty(&token).unwrap());
+    // Convert all_features and all_labels to PyTorch tensors and save as pt files
+    // First, pad sequences to the same length for batching
+    let max_seq_len = all_features.iter().map(|seq| seq.len() / 18).max().unwrap_or(0); // 18 features per position
+    let feature_dim = 18; // Fixed feature dimension
+
+    if max_seq_len > 0 {
+        let num_sequences = all_features.len();
+        let mut padded_features = Vec::new();
+        let mut padded_labels = Vec::new();
+        
+        for (features, labels) in all_features.into_iter().zip(all_labels.into_iter()) {
+            let mut padded_feature_seq = vec![vec![0.0; feature_dim]; max_seq_len];
+            let mut padded_label_seq = vec![0u8; max_seq_len];
+            
+            // Process features in chunks of 18
+            for (i, chunk) in features.chunks(18).enumerate() {
+                if i < max_seq_len {
+                    // Handle the case where the last chunk might be smaller than 18
+                    if chunk.len() == 18 {
+                        padded_feature_seq[i].copy_from_slice(chunk);
+                    } else {
+                        // Copy what we have and leave the rest as zeros
+                        for (j, &value) in chunk.iter().enumerate() {
+                            if j < 18 {
+                                padded_feature_seq[i][j] = value;
+                            }
+                        }
+                    }
+                    if i < labels.len() {
+                        padded_label_seq[i] = labels[i];
+                    }
+                }
+            }
+            
+            padded_features.extend(padded_feature_seq.into_iter().flatten());
+            padded_labels.extend(padded_label_seq);
         }
+        
+        // Convert to ndarray format for npz serialization
+        let features_array = Array3::from_shape_vec(
+            (num_sequences, max_seq_len, feature_dim),
+            padded_features
+        ).expect("Failed to create features array");
+        
+        let labels_array = Array2::from_shape_vec(
+            (num_sequences, max_seq_len),
+            padded_labels.into_iter().map(|x| x as u8).collect()
+        ).expect("Failed to create labels array");
+
+        // Save as npz file
+        let mut npz_writer = NpzWriter::new(File::create("all_data.npz").expect("Failed to create npz file"));
+        npz_writer.add_array("features", &features_array).expect("Failed to add features to npz");
+        npz_writer.add_array("labels", &labels_array).expect("Failed to add labels to npz");
+        npz_writer.finish().expect("Failed to finish npz file");
     }
+
+    // Feature vector structure (18 features per position):
+    // - 15 base counts: 5 bases (ACGT-) × 3 sources (pb, ont, ill)
+    // - 3 coverage counts: one per source
+    // - 1 position (normalized)
+    // - 1 entropy
 }
 
 /// Write the overlap graph to GFA (Graphical Fragment Assembly) format
@@ -236,8 +294,9 @@ fn find_overlap(seq1: &SequenceRecord, seq2: &SequenceRecord, kmer_size: usize, 
 }
 
 /// Process PacBio reads and their overlapping neighbors to create POA graphs and MSAs
-fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Value>> {
-    let mut all_tokens = Vec::new();
+fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> (Vec<Vec<f32>>, Vec<Vec<u8>>) {
+    let mut all_features = Vec::new();
+    let mut all_labels = Vec::new();
 
     // Print overlapping sequence IDs and sequences for each PacBio read
     for node_idx in graph.node_indices() {
@@ -324,9 +383,10 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                     CString::new(processed).unwrap()
                 }).collect();
                 
-                // Convert MSA to JSON tokens
+                // Convert MSA to numerical features
                 let msa_length = msa[0].to_bytes().len();
-                let mut tokens = Vec::new();
+                let mut features = Vec::new();
+                let mut labels = Vec::new();
                 
                 for pos in 0..msa_length {
                     let column: Vec<u8> = msa.iter()
@@ -335,20 +395,15 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
 
                     let label = consensus[pos];
                     
-                    let token = msa_column_to_token(&column, &sequence_names, &sequence_sources, pos, Some(label));
-                    tokens.push(token);
+                    let feature_vector = msa_column_to_features(&column, &sequence_sources, pos);
+                    features.extend(feature_vector);
+                    labels.push(label);
                 }
 
-                all_tokens.push(tokens);
+                all_features.push(features);
+                all_labels.push(labels);
                 
                 /*
-                skydive::elog!("MSA JSON tokens:");
-                for token in tokens {
-                    skydive::elog!("{}", serde_json::to_string_pretty(&token).unwrap());
-                }
-                skydive::elog!("");
-                */
-
                 for (i, seq) in msa.iter().enumerate() {
                     let read_name = if i < sequence_names.len() {
                         &sequence_names[i]
@@ -362,11 +417,12 @@ fn process_overlaps(graph: &DiGraph<SequenceRecord, OverlapInfo>) -> Vec<Vec<Val
                     );
                 }
                 skydive::elog!("");
+                */
             }
         }
     }
 
-    all_tokens
+    (all_features, all_labels)
 }
 
 /// Filter forward and reverse overlaps
@@ -525,4 +581,67 @@ fn msa_column_to_token(
     }
     
     Value::Object(token)
+}
+
+/// Convert an MSA column to a feature vector
+/// Returns a vector of 18 features:
+/// - 15 base counts: 5 bases (ACGT-) × 3 sources (pb, ont, ill)
+/// - 3 coverage counts: one per source
+/// - 1 position (normalized)
+/// - 1 entropy
+fn msa_column_to_features(
+    column: &[u8], 
+    sequence_sources: &[SequenceSource],
+    pos: usize
+) -> Vec<f32> {
+    let mut counts_by_source: HashMap<String, HashMap<u8, usize>> = HashMap::new();
+    
+    // Initialize counts for each source
+    counts_by_source.insert("pb".to_string(), HashMap::new());
+    counts_by_source.insert("ont".to_string(), HashMap::new());
+    counts_by_source.insert("ill".to_string(), HashMap::new());
+    
+    // Count bases by source
+    for (i, &base) in column.iter().enumerate() {
+        if i < sequence_sources.len() {
+            let source = match &sequence_sources[i] {
+                SequenceSource::PacBio => "pb",
+                SequenceSource::Nanopore => "ont",
+                SequenceSource::Illumina => "ill",
+            };
+            
+            *counts_by_source.get_mut(source).unwrap().entry(base).or_insert(0) += 1;
+        }
+    }
+    
+    let mut features = Vec::new();
+    
+    // Add counts for each base and source (15 features: 5 bases × 3 sources)
+    for source in &["pb", "ont", "ill"] {
+        let counts = &counts_by_source[&source.to_string()];
+        let mut cov = 0;
+        for base in b"ACGT-" {
+            let count = counts.get(base).unwrap_or(&0);
+            features.push(*count as f32);
+            cov += count;
+        }
+        // Add coverage for this source
+        features.push(cov as f32);
+    }
+    
+    // Add position (normalized)
+    features.push(pos as f32);
+    
+    // Calculate and add entropy
+    let all_counts: HashMap<u8, usize> = counts_by_source
+        .values()
+        .flat_map(|counts| counts.iter())
+        .fold(HashMap::new(), |mut acc, (&base, &count)| {
+            *acc.entry(base).or_insert(0) += count;
+            acc
+        });
+    let entropy = calculate_entropy(&all_counts);
+    features.push(entropy as f32);
+    
+    features
 }
