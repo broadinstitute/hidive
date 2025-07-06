@@ -22,10 +22,11 @@ workflow ValidateInPanelSamples {
         Int N = 20
     }
 
-    call SubsetVCFToSample {
+    call SubsetVCF {
         input:
             vcf = vcf,
             vcf_tbi = vcf_tbi,
+            bed = bed,
             sample_id = sample_id
     }
 
@@ -34,8 +35,8 @@ workflow ValidateInPanelSamples {
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            vcf = SubsetVCFToSample.sample_vcf_gz,
-            vcf_tbi = SubsetVCFToSample.sample_vcf_gz_tbi,
+            vcf = SubsetVCF.subset_vcf_gz,
+            vcf_tbi = SubsetVCF.subset_vcf_gz_tbi,
             bed = bed,
     }
 
@@ -43,7 +44,7 @@ workflow ValidateInPanelSamples {
         input:
             bam = long_reads_bam,
             loci = bed,
-            padding = 10000,
+            padding = 50000,
             prefix = sample_id
     }
 
@@ -96,7 +97,9 @@ workflow ValidateInPanelSamples {
 task SubsetVCF {
     input {
         File vcf
+        File vcf_tbi
         File bed
+        String? sample_id
     }
 
     Int disk_size = 1 + ceil(size([vcf, bed], "GiB"))
@@ -104,43 +107,13 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view -R ~{bed} ~{vcf} | bgzip > subset.vcf.gz
+        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} -R ~{bed} ~{vcf} | bgzip > subset.vcf.gz
         tabix -p vcf subset.vcf.gz
     >>>
 
     output {
         File subset_vcf_gz = "subset.vcf.gz"
         File subset_vcf_gz_tbi = "subset.vcf.gz.tbi"
-    }
-
-    runtime {
-        memory: "8 GB"
-        cpu: "1"
-        disks: "local-disk " + disk_size + " HDD"
-        preemptible: 3
-        docker: "staphb/bcftools:1.22"
-    }
-}
-
-task SubsetVCFToSample {
-    input {
-        File vcf
-        File vcf_tbi
-        String sample_id
-    }
-
-    Int disk_size = 1 + ceil(size([vcf, vcf_tbi], "GiB"))
-
-    command <<<
-        set -euxo pipefail
-
-        bcftools view -R ~{vcf} -s ~{sample_id} ~{vcf} | bgzip > ~{sample_id}.vcf.gz
-        tabix -p vcf ~{sample_id}.vcf.gz
-    >>>
-
-    output {
-        File sample_vcf_gz = "~{sample_id}.vcf.gz"
-        File sample_vcf_gz_tbi = "~{sample_id}.vcf.gz.tbi"
     }
 
     runtime {
