@@ -51,7 +51,6 @@ workflow ValidateInPanelSamples {
         input:
             long_reads_fastx = Fetch.fastq,
             short_reads_cram = cram,
-            short_reads_crai = crai,
             ref_fa_with_alt = ref_fa_with_alt,
             ref_fai_with_alt = ref_fai_with_alt,
             ref_cache_tar_gz = ref_cache_tar_gz,
