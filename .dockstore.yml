@@ -36,3 +36,6 @@ workflows:
 - name: RescueAndLocityper
   subclass: wdl
   primaryDescriptorPath: /wdl/RescueAndLocityper.wdl
+- name: ValidateInPanelSamples
+  subclass: wdl
+  primaryDescriptorPath: /wdl/ValidateInPanelSamples.wdl
