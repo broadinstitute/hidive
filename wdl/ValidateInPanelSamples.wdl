@@ -35,8 +35,7 @@ workflow ValidateInPanelSamples {
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            vcf = SubsetVCF.subset_vcf_gz,
-            vcf_tbi = SubsetVCF.subset_vcf_gz_tbi,
+            vcf = SubsetVCF.subset_vcf,
             bed = bed,
     }
 
@@ -107,13 +106,11 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} -R ~{bed} ~{vcf} | bgzip > subset.vcf.gz
-        tabix -p vcf subset.vcf.gz
+        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} -R ~{bed} ~{vcf} > subset.vcf
     >>>
 
     output {
-        File subset_vcf_gz = "subset.vcf.gz"
-        File subset_vcf_gz_tbi = "subset.vcf.gz.tbi"
+        File subset_vcf = "subset.vcf"
     }
 
     runtime {
@@ -131,7 +128,6 @@ task GenerateDBFromVCF {
         File reference_index
         File counts_jf
         File vcf
-        File vcf_tbi
         File bed
     }
 
