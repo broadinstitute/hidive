@@ -15,6 +15,8 @@ workflow ValidateInPanelSamples {
         File vcf_tbi
         File bed
 
+        Array[String] locus_names_to_remove = [ "empty" ] # ["INS_chr7_41458587_allele465753_103"],
+
         Int N = 20
     }
 
@@ -41,7 +43,7 @@ workflow ValidateInPanelSamples {
         call FilterNames {
             input:
                 locus_names = names_file,
-                names_to_remove = ["INS_chr7_41458587_allele465753_103"],
+                names_to_remove = locus_names_to_remove
         }
 
         call LocityperPreprocessAndGenotype {
