@@ -300,8 +300,6 @@ task LocityperPreprocessAndGenotype {
 
         Int locityper_n_cpu
         Int locityper_mem_gb
-
-        String docker = "eichlerlab/locityper:0.19.1"
     }
 
     Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
@@ -352,7 +350,7 @@ task LocityperPreprocessAndGenotype {
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
         preemptible: 0
-        docker: docker
+        docker: "eichlerlab/locityper:0.19.1"
     }
 
     output {
