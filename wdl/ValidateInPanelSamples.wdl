@@ -71,7 +71,7 @@ workflow ValidateInPanelSamples {
 
     output {
         File subset_vcf = SubsetVCF.subset_vcf
-        File results = Summarize.summary_csv
+        File summary_csv = Summarize.summary_csv
     }
 }
 
@@ -481,10 +481,12 @@ task Summarize {
         done
 
         python3 /locityper/extra/into_csv.py -i ./~{sample_id} -o gts.csv
+
+        grep -v '^#' gts.csv > gts.filtered.csv
     >>>
 
     output {
-        File summary_csv = "gts.csv"
+        File summary_csv = "gts.filtered.csv"
     }
 
     runtime {
