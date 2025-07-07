@@ -88,7 +88,7 @@ workflow ValidateInPanelSamples {
             sample_id = sample_id
     }
 
-    call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar }
+    call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
         File results = Summarize.summary_csv
@@ -416,32 +416,34 @@ task CombineTarFiles {
         String sample_id
     }
 
-    Int disk_size = 1 + 2*ceil(size(tar_files, "GiB"))
+    Int disk_size = 1 + 10*ceil(size(tar_files, "GiB"))
     String combined_tar = sample_id + ".combined.tar.gz"
 
     command <<<
         set -euxo pipefail
 
-        # Get the first tar file to start with
-        first_tar=$(echo ~{sep=" " tar_files} | cut -d' ' -f1)
-        echo "Starting with first tar file: $first_tar"
+        # Create a temporary directory to extract all tar files
+        mkdir -p combined_temp
         
-        # Copy the first tar file as our base
-        cp "$first_tar" ~{combined_tar}
-        
-        # Append the rest of the tar files (skip the first one)
-        remaining_tars=$(echo ~{sep=" " tar_files} | cut -d' ' -f2-)
-        for tar_file in $remaining_tars; do
-            echo "Appending $tar_file"
-            tar -Af ~{combined_tar} "$tar_file"
+        # Extract all tar files into the temporary directory
+        for tar_file in ~{sep=" " tar_files}; do
+            echo "Extracting $tar_file"
+            tar -xzf "$tar_file" -C combined_temp
         done
+        
+        # Create a new combined tar file from the extracted contents
+        echo "Creating combined tar file: ~{combined_tar}"
+        tar -czf ~{combined_tar} -C combined_temp .
         
         echo "Combined tar file created successfully"
         ls -lh ~{combined_tar}
+        
+        # Clean up
+        rm -rf combined_temp
     >>>
 
     output {
-        File combined_tar = combined_tar
+        File combined_tar_gz = combined_tar
     }
 
     runtime {
