@@ -346,6 +346,7 @@ task LocityperPreprocessAndGenotype {
         mkdir -p locityper_prepoc
 
         locityper preproc -a ~{cram} \
+            -r ~{reference} \
             --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
@@ -359,6 +360,7 @@ task LocityperPreprocessAndGenotype {
         mkdir -p out_dir
 
         locityper genotype -a ~{cram} \
+            -r ~{reference} \
             --interleaved \
             -d db \
             -p locityper_prepoc \
