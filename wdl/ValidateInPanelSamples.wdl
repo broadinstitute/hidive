@@ -473,7 +473,7 @@ task Summarize {
         mv out_dir ~{sample_id}
 
         # Remove subdirectories that don't have res.json.gz
-        for dir in ~{sample_id}/*/; do
+        for dir in ~{sample_id}/loci/*/; do
             if [ ! -f "${dir}/res.json.gz" ]; then
                 echo "Removing directory ${dir} - no res.json.gz found"
                 rm -rf "${dir}"
