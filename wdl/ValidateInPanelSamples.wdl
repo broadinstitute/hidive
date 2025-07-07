@@ -47,21 +47,21 @@ workflow ValidateInPanelSamples {
             prefix = sample_id
     }
 
-    call Rescue {
-        input:
-            long_reads_fastx = Fetch.fastq,
-            short_reads_cram = cram,
-            ref_fa_with_alt = ref_fa_with_alt,
-            ref_fai_with_alt = ref_fai_with_alt,
-            ref_cache_tar_gz = ref_cache_tar_gz,
-            prefix = sample_id
-    }
+    # call Rescue {
+    #     input:
+    #         long_reads_fastx = Fetch.fastq,
+    #         short_reads_cram = cram,
+    #         ref_fa_with_alt = ref_fa_with_alt,
+    #         ref_fai_with_alt = ref_fai_with_alt,
+    #         ref_cache_tar_gz = ref_cache_tar_gz,
+    #         prefix = sample_id
+    # }
 
-    call DeduplicateFastq {
-        input:
-            fastq = Rescue.fastq_gz,
-            prefix = sample_id
-    }
+    # call DeduplicateFastq {
+    #     input:
+    #         fastq = Rescue.fastq_gz,
+    #         prefix = sample_id
+    # }
 
     call SplitBedNames { input: bed = filtered_bed, N = N }
 
@@ -69,7 +69,9 @@ workflow ValidateInPanelSamples {
         call LocityperPreprocessAndGenotype {
             input:
                 sample_id = sample_id,
-                input_fq1 = DeduplicateFastq.fastq_gz,
+                # input_fq1 = DeduplicateFastq.fastq_gz,
+                cram = cram,
+                crai = crai,
                 db_targz = GenerateDBFromVCF.db_tar,
                 counts_file = counts_jf,
                 reference = ref_fa_with_alt,
@@ -309,8 +311,10 @@ EOF
 
 task LocityperPreprocessAndGenotype {
     input {
-        File input_fq1
-        File? input_fq2
+        # File input_fq1
+        # File? input_fq2
+        File cram
+        File crai
         File counts_file
         File reference
         File reference_index
@@ -324,7 +328,8 @@ task LocityperPreprocessAndGenotype {
         String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
+    # Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
+    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([cram, crai, counts_file, reference, reference_index, db_targz]), "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
@@ -339,7 +344,8 @@ task LocityperPreprocessAndGenotype {
         echo "using ${nthreads} threads"
 
         mkdir -p locityper_prepoc
-        locityper preproc -i ~{sep=" " select_all([input_fq1, input_fq2])} \
+
+        locityper preproc -a ~{cram} \
             --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
@@ -351,7 +357,8 @@ task LocityperPreprocessAndGenotype {
         tar --strip-components 1 -C db -xvzf ~{db_targz}
 
         mkdir -p out_dir
-        locityper genotype -i ~{sep=" " select_all([input_fq1, input_fq2])} \
+
+        locityper genotype -a ~{cram} \
             --interleaved \
             -d db \
             -p locityper_prepoc \
