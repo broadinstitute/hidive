@@ -140,58 +140,18 @@ task GenerateDBFromVCF {
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
+        mv ~{vcf} subset.vcf
+        bgzip subset.vcf
+        tabix -p vcf subset.vcf.gz
+
         locityper add -d vcf_db \
-            -v ~{vcf} \
+            -v subset.vcf.gz \
             -r reference.fa \
             -j ~{counts_jf} \
             -L ~{bed}
 
         echo "compressing DB"
         tar -czf ~{output_tar} vcf_db
-        echo "done compressing DB"
-    >>>
-
-    output {
-        File db_tar = output_tar
-    }
-
-    runtime {
-        memory: "8 GB"
-        cpu: "1"
-        disks: "local-disk " + disk_size + " HDD"
-        preemptible: 3
-        docker: "eichlerlab/locityper:0.19.1"
-    }
-}
-
-task GenerateDB {
-    input {
-        File reference
-        File reference_index
-        File counts_jf
-        String locus_name
-        String locus_coordinates
-        File alleles_fa
-    }
-
-    Int disk_size = 10
-    String output_tar = locus_name + "db.tar.gz"
-
-    command <<<
-        set -euxo pipefail
-
-        gunzip -c ~{reference} > reference.fa
-        samtools faidx reference.fa
-
-        locityper add -d ~{locus_name}.db \
-            -r reference.fa \
-            -j ~{counts_jf} \
-            -l ~{locus_name} ~{locus_coordinates} ~{alleles_fa}
-
-        find ~{locus_name}.db -type f -exec ls -lah {} \;
-        
-        echo "compressing DB"
-        tar -czf ~{output_tar} ~{locus_name}.db
         echo "done compressing DB"
     >>>
 
@@ -255,7 +215,7 @@ task Rescue {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastx, short_reads_cram, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
-    Int memory_gb = 6*num_cpus
+    Int memory_gb = 8*num_cpus
 
     command <<<
         set -euxo pipefail
