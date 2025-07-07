@@ -4,20 +4,19 @@ workflow ValidateInPanelSamples {
     input {
         String sample_id
 
-        File long_reads_bam
+        # File long_reads_bam
 
         File cram
         File crai
 
         File ref_fa_with_alt
         File ref_fai_with_alt
-        File ref_cache_tar_gz
+        # File ref_cache_tar_gz
         File counts_jf
 
         File vcf
         File vcf_tbi
         File bed
-        File filtered_bed
 
         Int N = 20
     }
@@ -39,46 +38,13 @@ workflow ValidateInPanelSamples {
             bed = bed,
     }
 
-    # call Fetch {
-    #     input:
-    #         bam = long_reads_bam,
-    #         loci = bed,
-    #         padding = 50000,
-    #         prefix = sample_id
-    # }
-
-    # call Rescue {
-    #     input:
-    #         long_reads_fastx = Fetch.fastq,
-    #         short_reads_cram = cram,
-    #         ref_fa_with_alt = ref_fa_with_alt,
-    #         ref_fai_with_alt = ref_fai_with_alt,
-    #         ref_cache_tar_gz = ref_cache_tar_gz,
-    #         prefix = sample_id
-    # }
-
-    # call DeduplicateFastq {
-    #     input:
-    #         fastq = Rescue.fastq_gz,
-    #         prefix = sample_id
-    # }
-
-    call SplitBedNames { input: bed = filtered_bed, N = N }
-
-    call DebugLocityperPreprocessAndGenotype {
+    call FilterBed {
         input:
-            sample_id = sample_id,
-            # input_fq1 = DeduplicateFastq.fastq_gz,
-            cram = cram,
-            crai = crai,
-            db_targz = GenerateDBFromVCF.db_tar,
-            counts_file = counts_jf,
-            reference = ref_fa_with_alt,
+            bed = bed,
             locus_names = ["INS_chr7_41458587_allele465753_103"],
-            reference_index = ref_fai_with_alt,
-            locityper_n_cpu = 4,
-            locityper_mem_gb = 32
     }
+
+    call SplitBedNames { input: bed = FilterBed.filtered_bed, N = N }
 
     scatter (names_file in SplitBedNames.name_parts) {
         call LocityperPreprocessAndGenotype {
@@ -107,6 +73,33 @@ workflow ValidateInPanelSamples {
 
     output {
         File results = Summarize.summary_csv
+    }
+}
+
+task FilterBed {
+    input {
+        File bed
+        Array[String] locus_names
+    }
+
+    Int disk_size = 1 + 2*ceil(size([bed], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        grep -v -f ~{write_lines(locus_names)} ~{bed} > filtered.bed
+    >>>
+
+    output {
+        File filtered_bed = "filtered.bed"
+    }
+
+    runtime {
+        memory: "1 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 1
+        docker: "staphb/bcftools:1.22"
     }
 }
 
