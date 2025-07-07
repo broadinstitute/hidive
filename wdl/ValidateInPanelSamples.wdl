@@ -68,6 +68,7 @@ workflow ValidateInPanelSamples {
     call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
+        File subset_vcf = SubsetVCF.subset_vcf
         File results = Summarize.summary_csv
     }
 }
