@@ -65,6 +65,21 @@ workflow ValidateInPanelSamples {
 
     call SplitBedNames { input: bed = filtered_bed, N = N }
 
+    call DebugLocityperPreprocessAndGenotype {
+        input:
+            sample_id = sample_id,
+            # input_fq1 = DeduplicateFastq.fastq_gz,
+            cram = cram,
+            crai = crai,
+            db_targz = GenerateDBFromVCF.db_tar,
+            counts_file = counts_jf,
+            reference = ref_fa_with_alt,
+            locus_names = ["INS_chr7_41458587_allele465753_103"],
+            reference_index = ref_fai_with_alt,
+            locityper_n_cpu = 4,
+            locityper_mem_gb = 32
+    }
+
     scatter (names_file in SplitBedNames.name_parts) {
         call LocityperPreprocessAndGenotype {
             input:
@@ -382,6 +397,84 @@ task LocityperPreprocessAndGenotype {
 
     output {
         File genotype_tar = output_tar
+    }
+}
+
+task DebugLocityperPreprocessAndGenotype {
+    input {
+        # File input_fq1
+        # File? input_fq2
+        File cram
+        File crai
+        File counts_file
+        File reference
+        File reference_index
+        File db_targz
+        String sample_id
+        Array[String] locus_names
+
+        Int locityper_n_cpu
+        Int locityper_mem_gb
+
+        String docker = "eichlerlab/locityper:0.19.1"
+    }
+
+    # Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
+    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([cram, crai, counts_file, reference, reference_index, db_targz]), "GiB"))
+    String output_tar = sample_id + ".locityper.tar.gz"
+
+    command <<<
+        set -x
+        
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
+        nthreads=$(nproc)
+        echo "using ${nthreads} threads"
+
+        mkdir -p locityper_prepoc
+
+        locityper preproc -a ~{cram} \
+            -r reference.fa \
+            --interleaved \
+            -j ~{counts_file} \
+            -@ ${nthreads} \
+            --technology illumina \
+            -r reference.fa \
+            -o locityper_prepoc
+
+        mkdir -p db
+        tar --strip-components 1 -C db -xvzf ~{db_targz}
+
+        mkdir -p out_dir
+
+        #export RUST_BACKTRACE=full
+
+        locityper genotype -a ~{cram} \
+            -r reference.fa \
+            --interleaved \
+            -d db \
+            -p locityper_prepoc \
+            -@ ${nthreads} \
+            --debug 2 \
+            --subset-loci ~{sep=" " locus_names} \
+            -o out_dir
+
+        #tar -czf ~{output_tar} out_dir
+
+        ls -lh *
+    >>>
+
+    runtime {
+        memory: "~{locityper_mem_gb} GB"
+        cpu: locityper_n_cpu
+        disks: "local-disk ~{disk_size} HDD"
+        preemptible: 0
+        docker: docker
+    }
+
+    output {
+        #File genotype_tar = output_tar
     }
 }
 
