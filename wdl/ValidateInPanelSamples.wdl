@@ -357,6 +357,8 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p out_dir
 
+        export RUST_BACKTRACE=1
+
         locityper genotype -a ~{cram} \
             -r reference.fa \
             --interleaved \
@@ -364,7 +366,8 @@ task LocityperPreprocessAndGenotype {
             -p locityper_prepoc \
             -@ ${nthreads} \
             --debug 2 \
-            --subset-loci ~{sep=" " locus_names} \
+            # --subset-loci ~{sep=" " locus_names} \
+            --subset-loci INS_chr7_41458587_allele465753_103 \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
