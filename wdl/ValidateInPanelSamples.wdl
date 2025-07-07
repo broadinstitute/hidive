@@ -4,14 +4,11 @@ workflow ValidateInPanelSamples {
     input {
         String sample_id
 
-        # File long_reads_bam
-
         File cram
         File crai
 
         File ref_fa_with_alt
         File ref_fai_with_alt
-        # File ref_cache_tar_gz
         File counts_jf
 
         File vcf
@@ -38,25 +35,24 @@ workflow ValidateInPanelSamples {
             bed = bed,
     }
 
-    call FilterBed {
-        input:
-            bed = bed,
-            locus_names = ["INS_chr7_41458587_allele465753_103"],
-    }
-
-    call SplitBedNames { input: bed = FilterBed.filtered_bed, N = N }
+    call SplitBedNames { input: bed = bed, N = N }
 
     scatter (names_file in SplitBedNames.name_parts) {
+        call FilterNames {
+            input:
+                locus_names = names_file,
+                names_to_remove = ["INS_chr7_41458587_allele465753_103"],
+        }
+
         call LocityperPreprocessAndGenotype {
             input:
                 sample_id = sample_id,
-                # input_fq1 = DeduplicateFastq.fastq_gz,
                 cram = cram,
                 crai = crai,
                 db_targz = GenerateDBFromVCF.db_tar,
                 counts_file = counts_jf,
                 reference = ref_fa_with_alt,
-                locus_names = read_lines(names_file),
+                locus_names = FilterNames.filtered_names,
                 reference_index = ref_fai_with_alt,
                 locityper_n_cpu = 4,
                 locityper_mem_gb = 32
@@ -73,33 +69,6 @@ workflow ValidateInPanelSamples {
 
     output {
         File results = Summarize.summary_csv
-    }
-}
-
-task FilterBed {
-    input {
-        File bed
-        Array[String] locus_names
-    }
-
-    Int disk_size = 1 + 2*ceil(size([bed], "GiB"))
-
-    command <<<
-        set -euxo pipefail
-
-        grep -v -f ~{write_lines(locus_names)} ~{bed} > filtered.bed
-    >>>
-
-    output {
-        File filtered_bed = "filtered.bed"
-    }
-
-    runtime {
-        memory: "1 GB"
-        cpu: "1"
-        disks: "local-disk " + disk_size + " HDD"
-        preemptible: 1
-        docker: "staphb/bcftools:1.22"
     }
 }
 
@@ -319,8 +288,6 @@ EOF
 
 task LocityperPreprocessAndGenotype {
     input {
-        # File input_fq1
-        # File? input_fq2
         File cram
         File crai
         File counts_file
@@ -336,8 +303,7 @@ task LocityperPreprocessAndGenotype {
         String docker = "eichlerlab/locityper:0.19.1"
     }
 
-    # Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
-    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([cram, crai, counts_file, reference, reference_index, db_targz]), "GiB"))
+    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
@@ -393,84 +359,6 @@ task LocityperPreprocessAndGenotype {
     }
 }
 
-task DebugLocityperPreprocessAndGenotype {
-    input {
-        # File input_fq1
-        # File? input_fq2
-        File cram
-        File crai
-        File counts_file
-        File reference
-        File reference_index
-        File db_targz
-        String sample_id
-        Array[String] locus_names
-
-        Int locityper_n_cpu
-        Int locityper_mem_gb
-
-        String docker = "eichlerlab/locityper:0.19.1"
-    }
-
-    # Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([input_fq1, input_fq2, counts_file, reference, reference_index, db_targz]), "GiB"))
-    Int disk_size = 1 + 1*length(locus_names) + 2*ceil(size(select_all([cram, crai, counts_file, reference, reference_index, db_targz]), "GiB"))
-    String output_tar = sample_id + ".locityper.tar.gz"
-
-    command <<<
-        set -x
-        
-        gunzip -c ~{reference} > reference.fa
-        samtools faidx reference.fa
-
-        nthreads=$(nproc)
-        echo "using ${nthreads} threads"
-
-        mkdir -p locityper_prepoc
-
-        locityper preproc -a ~{cram} \
-            -r reference.fa \
-            --interleaved \
-            -j ~{counts_file} \
-            -@ ${nthreads} \
-            --technology illumina \
-            -r reference.fa \
-            -o locityper_prepoc
-
-        mkdir -p db
-        tar --strip-components 1 -C db -xvzf ~{db_targz}
-
-        mkdir -p out_dir
-
-        #export RUST_BACKTRACE=full
-
-        locityper genotype -a ~{cram} \
-            -r reference.fa \
-            --interleaved \
-            -d db \
-            -p locityper_prepoc \
-            -@ ${nthreads} \
-            --debug 2 \
-            --subset-loci ~{sep=" " locus_names} \
-            -o out_dir
-
-        #tar -czf ~{output_tar} out_dir
-
-        ls -lh *
-    >>>
-
-    runtime {
-        memory: "~{locityper_mem_gb} GB"
-        cpu: locityper_n_cpu
-        disks: "local-disk ~{disk_size} HDD"
-        preemptible: 0
-        docker: docker
-    }
-
-    output {
-        #File genotype_tar = output_tar
-    }
-}
-
 task SplitBedNames {
     input {
         File bed
@@ -494,6 +382,33 @@ task SplitBedNames {
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task FilterNames {
+    input {
+        File locus_names
+        Array[String] names_to_remove
+    }
+
+    Int disk_size = 1 + 2*ceil(size([locus_names], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        grep -v -f ~{write_lines(names_to_remove)} ~{locus_names} > filtered.txt
+    >>>
+
+    output {
+        Array[String] filtered_names = read_lines("filtered.txt")
+    }
+
+    runtime {
+        memory: "1 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 1
         docker: "staphb/bcftools:1.22"
     }
 }
