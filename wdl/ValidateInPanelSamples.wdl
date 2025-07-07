@@ -366,8 +366,7 @@ task LocityperPreprocessAndGenotype {
             -p locityper_prepoc \
             -@ ${nthreads} \
             --debug 2 \
-            # --subset-loci ~{sep=" " locus_names} \
-            --subset-loci INS_chr7_41458587_allele465753_103 \
+            --subset-loci ~{sep=" " locus_names} \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
