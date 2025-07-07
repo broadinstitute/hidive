@@ -471,6 +471,15 @@ task Summarize {
         tar -xzvf ~{genotype_tar}
 
         mv out_dir ~{sample_id}
+
+        # Remove subdirectories that don't have res.json.gz
+        for dir in ~{sample_id}/*/; do
+            if [ ! -f "${dir}/res.json.gz" ]; then
+                echo "Removing directory ${dir} - no res.json.gz found"
+                rm -rf "${dir}"
+            fi
+        done
+
         python3 /locityper/extra/into_csv.py -i ./~{sample_id} -o gts.csv
     >>>
 
