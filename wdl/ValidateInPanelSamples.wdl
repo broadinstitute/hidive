@@ -215,7 +215,7 @@ task Rescue {
     }
 
     Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastx, short_reads_cram, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
-    Int memory_gb = 8*num_cpus
+    Int memory_gb = 2*num_cpus
 
     command <<<
         set -euxo pipefail
@@ -240,7 +240,7 @@ task Rescue {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper_modes"
         memory: "~{memory_gb} GB"
         cpu: num_cpus
         disks: "local-disk ~{disk_size_gb} SSD"

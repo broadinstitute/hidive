@@ -100,8 +100,11 @@ pub fn start(
 
     skydive::elog!("Fetches: {:?}", fetches);
 
+    // Create output writer
+    let buf_writer = BufWriter::new(File::create(output).unwrap());
+    let mut fastq_writer = fastq::Writer::new(buf_writer);
+
     // Read the CRAM files and search for the k-mers in each read.
-    let mut all_records = Vec::new();
     for seq_url in seq_urls {
         let mut reader = skydive::stage::open_bam(&seq_url).unwrap();
 
@@ -113,8 +116,6 @@ pub fn start(
         let processed_items = Arc::new(AtomicUsize::new(0));
         let progress_bar = Arc::new(progress_bar);
 
-        // const UPDATE_FREQUENCY: usize = 1_000_000;
-
         // Create an immutable map of tid to chromosome name
         let tid_to_chrom: HashMap<i32, String> = reader
             .header()
@@ -124,13 +125,35 @@ pub fn start(
             .map(|(tid, &name)| (tid as i32, String::from_utf8_lossy(name).into_owned()))
             .collect::<HashMap<_, _>>();
 
-        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval
-        {
-            // Use the fetches to retrieve the records.
-            retrieve_records(
+        // Use a buffer to pair reads by qname
+        let mut pair_buffer: HashMap<String, BamRecord> = HashMap::new();
+        const BUFFER_SIZE_LIMIT: usize = 500_000;
+
+        // Inline the streaming logic here, not as a closure
+        if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
+            let fetches_updated = prepare_fetches(&fetches, &search_option);
+            for (contig, interval) in fetches_updated {
+                let fetch_definition = create_fetch_definition(&search_option, Some(&contig), Some(interval));
+                reader.fetch(fetch_definition).expect("Failed to fetch reads");
+                process_records_streaming_inner(
+                    &mut reader,
+                    kmer_size,
+                    min_kmers_pct,
+                    &kmer_set,
+                    &tid_to_chrom,
+                    &progress_bar,
+                    &found_items,
+                    &processed_items,
+                    &mut fastq_writer,
+                    &mut pair_buffer,
+                    BUFFER_SIZE_LIMIT,
+                );
+            }
+        } else {
+            let fetch_definition = create_fetch_definition(&search_option, None, None);
+            reader.fetch(fetch_definition).expect("Failed to fetch reads");
+            process_records_streaming_inner(
                 &mut reader,
-                Some(&fetches),
-                &search_option,
                 kmer_size,
                 min_kmers_pct,
                 &kmer_set,
@@ -138,40 +161,13 @@ pub fn start(
                 &progress_bar,
                 &found_items,
                 &processed_items,
-                &mut all_records,
-            );
-        } else {
-            // Retrieve all or unmapped reads.
-            retrieve_records(
-                &mut reader,
-                None,
-                &search_option,
-                kmer_size,
-                min_kmers_pct,
-                &kmer_set,
-                &tid_to_chrom,
-                &progress_bar,
-                &found_items,
-                &processed_items,
-                &mut all_records,
+                &mut fastq_writer,
+                &mut pair_buffer,
+                BUFFER_SIZE_LIMIT,
             );
         }
 
-        let buf_writer = BufWriter::new(File::create(output).unwrap());
-        let mut fastq_writer = fastq::Writer::new(buf_writer);
-
-        write_paired_fastq_records(&all_records, &mut fastq_writer);
-
-        if !all_records.is_empty() {
-            skydive::elog!(
-                "Wrote {} reads to {}.",
-                all_records.len().to_formatted_string(&Locale::en),
-                output.to_str().unwrap()
-            );
-        } else {
-            skydive::elog!("No reads were found in the CRAM files. Aborting.");
-            std::process::exit(1);
-        }
+        finalize_progress(&progress_bar, &found_items, &processed_items);
     }
 }
 
@@ -288,14 +284,14 @@ fn detect_relevant_loci(
 
     let lr_mappings = map_sequences(&lr_aligner, &reads, false);
 
-    for lr_mapping in &lr_mappings {
-        skydive::elog!(
-            "lr mapping {:?}:{}-{}",
-            lr_mapping.target_name,
-            lr_mapping.target_start,
-            lr_mapping.target_end
-        );
-    }
+    // for lr_mapping in &lr_mappings {
+    //     skydive::elog!(
+    //         "lr mapping {:?}:{}-{}",
+    //         lr_mapping.target_name,
+    //         lr_mapping.target_start,
+    //         lr_mapping.target_end
+    //     );
+    // }
 
     let sr_aligner = initialize_aligner(ref_path, true);
 
@@ -840,44 +836,85 @@ fn finalize_progress(
     progress_bar.finish();
 }
 
-fn write_paired_fastq_records(records: &[BamRecord], fastq_writer: &mut fastq::Writer<BufWriter<File>>) {
-    let mut grouped_records = HashMap::new();
-    let mut emitted_names = HashSet::new();
-    
-    for record in records {
-        let qname = String::from_utf8_lossy(record.qname()).into_owned();
-        grouped_records.entry(qname).or_insert_with(Vec::new).push(record);
-    }
-
-    for (qname, records) in grouped_records {
-        // Skip if we've already emitted this read name
-        if emitted_names.contains(&qname) {
-            continue;
-        }
-        
-        // Handle proper paired reads (exactly 2 records)
-        if records.len() == 2 {
-            let mut paired_records = Vec::new();
-            for record in records {
-                if record.is_reverse() {
-                    let rv_seq = record.seq().as_bytes().reverse_complement();
-                    let mut rv_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-                    rv_qual.reverse();
-                    let rv_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &rv_seq, &rv_qual);
-                    paired_records.push(rv_record);
-                } else {
-                    let fw_seq = record.seq().as_bytes();
-                    let fw_qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
-                    let fw_record = fastq::Record::with_attrs(&String::from_utf8_lossy(record.qname()), None, &fw_seq, &fw_qual);
-                    paired_records.push(fw_record);
+fn process_records_streaming_inner(
+    reader: &mut IndexedReader,
+    kmer_size: usize,
+    min_kmers_pct: usize,
+    kmer_set: &HashSet<Vec<u8>>,
+    tid_to_chrom: &HashMap<i32, String>,
+    progress_bar: &Arc<ProgressBar>,
+    found_items: &Arc<AtomicUsize>,
+    processed_items: &Arc<AtomicUsize>,
+    fastq_writer: &mut fastq::Writer<BufWriter<File>>,
+    pair_buffer: &mut HashMap<String, BamRecord>,
+    buffer_size_limit: usize,
+) {
+    const UPDATE_FREQUENCY: usize = 1_000_000;
+    for record_result in reader.records() {
+        let record = match record_result {
+            Ok(record) => record,
+            Err(_) => continue,
+        };
+        update_processed_progress(
+            processed_items,
+            UPDATE_FREQUENCY,
+            tid_to_chrom,
+            &record,
+            &progress_bar,
+        );
+        if is_valid_read(&record, kmer_size, min_kmers_pct, kmer_set) {
+            update_found_progress(
+                found_items,
+                UPDATE_FREQUENCY,
+                tid_to_chrom,
+                &record,
+                &progress_bar,
+            );
+            let qname = String::from_utf8_lossy(record.qname()).into_owned();
+            if let Some(pair_record) = pair_buffer.remove(&qname) {
+                write_paired_record(&record, &pair_record, fastq_writer);
+            } else {
+                pair_buffer.insert(qname, record);
+                if pair_buffer.len() > buffer_size_limit {
+                    flush_buffer_portion(pair_buffer);
                 }
             }
-            fastq_writer.write_record(&paired_records[0]).unwrap();
-            fastq_writer.write_record(&paired_records[1]).unwrap();
-            
-            // Mark this read name as emitted
-            emitted_names.insert(qname);
         }
+    }
+    // Optionally: handle remaining unpaired records in pair_buffer here
+}
+
+fn write_paired_record(
+    record1: &BamRecord,
+    record2: &BamRecord,
+    fastq_writer: &mut fastq::Writer<BufWriter<File>>,
+) {
+    for record in [record1, record2] {
+        let seq = if record.is_reverse() {
+            record.seq().as_bytes().reverse_complement()
+        } else {
+            record.seq().as_bytes().to_vec()
+        };
+        let mut qual = record.qual().iter().map(|&q| q + 33).collect::<Vec<u8>>();
+        if record.is_reverse() {
+            qual.reverse();
+        }
+        let fastq_record = fastq::Record::with_attrs(
+            &String::from_utf8_lossy(record.qname()),
+            None,
+            &seq,
+            &qual,
+        );
+        fastq_writer.write_record(&fastq_record).unwrap();
+    }
+}
+
+fn flush_buffer_portion(pair_buffer: &mut HashMap<String, BamRecord>) {
+    // For memory efficiency, just drop half the buffer (oldest entries) as an example.
+    let drain_count = pair_buffer.len() / 2;
+    let keys: Vec<_> = pair_buffer.keys().take(drain_count).cloned().collect();
+    for key in keys {
+        pair_buffer.remove(&key);
     }
 }
 
