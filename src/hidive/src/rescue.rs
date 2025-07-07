@@ -127,7 +127,7 @@ pub fn start(
 
         // Use a buffer to pair reads by qname
         let mut pair_buffer: HashMap<String, BamRecord> = HashMap::new();
-        const BUFFER_SIZE_LIMIT: usize = 500_000;
+        const BUFFER_SIZE_LIMIT: usize = 100_000;
 
         // Inline the streaming logic here, not as a closure
         if search_option == SearchOption::Contig || search_option == SearchOption::ContigAndInterval {
