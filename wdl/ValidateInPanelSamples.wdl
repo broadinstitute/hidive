@@ -39,13 +39,13 @@ workflow ValidateInPanelSamples {
             bed = bed,
     }
 
-    call Fetch {
-        input:
-            bam = long_reads_bam,
-            loci = bed,
-            padding = 50000,
-            prefix = sample_id
-    }
+    # call Fetch {
+    #     input:
+    #         bam = long_reads_bam,
+    #         loci = bed,
+    #         padding = 50000,
+    #         prefix = sample_id
+    # }
 
     # call Rescue {
     #     input:
