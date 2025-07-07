@@ -335,8 +335,6 @@ task LocityperPreprocessAndGenotype {
     command <<<
         set -euxo pipefail
         
-        df -h
-
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
@@ -346,7 +344,7 @@ task LocityperPreprocessAndGenotype {
         mkdir -p locityper_prepoc
 
         locityper preproc -a ~{cram} \
-            -r ~{reference} \
+            -r reference.fa \
             --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
@@ -360,7 +358,7 @@ task LocityperPreprocessAndGenotype {
         mkdir -p out_dir
 
         locityper genotype -a ~{cram} \
-            -r ~{reference} \
+            -r reference.fa \
             --interleaved \
             -d db \
             -p locityper_prepoc \
