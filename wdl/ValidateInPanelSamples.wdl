@@ -330,8 +330,6 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p out_dir
 
-        export RUST_BACKTRACE=full
-
         locityper genotype -a ~{cram} \
             -r reference.fa \
             --interleaved \
