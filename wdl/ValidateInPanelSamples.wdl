@@ -72,6 +72,7 @@ workflow ValidateInPanelSamples {
     output {
         File subset_vcf = SubsetVCF.subset_vcf
         File summary_csv = Summarize.summary_csv
+        File results_tar_gz = CombineTarFiles.combined_tar_gz
     }
 }
 
