@@ -344,6 +344,8 @@ task LocityperPreprocessAndGenotype {
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
+
+        df -h .
     >>>
 
     runtime {
