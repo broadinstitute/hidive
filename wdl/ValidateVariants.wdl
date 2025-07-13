@@ -126,6 +126,9 @@ task GenerateDBFromVCF {
     command <<<
         set -euxo pipefail
 
+        nthreads=$(nproc)
+        echo "using ${nthreads} threads"
+
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
@@ -138,7 +141,9 @@ task GenerateDBFromVCF {
 
         tabix -p vcf subset.vcf.gz
 
-        locityper add -d vcf_db \
+        locityper add \
+            -@ ${nthreads} \
+            -d vcf_db \
             -v subset.vcf.gz \
             -r reference.fa \
             -j ~{counts_jf} \
@@ -154,8 +159,8 @@ task GenerateDBFromVCF {
     }
 
     runtime {
-        memory: "8 GB"
-        cpu: "1"
+        memory: "32 GB"
+        cpu: "32"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
         docker: "eichlerlab/locityper:0.19.1"
