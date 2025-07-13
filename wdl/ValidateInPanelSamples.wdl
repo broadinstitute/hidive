@@ -1,0 +1,502 @@
+version 1.0
+
+workflow ValidateInPanelSamples {
+    input {
+        String sample_id
+
+        File cram
+        File crai
+
+        File ref_fa_with_alt
+        File ref_fai_with_alt
+        File counts_jf
+
+        File vcf
+        File vcf_tbi
+        File bed
+
+        Array[String] locus_names_to_remove = [ "empty" ] # ["INS_chr7_41458587_allele465753_103"],
+
+        Int N = 20
+    }
+
+    call SubsetVCF {
+        input:
+            vcf = vcf,
+            vcf_tbi = vcf_tbi,
+            bed = bed,
+            sample_id = sample_id
+    }
+
+    call GenerateDBFromVCF {
+        input:
+            reference = ref_fa_with_alt,
+            reference_index = ref_fai_with_alt,
+            counts_jf = counts_jf,
+            vcf = SubsetVCF.subset_vcf,
+            bed = bed,
+    }
+
+    call SplitBedNames { input: bed = bed, N = N }
+
+    scatter (names_file in SplitBedNames.name_parts) {
+        call FilterNames {
+            input:
+                locus_names = names_file,
+                names_to_remove = locus_names_to_remove
+        }
+
+        call LocityperPreprocessAndGenotype {
+            input:
+                sample_id = sample_id,
+                cram = cram,
+                crai = crai,
+                db_targz = GenerateDBFromVCF.db_tar,
+                counts_file = counts_jf,
+                reference = ref_fa_with_alt,
+                locus_names = FilterNames.filtered_names,
+                reference_index = ref_fai_with_alt,
+                locityper_n_cpu = 4,
+                locityper_mem_gb = 32
+        }
+    }
+
+    call CombineTarFiles {
+        input:
+            tar_files = LocityperPreprocessAndGenotype.genotype_tar,
+            sample_id = sample_id
+    }
+
+    call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
+
+    output {
+        File subset_vcf = SubsetVCF.subset_vcf
+        File summary_csv = Summarize.summary_csv
+        File results_tar_gz = CombineTarFiles.combined_tar_gz
+    }
+}
+
+task SubsetVCF {
+    input {
+        File vcf
+        File vcf_tbi
+        File bed
+        String? sample_id
+    }
+
+    Int disk_size = 1 + ceil(size([vcf, bed], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} -R ~{bed} ~{vcf} > subset.vcf
+    >>>
+
+    output {
+        File subset_vcf = "subset.vcf"
+    }
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task GenerateDBFromVCF {
+    input {
+        File reference
+        File reference_index
+        File counts_jf
+        File vcf
+        File bed
+    }
+
+    Int disk_size = 1 + 4*ceil(size([reference, vcf, counts_jf, bed], "GiB"))
+    String output_tar = "vcf_db.tar.gz"
+
+    command <<<
+        set -euxo pipefail
+
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
+        mv ~{vcf} subset.vcf
+        bgzip subset.vcf
+        tabix -p vcf subset.vcf.gz
+
+        locityper add -d vcf_db \
+            -v subset.vcf.gz \
+            -r reference.fa \
+            -j ~{counts_jf} \
+            -L ~{bed}
+
+        echo "compressing DB"
+        tar -czf ~{output_tar} vcf_db
+        echo "done compressing DB"
+    >>>
+
+    output {
+        File db_tar = output_tar
+    }
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "eichlerlab/locityper:0.19.1"
+    }
+}
+
+task Fetch {
+    input {
+        String bam
+        String? locus
+        File? loci
+        Int padding
+
+        String prefix = "out"
+
+        Int disk_size_gb = 2
+        Int num_cpus = 4
+    }
+
+    command <<<
+        set -euxo pipefail
+
+        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fq
+    >>>
+
+    output {
+        File fastq = "~{prefix}.fq"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+        memory: "2 GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+    }
+}
+
+task Rescue {
+    input {
+        File long_reads_fastx
+        String short_reads_cram
+        # File short_reads_crai
+
+        File ref_fa_with_alt
+        File ref_fai_with_alt
+        File ref_cache_tar_gz
+
+        String prefix = "out"
+
+        Int num_cpus = 16
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastx, short_reads_cram, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
+    Int memory_gb = 8*num_cpus
+
+    command <<<
+        set -euxo pipefail
+
+        mv ~{ref_fa_with_alt} Homo_sapiens_assembly38.fasta
+        mv ~{ref_fai_with_alt} Homo_sapiens_assembly38.fasta.fai 
+        mv ~{ref_cache_tar_gz} Homo_sapiens_assembly38.ref_cache.tar.gz
+
+        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz >/dev/null 2>&1
+
+        export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
+        export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
+
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastx} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
+
+        hidive fetch -l "chr17:72062001-76562000" -p 10000 Homo_sapiens_assembly38.fasta > chr17.fa
+        hidive rescue -r Homo_sapiens_assembly38.fasta -f chr17.fa ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
+    >>>
+
+    output {
+        File fastq_gz = "~{prefix}.fq.gz"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper_modes"
+        memory: "~{memory_gb} GB"
+        cpu: num_cpus
+        disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 2
+    }
+}
+
+task DeduplicateFastq {
+    input {
+        File fastq
+        String prefix = "out"
+    }
+
+    Int disk_size_gb = 1 + 2*ceil(size([fastq], "GB"))
+    Int memory_gb = 2
+
+    command <<<
+        set -x
+
+        python3 <<EOF
+import gzip
+from collections import defaultdict
+
+seen_reads = defaultdict(int)
+written_reads = set()
+
+with gzip.open("~{fastq}", "rt") as f_in, gzip.open("~{prefix}.fq.gz", "wt") as f_out:
+    while True:
+        # Try to read the 4 lines that make up a FASTQ record
+        name = f_in.readline().strip()
+        if not name:  # EOF
+            break
+            
+        seq = f_in.readline()
+        plus = f_in.readline()
+        qual = f_in.readline()
+        
+        # Get just the read name without /1 or /2
+        read_name = name.split()[0]
+        
+        # Count this occurrence
+        seen_reads[read_name] += 1
+        
+        # Only write if we haven't written this read name yet
+        # and we've seen it exactly twice (paired)
+        if seen_reads[read_name] <= 2 and read_name not in written_reads:
+            f_out.write(f"{name}\n{seq}{plus}{qual}")
+            if seen_reads[read_name] == 2:
+                written_reads.add(read_name)
+
+EOF
+    >>>
+
+    output {
+        File fastq_gz = "~{prefix}.fq.gz"
+    }
+
+    runtime {
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+        memory: "~{memory_gb} GB"
+        cpu: 2
+        disks: "local-disk ~{disk_size_gb} SSD"
+        maxRetries: 0
+    }
+}
+
+task LocityperPreprocessAndGenotype {
+    input {
+        File cram
+        File crai
+        File counts_file
+        File reference
+        File reference_index
+        File db_targz
+        String sample_id
+        Array[String] locus_names
+
+        Int locityper_n_cpu
+        Int locityper_mem_gb
+    }
+
+    Int disk_size = 1 + ceil(0.05*length(locus_names)) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
+    String output_tar = sample_id + ".locityper.tar.gz"
+
+    command <<<
+        set -euxo pipefail
+        
+        gunzip -c ~{reference} > reference.fa
+        samtools faidx reference.fa
+
+        nthreads=$(nproc)
+        echo "using ${nthreads} threads"
+
+        mkdir -p locityper_prepoc
+
+        locityper preproc -a ~{cram} \
+            -r reference.fa \
+            --interleaved \
+            -j ~{counts_file} \
+            -@ ${nthreads} \
+            --technology illumina \
+            -r reference.fa \
+            -o locityper_prepoc
+
+        mkdir -p db
+        tar --strip-components 1 -C db -xvzf ~{db_targz}
+
+        mkdir -p out_dir
+
+        locityper genotype -a ~{cram} \
+            -r reference.fa \
+            --interleaved \
+            -d db \
+            -p locityper_prepoc \
+            -@ ${nthreads} \
+            --debug 2 \
+            --subset-loci ~{sep=" " locus_names} \
+            -o out_dir
+
+        tar -czf ~{output_tar} out_dir
+
+        df -h .
+    >>>
+
+    runtime {
+        memory: "~{locityper_mem_gb} GB"
+        cpu: locityper_n_cpu
+        disks: "local-disk ~{disk_size} HDD"
+        preemptible: 0
+        docker: "eichlerlab/locityper:0.19.1"
+    }
+
+    output {
+        File genotype_tar = output_tar
+    }
+}
+
+task SplitBedNames {
+    input {
+        File bed
+        Int N = 20
+    }
+
+    Int disk_size = 1 + ceil(size(bed, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        cut -f4 ~{bed} | split -l ~{N} - split_part_ && wc -l split_part_*
+    >>>
+
+    output {
+        Array[File] name_parts = glob("split_part_*")
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task FilterNames {
+    input {
+        File locus_names
+        Array[String] names_to_remove
+    }
+
+    Int disk_size = 1 + 2*ceil(size([locus_names], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        grep -v -f ~{write_lines(names_to_remove)} ~{locus_names} > filtered.txt
+    >>>
+
+    output {
+        Array[String] filtered_names = read_lines("filtered.txt")
+    }
+
+    runtime {
+        memory: "1 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 1
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task CombineTarFiles {
+    input {
+        Array[File] tar_files
+        String sample_id
+    }
+
+    Int disk_size = 1 + 10*ceil(size(tar_files, "GiB"))
+    String combined_tar = sample_id + ".combined.tar.gz"
+
+    command <<<
+        set -euxo pipefail
+
+        # Create a temporary directory to extract all tar files
+        mkdir -p combined_temp
+        
+        # Extract all tar files into the temporary directory
+        for tar_file in ~{sep=" " tar_files}; do
+            echo "Extracting $tar_file"
+            tar -xzf "$tar_file" -C combined_temp
+        done
+        
+        # Create a new combined tar file from the extracted contents
+        echo "Creating combined tar file: ~{combined_tar}"
+        tar -czf ~{combined_tar} -C combined_temp .
+        
+        echo "Combined tar file created successfully"
+        ls -lh ~{combined_tar}
+        
+        # Clean up
+        rm -rf combined_temp
+    >>>
+
+    output {
+        File combined_tar_gz = combined_tar
+    }
+
+    runtime {
+        memory: "8 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 0
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+    }
+}
+
+task Summarize {
+    input {
+        String sample_id
+        File genotype_tar
+    }
+
+    Int disk_size = 1 + 10*ceil(size(genotype_tar, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        tar -xzvf ~{genotype_tar}
+
+        mv out_dir ~{sample_id}
+
+        # Remove subdirectories that don't have res.json.gz
+        for dir in ~{sample_id}/loci/*/; do
+            if [ ! -f "${dir}/res.json.gz" ]; then
+                echo "Removing directory ${dir} - no res.json.gz found"
+                rm -rf "${dir}"
+            fi
+        done
+
+        python3 /locityper/extra/into_csv.py -i ./~{sample_id} -o gts.csv
+
+        grep -v '^#' gts.csv > gts.filtered.csv
+    >>>
+
+    output {
+        File summary_csv = "gts.filtered.csv"
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 0
+        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+    }
+}
