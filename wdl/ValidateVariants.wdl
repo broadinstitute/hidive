@@ -18,10 +18,10 @@ workflow ValidateVariants {
         Array[String] locus_names_to_remove = [ "empty" ]
 
         Int N = 20
-        Boolean subset_vcf = true
+        Boolean subset = true
     }
 
-    if subset_vcf {
+    if (subset) {
         call SubsetVCF {
             input:
                 vcf = vcf,
@@ -36,7 +36,7 @@ workflow ValidateVariants {
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            vcf = select_first([SubsetVCF.subset_vcf, vcf]),
+            vcf = select_first([SubsetVCF.out_vcf, vcf]),
             bed = bed,
     }
 
@@ -73,7 +73,7 @@ workflow ValidateVariants {
     call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
-        File subset_vcf = SubsetVCF.subset_vcf
+        File? subset_vcf = SubsetVCF.out_vcf
         File summary_csv = Summarize.summary_csv
         File results_tar_gz = CombineTarFiles.combined_tar_gz
     }
@@ -99,7 +99,7 @@ task SubsetVCF {
     >>>
 
     output {
-        File subset_vcf = "subset.vcf"
+        File out_vcf = "subset.vcf"
     }
 
     runtime {
