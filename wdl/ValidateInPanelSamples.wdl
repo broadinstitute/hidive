@@ -1,6 +1,6 @@
 version 1.0
 
-workflow ValidateInPanelSamples {
+workflow ValidateVariants {
     input {
         String sample_id
 
@@ -15,17 +15,20 @@ workflow ValidateInPanelSamples {
         File vcf_tbi
         File bed
 
-        Array[String] locus_names_to_remove = [ "empty" ] # ["INS_chr7_41458587_allele465753_103"],
+        Array[String] locus_names_to_remove = [ "empty" ]
 
         Int N = 20
+        Boolean subset_vcf = true
     }
 
-    call SubsetVCF {
-        input:
-            vcf = vcf,
-            vcf_tbi = vcf_tbi,
-            bed = bed,
-            sample_id = sample_id
+    if subset_vcf {
+        call SubsetVCF {
+            input:
+                vcf = vcf,
+                vcf_tbi = vcf_tbi,
+                bed = bed,
+                sample_id = sample_id
+        }
     }
 
     call GenerateDBFromVCF {
@@ -33,7 +36,7 @@ workflow ValidateInPanelSamples {
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            vcf = SubsetVCF.subset_vcf,
+            vcf = select_first([SubsetVCF.subset_vcf, vcf]),
             bed = bed,
     }
 
@@ -89,7 +92,10 @@ task SubsetVCF {
     command <<<
         set -euxo pipefail
 
-        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} -R ~{bed} ~{vcf} > subset.vcf
+        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} \
+            -i 'GT[*]="alt"' \
+            -R ~{bed} \
+            ~{vcf} > subset.vcf
     >>>
 
     output {
