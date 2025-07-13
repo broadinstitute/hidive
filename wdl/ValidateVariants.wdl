@@ -129,8 +129,13 @@ task GenerateDBFromVCF {
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
-        mv ~{vcf} subset.vcf
-        bgzip subset.vcf
+        if [[ ~{vcf} == *.gz ]]; then
+            cp ~{vcf} subset.vcf.gz
+        else
+            mv ~{vcf} subset.vcf
+            bgzip subset.vcf
+        fi
+
         tabix -p vcf subset.vcf.gz
 
         locityper add -d vcf_db \
