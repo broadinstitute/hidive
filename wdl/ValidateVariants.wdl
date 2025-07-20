@@ -31,16 +31,19 @@ workflow ValidateVariants {
     #         bed = bed,
     # }
 
-    call SplitBedNames { input: bed = bed, N = N }
+    # call SplitBedNames { input: bed = bed, N = N }
 
-    scatter (names_file in SplitBedNames.name_parts) {
+    call SplitBed { input: bed = bed, N = N }
+
+    # scatter (names_file in SplitBedNames.name_parts) {
+    scatter (split_bed in SplitBed.split_beds) {
         # call FilterNames {
         #     input:
         #         locus_names = names_file,
         #         names_to_remove = locus_names_to_remove
         # }
 
-        call FilterBed { input: locus_names = names_file, bed = bed }
+        # call FilterBed { input: locus_names = names_file, bed = bed }
 
         call GenerateDBFromVCF {
             input:
@@ -48,7 +51,7 @@ workflow ValidateVariants {
                 reference_index = ref_fai_with_alt,
                 counts_jf = counts_jf,
                 vcf = vcf,
-                bed = FilterBed.filtered_bed,
+                bed = split_bed,
         }
 
         call LocityperPreprocessAndGenotype {
@@ -284,6 +287,33 @@ task SplitBedNames {
 
     output {
         Array[File] name_parts = glob("split_part_*")
+    }
+
+    runtime {
+        memory: "4 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task SplitBed {
+    input {
+        File bed
+        Int N = 20
+    }
+
+    Int disk_size = 1 + ceil(size(bed, "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        cat ~{bed} | split -l ~{N} - split_part_ && wc -l split_part_*
+    >>>
+
+    output {
+        Array[File] split_beds = glob("split_part_*")
     }
 
     runtime {
