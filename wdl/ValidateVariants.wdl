@@ -18,30 +18,18 @@ workflow ValidateVariants {
         Array[String] locus_names_to_remove = [ "empty" ]
 
         Int N = 20
-        # Boolean subset = true
     }
-
-    # if (subset) {
-    #     call SubsetVCF {
-    #         input:
-    #             vcf = vcf,
-    #             vcf_tbi = vcf_tbi,
-    #             bed = bed,
-    #             sample_id = sample_id
-    #     }
-    # }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    call GenerateDBFromVCF {
-        input:
-            reference = ref_fa_with_alt,
-            reference_index = ref_fai_with_alt,
-            counts_jf = counts_jf,
-            # vcf = select_first([SubsetVCF.out_vcf, vcf]),
-            vcf = vcf,
-            bed = bed,
-    }
+    # call GenerateDBFromVCF {
+    #     input:
+    #         reference = ref_fa_with_alt,
+    #         reference_index = ref_fai_with_alt,
+    #         counts_jf = counts_jf,
+    #         vcf = vcf,
+    #         bed = bed,
+    # }
 
     call SplitBedNames { input: bed = bed, N = N }
 
@@ -50,6 +38,17 @@ workflow ValidateVariants {
             input:
                 locus_names = names_file,
                 names_to_remove = locus_names_to_remove
+        }
+
+        call FilterBed { input: locus_names = names_file, bed = bed }
+
+        call GenerateDBFromVCF {
+            input:
+                reference = ref_fa_with_alt,
+                reference_index = ref_fai_with_alt,
+                counts_jf = counts_jf,
+                vcf = vcf,
+                bed = FilterBed.filtered_bed,
         }
 
         call LocityperPreprocessAndGenotype {
@@ -61,7 +60,7 @@ workflow ValidateVariants {
                 reference_index = GunzipReference.ref_fai,
                 db_targz = GenerateDBFromVCF.db_tar,
                 counts_file = counts_jf,
-                locus_names = FilterNames.filtered_names,
+                # locus_names = FilterNames.filtered_names,
                 locityper_n_cpu = 4,
                 locityper_mem_gb = 32
         }
@@ -206,14 +205,15 @@ task LocityperPreprocessAndGenotype {
         File counts_file
         File db_targz
         String sample_id
-        Array[String] locus_names
+        # Array[String] locus_names
 
         Int locityper_n_cpu
         Int locityper_mem_gb
         Int locityper_max_gts = 1000000
     }
 
-    Int disk_size = 1 + ceil(0.05*length(locus_names)) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
+    # Int disk_size = 1 + ceil(0.05*length(locus_names)) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
+    Int disk_size = 1 + 4*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
@@ -247,8 +247,6 @@ task LocityperPreprocessAndGenotype {
             -d db \
             -p locityper_prepoc \
             -@ ${nthreads} \
-            --debug 2 \
-            --subset-loci ~{sep=" " locus_names} \
             --max-gts ~{locityper_max_gts} \
             -o out_dir
 
@@ -313,6 +311,33 @@ task FilterNames {
 
     output {
         Array[String] filtered_names = read_lines("filtered.txt")
+    }
+
+    runtime {
+        memory: "1 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 1
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task FilterBed {
+    input {
+        File locus_names
+        File bed
+    }
+
+    Int disk_size = 1 + 2*ceil(size([locus_names], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        grep -f ~{locus_names} ~{bed} > filtered.bed
+    >>>
+
+    output {
+        File filtered_bed = "filtered.bed"
     }
 
     runtime {
