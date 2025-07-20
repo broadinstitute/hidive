@@ -18,25 +18,28 @@ workflow ValidateVariants {
         Array[String] locus_names_to_remove = [ "empty" ]
 
         Int N = 20
-        Boolean subset = true
+        # Boolean subset = true
     }
 
-    if (subset) {
-        call SubsetVCF {
-            input:
-                vcf = vcf,
-                vcf_tbi = vcf_tbi,
-                bed = bed,
-                sample_id = sample_id
-        }
-    }
+    # if (subset) {
+    #     call SubsetVCF {
+    #         input:
+    #             vcf = vcf,
+    #             vcf_tbi = vcf_tbi,
+    #             bed = bed,
+    #             sample_id = sample_id
+    #     }
+    # }
+
+    call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
     call GenerateDBFromVCF {
         input:
             reference = ref_fa_with_alt,
             reference_index = ref_fai_with_alt,
             counts_jf = counts_jf,
-            vcf = select_first([SubsetVCF.out_vcf, vcf]),
+            # vcf = select_first([SubsetVCF.out_vcf, vcf]),
+            vcf = vcf,
             bed = bed,
     }
 
@@ -54,11 +57,11 @@ workflow ValidateVariants {
                 sample_id = sample_id,
                 cram = cram,
                 crai = crai,
+                reference = GunzipReference.ref_fa,
+                reference_index = GunzipReference.ref_fai,
                 db_targz = GenerateDBFromVCF.db_tar,
                 counts_file = counts_jf,
-                reference = ref_fa_with_alt,
                 locus_names = FilterNames.filtered_names,
-                reference_index = ref_fai_with_alt,
                 locityper_n_cpu = 4,
                 locityper_mem_gb = 32
         }
@@ -73,7 +76,7 @@ workflow ValidateVariants {
     call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
-        File? subset_vcf = SubsetVCF.out_vcf
+        # File? subset_vcf = SubsetVCF.out_vcf
         File summary_csv = Summarize.summary_csv
         File results_tar_gz = CombineTarFiles.combined_tar_gz
     }
@@ -167,142 +170,30 @@ task GenerateDBFromVCF {
     }
 }
 
-task Fetch {
+task GunzipReference {
     input {
-        String bam
-        String? locus
-        File? loci
-        Int padding
-
-        String prefix = "out"
-
-        Int disk_size_gb = 2
-        Int num_cpus = 4
+        File ref_gz
     }
+
+    Int disk_size_gb = 1 + 4*ceil(size(ref_gz, "GiB"))
 
     command <<<
         set -euxo pipefail
 
-        hidive fetch -l ~{select_first([locus, loci])} -p ~{padding} ~{bam} > ~{prefix}.fq
+        gunzip -c ~{ref_gz} > reference.fa
+        samtools faidx reference.fa
     >>>
 
     output {
-        File fastq = "~{prefix}.fq"
+        File ref_fa = "reference.fa"
+        File ref_fai = "reference.fa.fai"
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
         memory: "2 GB"
-        cpu: num_cpus
-        disks: "local-disk ~{disk_size_gb} SSD"
-    }
-}
-
-task Rescue {
-    input {
-        File long_reads_fastx
-        String short_reads_cram
-        # File short_reads_crai
-
-        File ref_fa_with_alt
-        File ref_fai_with_alt
-        File ref_cache_tar_gz
-
-        String prefix = "out"
-
-        Int num_cpus = 16
-    }
-
-    Int disk_size_gb = 1 + 2*ceil(size([long_reads_fastx, short_reads_cram, ref_fa_with_alt, ref_fai_with_alt, ref_cache_tar_gz], "GB"))
-    Int memory_gb = 8*num_cpus
-
-    command <<<
-        set -euxo pipefail
-
-        mv ~{ref_fa_with_alt} Homo_sapiens_assembly38.fasta
-        mv ~{ref_fai_with_alt} Homo_sapiens_assembly38.fasta.fai 
-        mv ~{ref_cache_tar_gz} Homo_sapiens_assembly38.ref_cache.tar.gz
-
-        tar xzf Homo_sapiens_assembly38.ref_cache.tar.gz >/dev/null 2>&1
-
-        export REF_PATH="$(pwd)/ref/cache/%2s/%2s/%s:http://www.ebi.ac.uk/ena/cram/md5/%s"
-        export REF_CACHE="$(pwd)/ref/cache/%2s/%2s/%s"
-
-        hidive rescue -r Homo_sapiens_assembly38.fasta -f ~{long_reads_fastx} ~{short_reads_cram} | gzip > ~{prefix}.fq.gz
-
-        hidive fetch -l "chr17:72062001-76562000" -p 10000 Homo_sapiens_assembly38.fasta > chr17.fa
-        hidive rescue -r Homo_sapiens_assembly38.fasta -f chr17.fa ~{short_reads_cram} | gzip >> ~{prefix}.fq.gz
-    >>>
-
-    output {
-        File fastq_gz = "~{prefix}.fq.gz"
-    }
-
-    runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:kvg_locityper_modes"
-        memory: "~{memory_gb} GB"
-        cpu: num_cpus
-        disks: "local-disk ~{disk_size_gb} SSD"
-        maxRetries: 2
-    }
-}
-
-task DeduplicateFastq {
-    input {
-        File fastq
-        String prefix = "out"
-    }
-
-    Int disk_size_gb = 1 + 2*ceil(size([fastq], "GB"))
-    Int memory_gb = 2
-
-    command <<<
-        set -x
-
-        python3 <<EOF
-import gzip
-from collections import defaultdict
-
-seen_reads = defaultdict(int)
-written_reads = set()
-
-with gzip.open("~{fastq}", "rt") as f_in, gzip.open("~{prefix}.fq.gz", "wt") as f_out:
-    while True:
-        # Try to read the 4 lines that make up a FASTQ record
-        name = f_in.readline().strip()
-        if not name:  # EOF
-            break
-            
-        seq = f_in.readline()
-        plus = f_in.readline()
-        qual = f_in.readline()
-        
-        # Get just the read name without /1 or /2
-        read_name = name.split()[0]
-        
-        # Count this occurrence
-        seen_reads[read_name] += 1
-        
-        # Only write if we haven't written this read name yet
-        # and we've seen it exactly twice (paired)
-        if seen_reads[read_name] <= 2 and read_name not in written_reads:
-            f_out.write(f"{name}\n{seq}{plus}{qual}")
-            if seen_reads[read_name] == 2:
-                written_reads.add(read_name)
-
-EOF
-    >>>
-
-    output {
-        File fastq_gz = "~{prefix}.fq.gz"
-    }
-
-    runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
-        memory: "~{memory_gb} GB"
         cpu: 2
         disks: "local-disk ~{disk_size_gb} SSD"
-        maxRetries: 0
     }
 }
 
@@ -310,15 +201,16 @@ task LocityperPreprocessAndGenotype {
     input {
         File cram
         File crai
-        File counts_file
         File reference
         File reference_index
+        File counts_file
         File db_targz
         String sample_id
         Array[String] locus_names
 
         Int locityper_n_cpu
         Int locityper_mem_gb
+        Int locityper_max_gts = 1000000
     }
 
     Int disk_size = 1 + ceil(0.05*length(locus_names)) + 2*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
@@ -327,8 +219,8 @@ task LocityperPreprocessAndGenotype {
     command <<<
         set -euxo pipefail
         
-        gunzip -c ~{reference} > reference.fa
-        samtools faidx reference.fa
+        mv ~{reference} reference.fa
+        mv ~{reference_index} reference.fa.fai
 
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
@@ -357,7 +249,7 @@ task LocityperPreprocessAndGenotype {
             -@ ${nthreads} \
             --debug 2 \
             --subset-loci ~{sep=" " locus_names} \
-            --max-gts 1000000 \ 
+            --max-gts ~{locityper_max_gts} \
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
@@ -365,16 +257,16 @@ task LocityperPreprocessAndGenotype {
         df -h .
     >>>
 
+    output {
+        File genotype_tar = output_tar
+    }
+
     runtime {
         memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
         preemptible: 0
         docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
-    }
-
-    output {
-        File genotype_tar = output_tar
     }
 }
 
