@@ -357,6 +357,7 @@ task LocityperPreprocessAndGenotype {
             -@ ${nthreads} \
             --debug 2 \
             --subset-loci ~{sep=" " locus_names} \
+            --max-gts 1000000 \ 
             -o out_dir
 
         tar -czf ~{output_tar} out_dir
@@ -369,7 +370,7 @@ task LocityperPreprocessAndGenotype {
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
         preemptible: 0
-        docker: "eichlerlab/locityper:0.19.1"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
     }
 
     output {
