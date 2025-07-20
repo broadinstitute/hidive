@@ -62,7 +62,7 @@ workflow ValidateVariants {
                 counts_file = counts_jf,
                 # locus_names = FilterNames.filtered_names,
                 locityper_n_cpu = 4,
-                locityper_mem_gb = 32
+                locityper_mem_gb = 64
         }
     }
 
