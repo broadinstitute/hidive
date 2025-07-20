@@ -34,11 +34,11 @@ workflow ValidateVariants {
     call SplitBedNames { input: bed = bed, N = N }
 
     scatter (names_file in SplitBedNames.name_parts) {
-        call FilterNames {
-            input:
-                locus_names = names_file,
-                names_to_remove = locus_names_to_remove
-        }
+        # call FilterNames {
+        #     input:
+        #         locus_names = names_file,
+        #         names_to_remove = locus_names_to_remove
+        # }
 
         call FilterBed { input: locus_names = names_file, bed = bed }
 
@@ -164,7 +164,7 @@ task GenerateDBFromVCF {
         memory: "32 GB"
         cpu: "32"
         disks: "local-disk " + disk_size + " HDD"
-        preemptible: 3
+        preemptible: 0
         docker: "eichlerlab/locityper:0.19.1"
     }
 }
