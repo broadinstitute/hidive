@@ -158,7 +158,7 @@ task LocityperPreprocessAndGenotype {
         File counts_file
         File db_targz
         String sample_id
-        # Array[String] locus_names
+        Array[String] locus_names
 
         Int locityper_n_cpu
         Int locityper_mem_gb
