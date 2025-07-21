@@ -22,36 +22,27 @@ workflow ValidateVariants {
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    # call GenerateDBFromVCF {
-    #     input:
-    #         reference = ref_fa_with_alt,
-    #         reference_index = ref_fai_with_alt,
-    #         counts_jf = counts_jf,
-    #         vcf = vcf,
-    #         bed = bed,
-    # }
+    call SplitBed {
+        input:
+            bed = bed,
+            N = N
+    }
 
-    # call SplitBedNames { input: bed = bed, N = N }
-
-    call SplitBed { input: bed = bed, N = N }
-
-    # scatter (names_file in SplitBedNames.name_parts) {
     scatter (split_bed in SplitBed.split_beds) {
-        # call FilterNames {
-        #     input:
-        #         locus_names = names_file,
-        #         names_to_remove = locus_names_to_remove
-        # }
-
-        # call FilterBed { input: locus_names = names_file, bed = bed }
-
         call GenerateDBFromVCF {
             input:
                 reference = ref_fa_with_alt,
                 reference_index = ref_fai_with_alt,
                 counts_jf = counts_jf,
                 vcf = vcf,
+                vcf_tbi = vcf_tbi,
                 bed = split_bed,
+        }
+
+        call FilterNames {
+            input:
+                bed = split_bed,
+                names_to_remove = locus_names_to_remove
         }
 
         call LocityperPreprocessAndGenotype {
@@ -63,7 +54,7 @@ workflow ValidateVariants {
                 reference_index = GunzipReference.ref_fai,
                 db_targz = GenerateDBFromVCF.db_tar,
                 counts_file = counts_jf,
-                # locus_names = FilterNames.filtered_names,
+                locus_names = FilterNames.filtered_names,
                 locityper_n_cpu = 4,
                 locityper_mem_gb = 64
         }
@@ -78,41 +69,8 @@ workflow ValidateVariants {
     call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
-        # File? subset_vcf = SubsetVCF.out_vcf
         File summary_csv = Summarize.summary_csv
         File results_tar_gz = CombineTarFiles.combined_tar_gz
-    }
-}
-
-task SubsetVCF {
-    input {
-        File vcf
-        File vcf_tbi
-        File bed
-        String? sample_id
-    }
-
-    Int disk_size = 1 + ceil(size([vcf, bed], "GiB"))
-
-    command <<<
-        set -euxo pipefail
-
-        bcftools view ~{if defined(sample_id) then "-s " + sample_id else ""} \
-            -i 'GT[*]="alt"' \
-            -R ~{bed} \
-            ~{vcf} > subset.vcf
-    >>>
-
-    output {
-        File out_vcf = "subset.vcf"
-    }
-
-    runtime {
-        memory: "8 GB"
-        cpu: "1"
-        disks: "local-disk " + disk_size + " HDD"
-        preemptible: 3
-        docker: "staphb/bcftools:1.22"
     }
 }
 
@@ -122,6 +80,7 @@ task GenerateDBFromVCF {
         File reference_index
         File counts_jf
         File vcf
+        File vcf_tbi
         File bed
     }
 
@@ -137,19 +96,10 @@ task GenerateDBFromVCF {
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
-        if [[ ~{vcf} == *.gz ]]; then
-            cp ~{vcf} subset.vcf.gz
-        else
-            mv ~{vcf} subset.vcf
-            bgzip subset.vcf
-        fi
-
-        tabix -p vcf subset.vcf.gz
-
         locityper add \
             -@ ${nthreads} \
             -d vcf_db \
-            -v subset.vcf.gz \
+            -v ~{vcf} \
             -r reference.fa \
             -j ~{counts_jf} \
             -L ~{bed}
@@ -250,6 +200,7 @@ task LocityperPreprocessAndGenotype {
             -d db \
             -p locityper_prepoc \
             -@ ${nthreads} \
+            --subset-loci ~{sep=" " locus_names} \
             --max-gts ~{locityper_max_gts} \
             -o out_dir
 
@@ -327,16 +278,16 @@ task SplitBed {
 
 task FilterNames {
     input {
-        File locus_names
+        File bed
         Array[String] names_to_remove
     }
 
-    Int disk_size = 1 + 2*ceil(size([locus_names], "GiB"))
+    Int disk_size = 1 + 2*ceil(size([bed], "GiB"))
 
     command <<<
         set -euxo pipefail
 
-        grep -v -f ~{write_lines(names_to_remove)} ~{locus_names} > filtered.txt
+        grep -v -f ~{write_lines(names_to_remove)} ~{bed} | cut -f4 > filtered.txt
     >>>
 
     output {
