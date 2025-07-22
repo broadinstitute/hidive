@@ -42,3 +42,6 @@ workflows:
 - name: ValidateVariants
   subclass: wdl
   primaryDescriptorPath: /wdl/ValidateVariants.wdl
+- name: BuildLocityperDB
+  subclass: wdl
+  primaryDescriptorPath: /wdl/BuildLocityperDB.wdl
