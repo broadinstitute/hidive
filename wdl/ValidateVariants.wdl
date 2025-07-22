@@ -8,69 +8,42 @@ workflow ValidateVariants {
         File crai
 
         File ref_fa_with_alt
-        File ref_fai_with_alt
         File counts_jf
-
-        File vcf
-        File vcf_tbi
         File bed
+
+        File locityper_db_tar_gz
 
         Array[String] locus_names_to_remove = [ "empty" ]
 
-        Int N = 20
+        Int locityper_n_cpu = 4
+        Int locityper_mem_gb = 32
+        Int locityper_max_gts = 100000
     }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    call SplitBed {
+    call FilterNames { input: bed = bed, names_to_remove = locus_names_to_remove }
+
+    call LocityperPreprocessAndGenotype {
         input:
-            bed = bed,
-            N = N
+            sample_id = sample_id,
+            cram = cram,
+            crai = crai,
+            reference = GunzipReference.ref_fa,
+            reference_index = GunzipReference.ref_fai,
+            db_targz = locityper_db_tar_gz,
+            counts_file = counts_jf,
+            locus_names = FilterNames.filtered_names,
+            locityper_n_cpu = locityper_n_cpu,
+            locityper_mem_gb = locityper_mem_gb,
+            locityper_max_gts = locityper_max_gts
     }
 
-    scatter (split_bed in SplitBed.split_beds) {
-        call GenerateDBFromVCF {
-            input:
-                reference = ref_fa_with_alt,
-                reference_index = ref_fai_with_alt,
-                counts_jf = counts_jf,
-                vcf = vcf,
-                vcf_tbi = vcf_tbi,
-                bed = split_bed,
-        }
-
-        call FilterNames {
-            input:
-                bed = split_bed,
-                names_to_remove = locus_names_to_remove
-        }
-
-        call LocityperPreprocessAndGenotype {
-            input:
-                sample_id = sample_id,
-                cram = cram,
-                crai = crai,
-                reference = GunzipReference.ref_fa,
-                reference_index = GunzipReference.ref_fai,
-                db_targz = GenerateDBFromVCF.db_tar,
-                counts_file = counts_jf,
-                locus_names = FilterNames.filtered_names,
-                locityper_n_cpu = 4,
-                locityper_mem_gb = 64
-        }
-    }
-
-    call CombineTarFiles {
-        input:
-            tar_files = LocityperPreprocessAndGenotype.genotype_tar,
-            sample_id = sample_id
-    }
-
-    call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
+    call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar }
 
     output {
         File summary_csv = Summarize.summary_csv
-        File results_tar_gz = CombineTarFiles.combined_tar_gz
+        File results_tar_gz = LocityperPreprocessAndGenotype.genotype_tar
     }
 }
 
@@ -162,10 +135,10 @@ task LocityperPreprocessAndGenotype {
 
         Int locityper_n_cpu
         Int locityper_mem_gb
-        Int locityper_max_gts = 2000000
+        Int locityper_max_gts
     }
 
-    Int disk_size = 1 + 4*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
+    Int disk_size = 1 + 10*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<

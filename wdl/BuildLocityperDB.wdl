@@ -67,8 +67,8 @@ task GenerateDBFromVCF {
     }
 
     runtime {
-        memory: "32 GB"
-        cpu: "32"
+        memory: "8 GB"
+        cpu: "4"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 0
         docker: "eichlerlab/locityper:0.19.1"
