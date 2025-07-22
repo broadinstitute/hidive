@@ -16,7 +16,7 @@ workflow ValidateVariants {
         Array[String] locus_names_to_remove = [ "empty" ]
 
         Int locityper_n_cpu = 4
-        Int locityper_mem_gb = 32
+        Int locityper_mem_gb = 64
         Int locityper_max_gts = 100000
     }
 
