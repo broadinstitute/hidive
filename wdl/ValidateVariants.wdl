@@ -163,7 +163,7 @@ task LocityperPreprocessAndGenotype {
 
         ls -lh
         df -h .
-        du -hcs vcf_db/*
+        du -hcs vcf_db/loci/*
 
         mkdir -p out_dir
 
