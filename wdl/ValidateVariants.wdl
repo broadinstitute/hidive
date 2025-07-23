@@ -150,29 +150,28 @@ task LocityperPreprocessAndGenotype {
         nthreads=$(nproc)
         echo "using ${nthreads} threads"
 
-        mkdir -p locityper_prepoc
+        mkdir -p locityper_preproc
 
         locityper preproc -a ~{cram} \
             -r reference.fa \
-            --interleaved \
             -j ~{counts_file} \
             -@ ${nthreads} \
             --technology illumina \
-            -r reference.fa \
-            -o locityper_prepoc
+            -o locityper_preproc
 
-        mkdir -p db
-        tar --strip-components 1 -C db -xvzf ~{db_targz}
+        tar -xvzf ~{db_targz}
+
+        ls -lh
+        df -h .
+        du -hcs vcf_db/*
 
         mkdir -p out_dir
 
         locityper genotype -a ~{cram} \
             -r reference.fa \
-            --interleaved \
-            -d db \
-            -p locityper_prepoc \
+            -d vcf_db \
+            -p locityper_preproc \
             -@ ${nthreads} \
-            --subset-loci ~{sep=" " locus_names} \
             --max-gts ~{locityper_max_gts} \
             -o out_dir
 
