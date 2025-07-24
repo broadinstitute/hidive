@@ -166,6 +166,8 @@ task LocityperPreprocessAndGenotype {
 
         tar -xvzf ~{db_targz}
 
+        du -hcs vcf_db/loci/DEL_chr1_143267323_allele1163495_1
+
         split -l 100 ~{bed} bed_part_
         ls bed_part_* | wc -l
 
@@ -184,7 +186,7 @@ task LocityperPreprocessAndGenotype {
                 -p locityper_preproc \
                 -@ ${nthreads} \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci ${LOCI_NAMES} \
+                --subset-loci DEL_chr1_143267323_allele1163495_1 \
                 -o out_dir
         done
 
