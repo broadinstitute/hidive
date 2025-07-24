@@ -184,7 +184,7 @@ task LocityperPreprocessAndGenotype {
                 -p locityper_preproc \
                 -@ ${nthreads} \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci "${LOCI_NAMES}" \
+                --subset-loci ${LOCI_NAMES} \
                 -o out_dir
         done
 
