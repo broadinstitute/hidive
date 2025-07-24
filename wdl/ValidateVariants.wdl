@@ -147,7 +147,7 @@ task LocityperPreprocessAndGenotype {
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
-        set -euxo pipefail
+        set -x
         
         mv ~{reference} reference.fa
         mv ~{reference_index} reference.fa.fai
@@ -171,7 +171,9 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p out_dir
 
-        for bed_part in bed_part_*; do
+        bed_part=bed_part_aa
+        # for bed_part in bed_part_*; do
+
             echo "Processing ${bed_part}"
             wc -l ${bed_part}
 
@@ -186,7 +188,7 @@ task LocityperPreprocessAndGenotype {
                 --max-gts ~{locityper_max_gts} \
                 --subset-loci ${LOCI_NAMES} \
                 -o out_dir
-        done
+        # done
 
         tar -czf ~{output_tar} out_dir
 
