@@ -175,13 +175,16 @@ task LocityperPreprocessAndGenotype {
             echo "Processing ${bed_part}"
             wc -l ${bed_part}
 
+            # Extract locus names and convert to space-separated list
+            LOCI_NAMES=$(cut -f4 ${bed_part} | tr '\n' ' ')
+
             locityper genotype -a ~{cram} \
                 -r reference.fa \
                 -d vcf_db \
                 -p locityper_preproc \
                 -@ ${nthreads} \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci <(cut -f4 ${bed_part} | tr '\n' ' ') \
+                --subset-loci "${LOCI_NAMES}" \
                 -o out_dir
         done
 
