@@ -22,7 +22,9 @@ workflow ValidateVariants {
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    call FilterNames { input: bed = bed, names_to_remove = locus_names_to_remove }
+    # call FilterNames { input: bed = bed, names_to_remove = locus_names_to_remove }
+
+    # call FilterBed { input: bed = bed, locus_names = locus_names_to_remove }
 
     call LocityperPreprocessAndGenotype {
         input:
@@ -33,7 +35,8 @@ workflow ValidateVariants {
             reference_index = GunzipReference.ref_fai,
             db_targz = locityper_db_tar_gz,
             counts_file = counts_jf,
-            locus_names = FilterNames.filtered_names,
+            # locus_names = FilterNames.filtered_names,
+            bed = bed,
             locityper_n_cpu = locityper_n_cpu,
             locityper_mem_gb = locityper_mem_gb,
             locityper_max_gts = locityper_max_gts
@@ -131,14 +134,16 @@ task LocityperPreprocessAndGenotype {
         File counts_file
         File db_targz
         String sample_id
-        Array[String] locus_names
+        # Array[String] locus_names
+
+        File bed
 
         Int locityper_n_cpu
         Int locityper_mem_gb
         Int locityper_max_gts
     }
 
-    Int disk_size = 1 + 10*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz], "GiB"))
+    Int disk_size = 1 + 10*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
@@ -161,19 +166,24 @@ task LocityperPreprocessAndGenotype {
 
         tar -xvzf ~{db_targz}
 
-        ls -lh
-        df -h .
-        du -hcs vcf_db/loci/*
+        split -l 100 ~{bed} bed_part_
+        ls bed_part_* | wc -l
 
         mkdir -p out_dir
 
-        locityper genotype -a ~{cram} \
-            -r reference.fa \
-            -d vcf_db \
-            -p locityper_preproc \
-            -@ ${nthreads} \
-            --max-gts ~{locityper_max_gts} \
-            -o out_dir
+        for bed_part in bed_part_*; do
+            echo "Processing ${bed_part}"
+            wc -l ${bed_part}
+
+            locityper genotype -a ~{cram} \
+                -r reference.fa \
+                -d vcf_db \
+                -p locityper_preproc \
+                -@ ${nthreads} \
+                --max-gts ~{locityper_max_gts} \
+                --subset-loci <(cut -f4 ${bed_part} | tr '\n' ' ') \
+                -o out_dir
+        done
 
         tar -czf ~{output_tar} out_dir
 
