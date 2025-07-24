@@ -147,7 +147,7 @@ task LocityperPreprocessAndGenotype {
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
-        set -euxo pipefail
+        set -x
         
         mv ~{reference} reference.fa
         mv ~{reference_index} reference.fa.fai
