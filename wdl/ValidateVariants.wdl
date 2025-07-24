@@ -147,7 +147,7 @@ task LocityperPreprocessAndGenotype {
     String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
-        set -x
+        set -euxo pipefail
         
         mv ~{reference} reference.fa
         mv ~{reference_index} reference.fa.fai
@@ -166,14 +166,17 @@ task LocityperPreprocessAndGenotype {
 
         tar -xvzf ~{db_targz}
 
-        #split -l 10 ~{bed} bed_part_
-        #ls bed_part_* | wc -l
+        split -l 10 ~{bed} bed_part_
+        ls bed_part_* | wc -l
 
         mkdir -p out_dir
 
-        while IFS=$'\t' read -r chrom start end name; do
-            echo "Processing locus: ${name}"
-            du -hcs vcf_db/loci/${name}
+        for bed_part in bed_part_*; do
+            echo "Processing ${bed_part}"
+            wc -l ${bed_part}
+
+            # Extract locus names and convert to space-separated list
+            LOCI_NAMES=$(cut -f4 ${bed_part} | tr '\n' ' ')
 
             locityper genotype -a ~{cram} \
                 -r reference.fa \
@@ -181,9 +184,9 @@ task LocityperPreprocessAndGenotype {
                 -p locityper_preproc \
                 -@ ${nthreads} \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci ${name} \
+                --subset-loci ${LOCI_NAMES} \
                 -o out_dir
-        done < ~{bed}
+        done
 
         tar -czf ~{output_tar} out_dir
 
