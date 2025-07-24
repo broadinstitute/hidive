@@ -166,19 +166,14 @@ task LocityperPreprocessAndGenotype {
 
         tar -xvzf ~{db_targz}
 
-        du -hcs vcf_db/loci/DEL_chr1_143267323_allele1163495_1
-
-        split -l 100 ~{bed} bed_part_
-        ls bed_part_* | wc -l
+        #split -l 10 ~{bed} bed_part_
+        #ls bed_part_* | wc -l
 
         mkdir -p out_dir
 
-        for bed_part in bed_part_*; do
-            echo "Processing ${bed_part}"
-            wc -l ${bed_part}
-
-            # Extract locus names and convert to space-separated list
-            LOCI_NAMES=$(cut -f4 ${bed_part} | tr '\n' ' ')
+        while IFS=$'\t' read -r chrom start end name; do
+            echo "Processing locus: ${name}"
+            du -hcs vcf_db/loci/${name}
 
             locityper genotype -a ~{cram} \
                 -r reference.fa \
@@ -186,9 +181,9 @@ task LocityperPreprocessAndGenotype {
                 -p locityper_preproc \
                 -@ ${nthreads} \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci DEL_chr1_143267323_allele1163495_1 \
+                --subset-loci ${name} \
                 -o out_dir
-        done
+        done < ~{bed}
 
         tar -czf ~{output_tar} out_dir
 
