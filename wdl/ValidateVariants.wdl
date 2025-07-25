@@ -13,17 +13,16 @@ workflow ValidateVariants {
 
         File locityper_db_tar_gz
 
-        Array[String] locus_names_to_remove = [ "empty" ]
+        # Array[String] locus_names_to_remove = [ "empty" ]
 
-        Int locityper_n_cpu = 4
-        Int locityper_mem_gb = 64
+        Int locityper_n_cpu = 16
+        # Int locityper_mem_gb = 64
         Int locityper_max_gts = 100000
     }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
     # call FilterNames { input: bed = bed, names_to_remove = locus_names_to_remove }
-
     # call FilterBed { input: bed = bed, locus_names = locus_names_to_remove }
 
     call LocityperPreprocessAndGenotype {
@@ -38,7 +37,7 @@ workflow ValidateVariants {
             # locus_names = FilterNames.filtered_names,
             bed = bed,
             locityper_n_cpu = locityper_n_cpu,
-            locityper_mem_gb = locityper_mem_gb,
+            # locityper_mem_gb = locityper_mem_gb,
             locityper_max_gts = locityper_max_gts
     }
 
@@ -139,31 +138,18 @@ task LocityperPreprocessAndGenotype {
         File bed
 
         Int locityper_n_cpu
-        Int locityper_mem_gb
         Int locityper_max_gts
     }
 
     Int disk_size = 1 + 10*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
+    Int locityper_mem_gb = 4 * locityper_n_cpu
+
     command <<<
         set -x
-        
+
         mv ~{reference} reference.fa
-        mv ~{reference_index} reference.fa.fai
-
-        nthreads=$(nproc)
-        echo "using ${nthreads} threads"
-
-        mkdir -p locityper_preproc
-
-        locityper preproc -a ~{cram} \
-            -r reference.fa \
-            -j ~{counts_file} \
-            -@ ${nthreads} \
-            --technology illumina \
-            -o locityper_preproc
-
         tar -xvzf ~{db_targz}
 
         split -l 10 ~{bed} bed_part_
@@ -171,25 +157,27 @@ task LocityperPreprocessAndGenotype {
 
         mkdir -p out_dir
 
-        bed_part=bed_part_aa
-        # for bed_part in bed_part_*; do
-
+        process_bed_part() {
+            bed_part="$1"
             echo "Processing ${bed_part}"
-            wc -l ${bed_part}
+            wc -l "${bed_part}"
 
             # Extract locus names and convert to space-separated list
-            LOCI_NAMES=$(cut -f4 ${bed_part} | tr '\n' ' ')
+            LOCI_NAMES=$(cut -f4 "${bed_part}" | tr '\n' ' ')
 
             locityper genotype -a ~{cram} \
                 -r reference.fa \
                 -d vcf_db \
                 -p locityper_preproc \
-                -@ ${nthreads} \
+                -@ 4 \
                 --max-gts ~{locityper_max_gts} \
                 --subset-loci ${LOCI_NAMES} \
                 -o out_dir
-        # done
+        }
+        export -f process_bed_part
 
+        parallel -j 25% process_bed_part ::: bed_part_*
+        
         tar -czf ~{output_tar} out_dir
 
         df -h .
