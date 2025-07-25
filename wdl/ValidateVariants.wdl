@@ -150,6 +150,16 @@ task LocityperPreprocessAndGenotype {
         set -x
 
         mv ~{reference} reference.fa
+
+        mkdir -p locityper_preproc
+
+        locityper preproc -a ~{cram} \
+            -r reference.fa \
+            -j ~{counts_file} \
+            -@ ~{locityper_n_cpu} \
+            --technology illumina \
+            -o locityper_preproc
+
         tar -xvzf ~{db_targz}
 
         split -l 10 ~{bed} bed_part_
