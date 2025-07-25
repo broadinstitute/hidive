@@ -150,6 +150,7 @@ task LocityperPreprocessAndGenotype {
         set -x
 
         mv ~{reference} reference.fa
+        mv ~{reference_index} reference.fa.fai
 
         mkdir -p locityper_preproc
 
