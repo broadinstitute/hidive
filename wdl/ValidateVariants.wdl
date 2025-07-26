@@ -13,17 +13,11 @@ workflow ValidateVariants {
 
         File locityper_db_tar_gz
 
-        # Array[String] locus_names_to_remove = [ "empty" ]
-
-        Int locityper_n_cpu = 16
-        # Int locityper_mem_gb = 64
+        Int locityper_n_cpu = 32
         Int locityper_max_gts = 100000
     }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
-
-    # call FilterNames { input: bed = bed, names_to_remove = locus_names_to_remove }
-    # call FilterBed { input: bed = bed, locus_names = locus_names_to_remove }
 
     call LocityperPreprocessAndGenotype {
         input:
@@ -34,10 +28,8 @@ workflow ValidateVariants {
             reference_index = GunzipReference.ref_fai,
             db_targz = locityper_db_tar_gz,
             counts_file = counts_jf,
-            # locus_names = FilterNames.filtered_names,
             bed = bed,
             locityper_n_cpu = locityper_n_cpu,
-            # locityper_mem_gb = locityper_mem_gb,
             locityper_max_gts = locityper_max_gts
     }
 
@@ -141,10 +133,10 @@ task LocityperPreprocessAndGenotype {
         Int locityper_max_gts
     }
 
-    Int disk_size = 1 + 10*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
+    Int disk_size = 1 + 4*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
     String output_tar = sample_id + ".locityper.tar.gz"
 
-    Int locityper_mem_gb = 4 * locityper_n_cpu
+    Int locityper_mem_gb = 2 * locityper_n_cpu
 
     command <<<
         set -x
@@ -163,31 +155,24 @@ task LocityperPreprocessAndGenotype {
 
         tar -xvzf ~{db_targz}
 
-        split -l 10 ~{bed} bed_part_
-        ls bed_part_* | wc -l
-
         mkdir -p out_dir
 
-        process_bed_part() {
-            bed_part="$1"
-            echo "Processing ${bed_part}"
-            wc -l "${bed_part}"
-
-            # Extract locus names and convert to space-separated list
-            LOCI_NAMES=$(cut -f4 "${bed_part}" | tr '\n' ' ')
-
+        process_single_locus() {
+            line="$1"
+            locus_name=$(echo "$line" | cut -f4)
+            echo "Processing locus: ${locus_name}"
+            
             locityper genotype -a ~{cram} \
                 -r reference.fa \
                 -d vcf_db \
                 -p locityper_preproc \
-                -@ 4 \
                 --max-gts ~{locityper_max_gts} \
-                --subset-loci ${LOCI_NAMES} \
+                --subset-loci "${locus_name}" \
                 -o out_dir
         }
-        export -f process_bed_part
+        export -f process_single_locus
 
-        parallel -j 25% process_bed_part ::: bed_part_*
+        cat ~{bed} | parallel --line-buffer -j ~{locityper_n_cpu} process_single_locus {}
         
         tar -czf ~{output_tar} out_dir
 
@@ -202,7 +187,7 @@ task LocityperPreprocessAndGenotype {
         memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
-        preemptible: 0
+        preemptible: 2
         docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
     }
 }
