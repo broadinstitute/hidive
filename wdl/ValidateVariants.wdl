@@ -13,31 +13,40 @@ workflow ValidateVariants {
 
         File locityper_db_tar_gz
 
-        Int locityper_n_cpu = 32
+        Int locityper_n_cpu = 16
         Int locityper_max_gts = 100000
     }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    call LocityperPreprocessAndGenotype {
-        input:
-            sample_id = sample_id,
-            cram = cram,
-            crai = crai,
-            reference = GunzipReference.ref_fa,
-            reference_index = GunzipReference.ref_fai,
-            db_targz = locityper_db_tar_gz,
-            counts_file = counts_jf,
-            bed = bed,
-            locityper_n_cpu = locityper_n_cpu,
-            locityper_max_gts = locityper_max_gts
+    call SplitBed { input: bed = bed, N = 400 }
+
+    scatter (split_bed in SplitBed.split_beds) {
+        call LocityperPreprocessAndGenotype {
+            input:
+                sample_id = sample_id,
+                cram = cram,
+                crai = crai,
+                reference = GunzipReference.ref_fa,
+                reference_index = GunzipReference.ref_fai,
+                db_targz = locityper_db_tar_gz,
+                counts_file = counts_jf,
+                bed = split_bed,
+                locityper_n_cpu = locityper_n_cpu,
+                locityper_max_gts = locityper_max_gts
+        }
     }
 
-    call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar }
+    call CombineTarFiles { input: tar_files = LocityperPreprocessAndGenotype.genotype_tar, sample_id = sample_id }
+
+    # call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar }
+
+    call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
         File summary_csv = Summarize.summary_csv
-        File results_tar_gz = LocityperPreprocessAndGenotype.genotype_tar
+        # File results_tar_gz = LocityperPreprocessAndGenotype.genotype_tar
+        File results_tar_gz = CombineTarFiles.combined_tar_gz
     }
 }
 
@@ -112,6 +121,7 @@ task GunzipReference {
         docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
         memory: "2 GB"
         cpu: 2
+        preemptible: 1
         disks: "local-disk ~{disk_size_gb} SSD"
     }
 }
@@ -173,6 +183,8 @@ task LocityperPreprocessAndGenotype {
         export -f process_single_locus
 
         cat ~{bed} | parallel --line-buffer -j ~{locityper_n_cpu} process_single_locus {}
+
+        find out_dir -type f -name "*.bam" -exec rm -f {} \;
         
         tar -czf ~{output_tar} out_dir
 
@@ -187,7 +199,7 @@ task LocityperPreprocessAndGenotype {
         memory: "~{locityper_mem_gb} GB"
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
-        preemptible: 2
+        preemptible: 1
         docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
     }
 }
@@ -241,7 +253,7 @@ task SplitBed {
         memory: "4 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
-        preemptible: 3
+        preemptible: 1
         docker: "staphb/bcftools:1.22"
     }
 }
@@ -340,7 +352,7 @@ task CombineTarFiles {
         memory: "8 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
-        preemptible: 0
+        preemptible: 1
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
     }
 }
@@ -381,7 +393,7 @@ task Summarize {
         memory: "4 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
-        preemptible: 0
+        preemptible: 1
         docker: "us.gcr.io/broad-dsp-lrma/lr-hidive:0.1.122"
     }
 }
