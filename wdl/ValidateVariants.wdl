@@ -11,15 +11,30 @@ workflow ValidateVariants {
         File counts_jf
         File bed
 
+        File? sample_map
+
         File locityper_db_tar_gz
 
-        Int locityper_n_cpu = 16
+        Int locityper_n_cpu = 32
         Int locityper_max_gts = 100000
     }
 
     call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
-    call SplitBed { input: bed = bed, N = 400 }
+    if (defined(sample_map)) {
+        call SubsetBed {
+            input:
+                bed = bed,
+                sample_map = select_first([sample_map]),
+                sample_id = sample_id
+        }
+    }
+
+    call SplitBed {
+        input:
+            bed = select_first([SubsetBed.subset_bed, bed]),
+            N = 2000
+    }
 
     scatter (split_bed in SplitBed.split_beds) {
         call LocityperPreprocessAndGenotype {
@@ -39,13 +54,10 @@ workflow ValidateVariants {
 
     call CombineTarFiles { input: tar_files = LocityperPreprocessAndGenotype.genotype_tar, sample_id = sample_id }
 
-    # call Summarize { input: sample_id = sample_id, genotype_tar = LocityperPreprocessAndGenotype.genotype_tar }
-
     call Summarize { input: sample_id = sample_id, genotype_tar = CombineTarFiles.combined_tar_gz }
 
     output {
         File summary_csv = Summarize.summary_csv
-        # File results_tar_gz = LocityperPreprocessAndGenotype.genotype_tar
         File results_tar_gz = CombineTarFiles.combined_tar_gz
     }
 }
@@ -144,9 +156,9 @@ task LocityperPreprocessAndGenotype {
     }
 
     Int disk_size = 1 + 4*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
-    String output_tar = sample_id + ".locityper.tar.gz"
+    Int locityper_mem_gb = ceil(1.5 * locityper_n_cpu)
 
-    Int locityper_mem_gb = 2 * locityper_n_cpu
+    String output_tar = sample_id + ".locityper.tar.gz"
 
     command <<<
         set -x
@@ -223,10 +235,39 @@ task SplitBedNames {
     }
 
     runtime {
-        memory: "4 GB"
+        memory: "1 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 3
+        docker: "staphb/bcftools:1.22"
+    }
+}
+
+task SubsetBed {
+    input {
+        File bed
+        File sample_map
+        String sample_id
+    }
+
+    Int disk_size = 1 + ceil(size([bed, sample_map], "GiB"))
+
+    command <<<
+        set -euxo pipefail
+
+        grep '^~{sample_id}' ~{sample_map} | cut -f2 | sed 's/,/\n/g' > loci.txt
+        grep -f loci.txt ~{bed} > subset.bed
+    >>>
+
+    output {
+        File subset_bed = "subset.bed"
+    }
+
+    runtime {
+        memory: "1 GB"
+        cpu: "1"
+        disks: "local-disk " + disk_size + " HDD"
+        preemptible: 1
         docker: "staphb/bcftools:1.22"
     }
 }
@@ -250,7 +291,7 @@ task SplitBed {
     }
 
     runtime {
-        memory: "4 GB"
+        memory: "1 GB"
         cpu: "1"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 1
