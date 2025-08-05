@@ -256,6 +256,7 @@ task SubsetBed {
         set -euxo pipefail
 
         grep '^~{sample_id}' ~{sample_map} | cut -f2 | sed 's/,/\n/g' > loci.txt
+        cat loci.txt
         grep -f loci.txt ~{bed} > subset.bed
     >>>
 
