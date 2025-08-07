@@ -130,7 +130,7 @@ task GunzipReference {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:1.0.0"
         memory: "2 GB"
         cpu: 2
         preemptible: 1
@@ -212,7 +212,7 @@ task LocityperPreprocessAndGenotype {
         cpu: locityper_n_cpu
         disks: "local-disk ~{disk_size} HDD"
         preemptible: 1
-        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:kvg_build_docker_locally"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-locityper:1.0.0"
     }
 }
 
