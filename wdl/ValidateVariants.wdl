@@ -177,7 +177,7 @@ task LocityperPreprocessAndGenotype {
             --technology illumina \
             -o locityper_preproc
 
-        tar -xvzf ~{db_targz}
+        tar -xzf ~{db_targz}
 
         mkdir -p out_dir
 
