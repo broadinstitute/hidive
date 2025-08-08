@@ -190,7 +190,7 @@ task LocityperPreprocessAndGenotype {
                 -r reference.fa \
                 -d vcf_db \
                 -p locityper_preproc \
-                --max-gts ~{locityper_max_gts} \
+                -S greedy:i=5k,a=1 -S anneal:i=20,a=20 \
                 --subset-loci "${locus_name}" \
                 -o out_dir
         }
