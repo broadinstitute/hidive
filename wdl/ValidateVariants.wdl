@@ -7,7 +7,9 @@ workflow ValidateVariants {
         File cram
         File crai
 
-        File ref_fa_with_alt
+        File ref_fa_uncompressed
+        File ref_fai_uncompressed
+
         File counts_jf
         File bed
 
@@ -19,7 +21,7 @@ workflow ValidateVariants {
         Int locityper_max_gts = 100000
     }
 
-    call GunzipReference { input: ref_gz = ref_fa_with_alt }
+    # call GunzipReference { input: ref_gz = ref_fa_with_alt }
 
     if (defined(sample_map)) {
         call SubsetBed {
@@ -42,8 +44,8 @@ workflow ValidateVariants {
                 sample_id = sample_id,
                 cram = cram,
                 crai = crai,
-                reference = GunzipReference.ref_fa,
-                reference_index = GunzipReference.ref_fai,
+                reference = ref_fa_uncompressed,
+                reference_index = ref_fai_uncompressed,
                 db_targz = locityper_db_tar_gz,
                 counts_file = counts_jf,
                 bed = split_bed,
