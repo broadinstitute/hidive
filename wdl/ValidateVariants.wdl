@@ -158,7 +158,7 @@ task LocityperPreprocessAndGenotype {
     }
 
     Int disk_size = 1 + 4*ceil(size([cram, crai, counts_file, reference, reference_index, db_targz, bed], "GiB"))
-    Int locityper_mem_gb = ceil(3.0 * locityper_n_cpu)
+    Int locityper_mem_gb = ceil(4.0 * locityper_n_cpu)
 
     String output_tar = sample_id + ".locityper.tar.gz"
 
