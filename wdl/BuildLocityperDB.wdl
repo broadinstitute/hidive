@@ -48,13 +48,15 @@ task GenerateDBFromVCF {
         gunzip -c ~{reference} > reference.fa
         samtools faidx reference.fa
 
+        cat ~{bed} | sed 's/^chr//' | sort -n -k1 -k2 | awk '{ print "chr" $0 }' > sorted.bed
+
         locityper add \
             -@ ${nthreads} \
             -d vcf_db \
             -v ~{vcf} \
             -r reference.fa \
             -j ~{counts_jf} \
-            -L ~{bed}
+            -L sorted.bed
 
         echo "compressing DB"
         tar -czf ~{output_tar} vcf_db
@@ -67,8 +69,8 @@ task GenerateDBFromVCF {
     }
 
     runtime {
-        memory: "8 GB"
-        cpu: "4"
+        memory: "128 GB"
+        cpu: "32"
         disks: "local-disk " + disk_size + " HDD"
         preemptible: 0
         docker: "eichlerlab/locityper:0.19.1"
