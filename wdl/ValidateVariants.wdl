@@ -179,12 +179,17 @@ task LocityperPreprocessAndGenotype {
 
         tar -xzf ~{db_targz}
 
+        # Create out_dir and ensure it exists before parallel processing
         mkdir -p out_dir
+        mkdir -p out_dir/loci
 
         process_single_locus() {
             line="$1"
             locus_name=$(echo "$line" | cut -f4)
             echo "Processing locus: ${locus_name}"
+            
+            # Ensure the locus-specific directory exists
+            mkdir -p "out_dir/loci/${locus_name}"
             
             locityper genotype -a ~{cram} \
                 -r reference.fa \
