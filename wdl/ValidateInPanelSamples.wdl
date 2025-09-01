@@ -131,6 +131,7 @@ task GenerateDBFromVCF {
             -v subset.vcf.gz \
             -r reference.fa \
             -j ~{counts_jf} \
+            -e 100k \
             -L ~{bed}
 
         echo "compressing DB"
