@@ -56,6 +56,7 @@ task GenerateDBFromVCF {
             -v ~{vcf} \
             -r reference.fa \
             -j ~{counts_jf} \
+            -e 100k \
             -L sorted.bed
 
         echo "compressing DB"
