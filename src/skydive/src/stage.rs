@@ -3,6 +3,7 @@ use anyhow::Result;
 use linked_hash_set::LinkedHashSet;
 use parquet::data_type::AsBytes;
 use rust_htslib::bam::record::Aux;
+use rust_htslib::htslib::qaddr_t;
 
 // Import various standard library collections.
 use std::collections::{HashMap, HashSet};
@@ -173,10 +174,15 @@ pub fn extract_aligned_bam_reads(
     let rg_sm_map = get_rg_to_sm_mapping(bam);
 
     let mut bmap = HashMap::new();
+    let mut read_spans: HashMap<String, (u64, u64)> = HashMap::new(); // Track read alignment spans
+    let mut read_coordinates: HashMap<String, (u64, u64)> = HashMap::new(); // Track read coordinates
+    let mut read_sequence_dict: HashMap<String, String> = HashMap::new();
 
     let _ = bam.fetch(((*chr).as_bytes(), *start, *stop));
+
     for p in bam.pileup() {
         let pileup = p.unwrap();
+        let mut readnames = HashSet::new();
 
         if *start <= (pileup.pos() as u64) && (pileup.pos() as u64) < *stop {
             for (i, alignment) in pileup.alignments().enumerate().filter(|(_, a)| {
@@ -190,11 +196,27 @@ pub fn extract_aligned_bam_reads(
                         })
                         .unwrap_or(false)
             }) {
+
+
                 let qname = String::from_utf8_lossy(alignment.record().qname()).into_owned();
+
+                // skip the alignment from the same read
+                if readnames.contains(&qname) {
+                    continue;
+                }
+                readnames.insert(qname.clone());
+
+
                 let sm = match get_sm_name_from_rg(&alignment.record(), &rg_sm_map) {
                     Ok(a) => a,
                     Err(_) => String::from("unknown"),
                 };
+
+                let read_seq = String::from_utf8_lossy(&alignment.record().seq().as_bytes()).into_owned();
+
+                if !read_sequence_dict.contains_key(&qname) {
+                    read_sequence_dict.insert(qname.clone(), read_seq);
+                }
 
                 let is_secondary = alignment.record().is_secondary();
                 let is_supplementary = alignment.record().is_supplementary();
@@ -204,29 +226,82 @@ pub fn extract_aligned_bam_reads(
                     bmap.insert(seq_name.clone(), (String::new(), Vec::new()));
                 }
 
-                if !alignment.is_del() && !alignment.is_refskip() {
-                    let a = alignment.record().seq()[alignment.qpos().unwrap()];
-                    let q = alignment.record().qual()[alignment.qpos().unwrap()];
+                // Handle different alignment types
+                match alignment.indel() {
+                    bam::pileup::Indel::Ins(len) => {
+                        
+                        // For insertions, add one reference base followed by the insertion bases
+                        if let Some(pos1) = alignment.qpos() {
+                            // Then add the insertion bases
+                            let pos2 = pos1 + (len as usize) + 1;
+                            for pos in pos1..pos2 {
+                                let a = alignment.record().seq()[pos];
+                                let q = alignment.record().qual()[pos];
+                                let valid_q = q.min(40);
 
-                    bmap.get_mut(&seq_name).unwrap().0.push(a as char);
-                    bmap.get_mut(&seq_name).unwrap().1.push(q + 33 as u8);
-                }
+                                // Track coordinates in the reconstructed sequence
+                                let read_start = read_coordinates.entry(seq_name.clone()).or_insert((u64::MAX, u64::MIN));
+                                read_start.0 = read_start.0.min(pos as u64);
+                                read_start.1 = read_start.1.max(pos as u64);
 
-                if let bam::pileup::Indel::Ins(len) = alignment.indel() {
-                    if let Some(pos1) = alignment.qpos() {
-                        let pos2 = pos1 + (len as usize);
-                        for pos in pos1..pos2 {
-                            let a = alignment.record().seq()[pos];
-                            let q = alignment.record().qual()[pos];
+                                bmap.get_mut(&seq_name).unwrap().0.push(a as char);
+                                bmap.get_mut(&seq_name).unwrap().1.push(valid_q + 33);
+                            }
+                        }
+                    }
+                    bam::pileup::Indel::Del(_) => {
+                        // For deletions, add the first base of the deletion
+                        if let Some(qpos) = alignment.qpos() {
+                            let a = alignment.record().seq()[qpos];
+                            let q = alignment.record().qual()[qpos];
+                            let valid_q = q.min(40);
+                            
+                            
+                            // Track coordinates in the reconstructed sequence
+                            let read_start = read_coordinates.entry(seq_name.clone()).or_insert((u64::MAX, u64::MIN));
+                            read_start.0 = read_start.0.min(qpos as u64);
+                            read_start.1 = read_start.1.max(qpos as u64);
 
                             bmap.get_mut(&seq_name).unwrap().0.push(a as char);
-                            bmap.get_mut(&seq_name).unwrap().1.push(q + 33 as u8);
+                            bmap.get_mut(&seq_name).unwrap().1.push(valid_q+33);
+                        }                       
+                    }
+                    bam::pileup::Indel::None => {
+                        // For matches/mismatches, add the base
+
+                        if let Some(qpos) = alignment.qpos() {
+                            let a = alignment.record().seq()[qpos];
+                            let q = alignment.record().qual()[qpos];
+                            let valid_q = q.min(40);
+                            
+                            // Track coordinates in the reconstructed sequence
+                            let read_start = read_coordinates.entry(seq_name.clone()).or_insert((u64::MAX, u64::MIN));
+                            read_start.0 = read_start.0.min(qpos as u64);
+                            read_start.1 = read_start.1.max(qpos as u64);
+
+                            bmap.get_mut(&seq_name).unwrap().0.push(a as char);
+                            bmap.get_mut(&seq_name).unwrap().1.push(valid_q + 33);
                         }
+                    
                     }
                 }
             }
         }
     }
+
+    //sanity check: ensure that the reconstructed sequences match the original read sequences
+    for (seq_name, (start, end)) in read_coordinates.iter() {
+        let qname = seq_name.split('|').next().unwrap();
+        if let Some(original_seq) = read_sequence_dict.get(qname) {
+            if let Some(reconstructed_seq) = bmap.get(seq_name) {
+                let reconstructed_seq_str: String = reconstructed_seq.0.clone();
+                let original_subseq = &original_seq[*start as usize..=*end as usize];
+                if original_subseq != reconstructed_seq_str {
+                    crate::elog!("Warning: Reconstructed sequence does not match original for read {}, {}, {}", qname, original_subseq, reconstructed_seq_str);
+                }
+            }
+        }
+    }   
 
     let records = bmap
         .iter()
