@@ -59,11 +59,14 @@ mod cluster;
 mod coassemble;
 mod consensus;
 mod correct;
+mod crf_train;
 mod eval_model;
 mod fetch;
 mod filter;
 mod genotype;
+mod haplotype_infer;
 mod impute;
+mod pangenome;
 mod phase;
 mod recruit;
 mod rescue;
@@ -500,6 +503,88 @@ enum Commands {
         #[clap(required = true, value_parser)]
         bam_path: PathBuf,
     },
+
+    /// Build a tiered pangenome graph from FASTA assemblies.
+    /// 
+    /// Outputs a GFA file that can be loaded directly by train-crf and infer-haplotypes.
+    #[clap(arg_required_else_help = true)]
+    BuildPangenome {
+        /// Output path for GFA graph.
+        #[clap(short, long, value_parser, default_value = "pangenome.gfa")]
+        output: PathBuf,
+
+        /// FASTA files for Tier 1 assemblies (HPRC/HGSVC3, near-T2T).
+        #[clap(long, value_parser, required = false)]
+        tier1_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files for Tier 2 assemblies (AoU-LR, 30x PacBio+ONT).
+        #[clap(long, value_parser, required = false)]
+        tier2_fasta_paths: Vec<PathBuf>,
+
+        /// FASTA files for Tier 3 assemblies (AoU-LR, ~15x PacBio only).
+        #[clap(long, value_parser, required = false)]
+        tier3_fasta_paths: Vec<PathBuf>,
+
+        /// Minimum alignment length for seqwish.
+        #[clap(long, value_parser)]
+        min_aln_len: Option<usize>,
+
+        /// K-mer size for alignment.
+        #[clap(short, long, value_parser)]
+        kmer_size: Option<usize>,
+    },
+
+    /// Train a CRF model on a pangenome graph.
+    #[clap(arg_required_else_help = true)]
+    TrainCrf {
+        /// Output path for trained CRF model.
+        #[clap(short, long, value_parser, default_value = "crf_model.json")]
+        output: PathBuf,
+
+        /// Path to pangenome graph (GFA format).
+        #[clap(short, long, value_parser, required = true)]
+        graph: PathBuf,
+
+        /// Paths to PacBio read files (FASTA/FASTQ).
+        #[clap(short, long, value_parser, required = true)]
+        reads: Vec<PathBuf>,
+
+        /// Paths to ground truth haplotype files (FASTA).
+        #[clap(long, value_parser, required = true)]
+        truth_haplotypes: Vec<PathBuf>,
+
+        /// K-mer size for feature extraction.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+
+        /// Number of training iterations.
+        #[clap(short, long, value_parser, default_value_t = 100)]
+        iterations: usize,
+    },
+
+    /// Infer both haplotypes for a sample using a trained CRF model.
+    #[clap(arg_required_else_help = true)]
+    InferHaplotypes {
+        /// Output path for inferred haplotypes (FASTA).
+        #[clap(short, long, value_parser, default_value = "haplotypes.fa")]
+        output: PathBuf,
+
+        /// Path to pangenome graph (GFA format).
+        #[clap(short, long, value_parser, required = true)]
+        graph: PathBuf,
+
+        /// Path to trained CRF model.
+        #[clap(short, long, value_parser, required = true)]
+        model: PathBuf,
+
+        /// Paths to PacBio read files (FASTA/FASTQ).
+        #[clap(short, long, value_parser, required = true)]
+        reads: Vec<PathBuf>,
+
+        /// K-mer size for feature extraction.
+        #[clap(short, long, value_parser, default_value_t = DEFAULT_KMER_SIZE)]
+        kmer_size: usize,
+    },
 }
 
 fn main() {
@@ -729,6 +814,60 @@ fn main() {
                 &vcf_path,
                 &bam_path,
             );
+        }
+        Commands::BuildPangenome {
+            output,
+            tier1_fasta_paths,
+            tier2_fasta_paths,
+            tier3_fasta_paths,
+            min_aln_len,
+            kmer_size,
+        } => {
+            let config = pangenome::PangenomeConfig {
+                tier1_fasta_paths,
+                tier2_fasta_paths,
+                tier3_fasta_paths,
+                output_path: output,
+                min_aln_len,
+                kmer_size,
+            };
+            pangenome::build_pangenome_graph(&config)
+                .expect("Failed to build pangenome graph");
+        }
+        Commands::TrainCrf {
+            output,
+            graph,
+            reads,
+            truth_haplotypes,
+            kmer_size,
+            iterations,
+        } => {
+            let config = crf_train::CRFTrainingConfig {
+                graph_path: graph,
+                read_paths: reads,
+                truth_haplotype_paths: truth_haplotypes,
+                output_path: output,
+                kmer_size,
+                iterations,
+            };
+            crf_train::train_crf(&config).expect("Failed to train CRF model");
+        }
+        Commands::InferHaplotypes {
+            output,
+            graph,
+            model,
+            reads,
+            kmer_size,
+        } => {
+            let config = haplotype_infer::HaplotypeInferenceConfig {
+                graph_path: graph,
+                model_path: model,
+                read_paths: reads,
+                output_path: output,
+                kmer_size,
+            };
+            haplotype_infer::infer_haplotypes(&config)
+                .expect("Failed to infer haplotypes");
         }
     }
 
