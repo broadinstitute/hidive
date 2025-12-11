@@ -1,0 +1,9 @@
+[env]
+LIBTORCH = { value = "/Users/kiran/repositories/hidive/venv/lib/python3.12/site-packages/torch", relative = false }
+LD_LIBRARY_PATH = { value = "/Users/kiran/repositories/hidive/venv/lib/python3.12/site-packages/torch/lib", relative = false }
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-rpath,/Users/kiran/repositories/hidive/venv/lib/python3.12/site-packages/torch/lib"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-rpath,/Users/kiran/repositories/hidive/venv/lib/python3.12/site-packages/torch/lib"] 

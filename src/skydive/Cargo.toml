@@ -25,6 +25,7 @@ needletail = "=0.5.1"
 openssl = { version = "=0.10", features = ["vendored"] }
 path-absolutize = "=3.1.1"
 pathfinding = "=4.11.0"
+parfait-gfa = "=0.1.2"
 parquet = "=52.1.0"
 petgraph = "=0.6.5"
 pyo3 = { version = "=0.20.0", features = ["abi3-py37", "extension-module"] }

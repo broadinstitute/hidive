@@ -68,6 +68,7 @@ mod phase;
 mod recruit;
 mod rescue;
 mod train;
+mod train_crf;
 mod trim;
 
 #[derive(Debug, Parser)]
@@ -500,6 +501,14 @@ enum Commands {
         #[clap(required = true, value_parser)]
         bam_path: PathBuf,
     },
+
+    /// Train a CRF model from a GFA file.
+    #[clap(arg_required_else_help = true)]
+    TrainCrf {
+        /// Input GFA file.
+        #[clap(short, long, value_parser, required = true)]
+        gfa_path: PathBuf,
+    },
 }
 
 fn main() {
@@ -729,6 +738,9 @@ fn main() {
                 &vcf_path,
                 &bam_path,
             );
+        }
+        Commands::TrainCrf { gfa_path } => {
+            train_crf::start(&gfa_path);
         }
     }
 
